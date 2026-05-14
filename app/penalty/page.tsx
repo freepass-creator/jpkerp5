@@ -1,14 +1,14 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { CaretLeft, Warning, Plus, MagnifyingGlass, ArrowsClockwise, Link as LinkIcon } from '@phosphor-icons/react';
+import { Warning, Plus, MagnifyingGlass, Link as LinkIcon } from '@phosphor-icons/react';
 import { usePenalties } from '@/lib/firebase/penalty-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { formatCurrency, formatDateFull, dateWithDow } from '@/lib/utils';
 import { TODAY } from '@/lib/mock-data';
 import { PenaltyRegisterDialog } from '@/components/penalty-register-dialog';
 import { PenaltyMatchDialog } from '@/components/penalty-match-dialog';
+import { Sidebar } from '@/components/layout/sidebar';
 import type { Penalty, PenaltyStatus } from '@/lib/types-penalty';
 
 const STATUS_FILTERS: (PenaltyStatus | '전체')[] = ['전체', '접수', '계약매칭', '임차인통보', '납부완료', '회사납부', '이의신청'];
@@ -49,19 +49,10 @@ export default function PenaltyPage() {
   }, [penalties]);
 
   return (
-    <div className="app">
+    <div className="layout">
+      <Sidebar onCreate={() => setRegisterOpen(true)} />
+      <div className="app">
       <header className="topbar">
-        <div className="topbar-brand">
-          <div className="topbar-brand-logo" title="CI 자리">CI</div>
-          <div className="topbar-brand-text">
-            <div className="name">icar ERP</div>
-          </div>
-        </div>
-
-        <Link href="/" className="btn btn-sm" style={{ textDecoration: 'none' }}>
-          <CaretLeft size={12} /> 메인
-        </Link>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13, color: 'var(--text-main)' }}>
           <Warning size={16} weight="fill" style={{ color: 'var(--orange-text)' }} />
           과태료 업무
@@ -96,7 +87,6 @@ export default function PenaltyPage() {
           </button>
         </div>
       </header>
-
       <div className="dashboard" style={{ gridTemplateColumns: '1fr' }}>
         <div className="panel">
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 18 }}>
@@ -189,6 +179,7 @@ export default function PenaltyPage() {
           setMatching(null);
         }}
       />
+      </div>
     </div>
   );
 }

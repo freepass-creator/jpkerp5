@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
 import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
 import type { Contract } from '@/lib/types';
-import { MOCK_CONTRACTS } from '@/lib/mock-data';
 
 const CONTRACTS_PATH = icarPath('contracts');
 
 /**
- * 계약 리스트 훅 — Firebase 연결되면 RTDB 실시간 구독, 안 됐으면 mock 로컬.
+ * 계약 리스트 훅 — Firebase RTDB 실시간 구독.
+ * 빈 상태로 시작 — 실데이터는 신규생성/import로 채워짐.
  */
 export function useContracts(): {
   contracts: Contract[];
@@ -19,13 +19,12 @@ export function useContracts(): {
   remove: (id: string) => Promise<void>;
   add: (c: Omit<Contract, 'id'>) => Promise<string>;
 } {
-  const [contracts, setContracts] = useState<Contract[]>(MOCK_CONTRACTS);
+  const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [configured] = useState(() => isFirebaseConfigured());
 
   useEffect(() => {
     if (!configured) {
-      // Firebase 미설정 — local mock 사용
       setLoading(false);
       return;
     }
@@ -46,20 +45,9 @@ export function useContracts(): {
         return;
       }
       const r = ref(db, CONTRACTS_PATH);
-      let seeded = false;
-      unsub = onValue(r, async (snap) => {
+      unsub = onValue(r, (snap) => {
         const val = snap.val();
-        if (!val || Object.keys(val).length === 0) {
-          if (!seeded) {
-            seeded = true;
-            const seedMap: Record<string, Contract> = {};
-            for (const c of MOCK_CONTRACTS) seedMap[c.id] = c;
-            await set(r, seedMap);
-          }
-          return;
-        }
-        const list: Contract[] = Object.values(val);
-        setContracts(list);
+        setContracts(val ? Object.values<Contract>(val) : []);
         setLoading(false);
       });
     })();

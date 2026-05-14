@@ -1,9 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { Plus, Buildings, MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, ChatCircleDots, X, CurrencyKrw, SignOut } from '@phosphor-icons/react';
-import { useAuth, logout } from '@/lib/use-auth';
+import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X } from '@phosphor-icons/react';
+import { Sidebar } from '@/components/layout/sidebar';
 import {
   TODAY,
   buildDeliveries,
@@ -301,16 +300,15 @@ export default function Page() {
   }
 
   return (
-    <div className="app">
-      {/* TOPBAR — Linear style */}
+    <div className="layout">
+      <Sidebar
+        onCreate={() => setCreateOpen(true)}
+        onSms={() => setSmsOpen(true)}
+        onLedger={() => setLedgerOpen(true)}
+        smsCount={selectedIds.size}
+      />
+      <div className="app">
       <header className="topbar">
-        <div className="topbar-brand">
-          <div className="topbar-brand-logo" title="CI 자리 (추후 교체)">CI</div>
-          <div className="topbar-brand-text">
-            <div className="name">icar ERP</div>
-          </div>
-        </div>
-
         <div className="topbar-search">
           <MagnifyingGlass size={14} className="icon" />
           <input
@@ -355,36 +353,13 @@ export default function Page() {
               : sortLabel(view)}
           </span>
           <span className="topbar-date">{dateWithDow(TODAY)}</span>
-          <UserBadge />
         </div>
 
-        <div className="topbar-actions">
-          {selectedIds.size > 0 && (
-            <button className="btn btn-sm" onClick={clearSelection} title="선택 해제">
-              <X size={12} /> 선택 해제 ({selectedIds.size})
-            </button>
-          )}
-          <button
-            className="btn"
-            onClick={() => setSmsOpen(true)}
-            title={selectedIds.size > 0 ? `${selectedIds.size}건 발송` : '전체 발송'}
-          >
-            <ChatCircleDots size={14} /> 문자
-            {selectedIds.size > 0 && <span className="chip-count" style={{ background: 'var(--brand-bg)', color: 'var(--brand)' }}>{selectedIds.size}</span>}
+        {selectedIds.size > 0 && (
+          <button className="btn btn-sm" onClick={clearSelection} title="선택 해제">
+            <X size={12} /> 선택 해제 ({selectedIds.size})
           </button>
-          <button className="btn" onClick={() => setLedgerOpen(true)} title="계좌·카드 수납 통합 관리">
-            <CurrencyKrw size={14} /> 수납이력
-          </button>
-          <Link href="/penalty" className="btn" style={{ textDecoration: 'none' }} title="과태료 / 통행료 / 범칙금 처리">
-            <Warning size={14} /> 과태료
-          </Link>
-          <button className="btn" title="마스터 (법인·차량·고객)">
-            <Buildings size={14} /> 마스터
-          </button>
-          <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>
-            <Plus size={14} weight="bold" /> 신규 생성
-          </button>
-        </div>
+        )}
       </header>
 
       {/* DASHBOARD */}
@@ -639,6 +614,7 @@ export default function Page() {
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filteredContracts} selectedIds={selectedIds} />
       <PaymentLedgerDialog open={ledgerOpen} onOpenChange={setLedgerOpen} contracts={contracts} />
+      </div>
     </div>
   );
 }
@@ -726,36 +702,6 @@ function DDay({ date, danger }: { date: string; danger?: boolean }) {
 }
 
 /* 합 ₩ 표시 short — 1,234,567 → 1.23M */
-function UserBadge() {
-  const { user } = useAuth();
-  if (!user) return null;
-  const name = user.displayName || user.email || '직원';
-  return (
-    <span
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 11, color: 'var(--text-sub)',
-        padding: '4px 10px', borderRadius: 999,
-        background: 'var(--bg-sunken)', border: '1px solid var(--border)',
-      }}
-      title={user.email ?? ''}
-    >
-      <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{name}</span>
-      <button
-        type="button"
-        onClick={() => void logout()}
-        title="로그아웃"
-        style={{
-          background: 'transparent', border: 'none', cursor: 'pointer',
-          padding: 0, display: 'inline-flex', color: 'var(--text-weak)',
-        }}
-      >
-        <SignOut size={12} />
-      </button>
-    </span>
-  );
-}
-
 function formatCurrencyShort(n: number): string {
   if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(2)}억`;
   if (n >= 10_000) return `${(n / 10_000).toFixed(0)}만`;
