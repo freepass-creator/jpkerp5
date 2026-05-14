@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { AuthGate } from '@/components/auth/auth-gate';
 
 export const metadata: Metadata = {
-  title: 'icar ERP — 미수/반납/수납',
-  description: '렌트사 미수금·출고반납·수납관리 ERP',
+  title: 'jpkerp5 — 차량 렌탈 ERP',
+  description: '미수·반납·수납·과태료 관리 ERP',
 };
 
 export const viewport: Viewport = {
@@ -22,7 +23,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthGate>{children}</AuthGate>
+      </body>
     </html>
   );
 }

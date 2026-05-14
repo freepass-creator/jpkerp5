@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Buildings, MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, ChatCircleDots, X, CurrencyKrw } from '@phosphor-icons/react';
+import { Plus, Buildings, MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, ChatCircleDots, X, CurrencyKrw, SignOut } from '@phosphor-icons/react';
+import { useAuth, logout } from '@/lib/use-auth';
 import {
   TODAY,
   buildDeliveries,
@@ -354,6 +355,7 @@ export default function Page() {
               : sortLabel(view)}
           </span>
           <span className="topbar-date">{dateWithDow(TODAY)}</span>
+          <UserBadge />
         </div>
 
         <div className="topbar-actions">
@@ -724,6 +726,36 @@ function DDay({ date, danger }: { date: string; danger?: boolean }) {
 }
 
 /* 합 ₩ 표시 short — 1,234,567 → 1.23M */
+function UserBadge() {
+  const { user } = useAuth();
+  if (!user) return null;
+  const name = user.displayName || user.email || '직원';
+  return (
+    <span
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontSize: 11, color: 'var(--text-sub)',
+        padding: '4px 10px', borderRadius: 999,
+        background: 'var(--bg-sunken)', border: '1px solid var(--border)',
+      }}
+      title={user.email ?? ''}
+    >
+      <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{name}</span>
+      <button
+        type="button"
+        onClick={() => void logout()}
+        title="로그아웃"
+        style={{
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          padding: 0, display: 'inline-flex', color: 'var(--text-weak)',
+        }}
+      >
+        <SignOut size={12} />
+      </button>
+    </span>
+  );
+}
+
 function formatCurrencyShort(n: number): string {
   if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(2)}억`;
   if (n >= 10_000) return `${(n / 10_000).toFixed(0)}만`;

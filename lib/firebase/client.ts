@@ -1,11 +1,10 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getDatabase, type Database } from 'firebase/database';
-import { getAuth, signInAnonymously, onAuthStateChanged, type Auth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, type Auth } from 'firebase/auth';
 
 /**
- * icar001 Firebase 클라이언트 — RTDB.
- * jpkerp 프로젝트 재사용, 노드 prefix = '/icar001/...'
- * .env.local 의 NEXT_PUBLIC_FIREBASE_* 필요.
+ * jpkerp5 Firebase 클라이언트 — RTDB + Auth.
+ * jpkerp 프로젝트 재사용, 노드 prefix = '/icar001/...' (icar001과 데이터 공유)
  */
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? '',
@@ -17,18 +16,17 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? '',
 };
 
-/** icar001 데이터 노드 prefix — jpkerp와 분리 */
+/** 데이터 노드 prefix — jpkerp ERP 와 분리 */
 export const ICAR_ROOT = 'icar001';
 
 let _app: FirebaseApp | null = null;
 let _rtdb: Database | null = null;
+let _auth: Auth | null = null;
 
-/** Firebase 환경변수 셋업 여부 */
 export function isFirebaseConfigured(): boolean {
   return !!firebaseConfig.apiKey;
 }
 
-/** 설정 안 됐으면 null 반환 (throw 하지 않음) */
 export function getFirebaseApp(): FirebaseApp | null {
   if (_app) return _app;
   const existing = getApps()[0];
@@ -38,7 +36,7 @@ export function getFirebaseApp(): FirebaseApp | null {
   }
   if (!isFirebaseConfigured()) {
     if (typeof window !== 'undefined') {
-      console.warn('[icar] Firebase 미설정 — Vercel/로컬 .env에 NEXT_PUBLIC_FIREBASE_* 등록 필요. 임시로 mock 데이터로 동작.');
+      console.warn('[jpkerp5] Firebase 미설정 — .env에 NEXT_PUBLIC_FIREBASE_* 등록 필요');
     }
     return null;
   }
@@ -54,34 +52,34 @@ export function getRtdb(): Database | null {
   return _rtdb;
 }
 
-let _auth: Auth | null = null;
-let _authReady: Promise<void> | null = null;
-
-/** 익명 로그인 보장 — jpkerp RTDB rules가 auth != null 요구하므로 필요 */
-export function ensureAuth(): Promise<void> {
-  if (_authReady) return _authReady;
+export function getFirebaseAuth(): Auth | null {
+  if (_auth) return _auth;
   const app = getFirebaseApp();
-  if (!app) return Promise.resolve();
+  if (!app) return null;
   _auth = getAuth(app);
-  _authReady = new Promise<void>((resolve, reject) => {
-    onAuthStateChanged(_auth!, async (user) => {
-      if (user) {
-        resolve();
-      } else {
-        try {
-          await signInAnonymously(_auth!);
-          resolve();
-        } catch (err) {
-          console.error('[icar] 익명 로그인 실패 — Firebase Console에서 Authentication → Sign-in method → Anonymous 활성화 필요:', err);
-          reject(err);
-        }
-      }
-    });
-  });
-  return _authReady;
+  return _auth;
 }
 
-/** /icar001/{path} 경로 헬퍼 */
+/**
+ * RTDB 호출 전 로그인 상태 보장 — 미로그인이면 reject.
+ * AuthGate 가 화면을 가리고 있으므로 사용자는 정상적으로 도달하면 항상 로그인 상태.
+ */
+export function ensureAuth(): Promise<void> {
+  const auth = getFirebaseAuth();
+  if (!auth) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    if (auth.currentUser) {
+      resolve();
+      return;
+    }
+    const unsub = onAuthStateChanged(auth, (user) => {
+      unsub();
+      if (user) resolve();
+      else reject(new Error('미로그인 — 로그인 후 다시 시도'));
+    });
+  });
+}
+
 export function icarPath(...parts: string[]): string {
   return [ICAR_ROOT, ...parts].filter(Boolean).join('/');
 }
