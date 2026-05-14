@@ -1,0 +1,1168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════
+ * icar ERP — Modern UI (Linear / Vercel inspired)
+ * ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Typography */
+  --font: 'Pretendard Variable', Pretendard, 'Inter', 'Apple SD Gothic Neo', 'Segoe UI', sans-serif;
+  --font-mono: 'Pretendard Variable', 'JetBrains Mono', Consolas, ui-monospace, monospace;
+  --font-size: 12px;
+  --line-height: 1.5;
+
+  /* Neutral palette — Zinc/Slate */
+  --bg-page: #fafafa;
+  --bg-card: #ffffff;
+  --bg-sunken: #f4f4f5;
+  --bg-hover: #f4f4f5;
+  --bg-selected: #eff6ff;
+  --bg-stripe: #fafafa;
+  --bg-elevated: #ffffff;
+
+  /* Text hierarchy */
+  --text-main:    #18181b;   /* zinc-900 */
+  --text-sub:     #52525b;   /* zinc-600 */
+  --text-weak:    #a1a1aa;   /* zinc-400 */
+  --text-muted:   #d4d4d8;   /* zinc-300 */
+  --text-inverse: #ffffff;
+  --text-link:    #2563eb;
+
+  /* Borders — soft */
+  --border:        #e4e4e7;  /* zinc-200 */
+  --border-soft:   #f4f4f5;  /* zinc-100 */
+  --border-strong: #d4d4d8;  /* zinc-300 */
+  --border-focus:  #18181b;
+
+  /* Brand — icar navy */
+  --brand:    #1B2A4A;
+  --brand-h:  #0F1B35;
+  --brand-bg: #eef2f7;
+  --brand-soft: #f8fafc;
+
+  --focus-ring: rgba(27, 42, 74, 0.18);
+
+  /* Accent palette (soft pastel bg + saturated text — Linear/Notion style) */
+  --red-bg:    #fef2f2;  --red-text:    #b91c1c;  --red-border:    #fecaca;
+  --orange-bg: #fff7ed;  --orange-text: #c2410c;  --orange-border: #fed7aa;
+  --amber-bg:  #fefce8;  --amber-text:  #a16207;  --amber-border:  #fef08a;
+  --green-bg:  #f0fdf4;  --green-text:  #15803d;  --green-border:  #bbf7d0;
+  --blue-bg:   #eff6ff;  --blue-text:   #1d4ed8;  --blue-border:   #bfdbfe;
+  --indigo-bg: #eef2ff;  --indigo-text: #4338ca;  --indigo-border: #c7d2fe;
+  --purple-bg: #faf5ff;  --purple-text: #7e22ce;  --purple-border: #e9d5ff;
+  --zinc-bg:   #f4f4f5;  --zinc-text:   #52525b;  --zinc-border:   #e4e4e7;
+
+  /* Alert aliases — backwards compat */
+  --alert-red-bg:    var(--red-bg);    --alert-red-text:    var(--red-text);    --alert-red-border:    var(--red-border);
+  --alert-orange-bg: var(--orange-bg); --alert-orange-text: var(--orange-text); --alert-orange-border: var(--orange-border);
+  --alert-green-bg:  var(--green-bg);  --alert-green-text:  var(--green-text);  --alert-green-border:  var(--green-border);
+  --alert-blue-bg:   var(--blue-bg);   --alert-blue-text:   var(--blue-text);   --alert-blue-border:   var(--blue-border);
+
+  /* Sizing */
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  --row-height:    40px;
+  --input-height:  32px;
+  --button-height: 32px;
+
+  --topbar-h:  56px;
+
+  /* Z-index */
+  --z-dropdown: 100;
+  --z-modal: 1000;
+  --z-toast: 2000;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow:    0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 24px -4px rgba(0,0,0,0.10), 0 4px 8px -2px rgba(0,0,0,0.04);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: var(--font);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--text-main);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11' 1, 'ss01' 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+input, button, select, textarea {
+  font-family: inherit; font-size: inherit; line-height: inherit; color: inherit;
+}
+
+a { color: var(--text-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.mono, .num, .plate, .date, code, kbd {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.plate { font-weight: 500; }
+
+/* ────────────── App Shell ────────────── */
+.app {
+  display: grid;
+  grid-template-rows: var(--topbar-h) 1fr;
+  height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  height: var(--topbar-h);
+}
+
+.topbar-search {
+  position: relative;
+  width: 260px;
+}
+.topbar-search .icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-weak);
+  pointer-events: none;
+}
+.topbar-search input {
+  padding-left: 30px;
+  width: 100%;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  height: 100%;
+}
+
+/* CI 들어갈 자리 — 점선 박스로 placeholder. 추후 <img> 또는 SVG로 교체. */
+.topbar-brand-logo {
+  width: 32px;
+  height: 32px;
+  background: var(--bg-sunken);
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-weak);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.topbar-brand-text { line-height: 1.1; }
+.topbar-brand-text .name { font-weight: 600; }
+.topbar-brand-text .sub  { font-size: 11px; color: var(--text-weak); font-weight: 400; }
+
+.topbar-summary {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex: 1;
+}
+
+/* Metric — Linear style */
+.metric {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.metric .label {
+  font-size: 11px;
+  color: var(--text-weak);
+  margin-bottom: 2px;
+  letter-spacing: 0;
+}
+.metric .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+.metric .value .unit { font-size: 11px; color: var(--text-sub); font-weight: 400; margin-left: 2px; }
+.metric.danger .value { color: var(--red-text); }
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 토픽바 우측 (정렬 라벨 + 날짜) */
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.topbar-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-weak);
+  white-space: nowrap;
+}
+.topbar-sort .arrow {
+  font-size: 9px;
+  opacity: 0.8;
+}
+.topbar-date {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-sub);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ────────────── Main grid ────────────── */
+.dashboard {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 16px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+/* Panel — card with subtle shadow */
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Panel header — 테이블 thead 와 시각 무게 동일하게 (높이 38px) */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  height: 38px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-weight: 600;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-main);
+}
+
+.panel-title .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: var(--radius);
+  background: var(--zinc-bg);
+  color: var(--zinc-text);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.panel-body { flex: 1; overflow: auto; }
+
+.panel-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.sidebar-stack {
+  display: grid;
+  grid-template-rows: minmax(220px, 1.5fr) minmax(180px, 1fr) minmax(160px, 1fr);
+  gap: 12px;
+  overflow: hidden;
+}
+
+/* Panel header 우측 메타 — 패널별 핵심 KPI (예: 연체알림 ₩2160만) */
+.panel-meta {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+.panel-meta.danger { color: var(--red-text); }
+
+/* ────────────── Buttons ────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--button-height);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+}
+.btn:hover { background: var(--bg-sunken); border-color: var(--border-strong); }
+.btn:active { background: var(--bg-stripe); transform: translateY(0.5px); }
+.btn:disabled {
+  background: var(--bg-sunken); color: var(--text-weak);
+  cursor: not-allowed; box-shadow: none; transform: none;
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: var(--text-inverse);
+  border-color: var(--brand);
+}
+.btn-primary:hover { background: var(--brand-h); border-color: var(--brand-h); }
+.btn-primary:active { background: var(--brand-h); }
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.btn-ghost:hover { background: var(--bg-sunken); border-color: transparent; }
+
+.btn-sm { height: 26px; padding: 0 10px; font-size: 12px; }
+
+/* ────────────── Input ────────────── */
+.input, .select {
+  height: var(--input-height);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-main);
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.input:focus, .select:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.input::placeholder { color: var(--text-weak); }
+
+/* ────────────── Pill 규격 시스템 ──────────────
+   모든 알약형 요소(.chip / .status / .tag / .badge)는
+   동일한 border-radius(pill), 동일한 인라인 alignment.
+   사이즈만 XS / SM / MD 로 다름.
+*/
+
+/* MD — 인터랙티브 칩 (필터 등). 높이 24px */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+.chip:hover { background: var(--bg-sunken); color: var(--text-main); }
+.chip.active {
+  background: var(--brand);
+  color: var(--text-inverse);
+  border-color: var(--brand);
+}
+.chip-count {
+  background: rgba(255,255,255,0.22);
+  padding: 0 5px;
+  border-radius: var(--radius);
+  font-size: 10px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+}
+.chip:not(.active) .chip-count {
+  background: var(--zinc-bg);
+  color: var(--text-sub);
+}
+
+/* ────────────── Table ────────────── */
+.table-wrap { width: 100%; overflow: auto; height: 100%; }
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: auto;
+}
+
+.table th, .table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+  white-space: nowrap;
+  height: var(--row-height);
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  font-weight: 500;
+  color: var(--text-weak);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* 정렬 가능 헤더 */
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s, color 0.1s;
+}
+.table th.sortable:hover {
+  background: var(--bg-sunken);
+  color: var(--text-main);
+}
+.table th.sortable.active {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+.table th .sort-arrow {
+  margin-left: 4px;
+  font-size: 9px;
+  vertical-align: 1px;
+}
+
+/* 2단 헤더 — 상태 그룹 */
+.table thead tr.group-row th {
+  font-size: 10px;
+  text-transform: none;
+  color: var(--text-sub);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border-soft);
+  padding: 4px 10px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  font-weight: 500;
+  top: 0;
+}
+.table thead tr.col-row th {
+  top: 24px;
+}
+
+/* 그룹 경계 세로 구분선 — 빼기로 함 */
+
+/* 상태 셀 — 뱃지 + 경과일 2줄 스택 */
+.status-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  line-height: 1.3;
+}
+.status-cell .days {
+  font-size: 10px;
+  color: var(--text-weak);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.status-cell .days.danger {
+  color: var(--red-text);
+  font-weight: 600;
+}
+
+.table tbody tr { transition: background 0.08s ease; cursor: pointer; }
+.table tbody tr:hover { background: var(--bg-hover); }
+.table tbody tr.selected { background: var(--bg-selected); }
+
+.table tbody tr:last-child td { border-bottom: none; }
+
+.table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table td.center, .table th.center { text-align: center; }
+.table td.danger { color: var(--red-text); font-weight: 500; }
+.table td.muted { color: var(--text-weak); }
+.table td.dim { color: var(--text-sub); }
+
+/* 체크박스 열 — 좌측 고정 */
+.table th.checkbox-col,
+.table td.checkbox-col {
+  width: 36px;
+  padding-left: 12px;
+  padding-right: 0;
+  text-align: center;
+}
+.table input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--brand);
+  cursor: pointer;
+  margin: 0;
+  vertical-align: middle;
+}
+.table tbody tr.selected-row { background: var(--brand-bg); }
+.table tbody tr.selected-row:hover { background: var(--brand-bg); }
+
+/* Customer name with avatar */
+.cust {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.cust-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--brand-bg);
+  color: var(--brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* SM — 상태 필 (테이블 / 리스트 상태표시). 높이 20px */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 9px 0 7px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.status::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+/* 차량상태 (7종) — 라이프사이클 색 그라데이션 (oragne→amber→blue→indigo→green→purple→zinc) */
+.status.구매대기  { background: var(--orange-bg); color: var(--orange-text); }   /* 매입 액션 필요 */
+.status.등록대기  { background: var(--amber-bg);  color: var(--amber-text); }    /* 등록 진행 */
+.status.상품화중  { background: var(--blue-bg);   color: var(--blue-text); }     /* 준비중 */
+.status.인도대기, .status.출고대기, .status.상품대기  { background: var(--indigo-bg); color: var(--indigo-text); } /* 영업 가능 */
+.status.계약완료, .status.계약, .status.계약중, .status.운행 { background: var(--green-bg); color: var(--green-text); } /* 운영 정상 */
+.status.휴차, .status.휴차중, .status.정비, .status.사고 { background: var(--purple-bg); color: var(--purple-text); }   /* 예외 */
+.status.임시배차 { background: var(--amber-bg); color: var(--amber-text); }   /* 임시 대체 출고 */
+.status.휴차대기, .status.대기, .status.반납, .status.반납완료, .status.반납예정 { background: var(--zinc-bg); color: var(--zinc-text); }   /* 반납 회수 후 결정 대기 */
+.status.상품화대기 { background: var(--blue-bg); color: var(--blue-text); }   /* 재상품화 큐 */
+.status.매각대기 { background: var(--orange-bg); color: var(--orange-text); }   /* 매각 진행 */
+.status.매각 { background: var(--red-bg); color: var(--red-text); }   /* terminal */
+
+/* 계약상태 (컴플라이언스 3종) — 정상=긍정 */
+.status.정상 { background: var(--green-bg); color: var(--green-text); }
+.status.미수검 { background: var(--amber-bg); color: var(--amber-text); }
+.status.위반 { background: var(--red-bg); color: var(--red-text); }
+
+/* 수납상태 (2종) */
+.status.미납 { background: var(--red-bg); color: var(--red-text); }
+/* 정상은 위 정상 정의 공유 → 그린 */
+
+/* 기타 (legacy) */
+.status.완료 { background: var(--green-bg); color: var(--green-text); }
+.status.예정 { background: var(--zinc-bg); color: var(--zinc-text); }
+
+/* XS — 사이드 리스트의 좌측 카테고리 태그. 높이 18px, 폭 통일 36px */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  min-width: 36px;
+  padding: 0 7px;
+  border-radius: var(--radius);
+  font-size: 10px;
+  font-weight: 500;
+}
+.tag.out  { background: var(--blue-bg);   color: var(--blue-text); }
+.tag.in   { background: var(--indigo-bg); color: var(--indigo-text); }
+.tag.over { background: var(--red-bg);    color: var(--red-text); }
+.tag.idle { background: var(--purple-bg); color: var(--purple-text); }
+
+/* ────────────── Filters ────────────── */
+.filter-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+.filter-group-label {
+  font-size: 10px;
+  color: var(--text-weak);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  margin-right: 2px;
+}
+
+/* ────────────── List item (side panel) — 테이블 row 규격 일치 ────────────── */
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  transition: background 0.08s;
+  min-height: var(--row-height);
+}
+.list-item:hover { background: var(--bg-hover); }
+.list-item:last-child { border-bottom: none; }
+
+.list-item-main { flex: 1; min-width: 0; }
+.list-item-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.list-item-sub {
+  font-size: 11px;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1.3;
+  margin-top: 0;
+}
+
+.list-item-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.list-item-right .date { font-size: 11px; color: var(--text-sub); }
+.list-item-right .dday { font-size: 11px; color: var(--text-weak); margin-top: 1px; }
+.list-item-right .dday.danger { color: var(--red-text); font-weight: 600; }
+
+/* ────────────── Modal / Dialog ────────────── */
+.dialog-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: var(--z-modal);
+  animation: fadeIn 0.12s ease;
+}
+/* 다이얼로그 — 모든 종류 고정 크기 (1200×860). 화면 작으면 vw/vh 클램프. */
+.dialog-content {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  width: min(1200px, 95vw);
+  height: min(860px, 92vh);
+  display: flex;
+  flex-direction: column;
+  z-index: calc(var(--z-modal) + 1);
+  box-shadow: var(--shadow-lg);
+  animation: zoomIn 0.14s ease;
+  overflow: hidden;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes zoomIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.97) } to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
+
+.dialog-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.dialog-title { font-weight: 600; font-size: 14px; }
+.dialog-body { flex: 1; overflow: auto; padding: 18px; }
+.dialog-footer {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.dialog-close {
+  background: transparent; border: none; cursor: pointer;
+  padding: 6px; border-radius: var(--radius);
+  color: var(--text-sub);
+  transition: background 0.1s;
+}
+.dialog-close:hover { background: var(--bg-sunken); color: var(--text-main); }
+
+/* ────────────── Search result row (이력 등록 검색) ────────────── */
+.search-result-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.1s;
+  font-size: 12px;
+}
+.search-result-row:last-child { border-bottom: none; }
+.search-result-row:hover { background: var(--bg-hover); }
+
+/* ────────────── Drop zone (모던 업로드 UI) ────────────── */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  background: var(--bg-sunken);
+  padding: 48px 24px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+.dropzone:hover {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+}
+.dropzone.drag {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+  transform: scale(1.005);
+}
+.dropzone-icon {
+  width: 56px;
+  height: 56px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand);
+  box-shadow: var(--shadow-sm);
+}
+.dropzone-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-top: 4px;
+}
+.dropzone-desc {
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.5;
+  max-width: 480px;
+}
+.dropzone-desc code {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  margin: 0 1px;
+  color: var(--text-main);
+}
+
+/* 컬럼 스키마 목록 (dropzone 내부) */
+.schema-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 4px 10px;
+  max-width: 720px;
+  text-align: left;
+}
+.schema-col {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+}
+.schema-col.required {
+  border-color: var(--border-strong);
+}
+.schema-col-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+.schema-col.required .schema-col-dot {
+  background: var(--red-text);
+}
+.schema-col-name { color: var(--text-main); font-weight: 500; }
+.schema-col-hint { color: var(--text-weak); font-size: 10px; margin-left: auto; }
+
+.schema-legend {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-weak);
+  margin-top: 6px;
+}
+.schema-legend-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.dropzone-hint {
+  font-size: 11px;
+  color: var(--text-weak);
+}
+
+/* 컴팩트 드롭존 — 파일이 이미 있을 때 사용 */
+.dropzone.compact {
+  flex-direction: row;
+  padding: 12px 16px;
+  gap: 10px;
+}
+.dropzone.compact .dropzone-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+.dropzone.compact .dropzone-title { font-size: 12px; margin: 0; }
+.dropzone.compact .dropzone-desc { display: none; }
+
+/* ────────────── Form ────────────── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px 14px;
+  align-items: center;
+}
+.form-label {
+  color: var(--text-sub);
+  text-align: right;
+  padding-right: 4px;
+  font-size: 12px;
+}
+
+/* ────────────── Tabs (라디안 위에 얹는 통일 스타일) ────────────── */
+.tabs-list {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  background: var(--bg-card);
+  flex-shrink: 0;
+  min-height: 40px;
+  align-items: stretch;
+}
+.tabs-trigger {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-sub);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
+  transition: color 0.12s, border-color 0.12s;
+  white-space: nowrap;
+  position: relative;
+}
+.tabs-trigger:hover { color: var(--text-main); }
+.tabs-trigger[data-state="active"] {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+  font-weight: 600;
+}
+.tabs-trigger .count {
+  color: var(--text-weak);
+  margin-left: 4px;
+  font-weight: 400;
+}
+
+/* ────────────── 단계 체크리스트 ────────────── */
+.checklist {
+  background: var(--bg-stripe);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.checklist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.checklist-progress {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-main);
+}
+.checklist-progress.complete { color: var(--green-text); }
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.checklist-item:hover { color: var(--text-main); }
+.checklist-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+.checklist-item.checked { color: var(--text-sub); text-decoration: line-through; text-decoration-color: var(--text-weak); }
+
+/* ────────────── Lifecycle Pipeline (차량 상태 파이프라인) ────────────── */
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+.pipeline-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--bg-sunken);
+  color: var(--text-weak);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.pipeline-step.past {
+  background: var(--green-bg);
+  color: var(--green-text);
+  border-color: var(--green-border);
+}
+.pipeline-step.past::before {
+  content: '✓';
+  font-weight: 700;
+  margin-right: 2px;
+  opacity: 0.7;
+}
+.pipeline-step.current {
+  background: var(--brand);
+  color: var(--text-inverse);
+  border-color: var(--brand);
+  font-weight: 600;
+  box-shadow: 0 0 0 3px var(--brand-bg);
+}
+.pipeline-step.future {
+  background: var(--bg-card);
+  color: var(--text-weak);
+  border-style: dashed;
+}
+.pipeline-step.skip {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border-style: dashed;
+  opacity: 0.5;
+}
+.pipeline-arrow {
+  color: var(--text-weak);
+  font-size: 11px;
+  user-select: none;
+}
+.pipeline-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding-left: 12px;
+  border-left: 2px dashed var(--border);
+}
+
+/* ────────────── Detail Dialog (계약 상세) — 모던 카드 레이아웃 ────────────── */
+.detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* HERO — 상단 강조 영역 */
+.detail-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, var(--brand-bg) 0%, var(--bg-card) 100%);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.detail-hero-main { flex: 1; }
+.detail-hero-name {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+.detail-hero-meta {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-hero-meta .plate {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  color: var(--text-main);
+}
+.detail-hero-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Section — 카드형 정보 그룹 */
+.detail-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.detail-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-stripe);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-sub);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.detail-section-header .icon { color: var(--text-weak); display: flex; }
+.detail-section-body { padding: 12px 14px; }
+
+/* Grid 2-col */
+.detail-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Field row — label/value */
+.detail-field {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 12px;
+  align-items: center;
+}
+.detail-field:not(:last-child) { border-bottom: 1px solid var(--border-soft); }
+.detail-field .label {
+  color: var(--text-weak);
+  font-size: 11px;
+}
+.detail-field .value {
+  color: var(--text-main);
+  font-weight: 500;
+}
+.detail-field .value.mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.detail-field .value.muted { color: var(--text-weak); font-weight: 400; }
+
+/* ────────────── Utility ────────────── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 32px;
+  color: var(--text-weak);
+  gap: 6px;
+  height: 100%;
+  font-size: 12px;
+}
+
+/* Make text-xs definition consistent */
+.text-xs { font-size: 11px; line-height: 1.4; }
