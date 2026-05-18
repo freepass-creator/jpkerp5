@@ -15,7 +15,7 @@ export type ColumnSpec = {
 
 /* ─────────────── 차량 등록 (회사 fleet에 차량 추가) ─────────────── */
 export const VEHICLE_COLUMNS: ColumnSpec[] = [
-  { label: '회사',         field: 'company',         required: true,  example: '아이카' },
+  { label: '회사',         field: 'company',         required: true,  example: '회사명' },
   { label: '차종',         field: 'model',           required: true,  example: '카니발하이리무진' },
   { label: '차량번호',     field: 'plate',           required: false, example: '109호1234', hint: '구매 전이면 미정/공란' },
   { label: '차량상태',     field: 'vehicleStatus',   required: false, example: '구매대기', hint: '구매대기/등록대기/상품화중/인도대기/재고' },
@@ -27,7 +27,7 @@ export const VEHICLE_COLUMNS: ColumnSpec[] = [
 
 /* ─────────────── 계약 ─────────────── */
 export const CONTRACT_COLUMNS: ColumnSpec[] = [
-  { label: '회사',         field: 'company',          required: true,  example: '아이카', hint: '아이카/달카/렌트로/직카 중 하나' },
+  { label: '회사',         field: 'company',          required: true,  example: '회사명', hint: '회사 마스터에 등록된 회사명' },
   { label: '차량번호',     field: 'vehiclePlate',     required: true,  example: '109호1234', hint: '미정/미발급 등 입력 시 구매대기 상태로 등록' },
   { label: '차종',         field: 'vehicleModel',     required: true,  example: '카니발하이리무진' },
   { label: '계약자명',     field: 'customerName',     required: true,  example: '김효진' },

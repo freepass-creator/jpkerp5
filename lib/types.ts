@@ -171,6 +171,45 @@ export type HistoryEntry = {
 export type VehicleHistoryCategory = HistoryCategory;
 export type VehicleHistoryEntry = HistoryEntry;
 
+/** 회사 마스터 — 법인 정보 + 계좌 */
+export type BankAccount = {
+  id: string;
+  bankName: string;       // KB / 우리 / 신한 / 하나 / 농협 등
+  accountNo: string;      // 계좌번호
+  accountHolder: string;  // 예금주 (회사명과 다를 수 있음)
+  purpose?: string;       // 대여료수납/보증금/관리비 등
+  isDefault?: boolean;
+};
+
+export type Company = {
+  id: string;
+  name: string;                  // 회사명 (계약의 company 코드와 매칭)
+  bizRegNo?: string;             // 사업자등록번호 (123-45-67890)
+  corpRegNo?: string;            // 법인등록번호 (110111-1234567)
+  ceo?: string;                  // 대표자
+  address?: string;
+  bizType?: string;              // 업태
+  bizItem?: string;              // 종목
+  accounts: BankAccount[];       // 계좌 N개
+  notes?: string;
+  createdAt: string;
+};
+
+/** 차량 마스터 — 등록증 기준 (plate + model + company만). 디테일은 나중. */
+export type Vehicle = {
+  id: string;
+  plate: string;            // 차량번호 (unique)
+  model: string;            // 차명
+  company: CompanyCode;
+  status: VehicleStatus;    // 구매대기/등록대기/상품화중/상품대기 등
+  purchasedDate?: string;
+  registeredDate?: string;
+  readiedDate?: string;
+  notes?: string;
+  currentContractId?: string;  // 운행중이면 계약 ID
+  createdAt: string;
+};
+
 /** 연락 기록 (미수관리) */
 export type ContactLog = {
   id: string;

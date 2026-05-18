@@ -9,16 +9,30 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/genai": "^2.4.0",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-tabs": "^1.1.1",
+    "@sparticuz/chromium": "^148.0.0",
+    "@tanstack/react-table": "^8.21.3",
     "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
     "firebase": "^12.12.1",
+    "firebase-admin": "^13.10.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
     "next": "^15.1.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.7.284",
+    "puppeteer": "^25.0.2",
+    "puppeteer-core": "^25.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.5.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.7.5",

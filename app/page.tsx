@@ -17,6 +17,7 @@ import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
 import { SmsDialog } from '@/components/sms-dialog';
 import { PaymentLedgerDialog } from '@/components/payment-ledger-dialog';
+import { CompanyDialog } from '@/components/company-dialog';
 
 type View = '전체' | '계약중' | '휴차' | '미수';
 const VIEWS: View[] = ['전체', '계약중', '휴차', '미수'];
@@ -187,6 +188,7 @@ export default function Page() {
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [companyOpen, setCompanyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Firebase RTDB 실시간 구독 — /icar001/contracts
@@ -305,6 +307,7 @@ export default function Page() {
         onCreate={() => setCreateOpen(true)}
         onSms={() => setSmsOpen(true)}
         onLedger={() => setLedgerOpen(true)}
+        onMaster={() => setCompanyOpen(true)}
         smsCount={selectedIds.size}
       />
       <div className="app">
@@ -614,6 +617,7 @@ export default function Page() {
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filteredContracts} selectedIds={selectedIds} />
       <PaymentLedgerDialog open={ledgerOpen} onOpenChange={setLedgerOpen} contracts={contracts} />
+      <CompanyDialog open={companyOpen} onOpenChange={setCompanyOpen} />
       </div>
     </div>
   );

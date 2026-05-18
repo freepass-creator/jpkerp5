@@ -16,8 +16,10 @@ export function useContracts(): {
   loading: boolean;
   configured: boolean;
   update: (c: Contract) => Promise<void>;
+  updateMany: (rows: Contract[]) => Promise<void>;
   remove: (id: string) => Promise<void>;
   add: (c: Omit<Contract, 'id'>) => Promise<string>;
+  addMany: (rows: Array<Omit<Contract, 'id'>>) => Promise<number>;
 } {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +98,45 @@ export function useContracts(): {
       const full = { ...c, id } as Contract;
       await set(newRef, full);
       return id;
+    },
+    addMany: async (rows: Array<Omit<Contract, 'id'>>) => {
+      if (rows.length === 0) return 0;
+      if (!configured) {
+        const stamped = rows.map((c) => ({
+          ...c,
+          id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        })) as Contract[];
+        setContracts((prev) => [...prev, ...stamped]);
+        return stamped.length;
+      }
+      await ensureAuth();
+      const db = getRtdb();
+      if (!db) return 0;
+      const batch: Record<string, Contract> = {};
+      for (const row of rows) {
+        const newRef = push(ref(db, CONTRACTS_PATH));
+        const id = newRef.key!;
+        batch[id] = { ...row, id } as Contract;
+      }
+      await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
+      return rows.length;
+    },
+    updateMany: async (rows: Contract[]) => {
+      if (rows.length === 0) return;
+      if (!configured) {
+        setContracts((prev) => {
+          const m = new Map(prev.map((c) => [c.id, c]));
+          for (const r of rows) m.set(r.id, r);
+          return Array.from(m.values());
+        });
+        return;
+      }
+      await ensureAuth();
+      const db = getRtdb();
+      if (!db) return;
+      const batch: Record<string, Contract> = {};
+      for (const r of rows) batch[r.id] = r;
+      await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
     },
   };
 }

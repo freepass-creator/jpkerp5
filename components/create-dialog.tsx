@@ -17,6 +17,14 @@ import {
   VEHICLE_COLUMNS, CONTRACT_COLUMNS, BANK_TX_COLUMNS, CARD_TX_COLUMNS,
   type ColumnSpec,
 } from '@/lib/import-schema';
+import { useContracts } from '@/lib/firebase/contracts-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import {
+  parseVehicleRow, parseContractRow, parseBankTxRow, parseCardTxRow,
+  matchTransactions, applyPaymentsToContracts,
+} from '@/lib/import-commit';
 
 type Mode = '차량' | '계약' | '수납' | '이력';
 
@@ -25,10 +33,18 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const [parsed, setParsed] = useState<ParsedSheet[]>([]);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  // RTDB stores
+  const { contracts, addMany: addContracts, updateMany: updateContracts } = useContracts();
+  const { addMany: addVehicles } = useVehicles();
+  const { addMany: addBankTx } = useBankTx();
+  const { addMany: addCardTx } = useCardTx();
 
   const reset = useCallback(() => {
     setParsed([]);
     setBusy(false);
+    setResult(null);
   }, []);
 
   const handleFiles = useCallback(
@@ -77,6 +93,65 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     setParsed((all) => all.map((p) => (p === target ? { ...p, kind } : p)));
   }
 
+  // ─── 커밋 핸들러 ─── //
+  async function commitContractFiles() {
+    setBusy(true);
+    try {
+      const rows = contractFiles.flatMap((p) => p.rows);
+      const valid = rows.map((r) => parseContractRow(r)).filter((x): x is NonNullable<typeof x> => !!x);
+      const n = await addContracts(valid);
+      setResult(`계약 ${n}건 저장 완료 (전체 ${rows.length}행 중 ${rows.length - n}건은 필수값 미달로 제외)`);
+      setParsed((all) => all.filter((p) => p.kind !== '계약'));
+    } catch (e) {
+      console.error(e);
+      setResult(`오류 — ${String((e as Error).message ?? e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function commitPaymentFiles() {
+    setBusy(true);
+    try {
+      const bankRows = paymentFiles.filter((p) => p.kind === '계좌').flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName })));
+      const cardRows = paymentFiles.filter((p) => p.kind === '카드').flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName })));
+      const bankParsed = bankRows.map((x) => parseBankTxRow(x.row, x.file)).filter((x): x is NonNullable<typeof x> => !!x);
+      const cardParsed = cardRows.map((x) => parseCardTxRow(x.row, x.file)).filter((x): x is NonNullable<typeof x> => !!x);
+      const bankSaved = await addBankTx(bankParsed);
+      const cardSaved = await addCardTx(cardParsed);
+      // 매칭
+      const txList = [
+        ...bankSaved.map((t) => ({ id: t.id, amount: t.amount, counterparty: t.counterparty })),
+        ...cardSaved.map((t) => ({ id: t.id, amount: t.amount, counterparty: t.customerName ?? '' })),
+      ];
+      const matches = matchTransactions(txList, contracts);
+      const patches = applyPaymentsToContracts(contracts, matches);
+      if (patches.length > 0) await updateContracts(patches);
+      const matchedCount = matches.filter((m) => m.contractId).length;
+      setResult(`수납 ${bankSaved.length + cardSaved.length}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)`);
+      setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '카드'));
+    } catch (e) {
+      console.error(e);
+      setResult(`오류 — ${String((e as Error).message ?? e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function commitVehicleRows(rows: Record<string, unknown>[]) {
+    setBusy(true);
+    try {
+      const valid = rows.map((r) => parseVehicleRow(r)).filter((x): x is NonNullable<typeof x> => !!x);
+      const n = await addVehicles(valid);
+      setResult(`차량 ${n}건 등록 (전체 ${rows.length}행 중 ${rows.length - n}건 제외)`);
+    } catch (e) {
+      console.error(e);
+      setResult(`오류 — ${String((e as Error).message ?? e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <DialogRoot
       open={open}
@@ -117,12 +192,17 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
             <div
               style={{ flex: 1, overflow: 'auto', padding: 16 }}
-              onDragOver={(e) => { e.preventDefault(); if (mode !== '이력') setDrag(true); }}
+              onDragOver={(e) => { e.preventDefault(); if (mode !== '이력' && mode !== '차량') setDrag(true); }}
               onDragLeave={() => setDrag(false)}
-              onDrop={(e) => { if (mode !== '이력') onDrop(e); }}
+              onDrop={(e) => { if (mode !== '이력' && mode !== '차량') onDrop(e); }}
             >
               <Tabs.Content value="차량">
-                <VehicleRegisterPane onClose={() => onOpenChange(false)} />
+                <VehicleRegisterPane
+                  onClose={() => onOpenChange(false)}
+                  onCommit={commitVehicleRows}
+                  busy={busy}
+                  result={result}
+                />
               </Tabs.Content>
               <Tabs.Content value="계약">
                 <ContractRegisterPane
@@ -131,6 +211,9 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                   onPick={onPick}
                   onChangeKind={(idx, k) => updateKind(idx, k, 'contract')}
                   onClose={() => onOpenChange(false)}
+                  onCommit={commitContractFiles}
+                  busy={busy}
+                  result={result}
                 />
               </Tabs.Content>
               <Tabs.Content value="수납">
@@ -140,6 +223,9 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                   onPick={onPick}
                   onChangeKind={(idx, k) => updateKind(idx, k, 'payment')}
                   onClose={() => onOpenChange(false)}
+                  onCommit={commitPaymentFiles}
+                  busy={busy}
+                  result={result}
                 />
               </Tabs.Content>
               <Tabs.Content value="이력">
@@ -165,6 +251,7 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 function UploadPane({
   files, drag, onPick, onChangeKind,
   emptyTitle, emptyDesc, columns, templateName,
+  onCommit, busy, result, commitLabel,
 }: {
   files: ParsedSheet[];
   drag: boolean;
@@ -174,7 +261,12 @@ function UploadPane({
   emptyDesc: string;
   columns: ColumnSpec[];
   templateName: string;
+  onCommit?: () => void | Promise<void>;
+  busy?: boolean;
+  result?: string | null;
+  commitLabel?: string;
 }) {
+  const totalRows = files.reduce((s, f) => s + f.rows.length, 0);
   if (files.length === 0) {
     return (
       <div className={cn('dropzone', drag && 'drag')} onClick={onPick} style={{ minHeight: 'auto', paddingTop: 32, paddingBottom: 32 }}>
@@ -214,6 +306,19 @@ function UploadPane({
       {files.map((p, i) => (
         <SheetPreview key={`${p.fileName}-${p.sheetName}-${i}`} sheet={p} onChangeKind={(k) => onChangeKind(i, k)} />
       ))}
+      {result && (
+        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 6, fontSize: 12, border: '1px solid var(--green-border)' }}>
+          {result}
+        </div>
+      )}
+      {onCommit && totalRows > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="btn btn-primary" type="button" disabled={busy} onClick={() => void onCommit()}>
+            {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
+            {' '}{commitLabel ?? `최종 저장 ${totalRows}건`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -222,13 +327,18 @@ function UploadPane({
 
 function UploadPaneMulti({
   files, drag, onPick, onChangeKind, groups,
+  onCommit, busy, result,
 }: {
   files: ParsedSheet[];
   drag: boolean;
   onPick: () => void;
   onChangeKind: (idx: number, k: UploadKind) => void;
   groups: { title: string; desc: string; columns: ColumnSpec[]; templateName: string }[];
+  onCommit?: () => void | Promise<void>;
+  busy?: boolean;
+  result?: string | null;
 }) {
+  const totalRows = files.reduce((s, f) => s + f.rows.length, 0);
   if (files.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -276,6 +386,19 @@ function UploadPaneMulti({
       {files.map((p, i) => (
         <SheetPreview key={`${p.fileName}-${p.sheetName}-${i}`} sheet={p} onChangeKind={(k) => onChangeKind(i, k)} />
       ))}
+      {result && (
+        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 6, fontSize: 12, border: '1px solid var(--green-border)' }}>
+          {result}
+        </div>
+      )}
+      {onCommit && totalRows > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="btn btn-primary" type="button" disabled={busy} onClick={() => void onCommit()}>
+            {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
+            {' '}최종 저장 {totalRows}건 (자동매칭 실행)
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -400,7 +523,14 @@ function SheetPreview({ sheet, onChangeKind }: { sheet: ParsedSheet; onChangeKin
 
 type VehicleMode = 'manual' | 'ocr' | 'excel';
 
-function VehicleRegisterPane({ onClose }: { onClose: () => void }) {
+function VehicleRegisterPane({
+  onClose, onCommit, busy, result,
+}: {
+  onClose: () => void;
+  onCommit: (rows: Record<string, unknown>[]) => Promise<void>;
+  busy: boolean;
+  result: string | null;
+}) {
   const [mode, setMode] = useState<VehicleMode>('manual');
 
   return (
@@ -419,16 +549,22 @@ function VehicleRegisterPane({ onClose }: { onClose: () => void }) {
 
       {mode === 'manual' && <VehicleManualForm onSubmit={() => { alert('mock: 차량 등록 완료'); onClose(); }} />}
       {mode === 'ocr' && <VehicleOcrPane onSubmit={() => { alert('mock: OCR 차량 등록 완료'); onClose(); }} />}
-      {mode === 'excel' && <VehicleExcelPane />}
+      {mode === 'excel' && <VehicleExcelPane onCommit={onCommit} busy={busy} result={result} />}
     </div>
   );
 }
 
-const COMPANIES = ['아이카', '달카', '렌트로', '직카'];
 const VEHICLE_STATUSES = ['구매대기', '등록대기', '상품화중', '인도대기', '재고'] as const;
 
+/** 등록된 회사 마스터에서 회사명 가져오기 (없으면 빈 배열) */
+function useCompanyNames(): string[] {
+  const { companies } = useCompanies();
+  return companies.map((c) => c.name).filter(Boolean);
+}
+
 function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
-  const [company, setCompany] = useState(COMPANIES[0]);
+  const companyNames = useCompanyNames();
+  const [company, setCompany] = useState(companyNames[0] ?? '');
   const [model, setModel] = useState('');
   const [plate, setPlate] = useState('');
   const [vehicleStatus, setVehicleStatus] = useState<string>('구매대기');
@@ -452,13 +588,7 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
         <div className="detail-section-body">
           <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '10px 14px', alignItems: 'center' }}>
             <label className="form-label">회사 *</label>
-            <div className="filter-bar">
-              {COMPANIES.map((co) => (
-                <button type="button" key={co} className={`chip ${company === co ? 'active' : ''}`} onClick={() => setCompany(co)}>
-                  {co}
-                </button>
-              ))}
-            </div>
+            <CompanyPicker value={company} onChange={setCompany} options={companyNames} />
 
             <label className="form-label">차량상태 *</label>
             <div className="filter-bar">
@@ -546,8 +676,8 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
     setTimeout(() => {
       setExtracted({
         plate: '109호' + Math.floor(1000 + Math.random() * 9000),
-        model: '신형G90',
-        company: '아이카',
+        model: '차종',
+        company: '',
       });
       setBusy(false);
     }, 1400);
@@ -634,22 +764,101 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
   );
 }
 
-function VehicleExcelPane() {
-  return (
-    <div className="dropzone" style={{ minHeight: 200, flex: 1, cursor: 'default' }}>
-      <div className="dropzone-icon">
-        <FileXls size={28} weight="duotone" />
-      </div>
-      <div className="dropzone-title">엑셀 일괄 등록</div>
-      <div className="dropzone-desc">기존 차량 리스트를 엑셀로 일괄 등록 (다음 라운드)</div>
-      <button
-        className="btn"
-        type="button"
-        onClick={() => downloadTemplate('차량등록_템플릿.xlsx', VEHICLE_COLUMNS)}
+function VehicleExcelPane({
+  onCommit, busy, result,
+}: {
+  onCommit: (rows: Record<string, unknown>[]) => Promise<void>;
+  busy: boolean;
+  result: string | null;
+}) {
+  const [sheets, setSheets] = useState<ParsedSheet[]>([]);
+  const [drag, setDrag] = useState(false);
+  const inputId = 'icar-vehicle-bulk-file';
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    const out: ParsedSheet[] = [];
+    for (const f of files) {
+      try {
+        const parsed = await parseExcelFile(f);
+        out.push(...parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setSheets((prev) => [...prev, ...out]);
+  }, []);
+
+  const totalRows = sheets.reduce((s, p) => s + p.rows.length, 0);
+
+  if (sheets.length === 0) {
+    return (
+      <div
+        className={cn('dropzone', drag && 'drag')}
+        style={{ minHeight: 240, flex: 1 }}
+        onClick={() => document.getElementById(inputId)?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => {
+          e.preventDefault(); setDrag(false);
+          const fs = Array.from(e.dataTransfer.files).filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name));
+          if (fs.length > 0) void handleFiles(fs);
+        }}
       >
-        <DownloadSimple size={14} /> 템플릿 다운로드
-      </button>
-      <SchemaList columns={VEHICLE_COLUMNS} />
+        <input
+          id={inputId} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden"
+          onChange={(e) => { if (e.target.files) { void handleFiles(Array.from(e.target.files)); e.target.value = ''; } }}
+        />
+        <div className="dropzone-icon"><FileXls size={28} weight="duotone" /></div>
+        <div className="dropzone-title">자산(차량) 엑셀 업로드</div>
+        <div className="dropzone-desc">기존 차량 리스트 일괄 등록 — 차량번호 + 차명 + 회사만 필수</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById(inputId)?.click(); }}>
+            <Plus size={14} weight="bold" /> 엑셀 파일 선택
+          </button>
+          <button className="btn" type="button" onClick={(e) => { e.stopPropagation(); downloadTemplate('차량등록_템플릿.xlsx', VEHICLE_COLUMNS); }}>
+            <DownloadSimple size={14} /> 템플릿
+          </button>
+        </div>
+        <div className="dropzone-hint">또는 여기에 끌어다 놓기 · .xlsx / .xls / .csv</div>
+        <SchemaList columns={VEHICLE_COLUMNS} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="dropzone compact" onClick={() => document.getElementById(inputId)?.click()}>
+        <div className="dropzone-icon"><FileArrowUp size={16} weight="duotone" /></div>
+        <div className="dropzone-title">파일 추가</div>
+        <span className="text-weak text-xs ml-auto">또는 끌어다 놓기</span>
+        <input
+          id={inputId} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden"
+          onChange={(e) => { if (e.target.files) { void handleFiles(Array.from(e.target.files)); e.target.value = ''; } }}
+        />
+      </div>
+      {sheets.map((p, i) => (
+        <SheetPreview key={`${p.fileName}-${p.sheetName}-${i}`} sheet={p} onChangeKind={() => { /* no-op */ }} />
+      ))}
+      {result && (
+        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 6, fontSize: 12, border: '1px solid var(--green-border)' }}>
+          {result}
+        </div>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          className="btn btn-primary"
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            const rows = sheets.flatMap((s) => s.rows);
+            await onCommit(rows);
+            setSheets([]);
+          }}
+        >
+          {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
+          {' '}최종 저장 {totalRows}건
+        </button>
+      </div>
     </div>
   );
 }
@@ -658,12 +867,16 @@ function VehicleExcelPane() {
 
 function ContractRegisterPane({
   files, drag, onPick, onChangeKind, onClose,
+  onCommit, busy, result,
 }: {
   files: ParsedSheet[];
   drag: boolean;
   onPick: () => void;
   onChangeKind: (idx: number, k: UploadKind) => void;
   onClose: () => void;
+  onCommit: () => Promise<void>;
+  busy: boolean;
+  result: string | null;
 }) {
   const [mode, setMode] = useState<VehicleMode>('manual');
   return (
@@ -689,6 +902,7 @@ function ContractRegisterPane({
           emptyDesc="여러 신규 계약을 한번에 등록"
           columns={CONTRACT_COLUMNS}
           templateName="계약생성_템플릿.xlsx"
+          onCommit={onCommit} busy={busy} result={result}
         />
       )}
     </div>
@@ -696,7 +910,8 @@ function ContractRegisterPane({
 }
 
 function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
-  const [company, setCompany] = useState(COMPANIES[0]);
+  const companyNames = useCompanyNames();
+  const [company, setCompany] = useState(companyNames[0] ?? '');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone1, setCustomerPhone1] = useState('');
   const [regNo, setRegNo] = useState('');
@@ -723,12 +938,8 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
         <div className="detail-section-body">
           <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 1fr', gap: '10px 14px', alignItems: 'center' }}>
             <label className="form-label">회사 *</label>
-            <div className="filter-bar" style={{ gridColumn: 'span 3' }}>
-              {COMPANIES.map((co) => (
-                <button type="button" key={co} className={`chip ${company === co ? 'active' : ''}`} onClick={() => setCompany(co)}>
-                  {co}
-                </button>
-              ))}
+            <div style={{ gridColumn: 'span 3' }}>
+              <CompanyPicker value={company} onChange={setCompany} options={companyNames} />
             </div>
 
             <label className="form-label">계약자명 *</label>
@@ -885,12 +1096,16 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
 
 function PaymentRegisterPane({
   files, drag, onPick, onChangeKind, onClose,
+  onCommit, busy, result,
 }: {
   files: ParsedSheet[];
   drag: boolean;
   onPick: () => void;
   onChangeKind: (idx: number, k: UploadKind) => void;
   onClose: () => void;
+  onCommit: () => Promise<void>;
+  busy: boolean;
+  result: string | null;
 }) {
   const [mode, setMode] = useState<VehicleMode>('manual');
   return (
@@ -916,6 +1131,7 @@ function PaymentRegisterPane({
             { title: '계좌 입금', desc: '은행 거래내역 — 입금자 + 금액 자동 매칭', columns: BANK_TX_COLUMNS, templateName: '계좌입금_템플릿.xlsx' },
             { title: '카드 결제', desc: '카드사 매출 — 승인번호 + 금액 자동 매칭', columns: CARD_TX_COLUMNS, templateName: '카드결제_템플릿.xlsx' },
           ]}
+          onCommit={onCommit} busy={busy} result={result}
         />
       )}
     </div>
@@ -1264,4 +1480,53 @@ function formatCell(v: unknown): string {
   if (v instanceof Date) return v.toISOString().slice(0, 10);
   if (typeof v === 'number') return formatCurrency(v) || String(v);
   return String(v);
+}
+
+/** 회사 선택기 — 등록된 회사가 있으면 칩, 없거나 직접 입력하려면 텍스트 입력. */
+function CompanyPicker({
+  value, onChange, options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+}) {
+  const [mode, setMode] = useState<'chip' | 'text'>(options.length > 0 ? 'chip' : 'text');
+
+  if (mode === 'chip' && options.length > 0) {
+    return (
+      <div className="filter-bar">
+        {options.map((co) => (
+          <button type="button" key={co} className={`chip ${value === co ? 'active' : ''}`} onClick={() => onChange(co)}>
+            {co}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="chip"
+          onClick={() => { setMode('text'); onChange(''); }}
+          title="등록되지 않은 회사명 직접 입력"
+          style={{ color: 'var(--text-weak)' }}
+        >
+          + 직접입력
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <input
+        className="input"
+        placeholder={options.length > 0 ? '회사명 직접 입력' : '회사명 (사이드바 → 회사 마스터에서 등록)'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ flex: 1 }}
+      />
+      {options.length > 0 && (
+        <button type="button" className="btn btn-sm btn-ghost" onClick={() => setMode('chip')} title="등록 회사에서 선택">
+          ↩ 선택
+        </button>
+      )}
+    </div>
+  );
 }
