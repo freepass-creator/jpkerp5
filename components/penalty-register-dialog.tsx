@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { CheckCircle, FileArrowUp, Keyboard, Camera, CircleNotch } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { DateInput } from '@/components/ui/date-input';
 import { cn } from '@/lib/utils';
 import type { Penalty, PenaltyDocType } from '@/lib/types-penalty';
 import { TODAY } from '@/lib/mock-data';
@@ -104,7 +105,7 @@ function ManualForm({ onSubmit }: { onSubmit: (p: Omit<Penalty, 'id'>) => Promis
             <input className="input" required value={carNumber} onChange={(e) => setCarNumber(e.target.value)} placeholder="예: 109호1234" />
 
             <label className="form-label">위반일 *</label>
-            <input type="date" className="input" required value={violationDate} onChange={(e) => setViolationDate(e.target.value)} style={{ width: 200 }} />
+            <DateInput required value={violationDate} onChange={setViolationDate} style={{ width: 200 }} />
 
             <label className="form-label">금액 *</label>
             <input className="input" required value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))} placeholder="원" style={{ width: 200 }} />
@@ -117,7 +118,7 @@ function ManualForm({ onSubmit }: { onSubmit: (p: Omit<Penalty, 'id'>) => Promis
         <div className="detail-section-body">
           <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 1fr', gap: '10px 14px', alignItems: 'center' }}>
             <label className="form-label">발급일</label>
-            <input type="date" className="input" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} style={{ width: 200 }} />
+            <DateInput value={issueDate} onChange={setIssueDate} style={{ width: 200 }} />
 
             <label className="form-label">발급기관</label>
             <input className="input" value={issuer} onChange={(e) => setIssuer(e.target.value)} placeholder="예: 서울지방경찰청" />
@@ -126,7 +127,7 @@ function ManualForm({ onSubmit }: { onSubmit: (p: Omit<Penalty, 'id'>) => Promis
             <input className="input" value={violationLocation} onChange={(e) => setViolationLocation(e.target.value)} placeholder="예: 강남대로 123" />
 
             <label className="form-label">납부기한</label>
-            <input type="date" className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: 200 }} />
+            <DateInput value={dueDate} onChange={setDueDate} style={{ width: 200 }} />
 
             <label className="form-label" style={{ alignSelf: 'start', paddingTop: 6 }}>위반 내용</label>
             <textarea className="input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)}

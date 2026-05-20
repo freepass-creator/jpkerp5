@@ -8,9 +8,12 @@ import {
   Upload, Warning as WarningIcon, X as XIcon,
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { DateInput } from '@/components/ui/date-input';
 import type { Contract, VehicleStatus } from '@/lib/types';
 import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
 import { contractIdentMasked, birthFromIdent, inferKind } from '@/lib/ident';
+import { displayCompanyName } from '@/lib/company-display';
+import { useCompanies } from '@/lib/firebase/companies-store';
 import { TODAY } from '@/lib/mock-data';
 import {
   validateDocument, summarizeIssues,
@@ -74,6 +77,8 @@ export function ContractDetailDialog({
 /* ─────────────── HERO (항상 상단) ─────────────── */
 
 function DetailHero({ c }: { c: Contract }) {
+  const { companies } = useCompanies();
+  const companyDisplay = displayCompanyName(c.company, companies);
   return (
     <div className="detail-hero">
       <div className="detail-hero-main">
@@ -83,7 +88,7 @@ function DetailHero({ c }: { c: Contract }) {
           <span>·</span>
           <span>{c.vehicleModel}</span>
           <span>·</span>
-          <span>{c.company}</span>
+          <span>{companyDisplay}</span>
           <span>·</span>
           <span>{c.contractNo}</span>
           <span>·</span>
@@ -202,6 +207,7 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
 /* ─────────────── 차량정보 (스펙) — 별도 탭 ─────────────── */
 
 function VehicleSpecTab({ c }: { c: Contract }) {
+  const { companies } = useCompanies();
   return (
     <div className="detail-stack">
       <Section icon={<Car size={12} weight="duotone" />} title="차량 식별">
@@ -209,7 +215,7 @@ function VehicleSpecTab({ c }: { c: Contract }) {
           <div>
             <Field label="차량번호" value={c.vehiclePlate} mono />
             <Field label="차종" value={c.vehicleModel} />
-            <Field label="회사" value={c.company} />
+            <Field label="회사" value={displayCompanyName(c.company, companies)} />
             {c.isInventoryPurchase && (
               <Field label="구분" value={<span style={{ color: 'var(--purple-text)', fontWeight: 600 }}>선도구매 (재고)</span>} />
             )}
@@ -391,11 +397,9 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           <span style={{ fontSize: 11, color: 'var(--text-weak)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             처리일
           </span>
-          <input
-            type="date"
-            className="input"
+          <DateInput
             value={actionDate}
-            onChange={(e) => setActionDate(e.target.value)}
+            onChange={setActionDate}
             style={{ width: 200 }}
           />
         </div>
@@ -728,7 +732,7 @@ function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => v
           <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 6, marginBottom: 12 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>일자</span>
-              <input type="date" className="input" value={payDate} onChange={(e) => setPayDate(e.target.value)} style={{ width: 160 }} />
+              <DateInput value={payDate} onChange={setPayDate} style={{ width: 160 }} />
               <span style={{ fontSize: 11, color: 'var(--text-sub)', marginLeft: 8 }}>금액</span>
               <input
                 type="text"

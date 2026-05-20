@@ -9,6 +9,7 @@ import {
   Camera, Keyboard, CircleNotch,
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { DateInput } from '@/components/ui/date-input';
 import { parseExcelFile, type ParsedSheet, type UploadKind } from '@/lib/excel-detect';
 import { formatCurrency, cn } from '@/lib/utils';
 import { MOCK_CONTRACTS } from '@/lib/mock-data';
@@ -704,7 +705,7 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
             <input className="input" placeholder="예: 가솔린 / 디젤 / 하이브리드" value={fuel} onChange={(e) => setFuel(e.target.value)} />
 
             <label className="form-label">매입일</label>
-            <input type="date" className="input" value={purchasedDate} onChange={(e) => setPurchasedDate(e.target.value)} style={{ width: 200 }} />
+            <DateInput value={purchasedDate} onChange={setPurchasedDate} style={{ width: 200 }} />
 
             <label className="form-label">매입가</label>
             <input className="input" placeholder="원 단위" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value.replace(/[^0-9]/g, ''))} style={{ width: 200 }} />
@@ -1166,7 +1167,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
             <input className="input" required placeholder="010-1234-5678" value={customerPhone1} onChange={(e) => setCustomerPhone1(e.target.value)} />
 
             <label className="form-label">계약일 *</label>
-            <input type="date" className="input" required value={contractDate} onChange={(e) => setContractDate(e.target.value)} style={{ width: 200 }} />
+            <DateInput required value={contractDate} onChange={setContractDate} style={{ width: 200 }} />
 
             <label className="form-label">월 대여료 *</label>
             <input className="input" required placeholder="원 단위" value={monthlyRent} onChange={(e) => setMonthlyRent(e.target.value.replace(/[^0-9]/g, ''))} style={{ width: 200 }} />
@@ -1195,7 +1196,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
             <input className="input" placeholder="저장 시 마스킹" value={regNo} onChange={(e) => setRegNo(e.target.value)} />
 
             <label className="form-label">반납예정</label>
-            <input type="date" className="input" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} style={{ width: 200 }} />
+            <DateInput value={returnDate} onChange={setReturnDate} style={{ width: 200 }} />
 
             <label className="form-label">결제일</label>
             <input className="input" placeholder="1~31" value={paymentDay} onChange={(e) => setPaymentDay(e.target.value.replace(/[^0-9]/g, ''))} style={{ width: 100 }} />
@@ -1382,7 +1383,7 @@ function PaymentManualForm({ onSubmit }: { onSubmit: () => void }) {
             </div>
 
             <label className="form-label">{kind === '계좌' ? '거래일자' : '승인일'} *</label>
-            <input type="date" className="input" required value={txDate} onChange={(e) => setTxDate(e.target.value)} style={{ width: 200 }} />
+            <DateInput required value={txDate} onChange={setTxDate} style={{ width: 200 }} />
 
             <label className="form-label">{kind === '계좌' ? '입금자' : '고객명'} *</label>
             <input className="input" required placeholder="계약자명과 자동 매칭" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} />
@@ -1459,7 +1460,7 @@ function PaymentOcrPane({ onSubmit }: { onSubmit: () => void }) {
           <div className="detail-section-body">
             <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '10px 14px', alignItems: 'center' }}>
               <label className="form-label">일자</label>
-              <input type="date" className="input" value={extracted.txDate} onChange={(e) => setExtracted({ ...extracted, txDate: e.target.value })} style={{ width: 200 }} />
+              <DateInput value={extracted.txDate} onChange={(v) => setExtracted({ ...extracted, txDate: v })} style={{ width: 200 }} />
               <label className="form-label">입금자</label>
               <input className="input" value={extracted.counterparty} onChange={(e) => setExtracted({ ...extracted, counterparty: e.target.value })} />
               <label className="form-label">금액</label>
@@ -1649,7 +1650,7 @@ function HistoryForm({
             </div>
 
             <label className="form-label">일자</label>
-            <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: 180 }} />
+            <DateInput value={date} onChange={setDate} style={{ width: 180 }} />
 
             <label className="form-label">제목</label>
             <input className="input" placeholder="예: 엔진오일·필터 교환" value={title} onChange={(e) => setTitle(e.target.value)} required />

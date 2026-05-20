@@ -13,6 +13,8 @@ import {
 import { formatCurrency, formatDate, daysSince, formatPeriod, dateWithDow } from '@/lib/utils';
 import type { Contract } from '@/lib/types';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import { displayCompanyName } from '@/lib/company-display';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
@@ -194,6 +196,7 @@ export default function Page() {
 
   // Firebase RTDB 실시간 구독 — /icar001/contracts
   const { contracts, loading: contractsLoading, update: rtdbUpdate } = useContracts();
+  const { companies: companyMaster } = useCompanies();
 
   // selectedId를 기준으로 fresh contract 참조 (업데이트 시 자동 반영)
   const selected = useMemo(
@@ -354,42 +357,6 @@ export default function Page() {
         </div>
       </header>
 
-      {/* 운영 KPI 스트립 — 한 줄 요약 */}
-      <div className="kpi-strip">
-        <span className="kpi-chip brand">
-          <Truck /> 운영중 <strong>{contracts.filter((c) => !!c.deliveredDate && !c.returnedDate && c.status !== '해지').length}</strong>
-        </span>
-        <span className="kpi-chip">
-          전체 <strong>{contracts.length}</strong>건
-        </span>
-        <span className="kpi-chip">
-          월매출 <strong className="mono">₩{formatCurrency(contracts.filter((c) => c.status === '운행').reduce((s, c) => s + (c.monthlyRent ?? 0), 0))}</strong>
-        </span>
-        {summary.totalUnpaid > 0 && (
-          <span className="kpi-chip red">
-            <Warning /> 미수 <strong className="mono">₩{formatCurrency(summary.totalUnpaid)}</strong> ({summary.unpaidCount}건)
-          </span>
-        )}
-        {overdue.filter((o) => o.type === '반납지연').length > 0 && (
-          <span className="kpi-chip orange">
-            <ArrowUDownLeft /> 반납지연 <strong>{overdue.filter((o) => o.type === '반납지연').length}</strong>
-          </span>
-        )}
-        {returns.filter((r) => r.status === '예정').length > 0 && (
-          <span className="kpi-chip">
-            반납 임박 <strong>{returns.filter((r) => r.status === '예정').length}</strong>
-          </span>
-        )}
-        {selectedIds.size > 0 && (
-          <span className="kpi-chip brand" style={{ marginLeft: 'auto' }}>
-            선택 <strong>{selectedIds.size}</strong>
-            <button className="btn btn-sm btn-ghost btn-icon" onClick={clearSelection} title="선택 해제" style={{ marginLeft: 4 }}>
-              <X />
-            </button>
-          </span>
-        )}
-      </div>
-
       <div className="dashboard">
         <div className="panel">
           <div className="panel-body">
@@ -468,7 +435,7 @@ export default function Page() {
                           />
                         </td>
                         {/* 회사 */}
-                        <td className="center dim">{c.company}</td>
+                        <td className="center dim">{displayCompanyName(c.company, companyMaster)}</td>
                         {/* 차량상태 */}
                         <td className="center">
                           <span className={`status ${vs.name}`}>{vs.name}</span>

@@ -1,0 +1,94 @@
+/**
+ * 회사명 표시 헬퍼.
+ *
+ * 규칙:
+ *   1) 회사 마스터에 등록되어 있으면 → 접미사 제거한 회사명 ("주식회사 아이카" → "아이카")
+ *   2) 등록 안 됨 + 사업자번호 있으면 → 사업자번호 뒷 5자리 (예: "67890")
+ *   3) 등록 안 됨 + 법인등록번호만 → 법인등록번호 뒷 7자리
+ *   4) 다 없으면 → 원본 그대로
+ *
+ * 사용 예:
+ *   const shown = displayCompanyName(c.company, companies);   // "아이카"
+ *   const shown = displayCompanyName('렌트로 주식회사');         // "렌트로"
+ *   const shown = displayCompanyName(undefined, [], '123-45-67890'); // "67890"
+ */
+
+import type { Company } from './types';
+import { normalizeIdent } from './ident';
+
+const CORP_SUFFIXES = [
+  '주식회사', '유한회사', '유한책임회사', '합자회사', '합명회사',
+  '(주)', '㈜', '(유)', '(합)', '(재)',
+  '재단법인', '사단법인', '학교법인', '의료법인', '협동조합', '조합',
+  '주식', // 일부 표기
+];
+
+/** "주식회사 아이카" / "아이카 (주)" / "㈜아이카" → "아이카" */
+export function stripCorpSuffix(name: string): string {
+  if (!name) return '';
+  let n = name.trim();
+  // 모든 접미사를 양쪽에서 제거 (1회 이상 반복할 수 있음)
+  let prev = '';
+  while (prev !== n) {
+    prev = n;
+    for (const suf of CORP_SUFFIXES) {
+      // 접두/접미/중간 모두 제거
+      n = n.replace(new RegExp(`\\s*${escapeRegex(suf)}\\s*`, 'g'), ' ').trim();
+    }
+  }
+  return n.replace(/\s+/g, ' ').trim();
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** 사업자번호/법인번호 뒷자리로 회사명 대체 */
+export function fallbackNameFromIdent(bizRegNo?: string, corpRegNo?: string): string {
+  if (bizRegNo) {
+    const d = normalizeIdent(bizRegNo);
+    if (d.length === 10) return d.slice(5);     // 뒤 5자리
+  }
+  if (corpRegNo) {
+    const d = normalizeIdent(corpRegNo);
+    if (d.length === 13) return d.slice(6);     // 뒤 7자리
+  }
+  return '';
+}
+
+/**
+ * Contract.company (회사명 또는 코드) + 회사 마스터 → 표시명.
+ * 매스터에서 못 찾으면 사업자번호/법인번호 뒷자리로 대체.
+ */
+export function displayCompanyName(
+  rawCompany: string | undefined,
+  companies: Company[] = [],
+  fallbackBizRegNo?: string,
+  fallbackCorpRegNo?: string,
+): string {
+  const raw = (rawCompany ?? '').trim();
+  if (!raw) {
+    return fallbackNameFromIdent(fallbackBizRegNo, fallbackCorpRegNo) || '';
+  }
+
+  // 마스터에서 정확/접미사제거 매칭 시도
+  const stripped = stripCorpSuffix(raw);
+  const matched = companies.find((co) => {
+    if (!co) return false;
+    if (co.code === raw) return true;
+    if (co.name === raw) return true;
+    if (stripCorpSuffix(co.name) === stripped) return true;
+    return false;
+  });
+
+  if (matched) {
+    return stripCorpSuffix(matched.name) || matched.name;
+  }
+
+  // 마스터 못 찾음 → 식별번호 뒷자리 시도
+  const fallback = fallbackNameFromIdent(fallbackBizRegNo, fallbackCorpRegNo);
+  if (fallback) return fallback;
+
+  // 최종 폴백 — 원본에서 접미사만 떼서 보여줌
+  return stripped || raw;
+}
