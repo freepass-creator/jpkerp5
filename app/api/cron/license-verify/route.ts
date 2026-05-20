@@ -1,42 +1,28 @@
 /**
- * 일일 면허번호 자동 재검증 cron.
+ * 일일 면허번호 자동 재검증 cron — RIMS 통신규약 v1.21.
  *
- * 호출 방식:
- *   GET /api/cron/license-verify           (Vercel Cron 또는 수동 호출)
- *   GET /api/cron/license-verify?dry=1     (RTDB 미갱신, 결과만 리턴)
+ * GET /api/cron/license-verify
+ *   ?dry=1   RTDB 미갱신, 결과만 리턴
  *
- * 보호:
- *   Vercel Cron 호출은 헤더 `x-vercel-cron-signature` 검증 (배포 시).
- *   로컬/수동 호출은 Bearer Firebase ID token (관리자 가드는 라우트가 아닌 호출 페이지에서).
- *
- * 동작:
- *   1. /icar001/contracts 전체 읽기
- *   2. customerLicenseNo 있는 계약만 RIMS 조회
- *   3. status/expiry 변경되면 RTDB 갱신
- *   4. 정지/취소/만료 발견 시 알림 list 리턴 (UI 에서 SMS 발송 트리거 가능)
- *
- * Vercel 설정 (vercel.json):
- *   { "crons": [{ "path": "/api/cron/license-verify", "schedule": "0 9 * * *" }] }
- *   매일 오전 9시 (UTC 0시 = KST 9시 차이는 별도 조정)
+ * 매일 자정 자동 실행 (vercel.json).
+ * 등록된 면허번호 전체를 RIMS 에 순차 호출 → 상태 변경 시 RTDB 갱신.
+ * 정지/취소/만료/결격 발견 시 outcomes[].alert = true.
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { getAdminRtdb } from '@/lib/firebase/admin';
 import type { Contract } from '@/lib/types';
-import { birthFromIdent, inferKind } from '@/lib/ident';
+import {
+  getRimsEnv,
+  verifyLicense,
+  normalizeLicenseNo,
+  licenseTypeToCode,
+  todayYYYYMMDD,
+  isoToYYYYMMDD,
+} from '@/lib/rims';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5분 — 100건+ 처리
-
-type RimsResult = {
-  ok: boolean;
-  status?: '정상' | '정지' | '취소' | '만료' | '결격' | '확인불가';
-  licenseType?: string;
-  expiryDate?: string;
-  holderName?: string;
-  mock?: boolean;
-  raw?: Record<string, unknown>;
-};
+export const maxDuration = 300; // 5분
 
 type Outcome = {
   contractId: string;
@@ -45,8 +31,10 @@ type Outcome = {
   licenseNo: string;
   before?: string;
   after?: string;
+  rtnCode?: string;
+  rtnLabel?: string;
   changed: boolean;
-  alert: boolean;     // 정지/취소/만료/결격 → 운영 알림 필요
+  alert: boolean;
   error?: string;
 };
 
@@ -54,11 +42,18 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const dry = url.searchParams.get('dry') === '1';
 
-  // Vercel Cron 시그니처 또는 수동 토큰 — production 배포 시 강화
   const cronSig = req.headers.get('x-vercel-cron-signature');
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && !cronSig && req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized cron' }, { status: 401 });
+  }
+
+  const env = getRimsEnv();
+  if (!env) {
+    return NextResponse.json({
+      ok: false,
+      error: 'RIMS env 미설정 — RIMS_AUTH_KEY / RIMS_SECRET_KEY 등록 필요',
+    });
   }
 
   let contracts: Record<string, Contract>;
@@ -76,46 +71,97 @@ export async function GET(req: NextRequest) {
   const outcomes: Outcome[] = [];
   let updated = 0;
   let alerts = 0;
+  const today = todayYYYYMMDD();
 
-  // RIMS 호출 — 순차 (rate limit 보호). 동시성 필요하면 RIMS 명세 받은 후 batch 모드 사용.
+  // 순차 호출 (RIMS 호출량 보호)
   for (const [id, c] of targets) {
-    const result = await callVerify({
-      licenseNo: c.customerLicenseNo!,
-      customerName: c.customerName,
-      birth: birthFromIdent(c.customerIdentNo, inferKind(c.customerIdentNo, c.customerKind)),
-    });
+    const licenseNo = normalizeLicenseNo(c.customerLicenseNo!);
+    const licnConCode = licenseTypeToCode(c.customerLicenseType);
 
-    const before = c.customerLicenseStatus;
-    const after = result.status ?? '확인불가';
-    const changed = before !== after;
-    const alert = ['정지', '취소', '만료', '결격'].includes(after);
+    if (licenseNo.length !== 12) {
+      outcomes.push({
+        contractId: id,
+        contractNo: c.contractNo,
+        customerName: c.customerName,
+        licenseNo: c.customerLicenseNo!,
+        before: c.customerLicenseStatus,
+        after: '확인불가',
+        changed: false,
+        alert: false,
+        error: `면허번호 자릿수 오류 (${licenseNo.length}자리)`,
+      });
+      continue;
+    }
+    if (!licnConCode) {
+      outcomes.push({
+        contractId: id,
+        contractNo: c.contractNo,
+        customerName: c.customerName,
+        licenseNo: c.customerLicenseNo!,
+        before: c.customerLicenseStatus,
+        after: '확인불가',
+        changed: false,
+        alert: false,
+        error: '면허종별 미설정 (customerLicenseType)',
+      });
+      continue;
+    }
 
-    outcomes.push({
-      contractId: id,
-      contractNo: c.contractNo,
-      customerName: c.customerName,
-      licenseNo: c.customerLicenseNo!,
-      before,
-      after,
-      changed,
-      alert,
-      error: result.ok ? undefined : (result.raw?.error as string | undefined),
-    });
+    // 검증 기간: 오늘 ~ 계약 종료일 (없으면 오늘)
+    const toDate = c.returnScheduledDate ? isoToYYYYMMDD(c.returnScheduledDate) : today;
+    const vhclRegNo = c.vehiclePlate || '99임9999';
 
-    if (alert) alerts++;
+    try {
+      const result = await verifyLicense(env, {
+        licenseNo,
+        residentName: c.customerName,
+        licnConCode,
+        fromDate: today,
+        toDate: toDate >= today ? toDate : today,
+        vhclRegNo,
+        bizinfo: env.userId,
+      });
 
-    if (changed && !dry && !result.mock) {
-      try {
+      const before = c.customerLicenseStatus;
+      const after = result.status;
+      const changed = before !== after;
+      const alert = ['정지', '취소', '만료', '결격'].includes(after);
+
+      outcomes.push({
+        contractId: id,
+        contractNo: c.contractNo,
+        customerName: c.customerName,
+        licenseNo: c.customerLicenseNo!,
+        before,
+        after,
+        rtnCode: result.rtnCode,
+        rtnLabel: result.rtnLabel,
+        changed,
+        alert,
+        error: result.rtnMessage,
+      });
+
+      if (alert) alerts++;
+
+      if (changed && !dry) {
         await getAdminRtdb().ref(`icar001/contracts/${id}`).update({
           customerLicenseStatus: after,
           customerLicenseCheckedAt: new Date().toISOString(),
-          customerLicenseExpiry: result.expiryDate ?? c.customerLicenseExpiry ?? null,
-          customerLicenseType: result.licenseType ?? c.customerLicenseType ?? null,
         });
         updated++;
-      } catch (e) {
-        console.error('[license cron]', id, e);
       }
+    } catch (e) {
+      outcomes.push({
+        contractId: id,
+        contractNo: c.contractNo,
+        customerName: c.customerName,
+        licenseNo: c.customerLicenseNo!,
+        before: c.customerLicenseStatus,
+        after: '확인불가',
+        changed: false,
+        alert: false,
+        error: (e as Error).message ?? String(e),
+      });
     }
   }
 
@@ -128,48 +174,4 @@ export async function GET(req: NextRequest) {
     outcomes,
     ranAt: new Date().toISOString(),
   });
-}
-
-async function callVerify(p: { licenseNo: string; customerName: string; birth?: string }): Promise<RimsResult> {
-  const apiKey = process.env.RIMS_API_KEY;
-  const secret = process.env.RIMS_SECRET_KEY;
-  const verifyUrl = process.env.RIMS_VERIFY_URL;
-
-  if (!apiKey || !secret || !verifyUrl) {
-    return { ok: false, mock: true, status: '확인불가', raw: { error: 'RIMS env/endpoint 미설정' } };
-  }
-
-  try {
-    const res = await fetch(verifyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey,
-        'X-Secret-Key': secret,
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ license_no: p.licenseNo, name: p.customerName, birth: p.birth }),
-    });
-    const raw = await res.json().catch(() => ({}));
-    return {
-      ok: res.ok && (raw.code === 0 || raw.code === '0' || raw.result === 'SUCCESS'),
-      status: mapStatus(raw),
-      licenseType: raw.license_type ?? raw.licenseType,
-      expiryDate: raw.expiry_date ?? raw.expiryDate,
-      holderName: raw.holder_name ?? raw.holderName,
-      raw,
-    };
-  } catch (e) {
-    return { ok: false, status: '확인불가', raw: { error: (e as Error).message ?? String(e) } };
-  }
-}
-
-function mapStatus(raw: Record<string, unknown>): RimsResult['status'] {
-  const s = String(raw.status ?? raw.license_status ?? '').toLowerCase();
-  if (s.includes('정상') || s === 'valid' || s === 'active') return '정상';
-  if (s.includes('정지') || s === 'suspended') return '정지';
-  if (s.includes('취소') || s === 'cancelled' || s === 'canceled') return '취소';
-  if (s.includes('만료') || s === 'expired') return '만료';
-  if (s.includes('결격')) return '결격';
-  return '확인불가';
 }

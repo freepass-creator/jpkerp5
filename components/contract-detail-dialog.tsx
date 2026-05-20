@@ -1125,6 +1125,7 @@ function DocumentsTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =>
 
 function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const [licenseNo, setLicenseNo] = useState(c.customerLicenseNo ?? '');
+  const [licenseType, setLicenseType] = useState(c.customerLicenseType ?? '1종 보통');
   const [busy, setBusy] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [ocrInfo, setOcrInfo] = useState<{
@@ -1132,8 +1133,15 @@ function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Cont
     nameMatch?: boolean; birthMatch?: boolean;
   } | null>(null);
   const [result, setResult] = useState<{
-    ok: boolean; status?: string; licenseType?: string; expiryDate?: string;
-    holderName?: string; mock?: boolean; error?: string;
+    ok: boolean;
+    mock?: boolean;
+    status?: string;
+    rtnCode?: string;
+    rtnLabel?: string;
+    rtnMessage?: string;
+    vhclIdntyLabel?: string;
+    licenseNoMasked?: string;
+    error?: string;
   } | null>(null);
 
   const status = result?.status ?? c.customerLicenseStatus ?? '미조회';
@@ -1165,6 +1173,7 @@ function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Cont
       const birth = (raw.birth_date ?? '').trim();
       const ltype = (raw.license_type ?? '').trim();
       const expiry = (raw.expiry_date ?? '').trim();
+      if (ltype) setLicenseType(ltype);
 
       const contractBirth = birthFromIdent(c.customerIdentNo, inferKind(c.customerIdentNo, c.customerKind))
         ?? contractBirthFromMasked(c.customerRegNoMasked);
@@ -1199,7 +1208,10 @@ function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Cont
         body: JSON.stringify({
           licenseNo: licenseNo.trim(),
           customerName: c.customerName,
-          birth: birthFromIdent(c.customerIdentNo, inferKind(c.customerIdentNo, c.customerKind)) ?? c.customerRegNoMasked,
+          licenseType,
+          vehiclePlate: c.vehiclePlate || '99임9999',
+          fromDate: undefined,                          // 서버에서 오늘 기본
+          toDate: c.returnScheduledDate || undefined,   // 계약 종료일까지
         }),
       });
       const json = await res.json();
@@ -1208,10 +1220,9 @@ function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Cont
       onUpdate({
         ...c,
         customerLicenseNo: licenseNo.trim(),
+        customerLicenseType: licenseType,
         customerLicenseStatus: (json.status as Contract['customerLicenseStatus']) ?? '확인불가',
         customerLicenseCheckedAt: new Date().toISOString(),
-        customerLicenseExpiry: json.expiryDate ?? c.customerLicenseExpiry,
-        customerLicenseType: json.licenseType ?? c.customerLicenseType,
       });
     } catch (e) {
       setResult({ ok: false, error: (e as Error).message ?? String(e) });
@@ -1228,15 +1239,32 @@ function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Cont
   return (
     <Section icon={<User size={12} weight="duotone" />} title="면허검증 — 한국교통안전공단 RIMS">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto auto', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 130px auto auto', gap: 8, alignItems: 'center' }}>
           <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>면허번호</div>
           <input
             className="input"
-            placeholder="예: 11-12-345678-90"
+            placeholder="예: 11-12-345678-90 (12자리)"
             value={licenseNo}
             onChange={(e) => setLicenseNo(e.target.value)}
             disabled={busy}
           />
+          <select
+            className="input"
+            value={licenseType}
+            onChange={(e) => setLicenseType(e.target.value)}
+            disabled={busy}
+            title="면허 종별"
+          >
+            <option value="1종 대형">1종 대형</option>
+            <option value="1종 보통">1종 보통</option>
+            <option value="1종 소형">1종 소형</option>
+            <option value="대형견인차">대형견인차</option>
+            <option value="구난차">구난차</option>
+            <option value="소형견인차">소형견인차</option>
+            <option value="2종 보통">2종 보통</option>
+            <option value="2종 소형">2종 소형</option>
+            <option value="2종 원동기">2종 원동기</option>
+          </select>
           <label className="btn" style={{ cursor: ocrBusy ? 'wait' : 'pointer' }}>
             <input
               type="file"
@@ -1292,22 +1320,28 @@ function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Cont
           background: 'var(--bg-card)',
         }}>
           <MiniField label="상태" value={status} valueColor={statusColor} bold />
-          <MiniField label="면허종류" value={result?.licenseType ?? c.customerLicenseType ?? '—'} />
-          <MiniField label="만료일" value={result?.expiryDate ?? c.customerLicenseExpiry ?? '—'} />
+          <MiniField label="RIMS 사유" value={result?.rtnLabel ?? '—'} />
+          <MiniField label="차량확인" value={result?.vhclIdntyLabel ?? '—'} />
           <MiniField label="최근조회" value={checkedAt ? checkedAt.slice(0, 16).replace('T', ' ') : '—'} />
         </div>
 
         {result?.mock && (
           <div style={{ fontSize: 11, color: 'var(--orange-text)', padding: '6px 10px', background: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
             <WarningIcon size={12} weight="fill" style={{ verticalAlign: 'text-top', marginRight: 4 }} />
-            RIMS API 명세 미연결 — mock 응답입니다. RIMS 로그인 후 받은 명세의 endpoint URL을 .env.local 의 RIMS_VERIFY_URL 에 입력하면 실제 조회됩니다.
-            {result.error ? <span style={{ marginLeft: 6, color: 'var(--text-weak)' }}>({result.error})</span> : null}
+            RIMS env 미설정 — mock 응답입니다. .env.local 의 RIMS_AUTH_KEY / RIMS_SECRET_KEY 확인.
+            {result.rtnMessage ? <span style={{ marginLeft: 6, color: 'var(--text-weak)' }}>({result.rtnMessage})</span> : null}
           </div>
         )}
-        {result?.holderName && result.holderName !== c.customerName && (
+        {result && !result.ok && !result.mock && result.rtnMessage && (
           <div style={{ fontSize: 11, color: 'var(--red-text)', padding: '6px 10px', background: 'var(--bg-card)', border: '1px solid var(--red-text)' }}>
             <WarningIcon size={12} weight="fill" style={{ verticalAlign: 'text-top', marginRight: 4 }} />
-            RIMS 명의({result.holderName}) ≠ 계약자({c.customerName}) — 본인 면허 여부 재확인 필요.
+            {result.rtnMessage}
+            {result.rtnCode ? <span style={{ marginLeft: 6, color: 'var(--text-weak)' }}>(코드 {result.rtnCode})</span> : null}
+          </div>
+        )}
+        {result?.licenseNoMasked && (
+          <div style={{ fontSize: 11, color: 'var(--text-weak)', padding: '2px 10px' }}>
+            RIMS 응답 면허번호 (마스킹): <span className="mono">{result.licenseNoMasked}</span>
           </div>
         )}
       </div>
