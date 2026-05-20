@@ -1143,8 +1143,52 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
   const [deposit, setDeposit] = useState('');
   const [manager, setManager] = useState('');
   const [notes, setNotes] = useState('');
+  // 운전자 / 면허
+  const [customerKind, setCustomerKind] = useState<'개인' | '사업자' | '법인'>('개인');
+  const [driverName, setDriverName] = useState('');
+  const [licenseNo, setLicenseNo] = useState('');
+  const [licenseType, setLicenseType] = useState('1종 보통');
+  const [licenseOcrBusy, setLicenseOcrBusy] = useState(false);
 
   const valid = customerName && customerPhone1 && contractDate && monthlyRent;
+
+  async function handleLicenseOcr(file: File) {
+    setLicenseOcrBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('type', 'license');
+      const { getFirebaseAuth } = await import('@/lib/firebase/client');
+      const auth = getFirebaseAuth();
+      const user = auth?.currentUser;
+      const idToken = user ? await user.getIdToken() : '';
+      const res = await fetch('/api/ocr/extract', {
+        method: 'POST',
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+        body: fd,
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'OCR 실패');
+      const raw = json.extracted as Record<string, string | null>;
+      const ln = (raw.license_no ?? '').trim();
+      const ltype = (raw.license_type ?? '').trim();
+      const holder = (raw.holder_name ?? '').trim();
+      if (ln) setLicenseNo(ln);
+      if (ltype) setLicenseType(ltype);
+      // 법인이면 주운전자명, 아니면 계약자명 채우기 (이미 있으면 덮어쓰지 않음)
+      if (holder) {
+        if (customerKind === '법인') {
+          if (!driverName) setDriverName(holder);
+        } else {
+          if (!customerName) setCustomerName(holder);
+        }
+      }
+    } catch (e) {
+      alert('면허증 OCR 실패: ' + ((e as Error).message ?? String(e)));
+    } finally {
+      setLicenseOcrBusy(false);
+    }
+  }
 
   return (
     <form
@@ -1189,12 +1233,79 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
       </div>
 
       <div className="detail-section">
+        <div className="detail-section-header">계약자 구분 / 운전자 면허</div>
+        <div className="detail-section-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 1fr', gap: '10px 14px', alignItems: 'center' }}>
+            <label className="form-label">구분</label>
+            <select className="input" value={customerKind} onChange={(e) => setCustomerKind(e.target.value as typeof customerKind)} style={{ width: 200 }}>
+              <option value="개인">개인</option>
+              <option value="사업자">사업자</option>
+              <option value="법인">법인</option>
+            </select>
+
+            <label className="form-label">등록번호</label>
+            <input
+              className="input"
+              placeholder={customerKind === '사업자' ? '123-45-67890' : customerKind === '법인' ? '110111-1234567' : '900101-1234567'}
+              value={regNo}
+              onChange={(e) => setRegNo(e.target.value)}
+            />
+
+            {customerKind === '법인' && (
+              <>
+                <label className="form-label">주운전자명 *</label>
+                <input
+                  className="input"
+                  placeholder="실제 차량 운전자 (법인 계약 시 필수)"
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  style={{ gridColumn: 'span 3' }}
+                />
+              </>
+            )}
+
+            <label className="form-label">면허번호</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                className="input"
+                placeholder="예: 11-12-345678-90"
+                value={licenseNo}
+                onChange={(e) => setLicenseNo(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <label className="btn" style={{ cursor: licenseOcrBusy ? 'wait' : 'pointer', flex: '0 0 auto' }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={licenseOcrBusy}
+                  onChange={(e) => { if (e.target.files?.[0]) handleLicenseOcr(e.target.files[0]); }}
+                />
+                {licenseOcrBusy ? <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <Camera size={12} weight="duotone" />}
+                면허증 OCR
+              </label>
+            </div>
+
+            <label className="form-label">면허종별</label>
+            <select className="input" value={licenseType} onChange={(e) => setLicenseType(e.target.value)} style={{ width: 200 }}>
+              <option value="1종 대형">1종 대형</option>
+              <option value="1종 보통">1종 보통</option>
+              <option value="1종 소형">1종 소형</option>
+              <option value="대형견인차">대형견인차</option>
+              <option value="구난차">구난차</option>
+              <option value="소형견인차">소형견인차</option>
+              <option value="2종 보통">2종 보통</option>
+              <option value="2종 소형">2종 소형</option>
+              <option value="2종 원동기">2종 원동기</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="detail-section">
         <div className="detail-section-header">계약 조건 (선택)</div>
         <div className="detail-section-body">
           <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 110px 1fr', gap: '10px 14px', alignItems: 'center' }}>
-            <label className="form-label">등록번호</label>
-            <input className="input" placeholder="저장 시 마스킹" value={regNo} onChange={(e) => setRegNo(e.target.value)} />
-
             <label className="form-label">반납예정</label>
             <DateInput value={returnDate} onChange={setReturnDate} style={{ width: 200 }} />
 

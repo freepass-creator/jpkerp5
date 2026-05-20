@@ -52,6 +52,9 @@ export const CONTRACT_COLUMNS: ColumnSpec[] = [
   { label: '자차여부',     field: 'selfInsured',      required: false, example: '가입', hint: '가입/미가입' },
   { label: '거리한도Km',   field: 'distanceLimitKm',  required: false, example: '30000' },
   { label: '담당자',       field: 'manager',          required: false, example: '장근안' },
+  { label: '주운전자',     field: 'driverName',       required: false, example: '박영협', hint: '법인 계약 시 실제 운전자명. 개인/사업자는 비워두면 계약자명이 운전자' },
+  { label: '면허번호',     field: 'customerLicenseNo', required: false, example: '15-02-008830-07', hint: '운전자 면허번호 12자리. 하이픈 무관' },
+  { label: '면허종별',     field: 'customerLicenseType', required: false, example: '1종 보통', hint: '1종 대형/1종 보통/1종 소형/2종 보통/2종 소형/2종 원동기' },
   { label: '비고',         field: 'notes',            required: false, example: '5/16 출고 예정' },
 ];
 

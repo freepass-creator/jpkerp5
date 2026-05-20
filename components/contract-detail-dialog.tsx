@@ -1207,11 +1207,12 @@ function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Cont
         },
         body: JSON.stringify({
           licenseNo: licenseNo.trim(),
-          customerName: c.customerName,
+          // 법인 계약이면 주운전자명, 아니면 계약자명을 RIMS에 보냄
+          customerName: c.customerKind === '법인' ? (c.driverName ?? '') : c.customerName,
           licenseType,
           vehiclePlate: c.vehiclePlate || '99임9999',
-          fromDate: undefined,                          // 서버에서 오늘 기본
-          toDate: c.returnScheduledDate || undefined,   // 계약 종료일까지
+          fromDate: undefined,
+          toDate: c.returnScheduledDate || undefined,
         }),
       });
       const json = await res.json();

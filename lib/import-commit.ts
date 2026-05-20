@@ -140,6 +140,10 @@ export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
   const seqHash = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
   const contractNo = `ICR-${yy}${mm}-${seqHash}`;
 
+  const licenseNoRaw = toStr(get(row, '면허번호', 'customerLicenseNo', 'licenseNo'));
+  const licenseTypeRaw = toStr(get(row, '면허종별', 'customerLicenseType', 'licenseType'));
+  const driverNameRaw = toStr(get(row, '주운전자', 'driverName'));
+
   return {
     contractNo,
     company,
@@ -148,6 +152,9 @@ export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
     customerKind,
     customerIdentNo: identDigits || undefined,
     customerRegNoMasked: regNoMasked,
+    customerLicenseNo: licenseNoRaw || undefined,
+    customerLicenseType: licenseTypeRaw || undefined,
+    driverName: driverNameRaw || undefined,
     customerPhone1: phone1,
     customerPhone2: toStr(get(row, '연락처2', 'customerPhone2')) || undefined,
     customerRegion: toStr(get(row, '지역', 'customerRegion')) || undefined,

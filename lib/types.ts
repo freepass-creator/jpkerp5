@@ -38,12 +38,14 @@ export type Contract = {
   customerPhone2?: string;
   customerRegion?: string;
   customerDistrict?: string;
-  // 면허 — RIMS 조회용
+  // 면허 — RIMS 조회용 (계약자 본인 또는 주운전자)
   customerLicenseNo?: string;        // 면허번호 (예: 11-12-345678-90)
   customerLicenseStatus?: '정상' | '정지' | '취소' | '만료' | '결격' | '확인불가' | '미조회';
   customerLicenseCheckedAt?: string; // 마지막 RIMS 조회 시각 (ISO)
   customerLicenseExpiry?: string;    // RIMS 응답의 만료일
   customerLicenseType?: string;      // 1종/2종 등
+  // 주운전자 — 법인 계약일 때 또는 계약자 ≠ 운전자일 때만. 비어있으면 customerName이 운전자.
+  driverName?: string;
   // 차량 (임베드)
   vehiclePlate: string;
   vehicleModel: string;

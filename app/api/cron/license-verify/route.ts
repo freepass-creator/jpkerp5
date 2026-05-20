@@ -112,9 +112,12 @@ export async function GET(req: NextRequest) {
     const vhclRegNo = c.vehiclePlate || '99임9999';
 
     try {
+      // 법인 계약이면 주운전자명, 아니면 계약자명
+      const residentName = c.customerKind === '법인' ? (c.driverName ?? '') : c.customerName;
+
       const result = await verifyLicense(env, {
         licenseNo,
-        residentName: c.customerName,
+        residentName,
         licnConCode,
         fromDate: today,
         toDate: toDate >= today ? toDate : today,
