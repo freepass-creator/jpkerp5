@@ -4,12 +4,17 @@ import { useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
-  Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft,
+  Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch,
+  Upload, Warning as WarningIcon, X as XIcon,
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import type { Contract, VehicleStatus } from '@/lib/types';
 import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
 import { TODAY } from '@/lib/mock-data';
+import {
+  validateDocument, summarizeIssues,
+  type DocumentKind, type DocumentData, type ValidationIssue,
+} from '@/lib/document-validation';
 
 export function ContractDetailDialog({
   contract,
@@ -39,6 +44,7 @@ export function ContractDetailDialog({
               <Tabs.Trigger value="vehicleSpec" className="tabs-trigger">차량정보</Tabs.Trigger>
               <Tabs.Trigger value="contract" className="tabs-trigger">계약정보</Tabs.Trigger>
               <Tabs.Trigger value="payment" className="tabs-trigger">수납내역</Tabs.Trigger>
+              <Tabs.Trigger value="documents" className="tabs-trigger">서류 검증</Tabs.Trigger>
               <Tabs.Trigger value="vehicleHistory" className="tabs-trigger">차량이력</Tabs.Trigger>
               <Tabs.Trigger value="contractHistory" className="tabs-trigger">계약이력</Tabs.Trigger>
             </Tabs.List>
@@ -48,6 +54,7 @@ export function ContractDetailDialog({
               <Tabs.Content value="vehicleStatus"><VehicleStatusTab c={contract} onUpdate={onUpdate} /></Tabs.Content>
               <Tabs.Content value="contract"><ContractInfoTab c={contract} /></Tabs.Content>
               <Tabs.Content value="payment"><PaymentTab c={contract} onUpdate={onUpdate} /></Tabs.Content>
+              <Tabs.Content value="documents"><DocumentsTab c={contract} onUpdate={onUpdate} /></Tabs.Content>
               <Tabs.Content value="vehicleHistory"><HistoryListTab scope="vehicle" c={contract} /></Tabs.Content>
               <Tabs.Content value="contractHistory"><HistoryListTab scope="contract" c={contract} /></Tabs.Content>
             </div>
@@ -933,4 +940,391 @@ function addMonths(yyyymmdd: string, months: number, day: number): string {
   d.setMonth(d.getMonth() + months);
   d.setDate(Math.min(day, 28));
   return d.toISOString().slice(0, 10);
+}
+
+/* ─────────────── 서류 검증 탭 ─────────────── */
+
+type UploadedDoc = {
+  id: string;
+  kind: DocumentKind;
+  fileName: string;
+  uploadedAt: string;
+  data: DocumentData;
+  issues: ValidationIssue[];
+};
+
+const DOC_KINDS: { value: DocumentKind; label: string; mockData: (c: Contract) => DocumentData }[] = [
+  { value: '자동차등록증', label: '자동차등록증', mockData: (c) => ({
+    vehiclePlate: c.vehiclePlate,
+    vehicleModel: c.vehicleModel,
+    vehicleVin: 'KMHJ381ABLU' + Math.floor(100000 + Math.random() * 900000),
+    vehicleYear: '2024',
+    vehicleOwner: c.company,
+  }) },
+  { value: '보험증권', label: '보험증권', mockData: (c) => ({
+    insurer: 'KB손해보험',
+    insuredName: c.company,
+    insuranceStart: c.contractDate,
+    insuranceEnd: c.returnScheduledDate,
+    insuranceAge: (c.insuranceAge ?? 26) + (Math.random() < 0.3 ? 2 : 0), // 30% 확률로 mismatch
+    insuranceDriverScope: '지정1인',
+  }) },
+  { value: '계약서', label: '계약서/신분증', mockData: (c) => ({
+    customerBirth: '1999-03-15',  // 만 26세 — 보험 26세 제한이면 OK, 28세 제한이면 fail
+    vehiclePlate: c.vehiclePlate,
+    vehicleModel: c.vehicleModel,
+  }) },
+  { value: '할부스케줄', label: '할부스케줄', mockData: (c) => ({
+    installmentTotal: c.monthlyRent * c.termMonths,
+    installmentMonths: c.termMonths + (Math.random() < 0.2 ? 1 : 0),
+    installmentMonthly: c.monthlyRent,
+    installmentStart: c.contractDate,
+  }) },
+];
+
+function DocumentsTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+  const [docs, setDocs] = useState<UploadedDoc[]>([]);
+  const [selectedKind, setSelectedKind] = useState<DocumentKind>('자동차등록증');
+  const [busy, setBusy] = useState(false);
+
+  function handleUpload(file: File) {
+    setBusy(true);
+    // mock OCR — 1.2초 후 추출 데이터 반환
+    setTimeout(() => {
+      const kindSpec = DOC_KINDS.find((k) => k.value === selectedKind);
+      const data = kindSpec ? kindSpec.mockData(c) : {};
+      const issues = validateDocument(data, c, selectedKind);
+      const doc: UploadedDoc = {
+        id: `doc-${Date.now()}`,
+        kind: selectedKind,
+        fileName: file.name,
+        uploadedAt: new Date().toISOString(),
+        data,
+        issues,
+      };
+      setDocs((prev) => [doc, ...prev]);
+      setBusy(false);
+    }, 1200);
+  }
+
+  function removeDoc(id: string) {
+    setDocs((prev) => prev.filter((d) => d.id !== id));
+  }
+
+  return (
+    <div className="detail-stack">
+      <LicenseVerifySection c={c} onUpdate={onUpdate} />
+
+      <Section icon={<FileText size={12} weight="duotone" />} title="서류 업로드 — 데이터와 자동 비교">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="filter-bar">
+            {DOC_KINDS.map((k) => (
+              <button
+                key={k.value}
+                type="button"
+                className={`chip ${selectedKind === k.value ? 'active' : ''}`}
+                onClick={() => setSelectedKind(k.value)}
+              >
+                {k.label}
+              </button>
+            ))}
+          </div>
+          <label className="dropzone" style={{ minHeight: 100, cursor: busy ? 'wait' : 'pointer' }}>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }}
+            />
+            <div className="dropzone-icon">
+              {busy ? <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <Upload weight="duotone" />}
+            </div>
+            <div className="dropzone-title">{busy ? `${selectedKind} 분석 중...` : `${selectedKind} 업로드`}</div>
+            <div className="dropzone-desc">파일 선택 또는 드래그 — OCR 추출 후 계약 데이터와 비교</div>
+          </label>
+        </div>
+      </Section>
+
+      <Section icon={<CheckCircle size={12} weight="duotone" />} title={`업로드된 서류 (${docs.length})`}>
+        {docs.length === 0 ? (
+          <div style={{ padding: '20px 12px', fontSize: 12, color: 'var(--text-weak)', textAlign: 'center' }}>
+            아직 업로드된 서류가 없습니다.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {docs.map((d) => {
+              const sum = summarizeIssues(d.issues);
+              return (
+                <div key={d.id} style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--border-soft)' }}>
+                    <FileText size={14} weight="duotone" style={{ color: 'var(--text-sub)' }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{d.kind}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>{d.fileName} · {d.uploadedAt.slice(0, 10)}</div>
+                    </div>
+                    {sum.ok ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--green-text)', fontWeight: 600 }}>
+                        <CheckCircle size={12} weight="fill" /> 일치
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}>
+                        {sum.errors > 0 && <span style={{ color: 'var(--red-text)' }}><WarningIcon size={12} weight="fill" /> 오류 {sum.errors}</span>}
+                        {sum.warns > 0 && <span style={{ color: 'var(--orange-text)', marginLeft: 6 }}>경고 {sum.warns}</span>}
+                      </span>
+                    )}
+                    <button className="btn btn-sm btn-ghost btn-icon" type="button" onClick={() => removeDoc(d.id)}>
+                      <XIcon />
+                    </button>
+                  </div>
+                  {d.issues.length > 0 && (
+                    <div style={{ padding: '8px 12px' }}>
+                      {d.issues.map((iss, idx) => (
+                        <div key={idx} style={{
+                          display: 'grid',
+                          gridTemplateColumns: '100px 1fr',
+                          gap: 8,
+                          padding: '4px 0',
+                          fontSize: 11,
+                          borderTop: idx > 0 ? '1px solid var(--border-soft)' : 'none',
+                        }}>
+                          <span style={{
+                            color: iss.level === 'error' ? 'var(--red-text)' : 'var(--orange-text)',
+                            fontWeight: 600,
+                          }}>
+                            {iss.label}
+                          </span>
+                          <span style={{ color: 'var(--text-sub)' }}>
+                            <span style={{ color: 'var(--text-main)' }}>계약</span>: {iss.contractValue}
+                            {' / '}
+                            <span style={{ color: iss.level === 'error' ? 'var(--red-text)' : 'var(--orange-text)' }}>서류</span>: {iss.documentValue}
+                            <span style={{ marginLeft: 8, color: 'var(--text-weak)' }}>— {iss.message}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Section>
+    </div>
+  );
+}
+
+/* ─────────────── 면허검증 (RIMS) ─────────────── */
+
+function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+  const [licenseNo, setLicenseNo] = useState(c.customerLicenseNo ?? '');
+  const [busy, setBusy] = useState(false);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrInfo, setOcrInfo] = useState<{
+    holderName?: string; birth?: string; licenseType?: string; expiry?: string;
+    nameMatch?: boolean; birthMatch?: boolean;
+  } | null>(null);
+  const [result, setResult] = useState<{
+    ok: boolean; status?: string; licenseType?: string; expiryDate?: string;
+    holderName?: string; mock?: boolean; error?: string;
+  } | null>(null);
+
+  const status = result?.status ?? c.customerLicenseStatus ?? '미조회';
+  const checkedAt = c.customerLicenseCheckedAt;
+
+  async function handleOcr(file: File) {
+    setOcrBusy(true);
+    setOcrInfo(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('type', 'license');
+      const { getFirebaseAuth } = await import('@/lib/firebase/client');
+      const auth = getFirebaseAuth();
+      const user = auth?.currentUser;
+      const idToken = user ? await user.getIdToken() : '';
+
+      const res = await fetch('/api/ocr/extract', {
+        method: 'POST',
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+        body: fd,
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'OCR 실패');
+
+      const raw = json.extracted as Record<string, string | null>;
+      const ln = (raw.license_no ?? '').trim();
+      const holder = (raw.holder_name ?? '').trim();
+      const birth = (raw.birth_date ?? '').trim();
+      const ltype = (raw.license_type ?? '').trim();
+      const expiry = (raw.expiry_date ?? '').trim();
+
+      const contractBirth = contractBirthFromMasked(c.customerRegNoMasked);
+      const nameMatch = holder && c.customerName ? norm(holder) === norm(c.customerName) : undefined;
+      const birthMatch = birth && contractBirth ? birth === contractBirth : undefined;
+
+      if (ln) setLicenseNo(ln);
+      setOcrInfo({ holderName: holder, birth, licenseType: ltype, expiry, nameMatch, birthMatch });
+    } catch (e) {
+      setOcrInfo({ holderName: `오류: ${(e as Error).message ?? String(e)}` });
+    } finally {
+      setOcrBusy(false);
+    }
+  }
+
+  async function handleVerify() {
+    if (!licenseNo.trim()) return;
+    setBusy(true);
+    setResult(null);
+    try {
+      const { getFirebaseAuth } = await import('@/lib/firebase/client');
+      const auth = getFirebaseAuth();
+      const user = auth?.currentUser;
+      const idToken = user ? await user.getIdToken() : '';
+
+      const res = await fetch('/api/license/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          licenseNo: licenseNo.trim(),
+          customerName: c.customerName,
+          birth: c.customerRegNoMasked,
+        }),
+      });
+      const json = await res.json();
+      setResult(json);
+
+      onUpdate({
+        ...c,
+        customerLicenseNo: licenseNo.trim(),
+        customerLicenseStatus: (json.status as Contract['customerLicenseStatus']) ?? '확인불가',
+        customerLicenseCheckedAt: new Date().toISOString(),
+        customerLicenseExpiry: json.expiryDate ?? c.customerLicenseExpiry,
+        customerLicenseType: json.licenseType ?? c.customerLicenseType,
+      });
+    } catch (e) {
+      setResult({ ok: false, error: (e as Error).message ?? String(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const statusColor =
+    status === '정상' ? 'var(--green-text)' :
+    status === '미조회' || status === '확인불가' ? 'var(--text-weak)' :
+    'var(--red-text)';
+
+  return (
+    <Section icon={<User size={12} weight="duotone" />} title="면허검증 — 한국교통안전공단 RIMS">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto auto', gap: 8, alignItems: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>면허번호</div>
+          <input
+            className="input"
+            placeholder="예: 11-12-345678-90"
+            value={licenseNo}
+            onChange={(e) => setLicenseNo(e.target.value)}
+            disabled={busy}
+          />
+          <label className="btn" style={{ cursor: ocrBusy ? 'wait' : 'pointer' }}>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={ocrBusy}
+              onChange={(e) => { if (e.target.files?.[0]) handleOcr(e.target.files[0]); }}
+            />
+            {ocrBusy ? <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={12} weight="duotone" />}
+            {ocrBusy ? '추출 중...' : '면허증 OCR'}
+          </label>
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={handleVerify}
+            disabled={busy || !licenseNo.trim()}
+          >
+            {busy ? <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : null}
+            {busy ? '조회 중...' : '검증'}
+          </button>
+        </div>
+
+        {ocrInfo && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 8,
+            padding: 10,
+            background: 'var(--bg-sunken)',
+            border: '1px solid var(--border-soft)',
+          }}>
+            <MiniField
+              label="OCR 성명"
+              value={ocrInfo.holderName ?? '—'}
+              valueColor={ocrInfo.nameMatch === false ? 'var(--red-text)' : ocrInfo.nameMatch ? 'var(--green-text)' : undefined}
+            />
+            <MiniField
+              label="OCR 생년월일"
+              value={ocrInfo.birth ?? '—'}
+              valueColor={ocrInfo.birthMatch === false ? 'var(--red-text)' : ocrInfo.birthMatch ? 'var(--green-text)' : undefined}
+            />
+            <MiniField label="면허종류" value={ocrInfo.licenseType ?? '—'} />
+            <MiniField label="갱신만료" value={ocrInfo.expiry ?? '—'} />
+          </div>
+        )}
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 8,
+          padding: 10,
+          border: '1px solid var(--border-soft)',
+          background: 'var(--bg-card)',
+        }}>
+          <MiniField label="상태" value={status} valueColor={statusColor} bold />
+          <MiniField label="면허종류" value={result?.licenseType ?? c.customerLicenseType ?? '—'} />
+          <MiniField label="만료일" value={result?.expiryDate ?? c.customerLicenseExpiry ?? '—'} />
+          <MiniField label="최근조회" value={checkedAt ? checkedAt.slice(0, 16).replace('T', ' ') : '—'} />
+        </div>
+
+        {result?.mock && (
+          <div style={{ fontSize: 11, color: 'var(--orange-text)', padding: '6px 10px', background: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+            <WarningIcon size={12} weight="fill" style={{ verticalAlign: 'text-top', marginRight: 4 }} />
+            RIMS API 명세 미연결 — mock 응답입니다. RIMS 로그인 후 받은 명세의 endpoint URL을 .env.local 의 RIMS_VERIFY_URL 에 입력하면 실제 조회됩니다.
+            {result.error ? <span style={{ marginLeft: 6, color: 'var(--text-weak)' }}>({result.error})</span> : null}
+          </div>
+        )}
+        {result?.holderName && result.holderName !== c.customerName && (
+          <div style={{ fontSize: 11, color: 'var(--red-text)', padding: '6px 10px', background: 'var(--bg-card)', border: '1px solid var(--red-text)' }}>
+            <WarningIcon size={12} weight="fill" style={{ verticalAlign: 'text-top', marginRight: 4 }} />
+            RIMS 명의({result.holderName}) ≠ 계약자({c.customerName}) — 본인 면허 여부 재확인 필요.
+          </div>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+function norm(s: string): string {
+  return s.replace(/\s+/g, '').toLowerCase();
+}
+
+function contractBirthFromMasked(masked?: string): string | undefined {
+  if (!masked) return undefined;
+  const m = masked.match(/^(\d{2})(\d{2})(\d{2})-([1-4])/);
+  if (!m) return undefined;
+  const [, yy, mm, dd, g] = m;
+  const century = (g === '1' || g === '2') ? 1900 : 2000;
+  return `${century + parseInt(yy, 10)}-${mm}-${dd}`;
+}
+
+function MiniField({ label, value, valueColor, bold }: { label: string; value: string; valueColor?: string; bold?: boolean }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: 'var(--text-weak)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 12, color: valueColor ?? 'var(--text-main)', fontWeight: bold ? 600 : 400 }}>{value}</div>
+    </div>
+  );
 }

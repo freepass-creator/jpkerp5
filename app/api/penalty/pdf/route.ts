@@ -43,6 +43,35 @@ declare global {
   var __puppeteer_signals_registered: boolean | undefined;
 }
 
+/**
+ * Windows에서 puppeteer 기본 다운로드가 자주 실패 → ~/.cache/puppeteer/chrome
+ * 에 캐싱된 (다른 프로젝트의) Chrome 자동 탐지 + 재사용.
+ */
+function findLocalChromePath(): string | undefined {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const os = require('os') as typeof import('os');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const path = require('path') as typeof import('path');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = require('fs') as typeof import('fs');
+
+    const cacheDir = path.join(os.homedir(), '.cache', 'puppeteer', 'chrome');
+    if (!fs.existsSync(cacheDir)) return undefined;
+    const versions = fs.readdirSync(cacheDir).sort().reverse();
+    for (const v of versions) {
+      const candidates = [
+        path.join(cacheDir, v, 'chrome-win64', 'chrome.exe'),
+        path.join(cacheDir, v, 'chrome-linux64', 'chrome'),
+        path.join(cacheDir, v, 'chrome-mac-arm64', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+        path.join(cacheDir, v, 'chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+      ];
+      for (const c of candidates) if (fs.existsSync(c)) return c;
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
 async function getBrowser(): Promise<Browser> {
   const existing = globalThis.__puppeteer_browser;
   if (existing && existing.connected) return existing;
@@ -60,8 +89,10 @@ async function getBrowser(): Promise<Browser> {
     }) as unknown as Browser;
   } else {
     const puppeteer = (await import('puppeteer')).default;
+    const executablePath = findLocalChromePath();
     browser = await puppeteer.launch({
       headless: true,
+      ...(executablePath ? { executablePath } : {}),
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--font-render-hinting=none'],
     }) as unknown as Browser;
   }

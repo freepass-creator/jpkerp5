@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AuthGate } from '@/components/auth/auth-gate';
+import { SettingsInit } from '@/components/settings-init';
 
 export const metadata: Metadata = {
   title: 'jpkerp5 — 차량 렌탈 ERP',
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
+        <SettingsInit />
         <AuthGate>{children}</AuthGate>
       </body>
     </html>

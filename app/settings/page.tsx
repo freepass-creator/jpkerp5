@@ -1,0 +1,433 @@
+'use client';
+
+import { useState } from 'react';
+import {
+  Gear, User, Sun, Moon, Desktop, ArrowCounterClockwise, SignOut, BookOpen, Snowflake, Leaf, Coffee,
+  Shield, Play, CircleNotch,
+} from '@phosphor-icons/react';
+import { Sidebar } from '@/components/layout/sidebar';
+import { BottomBar } from '@/components/layout/bottom-bar';
+import { useAuth, logout } from '@/lib/use-auth';
+import { useSettings, type Theme, type FontFamily, type FontSize, type Density, type Radius, type Accent } from '@/lib/use-settings';
+
+type Tab = 'display' | 'account' | 'admin';
+
+export default function SettingsPage() {
+  const [tab, setTab] = useState<Tab>('display');
+  const { user } = useAuth();
+
+  return (
+    <div className="layout">
+      <Sidebar />
+      <div className="app">
+        <header className="topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 600, fontSize: 14, color: 'var(--text-main)' }}>
+            <Gear size={16} weight="fill" style={{ color: 'var(--text-sub)' }} />
+            설정
+          </div>
+        </header>
+
+        <div className="page-shell">
+          <nav className="page-shell-nav">
+            <button type="button" className={`page-shell-nav-item ${tab === 'display' ? 'active' : ''}`} onClick={() => setTab('display')}>
+              <Sun size={14} weight={tab === 'display' ? 'fill' : 'regular'} />
+              <span>화면</span>
+            </button>
+            <button type="button" className={`page-shell-nav-item ${tab === 'account' ? 'active' : ''}`} onClick={() => setTab('account')}>
+              <User size={14} weight={tab === 'account' ? 'fill' : 'regular'} />
+              <span>계정</span>
+            </button>
+            <button type="button" className={`page-shell-nav-item ${tab === 'admin' ? 'active' : ''}`} onClick={() => setTab('admin')}>
+              <Shield size={14} weight={tab === 'admin' ? 'fill' : 'regular'} />
+              <span>관리</span>
+            </button>
+          </nav>
+
+          <main className="page-shell-main">
+            {tab === 'display' && <DisplaySettings />}
+            {tab === 'account' && <AccountSettings />}
+            {tab === 'admin' && <AdminSettings />}
+          </main>
+        </div>
+
+        <BottomBar
+          right={
+            <span>
+              {tab === 'display' && '화면 — 테마 · 글꼴 · 글자 크기 · 행 밀도'}
+              {tab === 'account' && `로그인 — ${user?.email ?? '-'}`}
+              {tab === 'admin' && '관리 — 일일 면허재검증 · 데이터 정비'}
+            </span>
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────── 화면 ──────────────────── */
+
+const THEMES: { value: Theme; label: string; icon: React.ReactNode }[] = [
+  { value: 'light', label: '라이트',  icon: <Sun weight="bold" /> },
+  { value: 'sepia', label: '세피아',  icon: <BookOpen weight="bold" /> },
+  { value: 'cool',  label: '쿨',      icon: <Snowflake weight="bold" /> },
+  { value: 'warm',  label: '웜',      icon: <Coffee weight="bold" /> },
+  { value: 'mint',  label: '민트',    icon: <Leaf weight="bold" /> },
+  { value: 'dark',  label: '다크',    icon: <Moon weight="bold" /> },
+  { value: 'auto',  label: '시스템',  icon: <Desktop weight="bold" /> },
+];
+
+const ACCENTS: { value: Accent; label: string; color: string }[] = [
+  { value: 'navy',   label: '네이비', color: '#1B2A4A' },
+  { value: 'blue',   label: '블루',   color: '#2563eb' },
+  { value: 'indigo', label: '인디고', color: '#4f46e5' },
+  { value: 'teal',   label: '틸',     color: '#0d9488' },
+  { value: 'green',  label: '그린',   color: '#16a34a' },
+  { value: 'red',    label: '레드',   color: '#dc2626' },
+  { value: 'orange', label: '오렌지', color: '#ea580c' },
+  { value: 'purple', label: '퍼플',   color: '#9333ea' },
+  { value: 'slate',  label: '슬레이트', color: '#475569' },
+];
+const FONTS: { value: FontFamily; label: string; desc: string }[] = [
+  { value: 'pretendard',      label: 'Pretendard',         desc: '한글·영문·숫자 통일 (기본)' },
+  { value: 'pretendard-mono', label: 'Pretendard + 등폭',  desc: '영문·숫자는 Consolas' },
+  { value: 'mono',            label: 'Consolas + 굴림체',  desc: '전통 ERP' },
+  { value: 'noto',            label: 'Noto Sans KR',       desc: 'Google 표준' },
+  { value: 'spoqa',           label: 'Spoqa Han Sans Neo', desc: '가독성 우수' },
+  { value: 'nanum',           label: '나눔고딕',           desc: '한국어 표준' },
+  { value: 'nanum-square',    label: '나눔스퀘어 라운드',  desc: '둥근 형태' },
+  { value: 'ibm-plex',        label: 'IBM Plex Sans KR',   desc: '모던' },
+  { value: 'gowun',           label: '고운돋움',           desc: '얇고 우아' },
+  { value: 'system',          label: '시스템 기본',        desc: 'OS 기본' },
+];
+const FONT_SIZES: FontSize[] = [11, 12, 13, 14];
+const DENSITIES: { value: Density; label: string; desc: string }[] = [
+  { value: 'compact',     label: '컴팩트', desc: '많은 정보 (행 30px)' },
+  { value: 'comfortable', label: '편안함', desc: '여유 (행 36px)' },
+];
+const RADII: { value: Radius; label: string; desc: string }[] = [
+  { value: 'square',  label: '직각',  desc: '모서리 0 — 기능 우선 (기본)' },
+  { value: 'soft',    label: '약간',  desc: '모서리 3~8px — 살짝 둥글게' },
+  { value: 'rounded', label: '둥근',  desc: '모서리 4~12px — 부드럽게' },
+];
+
+function DisplaySettings() {
+  const { settings, update, reset } = useSettings();
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
+      <header style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <h1 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>화면</h1>
+        <span style={{ fontSize: 12, color: 'var(--text-weak)' }}>테마 · 글꼴 · 글자 크기 · 행 밀도</span>
+        <div style={{ flex: 1 }} />
+        <button className="btn" type="button" onClick={reset}>
+          <ArrowCounterClockwise /> 기본값 복원
+        </button>
+      </header>
+
+      <Section title="테마">
+        <div className="filter-bar">
+          {THEMES.map((t) => (
+            <button key={t.value} type="button" className={`chip ${settings.theme === t.value ? 'active' : ''}`} onClick={() => update({ theme: t.value })}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="브랜드 색상">
+        <div className="filter-bar">
+          {ACCENTS.map((a) => (
+            <button
+              key={a.value}
+              type="button"
+              className={`chip ${settings.accent === a.value ? 'active' : ''}`}
+              onClick={() => update({ accent: a.value })}
+              title={a.label}
+            >
+              <span style={{
+                display: 'inline-block',
+                width: 12, height: 12,
+                background: a.color,
+                border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: 'var(--radius-sm)',
+              }} />
+              {a.label}
+            </button>
+          ))}
+          {/* 커스텀 색상 picker */}
+          <label
+            className={`chip ${settings.accent === 'custom' ? 'active' : ''}`}
+            style={{ cursor: 'pointer', position: 'relative' }}
+            title="직접 색상 선택"
+          >
+            <span style={{
+              display: 'inline-block',
+              width: 12, height: 12,
+              background: settings.customAccent || '#1B2A4A',
+              border: '1px solid rgba(0,0,0,0.1)',
+              borderRadius: 'var(--radius-sm)',
+            }} />
+            기타
+            <input
+              type="color"
+              value={settings.customAccent || '#1B2A4A'}
+              onChange={(e) => update({ accent: 'custom', customAccent: e.target.value })}
+              style={{
+                position: 'absolute',
+                opacity: 0,
+                width: '100%', height: '100%',
+                top: 0, left: 0,
+                cursor: 'pointer',
+              }}
+            />
+          </label>
+          {settings.accent === 'custom' && (
+            <span style={{ fontSize: 11, color: 'var(--text-weak)', marginLeft: 4, fontFamily: 'var(--font-mono)' }}>
+              {settings.customAccent}
+            </span>
+          )}
+        </div>
+      </Section>
+
+      <Section title="글꼴">
+        <div className="filter-bar">
+          {FONTS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              className={`chip ${settings.fontFamily === f.value ? 'active' : ''}`}
+              onClick={() => update({ fontFamily: f.value })}
+              title={f.desc}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="글자 크기">
+        <div className="filter-bar">
+          {FONT_SIZES.map((sz) => (
+            <button key={sz} type="button" className={`chip ${settings.fontSize === sz ? 'active' : ''}`} onClick={() => update({ fontSize: sz })}>
+              {sz}px
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="행 밀도">
+        <div className="filter-bar">
+          {DENSITIES.map((d) => (
+            <button key={d.value} type="button" className={`chip ${settings.density === d.value ? 'active' : ''}`} onClick={() => update({ density: d.value })} title={d.desc}>
+              {d.label}
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="모서리 (라디우스)">
+        <div className="filter-bar">
+          {RADII.map((r) => (
+            <button key={r.value} type="button" className={`chip ${settings.radius === r.value ? 'active' : ''}`} onClick={() => update({ radius: r.value })} title={r.desc}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {title}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/* ──────────────────── 계정 ──────────────────── */
+
+function AccountSettings() {
+  const { user } = useAuth();
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 560 }}>
+      <header>
+        <h1 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>계정</h1>
+        <p style={{ fontSize: 12, color: 'var(--text-weak)', marginTop: 4 }}>로그인 정보 · 세션 관리</p>
+      </header>
+
+      <section className="detail-section">
+        <div className="detail-section-header">로그인 정보</div>
+        <div className="detail-section-body">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: '50%',
+              background: 'var(--brand-bg)', color: 'var(--brand)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <User size={20} weight="bold" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>{user?.displayName || '직원'}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-weak)', marginTop: 2 }}>{user?.email}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="detail-section">
+        <div className="detail-section-header">세션</div>
+        <div className="detail-section-body" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--text-sub)' }}>현재 세션에서 로그아웃합니다.</span>
+          <button className="btn btn-danger" type="button" onClick={() => void logout()}>
+            <SignOut /> 로그아웃
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ──────────────────── 관리 ──────────────────── */
+
+type LicenseRun = {
+  ok: boolean;
+  dry?: boolean;
+  targets?: number;
+  updated?: number;
+  alerts?: number;
+  outcomes?: Array<{
+    contractId: string;
+    contractNo: string;
+    customerName: string;
+    licenseNo: string;
+    before?: string;
+    after?: string;
+    changed: boolean;
+    alert: boolean;
+    error?: string;
+  }>;
+  ranAt?: string;
+  error?: string;
+};
+
+function AdminSettings() {
+  const [busy, setBusy] = useState(false);
+  const [run, setRun] = useState<LicenseRun | null>(null);
+
+  async function trigger(dry: boolean) {
+    setBusy(true);
+    setRun(null);
+    try {
+      const { getFirebaseAuth } = await import('@/lib/firebase/client');
+      const auth = getFirebaseAuth();
+      const user = auth?.currentUser;
+      const idToken = user ? await user.getIdToken() : '';
+      const res = await fetch(`/api/cron/license-verify${dry ? '?dry=1' : ''}`, {
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+      });
+      const json = await res.json();
+      setRun(json);
+    } catch (e) {
+      setRun({ ok: false, error: (e as Error).message ?? String(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <section className="detail-section">
+        <div className="detail-section-header">면허번호 일괄 재검증 — RIMS</div>
+        <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>
+            등록된 모든 계약의 면허번호를 RIMS에 일괄 조회합니다. 매일 0시 자동 실행 (Vercel Cron).
+            <br />
+            <span style={{ color: 'var(--text-weak)' }}>
+              · 시뮬레이션: RTDB 갱신 없이 결과만 확인
+              <br />
+              · 실행: 정지/취소/만료 발견 시 status 갱신 + 알림 대상 표시
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" type="button" onClick={() => trigger(true)} disabled={busy}>
+              {busy ? <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={12} weight="duotone" />}
+              시뮬레이션 (dry-run)
+            </button>
+            <button className="btn btn-primary" type="button" onClick={() => trigger(false)} disabled={busy}>
+              {busy ? <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={12} weight="fill" />}
+              지금 실행
+            </button>
+          </div>
+
+          {run && (
+            <div style={{ marginTop: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-card)' }}>
+              {!run.ok ? (
+                <div style={{ padding: 10, color: 'var(--red-text)', fontSize: 12 }}>오류: {run.error ?? 'unknown'}</div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, padding: 10, borderBottom: '1px solid var(--border-soft)' }}>
+                    <Kpi label="대상" value={String(run.targets ?? 0)} />
+                    <Kpi label="갱신" value={String(run.updated ?? 0)} />
+                    <Kpi label="경보" value={String(run.alerts ?? 0)} alert={!!run.alerts && run.alerts > 0} />
+                    <Kpi label="모드" value={run.dry ? '시뮬레이션' : '실행'} />
+                  </div>
+                  {run.outcomes && run.outcomes.length > 0 && (
+                    <div style={{ maxHeight: 320, overflow: 'auto' }}>
+                      <table className="table" style={{ fontSize: 11 }}>
+                        <thead>
+                          <tr>
+                            <th>계약</th>
+                            <th>고객</th>
+                            <th>면허번호</th>
+                            <th>이전</th>
+                            <th>이후</th>
+                            <th>비고</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {run.outcomes.map((o) => (
+                            <tr key={o.contractId} style={o.alert ? { background: 'var(--red-text-bg, transparent)' } : undefined}>
+                              <td className="mono">{o.contractNo}</td>
+                              <td>{o.customerName}</td>
+                              <td className="mono">{o.licenseNo}</td>
+                              <td style={{ color: 'var(--text-weak)' }}>{o.before ?? '—'}</td>
+                              <td style={{ color: o.alert ? 'var(--red-text)' : o.changed ? 'var(--orange-text)' : 'var(--text-sub)', fontWeight: o.changed ? 600 : 400 }}>
+                                {o.after ?? '—'}
+                              </td>
+                              <td style={{ color: 'var(--text-weak)' }}>
+                                {o.alert ? '운영 알림 필요' : o.changed ? '상태 변경' : o.error ? `오류: ${o.error}` : '변동 없음'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-weak)' }}>
+                    실행 시각: {run.ranAt ? run.ranAt.slice(0, 19).replace('T', ' ') : '-'}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Kpi({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: 'var(--text-weak)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: alert ? 'var(--red-text)' : 'var(--text-main)' }}>{value}</div>
+    </div>
+  );
+}

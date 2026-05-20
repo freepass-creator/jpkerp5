@@ -54,6 +54,26 @@ export const CONTRACT_COLUMNS: ColumnSpec[] = [
   { label: '비고',         field: 'notes',            required: false, example: '5/16 출고 예정' },
 ];
 
+/* ─────────────── 현황 스냅샷 (운영중 계약 상태 일괄 반영) ─────────────── */
+/**
+ * 기존 운영중인 계약들의 현재 상태를 일괄 업로드해서 계약 마스터에 반영.
+ * 차량번호 기준으로 upsert (있으면 갱신, 없으면 신규).
+ * 업로드 후 수납 엑셀 매칭은 정상 동작 — 미수금이 차감됨.
+ */
+export const SNAPSHOT_COLUMNS: ColumnSpec[] = [
+  { label: '법인등록번호', field: 'corpRegNo',     required: true,  example: '110111-1234567', hint: '회사 마스터의 법인등록번호로 자동 매칭 → 회사명 결정. 미등록은 입력값 그대로.' },
+  { label: '차량번호',   field: 'vehiclePlate',    required: true,  example: '109호1234',  hint: 'UPSERT 키 — 동일 번호 있으면 갱신' },
+  { label: '차명',       field: 'vehicleModel',    required: true,  example: 'K5' },
+  { label: '계약자',     field: 'customerName',    required: true,  example: '홍길동' },
+  { label: '연락처',     field: 'customerPhone1',  required: false, example: '010-1234-5678' },
+  { label: '계약시작일', field: 'contractDate',    required: true,  example: '2026-01-01',  hint: 'YYYY-MM-DD' },
+  { label: '계약종료일', field: 'returnScheduledDate', required: true, example: '2026-12-31', hint: 'YYYY-MM-DD' },
+  { label: '보증금',     field: 'deposit',         required: false, example: '2000000',     hint: '원 단위' },
+  { label: '월대여료',   field: 'monthlyRent',     required: true,  example: '1500000',     hint: '원 단위 (월 청구금액)' },
+  { label: '보험연령',   field: 'insuranceAge',    required: false, example: '26',          hint: '만 N세 — 자동차보험 운전자 연령제한' },
+  { label: '현재미수',   field: 'unpaidAmount',    required: false, example: '1500000',     hint: '오늘 기준 미수 합계 (원). 0이면 정상' },
+];
+
 /* ─────────────── 계좌 입금 트랜잭션 ─────────────── */
 export const BANK_TX_COLUMNS: ColumnSpec[] = [
   { label: '거래일자',     field: 'txDate',       required: true,  example: '2026-05-14' },

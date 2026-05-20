@@ -4,24 +4,15 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  House, Warning, Buildings, CurrencyKrw, ChatCircleDots, Plus,
-  SignOut, Gear, CaretLeft, CaretRight,
+  House, Warning, Buildings, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw,
 } from '@phosphor-icons/react';
-import { useAuth, logout } from '@/lib/use-auth';
 
-type ActionHandlers = {
-  onCreate?: () => void;
-  onSms?: () => void;
-  onLedger?: () => void;
-  onMaster?: () => void;
-  smsCount?: number;
-};
+type SidebarProps = Record<string, never>;
 
 const COLLAPSE_KEY = 'jpkerp5_sidebar_collapsed';
 
-export function Sidebar({ onCreate, onSms, onLedger, onMaster, smsCount }: ActionHandlers = {}) {
+export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
   const pathname = usePathname();
-  const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -53,67 +44,36 @@ export function Sidebar({ onCreate, onSms, onLedger, onMaster, smsCount }: Actio
       </div>
 
       <div className="sb-section">
-        <div className="sb-section-label">메뉴</div>
-        <Link href="/" className={`sb-item ${isActive('/') && pathname === '/' ? 'active' : ''}`} title="홈 — 미수/반납">
+        <Link href="/dashboard" className={`sb-item ${isActive('/dashboard') ? 'active' : ''}`} title="대시보드 (지표 관리)">
+          <ChartBar size={14} weight={isActive('/dashboard') ? 'fill' : 'regular'} />
+          <span>대시보드</span>
+        </Link>
+        <Link href="/" className={`sb-item ${pathname === '/' ? 'active' : ''}`} title="운영 현황 (자산·계약)">
           <House size={14} weight={pathname === '/' ? 'fill' : 'regular'} />
-          <span>홈 — 미수/반납</span>
+          <span>운영 현황</span>
         </Link>
-        <Link href="/penalty" className={`sb-item ${isActive('/penalty') ? 'active' : ''}`} title="과태료 업무">
-          <Warning size={14} weight={isActive('/penalty') ? 'fill' : 'regular'} />
-          <span>과태료 업무</span>
+        <Link href="/payments" className={`sb-item ${isActive('/payments') ? 'active' : ''}`} title="계좌 관리 (계좌·카드)">
+          <CurrencyKrw size={14} weight={isActive('/payments') ? 'fill' : 'regular'} />
+          <span>계좌 관리</span>
         </Link>
-        <button
-          className="sb-item"
-          type="button"
-          onClick={onMaster}
-          disabled={!onMaster}
-          title={onMaster ? '회사(법인) 마스터 관리' : '마스터 (준비중)'}
-        >
-          <Buildings size={14} />
-          <span>회사 마스터</span>
-        </button>
-      </div>
-
-      <div className="sb-section">
-        <div className="sb-section-label">액션</div>
-        {onCreate && (
-          <button className="sb-item primary" type="button" onClick={onCreate} title="신규 생성">
-            <Plus size={14} weight="bold" />
-            <span>신규 생성</span>
-          </button>
-        )}
-        {onSms && (
-          <button className="sb-item" type="button" onClick={onSms} title="문자 발송">
-            <ChatCircleDots size={14} />
-            <span>문자 발송</span>
-            {smsCount !== undefined && smsCount > 0 && <span className="sb-count">{smsCount}</span>}
-          </button>
-        )}
-        {onLedger && (
-          <button className="sb-item" type="button" onClick={onLedger} title="수납이력">
-            <CurrencyKrw size={14} />
-            <span>수납이력</span>
-          </button>
-        )}
       </div>
 
       <div className="sb-spacer" />
 
+      {/* 관리 영역 — 일일 운영과 분리. 과태료·법인·설정 */}
       <div className="sb-foot">
-        <button className="sb-item" type="button" title="설정 — 준비중">
-          <Gear size={14} />
+        <Link href="/penalty" className={`sb-item ${isActive('/penalty') ? 'active' : ''}`} title="과태료 업무">
+          <Warning size={14} weight={isActive('/penalty') ? 'fill' : 'regular'} />
+          <span>과태료 업무</span>
+        </Link>
+        <Link href="/companies" className={`sb-item ${isActive('/companies') ? 'active' : ''}`} title="법인 관리">
+          <Buildings size={14} weight={isActive('/companies') ? 'fill' : 'regular'} />
+          <span>법인 관리</span>
+        </Link>
+        <Link href="/settings" className={`sb-item ${isActive('/settings') ? 'active' : ''}`} title="설정 (화면·계정)">
+          <Gear size={14} weight={isActive('/settings') ? 'fill' : 'regular'} />
           <span>설정</span>
-        </button>
-        {user && (
-          <div className="sb-user">
-            <div>{user.displayName || '직원'}</div>
-            <div className="sb-user-email">{user.email}</div>
-          </div>
-        )}
-        <button className="sb-item" type="button" onClick={() => void logout()} title="로그아웃">
-          <SignOut size={14} />
-          <span>로그아웃</span>
-        </button>
+        </Link>
       </div>
     </aside>
   );

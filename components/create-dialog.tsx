@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as XLSX from 'xlsx';
 import {
@@ -14,7 +14,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { MOCK_CONTRACTS } from '@/lib/mock-data';
 import type { Contract, HistoryCategory, HistoryScope } from '@/lib/types';
 import {
-  VEHICLE_COLUMNS, CONTRACT_COLUMNS, BANK_TX_COLUMNS, CARD_TX_COLUMNS,
+  VEHICLE_COLUMNS, CONTRACT_COLUMNS, BANK_TX_COLUMNS, CARD_TX_COLUMNS, SNAPSHOT_COLUMNS,
   type ColumnSpec,
 } from '@/lib/import-schema';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -24,12 +24,25 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import {
   parseVehicleRow, parseContractRow, parseBankTxRow, parseCardTxRow,
   matchTransactions, applyPaymentsToContracts,
+  parseSnapshotRow, applySnapshotToContract,
 } from '@/lib/import-commit';
+import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 
-type Mode = '차량' | '계약' | '수납' | '이력';
+type Mode = '현황' | '차량' | '계약' | '수납' | '이력';
 
-export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const [mode, setMode] = useState<Mode>('차량');
+export function CreateDialog({
+  open, onOpenChange, initialMode = '현황',
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initialMode?: Mode;
+}) {
+  const [mode, setMode] = useState<Mode>(initialMode);
+
+  // open 될 때마다 initialMode 로 리셋 (다른 페이지에서 다른 탭으로 진입 가능)
+  React.useEffect(() => {
+    if (open) setMode(initialMode);
+  }, [open, initialMode]);
   const [parsed, setParsed] = useState<ParsedSheet[]>([]);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -40,6 +53,7 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const { addMany: addVehicles } = useVehicles();
   const { addMany: addBankTx } = useBankTx();
   const { addMany: addCardTx } = useCardTx();
+  const { companies } = useCompanies();
 
   const reset = useCallback(() => {
     setParsed([]);
@@ -59,7 +73,7 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           console.error('parse fail', f.name, e);
         }
       }
-      const fallback: UploadKind = mode === '이력' || mode === '차량' ? '미분류' : (mode as UploadKind);
+      const fallback: UploadKind = mode === '이력' || mode === '차량' || mode === '현황' ? '미분류' : (mode as UploadKind);
       setParsed((prev) => [
         ...prev,
         ...results.map((r) => ({ ...r, kind: r.kind === '미분류' ? fallback : r.kind })),
@@ -138,6 +152,31 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     }
   }
 
+  async function commitSnapshotRows(rows: Record<string, unknown>[]) {
+    setBusy(true);
+    try {
+      const patches = rows.map((r) => parseSnapshotRow(r, companies)).filter((x): x is NonNullable<typeof x> => !!x);
+      // 차량번호 색인 — 기존 계약 매칭
+      const byPlate = new Map(contracts.map((c) => [c.vehiclePlate.trim(), c]));
+      const updates: Contract[] = [];
+      const creates: Array<Omit<Contract, 'id'>> = [];
+      for (const p of patches) {
+        const existing = byPlate.get(p.vehiclePlate.trim());
+        const out = applySnapshotToContract(existing, p);
+        if (existing && 'id' in out) updates.push(out as Contract);
+        else creates.push(out as Omit<Contract, 'id'>);
+      }
+      if (updates.length > 0) await updateContracts(updates);
+      const created = creates.length > 0 ? await addContracts(creates) : 0;
+      setResult(`스냅샷 반영 — 기존 ${updates.length}건 갱신, 신규 ${created}건 등록 (전체 ${rows.length}행 중 ${rows.length - patches.length}건 제외)`);
+    } catch (e) {
+      console.error(e);
+      setResult(`오류 — ${String((e as Error).message ?? e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function commitVehicleRows(rows: Record<string, unknown>[]) {
     setBusy(true);
     try {
@@ -178,6 +217,7 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
           <Tabs.Root value={mode} onValueChange={(v) => setMode(v as Mode)} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <Tabs.List className="tabs-list">
+              <Tabs.Trigger value="현황" className="tabs-trigger">운영 현황 업로드</Tabs.Trigger>
               <Tabs.Trigger value="차량" className="tabs-trigger">차량 등록</Tabs.Trigger>
               <Tabs.Trigger value="계약" className="tabs-trigger">
                 계약 생성
@@ -192,10 +232,13 @@ export function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
             <div
               style={{ flex: 1, overflow: 'auto', padding: 16 }}
-              onDragOver={(e) => { e.preventDefault(); if (mode !== '이력' && mode !== '차량') setDrag(true); }}
+              onDragOver={(e) => { e.preventDefault(); if (mode !== '이력' && mode !== '차량' && mode !== '현황') setDrag(true); }}
               onDragLeave={() => setDrag(false)}
-              onDrop={(e) => { if (mode !== '이력' && mode !== '차량') onDrop(e); }}
+              onDrop={(e) => { if (mode !== '이력' && mode !== '차량' && mode !== '현황') onDrop(e); }}
             >
+              <Tabs.Content value="현황">
+                <SnapshotPane onCommit={commitSnapshotRows} busy={busy} result={result} />
+              </Tabs.Content>
               <Tabs.Content value="차량">
                 <VehicleRegisterPane
                   onClose={() => onOpenChange(false)}
@@ -441,20 +484,49 @@ function SchemaList({ columns }: { columns: ColumnSpec[] }) {
   );
 }
 
-/* ─────────────── 템플릿 다운로드 ─────────────── */
+/* ─────────────── 템플릿 다운로드 — 양식·노트·예시 포함 ─────────────── */
 
 function downloadTemplate(filename: string, columns: ColumnSpec[]) {
-  const headers = columns.map((c) => c.label);
-  const sample1 = columns.map((c) => c.example);
-  const sample2 = columns.map(() => '');
-  const aoa = [headers, sample1, sample2];
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  // 너비
-  ws['!cols'] = columns.map((c) => ({ wch: Math.max(c.label.length, c.example.length, 8) + 2 }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '템플릿');
-  XLSX.writeFile(wb, filename);
+  // 파일명에서 의미 추출 → 타이틀/노트 자동 결정
+  let title = '일괄 등록 양식';
+  let notes: string[] = [];
+  if (filename.includes('계약')) {
+    title = '계약 일괄 등록 양식';
+    notes = [
+      '· 회사코드 / 사업자번호 / 법인등록번호 중 하나로 회사 자동 매칭',
+      '· 차량번호 한국형식 「12가1234」 또는 「123가1234」',
+      '· 날짜 = YYYY-MM-DD 형식 또는 엑셀 날짜 셀',
+      '· 결제방법 = CMS / 카드 / 세금계산서 / 이체 / 후불 / 현금 / 기타',
+      '· 금액 컬럼은 천단위 콤마 자동 — 콤마 안 찍어도 됨',
+    ];
+  } else if (filename.includes('스냅샷') || filename.includes('현황')) {
+    title = '운영 현황 스냅샷 양식';
+    notes = [
+      '· UPSERT — 차량번호 기준 동일 번호 있으면 갱신, 없으면 신규',
+      '· 법인등록번호 = 회사 마스터 등록된 법인번호로 자동 매칭 → 회사명 결정',
+      '· 계약시작일/계약종료일 = YYYY-MM-DD 형식. 회차는 자동 계산',
+      '· 현재미수 = 오늘 기준 미수 합계. 이후 수납 엑셀로 자동 차감',
+    ];
+  } else if (filename.includes('차량')) {
+    title = '차량(자산) 일괄 등록 양식';
+    notes = [
+      '· 차량번호 미정이면 「미정」 으로 입력 → 구매대기 상태로 등록',
+      '· 회사명 = 회사 마스터 등록된 회사명',
+    ];
+  } else if (filename.includes('계좌')) {
+    title = '계좌 입금내역 일괄 등록 양식';
+    notes = [
+      '· 입금자명·금액 기준으로 계약과 자동 매칭 (±10%)',
+      '· 출금 행은 무시 (입금만)',
+    ];
+  } else if (filename.includes('카드')) {
+    title = '카드 매출내역 일괄 등록 양식';
+    notes = [
+      '· 승인번호·금액 기준으로 계약과 자동 매칭',
+      '· 고객명 입력 시 매칭 정확도 향상',
+    ];
+  }
+  excelTemplate(filename, columns, { title, notes });
 }
 
 /* ─────────────── 파일 미리보기 ─────────────── */
@@ -668,19 +740,43 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
 
 function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [extracted, setExtracted] = useState<{ plate: string; model: string; company: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [extracted, setExtracted] = useState<{ plate: string; model: string; company: string; vin?: string; year?: string } | null>(null);
 
-  function handleImage(file: File) {
+  async function handleImage(file: File) {
     setBusy(true);
-    // mock OCR — 실제로는 Vision API 등 호출
-    setTimeout(() => {
-      setExtracted({
-        plate: '109호' + Math.floor(1000 + Math.random() * 9000),
-        model: '차종',
-        company: '',
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('type', 'vehicle_reg');
+
+      // Firebase ID token (서버 requireAuth)
+      const { getFirebaseAuth } = await import('@/lib/firebase/client');
+      const auth = getFirebaseAuth();
+      const user = auth?.currentUser;
+      const idToken = user ? await user.getIdToken() : '';
+
+      const res = await fetch('/api/ocr/extract', {
+        method: 'POST',
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+        body: fd,
       });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'OCR 실패');
+      const raw = json.extracted as Record<string, unknown>;
+      setExtracted({
+        plate: String(raw.car_number ?? raw.plate ?? ''),
+        model: String(raw.car_name ?? raw.model ?? ''),
+        company: String(raw.owner_name ?? raw.company ?? ''),
+        vin: String(raw.vin ?? raw.chassis_no ?? '') || undefined,
+        year: String(raw.year_model ?? raw.model_year ?? '') || undefined,
+      });
+    } catch (e) {
+      setError((e as Error).message ?? String(e));
+    } finally {
       setBusy(false);
-    }, 1400);
+    }
   }
 
   if (busy) {
@@ -715,6 +811,18 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
               <input className="input" value={extracted.model} onChange={(e) => setExtracted({ ...extracted, model: e.target.value })} />
               <label className="form-label">차량번호</label>
               <input className="input" value={extracted.plate} onChange={(e) => setExtracted({ ...extracted, plate: e.target.value })} style={{ width: 240 }} />
+              {extracted.vin && (
+                <>
+                  <label className="form-label">차대번호</label>
+                  <input className="input mono" value={extracted.vin} onChange={(e) => setExtracted({ ...extracted, vin: e.target.value })} />
+                </>
+              )}
+              {extracted.year && (
+                <>
+                  <label className="form-label">연식</label>
+                  <input className="input mono" value={extracted.year} onChange={(e) => setExtracted({ ...extracted, year: e.target.value })} style={{ width: 120 }} />
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -754,12 +862,17 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
       <div className="dropzone-title">자동차등록증 스캔</div>
       <div className="dropzone-desc">
         등록증 사진(.jpg/.png) 또는 스캔본(.pdf) 업로드 시<br />
-        차량번호 · 차종 · 회사를 자동 추출합니다
+        차량번호 · 차종 · 차대번호 · 연식 · 소유자 등 자동 추출 (Gemini Vision)
       </div>
       <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('icar-ocr-file')?.click(); }}>
         <Camera size={14} /> 이미지 선택
       </button>
       <div className="dropzone-hint">또는 여기에 끌어다 놓기</div>
+      {error && (
+        <div style={{ marginTop: 10, padding: 8, background: 'var(--red-bg)', color: 'var(--red-text)', fontSize: 11, border: '1px solid var(--red-border)' }}>
+          ❌ {error}
+        </div>
+      )}
     </div>
   );
 }
@@ -857,6 +970,110 @@ function VehicleExcelPane({
         >
           {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
           {' '}최종 저장 {totalRows}건
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── 현황 스냅샷 Pane — 차량번호 upsert ─────────────── */
+
+function SnapshotPane({
+  onCommit, busy, result,
+}: {
+  onCommit: (rows: Record<string, unknown>[]) => Promise<void>;
+  busy: boolean;
+  result: string | null;
+}) {
+  const [sheets, setSheets] = useState<ParsedSheet[]>([]);
+  const [drag, setDrag] = useState(false);
+  const inputId = 'icar-snapshot-bulk-file';
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    const out: ParsedSheet[] = [];
+    for (const f of files) {
+      try {
+        const parsed = await parseExcelFile(f);
+        out.push(...parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setSheets((prev) => [...prev, ...out]);
+  }, []);
+
+  const totalRows = sheets.reduce((s, p) => s + p.rows.length, 0);
+
+  if (sheets.length === 0) {
+    return (
+      <div
+        className={cn('dropzone', drag && 'drag')}
+        style={{ minHeight: 240, flex: 1 }}
+        onClick={() => document.getElementById(inputId)?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => {
+          e.preventDefault(); setDrag(false);
+          const fs = Array.from(e.dataTransfer.files).filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name));
+          if (fs.length > 0) void handleFiles(fs);
+        }}
+      >
+        <input
+          id={inputId} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden"
+          onChange={(e) => { if (e.target.files) { void handleFiles(Array.from(e.target.files)); e.target.value = ''; } }}
+        />
+        <div className="dropzone-icon"><FileXls size={28} weight="duotone" /></div>
+        <div className="dropzone-title">계약 현황 스냅샷 업로드</div>
+        <div className="dropzone-desc">
+          운영중인 계약의 현재 상태를 일괄 반영 — 차량번호 기준 UPSERT.<br />
+          이후 수납 엑셀 업로드 시 자동매칭으로 미수금이 차감되며 회차가 진행됩니다.
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById(inputId)?.click(); }}>
+            <Plus size={14} weight="bold" /> 엑셀 파일 선택
+          </button>
+          <button className="btn" type="button" onClick={(e) => { e.stopPropagation(); downloadTemplate('계약현황_스냅샷_템플릿.xlsx', SNAPSHOT_COLUMNS); }}>
+            <DownloadSimple size={14} /> 템플릿
+          </button>
+        </div>
+        <div className="dropzone-hint">또는 여기에 끌어다 놓기 · .xlsx / .xls / .csv</div>
+        <SchemaList columns={SNAPSHOT_COLUMNS} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="dropzone compact" onClick={() => document.getElementById(inputId)?.click()}>
+        <div className="dropzone-icon"><FileArrowUp size={16} weight="duotone" /></div>
+        <div className="dropzone-title">파일 추가</div>
+        <span className="text-weak text-xs ml-auto">또는 끌어다 놓기</span>
+        <input
+          id={inputId} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden"
+          onChange={(e) => { if (e.target.files) { void handleFiles(Array.from(e.target.files)); e.target.value = ''; } }}
+        />
+      </div>
+      {sheets.map((p, i) => (
+        <SheetPreview key={`${p.fileName}-${p.sheetName}-${i}`} sheet={p} onChangeKind={() => { /* no-op */ }} />
+      ))}
+      {result && (
+        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 6, fontSize: 12, border: '1px solid var(--green-border)' }}>
+          {result}
+        </div>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          className="btn btn-primary"
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            const rows = sheets.flatMap((s) => s.rows);
+            await onCommit(rows);
+            setSheets([]);
+          }}
+        >
+          {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
+          {' '}현황 반영 {totalRows}건 (UPSERT)
         </button>
       </div>
     </div>

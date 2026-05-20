@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { ref, set, onValue } from 'firebase/database';
-import { getRtdb } from './firebase/client';
+import { ref, set, onValue, get } from 'firebase/database';
+import { getRtdb, ensureAuth } from './firebase/client';
 import { stripUndef } from './store-utils';
 
 /**
@@ -74,22 +74,43 @@ export function createKeyedStore<T>(opts: Options<T>) {
   /** 첫 onValue fire 후 true. 그 전엔 setItems 가 RTDB write 거부 (레이스 컨디션 데이터 손실 방지). */
   let initialized = false;
 
-  function ensureSubscription() {
+  async function ensureSubscription() {
     if (subscribed || typeof window === 'undefined') return;
     subscribed = true;
     const db = getRtdb();
     if (!db) {
-      // Firebase 미설정 시 로컬 모드 — 초기화만 마침
       initialized = true;
       listeners.forEach((l) => l(cache));
       return;
     }
-    onValue(ref(db, path), (snap) => {
-      const v = fromRtdb(snap.val());
-      cache = v;
-      initialized = true;
-      listeners.forEach((l) => l(v));
-    });
+
+    // 1) auth 대기 (RTDB Rules 가 auth 요구)
+    try { await ensureAuth(); } catch (e) {
+      console.warn(`[${storeName}] auth not ready`, e);
+    }
+
+    // 2) get() 으로 첫 로드 — initialized 보장. 에러여도 통과.
+    try {
+      const snap = await get(ref(db, path));
+      cache = fromRtdb(snap.val());
+    } catch (e) {
+      console.warn(`[${storeName}] initial get failed`, e);
+    }
+    initialized = true;
+    listeners.forEach((l) => l(cache));
+
+    // 3) 실시간 업데이트는 onValue
+    try {
+      onValue(ref(db, path), (snap) => {
+        const v = fromRtdb(snap.val());
+        cache = v;
+        listeners.forEach((l) => l(v));
+      }, (err) => {
+        console.warn(`[${storeName}] onValue error`, err);
+      });
+    } catch (e) {
+      console.warn(`[${storeName}] subscribe failed`, e);
+    }
   }
 
   function useStore() {
@@ -97,7 +118,7 @@ export function createKeyedStore<T>(opts: Options<T>) {
     const [ready, setReady] = useState<boolean>(() => initialized);
 
     useEffect(() => {
-      ensureSubscription();
+      void ensureSubscription();
       const fn = (v: T[]) => { setLocal(v); setReady(true); };
       listeners.add(fn);
       setLocal(cache);

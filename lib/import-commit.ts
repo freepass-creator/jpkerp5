@@ -1,7 +1,7 @@
 // 엑셀 한 행 → DB 레코드 변환 + 자동 매칭 헬퍼
 
 import type {
-  Contract, Vehicle, CompanyCode, VehicleStatus, BankTransaction, CardTransaction,
+  Contract, Vehicle, CompanyCode, VehicleStatus, BankTransaction, CardTransaction, Company,
 } from './types';
 
 type Row = Record<string, unknown>;
@@ -165,6 +165,186 @@ export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
     totalSeq: termMonths,
     unpaidAmount: 0,      // 초기값 — 수납 매칭 시 갱신
     unpaidSeqCount: 0,
+  };
+}
+
+/* ──────────────── 현황 스냅샷 ──────────────── */
+
+/**
+ * 스냅샷 행 파싱 결과 — upsert 키는 차량번호.
+ * 기존 contract 있으면 patch, 없으면 신규 생성.
+ */
+export type SnapshotPatch = {
+  vehiclePlate: string;
+  company: string;
+  vehicleModel: string;
+  customerName: string;
+  customerPhone1: string;
+  contractDate: string;
+  returnScheduledDate: string;
+  termMonths: number;
+  deposit: number;
+  monthlyRent: number;
+  insuranceAge?: number;
+  currentSeq: number;
+  unpaidAmount: number;
+  unpaidSeqCount: number;
+};
+
+/** 계약시작일/계약종료일 셀 파싱 — 별도 두 셀. legacy "계약기간" 단일 셀도 fallback 처리. */
+function parseContractPeriod(row: Row): { start: string; end: string; months: number } {
+  let start = toDate(get(row, '계약시작일', '시작일', 'contractDate', 'startDate'));
+  let end = toDate(get(row, '계약종료일', '종료일', 'returnScheduledDate', 'endDate'));
+
+  // legacy "계약기간" 단일 셀 — "2026-01-01 ~ 2026-12-31"
+  if (!start || !end) {
+    const periodStr = toStr(get(row, '계약기간', 'contractPeriod', 'period'));
+    if (periodStr) {
+      const parts = periodStr.split(/\s*[~→]|(?<=\d)\s*-\s*(?=\d{4})|\s+to\s+/i)
+        .map((s) => s.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        if (!start) start = toDate(parts[0]);
+        if (!end) end = toDate(parts[1]);
+      }
+    }
+  }
+
+  if (!start) start = new Date().toISOString().slice(0, 10);
+
+  let months = 12;
+  if (start && end) {
+    const d1 = new Date(start);
+    const d2 = new Date(end);
+    months = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+  }
+  return { start, end, months };
+}
+
+/** 계약시작일 → 오늘 기준 현재 회차 (1-indexed, termMonths로 clamp) */
+function computeCurrentSeq(contractDate: string, termMonths: number): number {
+  if (!contractDate) return 1;
+  const start = new Date(contractDate);
+  const today = new Date();
+  const months = (today.getFullYear() - start.getFullYear()) * 12
+    + (today.getMonth() - start.getMonth()) + 1;
+  return Math.max(1, Math.min(termMonths, months));
+}
+
+/** 등록번호 정규화 — 하이픈/공백 제거 */
+function normalizeRegNo(s: string): string {
+  return s.replace(/[-\s]/g, '');
+}
+
+/**
+ * 법인등록번호 → 회사명 매핑. 회사 마스터의 법인번호와 매칭되면 회사명 반환,
+ * 미등록이면 입력값 그대로 반환 (CompanyDialog의 "미등록 법인" 섹션에 자동 노출됨).
+ * fallback: 사업자번호 → 회사명 (구버전 호환).
+ */
+function resolveCompanyByRegNo(regNoOrName: string, companies?: Company[]): string {
+  if (!regNoOrName) return '';
+  const norm = normalizeRegNo(regNoOrName);
+  if (companies && companies.length > 0) {
+    // 1순위: 법인등록번호
+    const byCorp = companies.find((c) => c.corpRegNo && normalizeRegNo(c.corpRegNo) === norm);
+    if (byCorp) return byCorp.name;
+    // 2순위: 사업자등록번호 (legacy 호환)
+    const byBiz = companies.find((c) => c.bizRegNo && normalizeRegNo(c.bizRegNo) === norm);
+    if (byBiz) return byBiz.name;
+  }
+  return regNoOrName;  // 미등록 — 사용자가 입력한 값 그대로
+}
+
+export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch | null {
+  const plate = toStr(get(row, '차량번호', 'vehiclePlate', 'plate'));
+  const customerName = toStr(get(row, '계약자', '계약자명', 'customerName'));
+  const monthlyRent = toNum(get(row, '월대여료', '월렌트료', 'monthlyRent'));
+  if (!plate || !customerName || monthlyRent <= 0) return null;
+
+  const regNoOrName = toStr(get(row, '법인등록번호', '법인번호', '사업자번호', '회사명', '회사', 'corpRegNo', 'bizRegNo', 'company'));
+  const company = resolveCompanyByRegNo(regNoOrName, companies);
+  const vehicleModel = toStr(get(row, '차명', '차종', 'vehicleModel')) || '미정';
+  const phone = toStr(get(row, '연락처', '연락처1', 'customerPhone1'));
+  const period = parseContractPeriod(row);
+  const deposit = toNum(get(row, '보증금', 'deposit'));
+  const insuranceAge = toNum(get(row, '보험연령', 'insuranceAge')) || undefined;
+
+  // 계약회차는 자동 계산 (계약시작일 ~ 오늘)
+  const currentSeq = computeCurrentSeq(period.start, period.months);
+  const unpaidAmount = toNum(get(row, '현재미수', '미수금', 'unpaidAmount'));
+  const unpaidSeqCount = unpaidAmount > 0 && monthlyRent > 0
+    ? Math.ceil(unpaidAmount / monthlyRent)
+    : 0;
+
+  return {
+    vehiclePlate: plate,
+    company,
+    vehicleModel,
+    customerName,
+    customerPhone1: phone,
+    contractDate: period.start,
+    returnScheduledDate: period.end,
+    termMonths: period.months,
+    deposit,
+    monthlyRent,
+    insuranceAge,
+    currentSeq,
+    unpaidAmount,
+    unpaidSeqCount,
+  };
+}
+
+/** 스냅샷 patch를 기존 Contract 위에 덮어 — 신규는 새 Contract 생성 */
+export function applySnapshotToContract(
+  existing: Contract | undefined,
+  patch: SnapshotPatch,
+): Contract | Omit<Contract, 'id'> {
+  if (existing) {
+    return {
+      ...existing,
+      company: (patch.company || existing.company) as Contract['company'],
+      vehiclePlate: patch.vehiclePlate,
+      vehicleModel: patch.vehicleModel || existing.vehicleModel,
+      customerName: patch.customerName || existing.customerName,
+      customerPhone1: patch.customerPhone1 || existing.customerPhone1,
+      contractDate: patch.contractDate || existing.contractDate,
+      returnScheduledDate: patch.returnScheduledDate || existing.returnScheduledDate,
+      termMonths: patch.termMonths || existing.termMonths,
+      deposit: patch.deposit || existing.deposit,
+      monthlyRent: patch.monthlyRent || existing.monthlyRent,
+      insuranceAge: patch.insuranceAge ?? existing.insuranceAge,
+      currentSeq: patch.currentSeq,
+      totalSeq: Math.max(patch.currentSeq, existing.totalSeq || patch.termMonths),
+      unpaidAmount: patch.unpaidAmount,
+      unpaidSeqCount: patch.unpaidSeqCount,
+    };
+  }
+
+  // 신규
+  const yy = patch.contractDate.slice(2, 4);
+  const mm = patch.contractDate.slice(5, 7);
+  const seqHash = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return {
+    contractNo: `ICR-${yy}${mm}-${seqHash}`,
+    company: (patch.company || '기타') as Contract['company'],
+    customerName: patch.customerName,
+    customerPhone1: patch.customerPhone1,
+    vehiclePlate: patch.vehiclePlate,
+    vehicleModel: patch.vehicleModel,
+    vehicleStatus: '운행',
+    contractDate: patch.contractDate,
+    returnScheduledDate: patch.returnScheduledDate || undefined,
+    termMonths: patch.termMonths,
+    longTerm: patch.termMonths >= 12,
+    monthlyRent: patch.monthlyRent,
+    deposit: patch.deposit,
+    insuranceAge: patch.insuranceAge,
+    paymentDay: 1,
+    paymentMethod: '이체',
+    status: '운행',
+    currentSeq: patch.currentSeq,
+    totalSeq: Math.max(patch.currentSeq, patch.termMonths),
+    unpaidAmount: patch.unpaidAmount,
+    unpaidSeqCount: patch.unpaidSeqCount,
   };
 }
 

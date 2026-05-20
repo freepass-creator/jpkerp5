@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X } from '@phosphor-icons/react';
+import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, CurrencyKrw } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
+import { BottomBar } from '@/components/layout/bottom-bar';
 import {
   TODAY,
   buildDeliveries,
@@ -17,7 +18,6 @@ import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
 import { SmsDialog } from '@/components/sms-dialog';
 import { PaymentLedgerDialog } from '@/components/payment-ledger-dialog';
-import { CompanyDialog } from '@/components/company-dialog';
 
 type View = '전체' | '계약중' | '휴차' | '미수';
 const VIEWS: View[] = ['전체', '계약중', '휴차', '미수'];
@@ -47,7 +47,7 @@ function matchesCompany(c: Contract, co: string): boolean {
 }
 
 /** 컬럼 정렬 키 — 수동 정렬 시 클릭한 컬럼명 */
-type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '계약상태' | '계약기간' | '반납까지' | '수납상태' | '미수금' | '담당';
+type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '계약기간' | '회차' | '반납까지' | '수납상태' | '미수금' | '담당';
 type SortDir = 'asc' | 'desc';
 
 const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약완료', '휴차', '반납'];
@@ -62,8 +62,10 @@ function compareForCol(a: Contract, b: Contract, col: SortCol): number {
     case '차종': return a.vehicleModel.localeCompare(b.vehicleModel);
     case '계약자': return a.customerName.localeCompare(b.customerName);
     case '연락처': return a.customerPhone1.localeCompare(b.customerPhone1);
+    case '보험연령': return (a.insuranceAge ?? 0) - (b.insuranceAge ?? 0);
     case '계약상태': return CS_ORDER.indexOf(getContractState(a).name) - CS_ORDER.indexOf(getContractState(b).name);
     case '계약기간': return a.contractDate.localeCompare(b.contractDate);
+    case '회차': return (a.currentSeq ?? 0) - (b.currentSeq ?? 0);
     case '반납까지': {
       const aD = a.returnScheduledDate ?? '9999-12-31';
       const bD = b.returnScheduledDate ?? '9999-12-31';
@@ -188,7 +190,6 @@ export default function Page() {
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
-  const [companyOpen, setCompanyOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Firebase RTDB 실시간 구독 — /icar001/contracts
@@ -303,13 +304,7 @@ export default function Page() {
 
   return (
     <div className="layout">
-      <Sidebar
-        onCreate={() => setCreateOpen(true)}
-        onSms={() => setSmsOpen(true)}
-        onLedger={() => setLedgerOpen(true)}
-        onMaster={() => setCompanyOpen(true)}
-        smsCount={selectedIds.size}
-      />
+      <Sidebar />
       <div className="app">
       <header className="topbar">
         <div className="topbar-search">
@@ -332,20 +327,20 @@ export default function Page() {
               </button>
             );
           })}
-          <span className="filter-divider" />
-          {companies.map((co) => {
-            const cnt = companyCounts[co] ?? 0;
-            return (
-              <button
-                key={co}
-                className={`chip ${companyFilter === co ? 'active' : ''}`}
-                onClick={() => setCompanyFilter(co)}
-              >
-                {co}
-                {cnt > 0 && <span className="chip-count">{cnt}</span>}
-              </button>
-            );
-          })}
+          {companies.length > 1 && (
+            <>
+              <span className="filter-divider" />
+              {companies.map((co) => {
+                const cnt = companyCounts[co] ?? 0;
+                return (
+                  <button key={co} className={`chip ${companyFilter === co ? 'active' : ''}`} onClick={() => setCompanyFilter(co)}>
+                    {co}
+                    {cnt > 0 && <span className="chip-count">{cnt}</span>}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
 
         <div className="topbar-right">
@@ -357,17 +352,45 @@ export default function Page() {
           </span>
           <span className="topbar-date">{dateWithDow(TODAY)}</span>
         </div>
-
-        {selectedIds.size > 0 && (
-          <button className="btn btn-sm" onClick={clearSelection} title="선택 해제">
-            <X size={12} /> 선택 해제 ({selectedIds.size})
-          </button>
-        )}
       </header>
 
-      {/* DASHBOARD */}
+      {/* 운영 KPI 스트립 — 한 줄 요약 */}
+      <div className="kpi-strip">
+        <span className="kpi-chip brand">
+          <Truck /> 운영중 <strong>{contracts.filter((c) => !!c.deliveredDate && !c.returnedDate && c.status !== '해지').length}</strong>
+        </span>
+        <span className="kpi-chip">
+          전체 <strong>{contracts.length}</strong>건
+        </span>
+        <span className="kpi-chip">
+          월매출 <strong className="mono">₩{formatCurrency(contracts.filter((c) => c.status === '운행').reduce((s, c) => s + (c.monthlyRent ?? 0), 0))}</strong>
+        </span>
+        {summary.totalUnpaid > 0 && (
+          <span className="kpi-chip red">
+            <Warning /> 미수 <strong className="mono">₩{formatCurrency(summary.totalUnpaid)}</strong> ({summary.unpaidCount}건)
+          </span>
+        )}
+        {overdue.filter((o) => o.type === '반납지연').length > 0 && (
+          <span className="kpi-chip orange">
+            <ArrowUDownLeft /> 반납지연 <strong>{overdue.filter((o) => o.type === '반납지연').length}</strong>
+          </span>
+        )}
+        {returns.filter((r) => r.status === '예정').length > 0 && (
+          <span className="kpi-chip">
+            반납 임박 <strong>{returns.filter((r) => r.status === '예정').length}</strong>
+          </span>
+        )}
+        {selectedIds.size > 0 && (
+          <span className="kpi-chip brand" style={{ marginLeft: 'auto' }}>
+            선택 <strong>{selectedIds.size}</strong>
+            <button className="btn btn-sm btn-ghost btn-icon" onClick={clearSelection} title="선택 해제" style={{ marginLeft: 4 }}>
+              <X />
+            </button>
+          </span>
+        )}
+      </div>
+
       <div className="dashboard">
-        {/* MAIN — 계약 리스트 */}
         <div className="panel">
           <div className="panel-body">
             <table className="table">
@@ -396,8 +419,10 @@ export default function Page() {
                   <SortableTh col="차종" sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="계약자" width={96} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="연락처" width={116} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="보험연령" align="center" width={70} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="계약상태" align="center" width={80} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="계약기간" align="center" width={152} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="회차" align="center" width={64} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="반납까지" align="center" width={76} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="수납상태" align="center" width={86} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="미수금" align="num" width={110} sort={manualSort} onSort={toggleSort} />
@@ -408,7 +433,7 @@ export default function Page() {
               <tbody>
                 {filteredContracts.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="muted center" style={{ padding: 32 }}>표시할 계약이 없습니다.</td>
+                    <td colSpan={16} className="muted center" style={{ padding: 32 }}>표시할 계약이 없습니다.</td>
                   </tr>
                 ) : (
                   filteredContracts.map((c) => {
@@ -419,11 +444,18 @@ export default function Page() {
                     const ps = getPaymentState(c);
 
                     const isChecked = selectedIds.has(c.id);
+                    // status strip — 빨강(미수 30일+ 또는 반납지연) / 주황(미수 0~30) / 초록(정상 운영)
+                    let alertClass = '';
+                    if (ps.name === '미납' && ps.days > 30) alertClass = 'alert-red';
+                    else if (isReturnOverdue) alertClass = 'alert-red';
+                    else if (ps.name === '미납') alertClass = 'alert-orange';
+                    else if (cs.name === '위반' || cs.name === '미수검') alertClass = 'alert-amber';
+                    else if (isRunning(c)) alertClass = 'alert-green';
                     return (
                       <tr
                         key={c.id}
                         onDoubleClick={() => handleRowDoubleClick(c)}
-                        className={`${selected?.id === c.id ? 'selected' : ''} ${isChecked ? 'selected-row' : ''}`}
+                        className={`status-row ${alertClass} ${selected?.id === c.id ? 'selected' : ''} ${isChecked ? 'selected-row' : ''}`}
                         onClick={() => setSelectedId(c.id)}
                       >
                         {/* 체크박스 */}
@@ -447,12 +479,20 @@ export default function Page() {
                         {/* 고객 */}
                         <td>{c.customerName}</td>
                         <td className="mono dim">{c.customerPhone1}</td>
+                        {/* 보험연령 */}
+                        <td className="center mono dim">
+                          {c.insuranceAge ? `${c.insuranceAge}세` : <span className="muted">-</span>}
+                        </td>
                         {/* 계약상태 + 기간 */}
                         <td className="center">
                           <span className={`status ${cs.name}`}>{cs.name}</span>
                         </td>
                         <td className="center mono dim">
                           {formatPeriod(c.deliveredDate ?? c.contractDate, c.returnScheduledDate) || <span className="muted">-</span>}
+                        </td>
+                        {/* 회차 */}
+                        <td className="center mono dim">
+                          {c.currentSeq && c.totalSeq ? `${c.currentSeq}/${c.totalSeq}` : <span className="muted">-</span>}
                         </td>
                         <td className={`center mono ${isReturnOverdue ? 'danger' : 'dim'}`}>
                           {returnDaysToGo === null
@@ -489,7 +529,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* SIDEBAR — 3패널: 연체 / 반납·만기 / 출고예정 (연체 우선·크게) */}
+        {/* 보조 패널 — 연체 / 반납·만기 / 출고 예정 */}
         <div className="sidebar-stack">
           <SidePanel
             icon={<Warning size={14} weight="fill" />}
@@ -608,6 +648,42 @@ export default function Page() {
         </div>
       </div>
 
+      <BottomBar
+        left={
+          <>
+            <button className="btn btn-primary" type="button" onClick={() => setCreateOpen(true)}>
+              <Plus size={14} weight="bold" /> 신규 등록
+            </button>
+            <button className="btn" type="button" onClick={() => setLedgerOpen(true)} title="수납 이력">
+              <CurrencyKrw size={14} /> 수납 이력
+            </button>
+            <button className="btn" type="button" onClick={() => setSmsOpen(true)} title="문자 발송" disabled={selectedIds.size === 0}>
+              <PaperPlaneTilt size={14} /> 문자 발송{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+            </button>
+          </>
+        }
+        right={
+          <>
+            <span>전체 <strong>{contracts.length}</strong>건</span>
+            {selectedIds.size > 0 && (
+              <>
+                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <span>선택 <strong>{selectedIds.size}</strong>건</span>
+                <button className="btn btn-sm btn-ghost" type="button" onClick={clearSelection}>
+                  <X size={11} /> 선택 해제
+                </button>
+              </>
+            )}
+            {summary.totalUnpaid > 0 && (
+              <>
+                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <span>미수 <strong className="mono" style={{ color: 'var(--red-text)' }}>₩{formatCurrency(summary.totalUnpaid)}</strong></span>
+              </>
+            )}
+          </>
+        }
+      />
+
       <ContractDetailDialog
         contract={selected}
         open={detailOpen}
@@ -617,7 +693,6 @@ export default function Page() {
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filteredContracts} selectedIds={selectedIds} />
       <PaymentLedgerDialog open={ledgerOpen} onOpenChange={setLedgerOpen} contracts={contracts} />
-      <CompanyDialog open={companyOpen} onOpenChange={setCompanyOpen} />
       </div>
     </div>
   );

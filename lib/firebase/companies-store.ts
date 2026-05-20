@@ -5,7 +5,15 @@ import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } f
 import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
 import type { Company } from '@/lib/types';
 
+import { genCode } from '@/lib/code';
+
 const COMPANIES_PATH = icarPath('companies');
+
+/** 새 회사 코드 — 6자 영문·숫자 난수 (prefix 없음). 기존과 충돌 시 재시도. */
+export function nextCompanyCode(existing: Company[]): string {
+  const used = new Set(existing.map((c) => c.code).filter(Boolean));
+  return genCode(6, used);
+}
 
 export function useCompanies(): {
   companies: Company[];
@@ -45,16 +53,19 @@ export function useCompanies(): {
     loading,
     configured,
     add: async (c) => {
+      // 코드 미지정 시 자동 부여 (CP01 ~)
+      const code = c.code && c.code.trim() ? c.code : nextCompanyCode(companies);
+      const payload = { ...c, code };
       if (!configured) {
         const id = `local-${Date.now()}`;
-        setCompanies((prev) => [...prev, { ...c, id } as Company]);
+        setCompanies((prev) => [...prev, { ...payload, id } as Company]);
         return id;
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return '';
       const newRef = push(ref(db, COMPANIES_PATH));
       const id = newRef.key!;
-      await set(newRef, { ...c, id });
+      await set(newRef, { ...payload, id });
       return id;
     },
     update: async (c) => {

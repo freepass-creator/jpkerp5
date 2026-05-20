@@ -34,6 +34,12 @@ export type Contract = {
   customerPhone2?: string;
   customerRegion?: string;
   customerDistrict?: string;
+  // 면허 — RIMS 조회용
+  customerLicenseNo?: string;        // 면허번호 (예: 11-12-345678-90)
+  customerLicenseStatus?: '정상' | '정지' | '취소' | '만료' | '결격' | '확인불가' | '미조회';
+  customerLicenseCheckedAt?: string; // 마지막 RIMS 조회 시각 (ISO)
+  customerLicenseExpiry?: string;    // RIMS 응답의 만료일
+  customerLicenseType?: string;      // 1종/2종 등
   // 차량 (임베드)
   vehiclePlate: string;
   vehicleModel: string;
@@ -171,7 +177,7 @@ export type HistoryEntry = {
 export type VehicleHistoryCategory = HistoryCategory;
 export type VehicleHistoryEntry = HistoryEntry;
 
-/** 회사 마스터 — 법인 정보 + 계좌 */
+/** 회사 마스터 — 법인 정보 + 계좌/카드 */
 export type BankAccount = {
   id: string;
   bankName: string;       // KB / 우리 / 신한 / 하나 / 농협 등
@@ -181,8 +187,39 @@ export type BankAccount = {
   isDefault?: boolean;
 };
 
+export type CorporateCard = {
+  id: string;
+  cardName: string;       // 카드 명 (예: 법인 BC, 운영비 카드)
+  cardCompany: string;    // 카드사 (KB/신한/현대 등)
+  cardLast4: string;      // 끝 4자리
+  purpose?: string;       // 차량유지비/주유/유료도로 등
+  holder?: string;        // 카드 명의자
+};
+
+export type LocationKind = '사무실' | '차고지' | '주차장';
+
+export type CompanyLocation = {
+  id: string;
+  kind: LocationKind;
+  name: string;            // 본사 / 강남지점 / 분당 차고지 등
+  address: string;
+  phone?: string;
+  capacity?: number;       // 주차장 — 수용 대수
+  notes?: string;
+};
+
+export type CompanyDocument = {
+  id: string;
+  title: string;           // 사업자등록증 / 법인등기부 / 인감증명 등
+  fileUrl?: string;        // Firebase Storage URL (Phase 2)
+  fileName?: string;
+  uploadedAt: string;
+  notes?: string;
+};
+
 export type Company = {
   id: string;
+  code: string;                  // CP01 / CP02 — 자동 부여 (영구·재발급 X)
   name: string;                  // 회사명 (계약의 company 코드와 매칭)
   bizRegNo?: string;             // 사업자등록번호 (123-45-67890)
   corpRegNo?: string;            // 법인등록번호 (110111-1234567)
@@ -191,6 +228,9 @@ export type Company = {
   bizType?: string;              // 업태
   bizItem?: string;              // 종목
   accounts: BankAccount[];       // 계좌 N개
+  cards?: CorporateCard[];       // 법인카드 N개
+  locations?: CompanyLocation[]; // 사무실/차고지/주차장 통합
+  documents?: CompanyDocument[]; // 사업자등록증/등기부/인감 등 서류
   notes?: string;
   createdAt: string;
 };

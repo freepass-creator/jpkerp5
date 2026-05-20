@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Trash, X, PencilSimple, CheckCircle, Warning, FileXls, Eye, FileZip, CircleNotch, FileText, User } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
-import { CompanyDialog } from '@/components/company-dialog';
+import { BottomBar } from '@/components/layout/bottom-bar';
 import { downloadPenaltyZip, previewPenaltyItem, type PenaltyWorkItem } from '@/lib/penalty-pdf';
 import { usePenaltyStore } from '@/lib/use-penalty-store';
 import { dedupPenalties, describeDuplicate } from '@/lib/penalty-dedup';
@@ -86,7 +86,6 @@ export default function PenaltyPage() {
   const [periodBy, setPeriodBy] = useState<'processed' | 'violation'>('processed');
   /** 고지서 등록 다이얼로그 — 빈 상태 텍스트에서도 열 수 있도록 lift */
   const [registerOpen, setRegisterOpen] = useState(false);
-  const [companyOpen, setCompanyOpen] = useState(false);
 
   function handleCreate(newItems: PenaltyWorkItem[]) {
     setItems((prev) => {
@@ -403,13 +402,14 @@ export default function PenaltyPage() {
         </div>
       )}
       <div className="layout">
-        <Sidebar
-          onCreate={() => setRegisterOpen(true)}
-          onMaster={() => setCompanyOpen(true)}
-        />
-        <div className="app penalty-shell">
+        <Sidebar />
+        <div className="app">
         <header className="topbar">
-          <nav className="filter-bar" role="tablist" aria-label="단계">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 600, fontSize: 14, color: 'var(--text-main)' }}>
+            <Warning size={16} weight="fill" style={{ color: 'var(--orange-text)' }} />
+            과태료 업무
+          </div>
+          <div className="filter-bar" role="tablist" aria-label="단계" style={{ marginLeft: 16 }}>
             <button
               type="button"
               className={`chip ${phase === 'in-progress' ? 'active' : ''}`}
@@ -426,17 +426,9 @@ export default function PenaltyPage() {
               처리완료
               {completed.length > 0 && <span className="chip-count">{completed.length}</span>}
             </button>
-          </nav>
-          <div className="topbar-right">
-            <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>
-              {phase === 'in-progress'
-                ? <>매칭 <strong style={{ color: 'var(--green-text)' }}>{inProgMatched}</strong> · 미매칭 <strong style={{ color: 'var(--red-text)' }}>{inProgUnmatched}</strong> · 번호인식실패 <strong style={{ color: 'var(--orange-text)' }}>{inProgNoCar}</strong> · 합계 <strong className="mono">₩{inProgAmount.toLocaleString('ko-KR')}</strong></>
-                : <>{completedFiltered.length}건 · ₩<strong className="mono">{compAmount.toLocaleString('ko-KR')}</strong></>}
-            </span>
           </div>
         </header>
 
-      {/* legacy PageShell footer/header — 인라인으로 변환 */}
       <PageShellInline
         footerLeft={phase === 'in-progress' ? (
           <>
@@ -737,7 +729,6 @@ export default function PenaltyPage() {
         </div>
       </PageShellInline>
       </div>
-      <CompanyDialog open={companyOpen} onOpenChange={setCompanyOpen} />
       </div>
 
       <EntityFormDialog
@@ -757,7 +748,11 @@ export default function PenaltyPage() {
   );
 }
 
-/** v4 PageShell 의 footer 영역만 인라인으로 복제 — 본문 + 하단 액션바 */
+/**
+ * 본문 + 표준 BottomBar 래퍼.
+ * footerLeft = stats (우측 표시), footerRight = actions (좌측 표시)
+ * — 카톡 알림이 화면 우측 하단에 떠서 버튼은 좌측에 배치.
+ */
 function PageShellInline({
   footerLeft,
   footerRight,
@@ -770,10 +765,7 @@ function PageShellInline({
   return (
     <>
       <div className="penalty-body">{children}</div>
-      <footer className="penalty-footer">
-        <div className="penalty-footer-left">{footerLeft}</div>
-        <div className="penalty-footer-right">{footerRight}</div>
-      </footer>
+      <BottomBar left={footerRight} right={footerLeft} />
     </>
   );
 }

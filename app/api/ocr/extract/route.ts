@@ -272,6 +272,27 @@ const RENTAL_CONTRACT_SCHEMA = {
   ],
 };
 
+const LICENSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    license_no: { type: Type.STRING, nullable: true, description: '면허번호 (XX-XX-XXXXXX-XX 12자리 숫자, 하이픈 포함 그대로)' },
+    license_type: { type: Type.STRING, nullable: true, description: '면허종류 (1종 보통, 2종 보통, 1종 대형, 1종 특수, 2종 소형 등)' },
+    holder_name: { type: Type.STRING, nullable: true, description: '성명' },
+    resident_no: { type: Type.STRING, nullable: true, description: '주민등록번호 앞 6자리만 (생년월일 부분, YYMMDD)' },
+    birth_date: { type: Type.STRING, nullable: true, description: '생년월일 YYYY-MM-DD (주민번호 7번째 자리로 세기 결정 — 1/2→19xx, 3/4→20xx)' },
+    address: { type: Type.STRING, nullable: true, description: '주소' },
+    issue_date: { type: Type.STRING, nullable: true, description: '발급일 YYYY-MM-DD' },
+    expiry_date: { type: Type.STRING, nullable: true, description: '적성검사기간 만료일 또는 갱신만료일 YYYY-MM-DD' },
+    serial_no: { type: Type.STRING, nullable: true, description: '카드 일련번호/연번 (우상단)' },
+    conditions: { type: Type.STRING, nullable: true, description: '조건 (예: A (수동), 자동, 안경 등)' },
+    issuer: { type: Type.STRING, nullable: true, description: '발급기관 (예: 서울지방경찰청장)' },
+  },
+  required: [
+    'license_no', 'license_type', 'holder_name', 'resident_no', 'birth_date',
+    'address', 'issue_date', 'expiry_date', 'serial_no', 'conditions', 'issuer',
+  ],
+};
+
 const PENALTY_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -486,6 +507,32 @@ const TYPE_SPECS: Record<string, TypeSpec> = {
 4. 차량번호 포맷 안 맞으면 무조건 null
 5. 값 없으면 null. 한글 표기 그대로 보존 (정규화·번역 금지)`,
     schema: RENTAL_CONTRACT_SCHEMA,
+  },
+  license: {
+    label: '운전면허증',
+    prompt: `이 이미지는 한국 운전면허증 카드 (모바일 면허증 포함) 입니다.
+
+## 핵심 필드
+
+- **license_no**: 면허번호. 한국 면허번호는 \`\\d{2}-\\d{2}-\\d{6}-\\d{2}\` 패턴 (예: "11-12-345678-90"). 카드 정면 큰 글씨로 표기. 하이픈 그대로 보존.
+- **license_type**: "1종 보통", "2종 보통", "1종 대형", "1종 특수(대형견인/소형견인/구난)", "2종 소형", "2종 원동기" 등 그대로.
+- **holder_name**: 성명. 한자 병기 시 한글만.
+- **resident_no**: 주민번호 앞 6자리(생년월일 부분)만. 뒷자리 1자(성별)는 birth_date 계산에만 사용. 풀 주민번호 저장 X.
+- **birth_date**: 주민번호 7번째 자리로 세기 판정 — 1·2 → 19xx, 3·4 → 20xx, 5·6 → 19xx(외국인), 7·8 → 20xx(외국인). YYMMDD + 세기 → YYYY-MM-DD.
+- **address**: 주소 (시/도 ~ 상세). 카드에 적힌 그대로.
+- **issue_date**: 발급일 YYYY-MM-DD.
+- **expiry_date**: "적성검사기간 ~ YYYY.MM.DD" 또는 "갱신만료일 YYYY.MM.DD". YYYY-MM-DD 로 변환.
+- **serial_no**: 카드 우상단 연번/일련번호 (있을 때).
+- **conditions**: 조건 (예: "A 수동", "안경", "자동변속기"). 비면 null.
+- **issuer**: 발급기관 (예: "서울지방경찰청장", "경기남부지방경찰청장").
+
+## 추출 원칙
+
+- 값 없으면 null. 절대 추측 X.
+- 카드가 일부만 보이거나 광택/그림자로 안 보이는 글자는 null.
+- 주민번호 뒷 7자리는 절대 추출 X (개인정보 보호).
+- birth_date 는 resident_no 앞 6자리 + 7번째 자리 조합으로 계산.`,
+    schema: LICENSE_SCHEMA,
   },
   penalty: {
     label: '과태료/범칙금/통행료 고지서',

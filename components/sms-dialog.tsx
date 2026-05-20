@@ -59,15 +59,47 @@ export function SmsDialog({
     setBody(TEMPLATES[idx].body);
   }
 
-  function sendMessages() {
-    // mock — 실제로는 SMS 게이트웨이 API 호출
+  async function sendMessages() {
     const ok = window.confirm(
       `${recipients.length}명에게 문자를 발송합니다.\n\n[미리보기]\n${preview(body, recipients[0])}\n\n계속 진행하시겠습니까?`
     );
-    if (ok) {
-      alert(`mock: ${recipients.length}건 발송 완료`);
-      onOpenChange(false);
+    if (!ok) return;
+
+    // Firebase ID token
+    const { getFirebaseAuth } = await import('@/lib/firebase/client');
+    const auth = getFirebaseAuth();
+    const user = auth?.currentUser;
+    const idToken = user ? await user.getIdToken() : '';
+
+    let sent = 0, failed = 0, mocked = 0;
+    for (const r of recipients) {
+      try {
+        const res = await fetch('/api/sms/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          },
+          body: JSON.stringify({
+            tel: r.phone,
+            message: preview(body, r),
+            subject: TEMPLATES[templateIdx].label,
+          }),
+        });
+        const json = await res.json();
+        if (json.mock) mocked++;
+        else if (json.ok) sent++;
+        else failed++;
+      } catch {
+        failed++;
+      }
     }
+    if (mocked > 0 && sent === 0 && failed === 0) {
+      alert(`Aligo 환경변수 미설정 — mock 응답으로 ${mocked}건 처리됨.\n실제 발송하려면 .env.local 에 ALIGO_API_KEY / ALIGO_USER_ID / ALIGO_SENDER_TEL 등록 필요.`);
+    } else {
+      alert(`발송 완료 — 성공 ${sent}건 · 실패 ${failed}건${mocked > 0 ? ` · mock ${mocked}건` : ''}`);
+    }
+    onOpenChange(false);
   }
 
   const bodyLen = body.length;

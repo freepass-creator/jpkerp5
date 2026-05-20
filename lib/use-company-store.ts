@@ -12,7 +12,7 @@ import type { Company } from './sample-companies';
 
 function adapt(c: JpkCompany): Company {
   return {
-    code: c.id,                       // jpkerp5는 별도 code 없음 → id 사용
+    code: c.code || c.id,             // 자동 부여된 코드 (CP01) 우선, fallback id
     name: c.name,
     ceo: c.ceo ?? '',
     bizNo: c.bizRegNo ?? '',
