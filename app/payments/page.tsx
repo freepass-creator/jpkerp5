@@ -18,6 +18,16 @@ export default function PaymentsPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function toggleRow(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const { rows: bankTx } = useBankTx();
   const { rows: cardTx } = useCardTx();
@@ -98,6 +108,23 @@ export default function PaymentsPage() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th className="checkbox-col">
+                      <input
+                        type="checkbox"
+                        checked={filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id))}
+                        ref={(el) => {
+                          if (!el) return;
+                          const some = filtered.some((r) => selectedIds.has(r.id));
+                          const all = filtered.every((r) => selectedIds.has(r.id));
+                          el.indeterminate = some && !all;
+                        }}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds(new Set(filtered.map((r) => r.id)));
+                          else setSelectedIds(new Set());
+                        }}
+                        aria-label="전체 선택"
+                      />
+                    </th>
                     <th className="center" style={{ width: 36 }}>매칭</th>
                     <th style={{ width: 110 }}>일자</th>
                     {tab === 'bank' ? (
@@ -120,12 +147,20 @@ export default function PaymentsPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="muted center" style={{ padding: 32 }}>
+                      <td colSpan={8} className="muted center" style={{ padding: 32 }}>
                         표시할 트랜잭션이 없습니다. 사이드바 → 신규 등록 → 수납 으로 엑셀 업로드.
                       </td>
                     </tr>
                   ) : filtered.map((r) => (
-                    <tr key={r.id}>
+                    <tr key={r.id} className={selectedIds.has(r.id) ? 'selected-row' : undefined}>
+                      <td className="checkbox-col">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(r.id)}
+                          onChange={() => toggleRow(r.id)}
+                          aria-label="선택"
+                        />
+                      </td>
                       <td className="center">
                         {r.matchedContractId ? (
                           <CheckCircle size={14} weight="fill" style={{ color: 'var(--green-text)' }} />
