@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
 import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
+import { audit } from './audit-store';
 import type { Penalty } from '@/lib/types-penalty';
 
 const PATH = icarPath('penalties');
@@ -57,6 +58,7 @@ export function usePenalties(): {
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
       await set(newRef, { ...p, id });
+      void audit.create('penalty', id, `과태료 등록 ${p.noticeNo ?? ''} ${p.carNumber} ${p.amount}원`);
       return id;
     },
     update: async (p) => {
@@ -68,8 +70,10 @@ export function usePenalties(): {
       const db = getRtdb();
       if (!db) return;
       await rtdbUpdate(ref(db, `${PATH}/${p.id}`), p as unknown as Record<string, unknown>);
+      void audit.update('penalty', p.id, `과태료 수정 ${p.noticeNo ?? ''} ${p.carNumber}`);
     },
     remove: async (id) => {
+      const target = penalties.find((p) => p.id === id);
       if (!configured) {
         setPenalties((prev) => prev.filter((x) => x.id !== id));
         return;
@@ -78,6 +82,7 @@ export function usePenalties(): {
       const db = getRtdb();
       if (!db) return;
       await rtdbRemove(ref(db, `${PATH}/${id}`));
+      void audit.delete('penalty', id, `과태료 삭제 ${target?.noticeNo ?? id} ${target?.carNumber ?? ''}`);
     },
   };
 }

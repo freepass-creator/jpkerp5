@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
 import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
+import { audit } from './audit-store';
 import type { Vehicle } from '@/lib/types';
 
 const VEHICLES_PATH = icarPath('vehicles');
@@ -57,6 +58,7 @@ export function useVehicles(): {
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
       await set(newRef, { ...v, id });
+      void audit.create('vehicle', id, `차량 등록 ${v.plate} ${v.model}`);
       return id;
     },
     addMany: async (rows) => {
@@ -76,6 +78,7 @@ export function useVehicles(): {
         batch[id] = { ...row, id } as Vehicle;
       }
       await rtdbUpdate(ref(db, VEHICLES_PATH), batch as unknown as Record<string, unknown>);
+      void audit.import('vehicle', `차량 일괄 등록 ${rows.length}대`, { count: rows.length });
       return rows.length;
     },
     update: async (v) => {
@@ -86,8 +89,10 @@ export function useVehicles(): {
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
       await rtdbUpdate(ref(db, `${VEHICLES_PATH}/${v.id}`), v as unknown as Record<string, unknown>);
+      void audit.update('vehicle', v.id, `차량 수정 ${v.plate} ${v.model}`);
     },
     remove: async (id) => {
+      const target = vehicles.find((v) => v.id === id);
       if (!configured) {
         setVehicles((prev) => prev.filter((x) => x.id !== id));
         return;
@@ -95,6 +100,7 @@ export function useVehicles(): {
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
       await rtdbRemove(ref(db, `${VEHICLES_PATH}/${id}`));
+      void audit.delete('vehicle', id, `차량 삭제 ${target?.plate ?? id} ${target?.model ?? ''}`);
     },
   };
 }

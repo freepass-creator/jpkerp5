@@ -15,7 +15,7 @@
  *   - Contract.unpaidAmount / unpaidSeqCount 캐시 재계산
  */
 
-import type { BankTransaction, Contract, PaymentScheduleInline } from './types';
+import type { BankTransaction, CardTransaction, Contract, PaymentScheduleInline } from './types';
 import { applyPayment, totalUnpaid, totalUnpaidCount, computeCurrentSeq } from './payment-schedule';
 
 /** 이름 정규화 — 공백 제거, 소문자 */
@@ -178,6 +178,115 @@ export function autoMatchAll(
     const high = candidates.filter((c) => c.confidence === 'high' && !used.has(`${c.contract.id}:${c.scheduleSeq}`));
     if (high.length === 0) continue;
     // 가장 오래된 미납 회차 우선
+    const pick = high[0];
+    used.add(`${pick.contract.id}:${pick.scheduleSeq}`);
+    results.push({ tx: t, candidate: pick });
+  }
+  return results;
+}
+
+/* ──────────────── 카드 매출 매칭 ──────────────── */
+
+export type CardMatchCandidate = {
+  contract: Contract;
+  scheduleSeq: number;
+  scheduleAmount: number;
+  scheduleDueDate: string;
+  confidence: 'high' | 'medium' | 'low';
+};
+
+/**
+ * 카드 매출 매칭 후보 — customerName + amount 기준.
+ * BankTransaction의 findCandidates와 동일 로직, 다른 필드명.
+ */
+export function findCardCandidates(tx: CardTransaction, contracts: Contract[]): CardMatchCandidate[] {
+  if (tx.amount <= 0) return [];
+  if (tx.matchedContractId) return [];
+
+  const out: CardMatchCandidate[] = [];
+  const cardName = normName(tx.customerName ?? '');
+
+  for (const c of contracts) {
+    if (c.status === '해지') continue;
+    const cName = normName(c.customerName);
+    const driverName = c.driverName ? normName(c.driverName) : '';
+    const nameMatch = cardName && (cardName === cName || cardName === driverName || cName.includes(cardName) || cardName.includes(cName));
+
+    for (const s of c.schedules ?? []) {
+      if (s.status === '완료') continue;
+      const amountMatch = s.amount === tx.amount || (s.status === '부분납' && (s.amount - s.paidAmount) === tx.amount);
+      if (!amountMatch && !nameMatch) continue;
+      out.push({
+        contract: c,
+        scheduleSeq: s.seq,
+        scheduleAmount: s.amount,
+        scheduleDueDate: s.dueDate,
+        confidence: nameMatch && amountMatch ? 'high' : nameMatch ? 'medium' : 'low',
+      });
+    }
+  }
+
+  return out.sort((a, b) => {
+    const rank = { high: 0, medium: 1, low: 2 } as const;
+    if (rank[a.confidence] !== rank[b.confidence]) return rank[a.confidence] - rank[b.confidence];
+    return a.scheduleDueDate.localeCompare(b.scheduleDueDate);
+  });
+}
+
+/** 카드 매칭 적용 — Bank와 동일 패턴 */
+export function applyCardMatch(
+  tx: CardTransaction,
+  contract: Contract,
+  scheduleSeq: number,
+  actorEmail?: string,
+): {
+  txPatch: Partial<CardTransaction>;
+  contractPatch: Partial<Contract> & { schedules: PaymentScheduleInline[] };
+} {
+  const schedules = (contract.schedules ?? []).map((s) => ({ ...s }));
+  const target = schedules.find((s) => s.seq === scheduleSeq);
+  if (!target) throw new Error(`회차 ${scheduleSeq} 를 찾을 수 없습니다`);
+  target.status = '완료';
+  target.paidAmount = target.amount;
+  target.paidAt = tx.txDate;
+
+  return {
+    txPatch: {
+      matchedContractId: contract.id,
+      matchedScheduleId: String(scheduleSeq),
+    },
+    contractPatch: {
+      schedules,
+      unpaidAmount: totalUnpaid(schedules),
+      unpaidSeqCount: totalUnpaidCount(schedules),
+      currentSeq: computeCurrentSeq(schedules, tx.txDate),
+      lastPaidDate: tx.txDate,
+      lastPaidAmount: tx.amount,
+    },
+  };
+}
+
+/** 카드 매출 일괄 자동매칭 — high confidence만 */
+export type CardAutoMatchResult = {
+  tx: CardTransaction;
+  candidate: CardMatchCandidate;
+};
+
+export function autoMatchCardAll(
+  txs: CardTransaction[],
+  contracts: Contract[],
+): CardAutoMatchResult[] {
+  const results: CardAutoMatchResult[] = [];
+  const used = new Set<string>();
+  for (const c of contracts) {
+    for (const s of c.schedules ?? []) {
+      if (s.status === '완료') used.add(`${c.id}:${s.seq}`);
+    }
+  }
+  for (const t of txs) {
+    const candidates = findCardCandidates(t, contracts);
+    const high = candidates.filter((c) => c.confidence === 'high' && !used.has(`${c.contract.id}:${c.scheduleSeq}`));
+    if (high.length === 0) continue;
     const pick = high[0];
     used.add(`${pick.contract.id}:${pick.scheduleSeq}`);
     results.push({ tx: t, candidate: pick });

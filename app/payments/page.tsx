@@ -13,7 +13,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { displayCompanyName } from '@/lib/company-display';
 import { applicableSubjects, ALL_SUBJECTS } from '@/lib/ledger-subjects';
-import { autoMatchAll, applyMatch, reverseMatch, applyFifoPayment } from '@/lib/receipt-match';
+import { autoMatchAll, applyMatch, reverseMatch, applyFifoPayment, autoMatchCardAll, applyCardMatch } from '@/lib/receipt-match';
 import { ReceiptMatchDialog } from '@/components/receipt-match-dialog';
 import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { audit } from '@/lib/firebase/audit-store';
@@ -40,7 +40,7 @@ export default function PaymentsPage() {
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
 
   const { rows: bankTx, update: updateBankTx, updateMany: updateManyBankTx } = useBankTx();
-  const { rows: cardTx } = useCardTx();
+  const { rows: cardTx, updateMany: updateManyCardTx } = useCardTx();
   const { contracts, update: updateContract, updateMany: updateManyContracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
 
@@ -81,6 +81,10 @@ export default function PaymentsPage() {
     await updateBankTx(tx.id, { subject: subject || undefined } as Partial<BankTransaction>);
   }
 
+  async function handleNoteChange(tx: BankTransaction, note: string) {
+    await updateBankTx(tx.id, { note: note || undefined } as Partial<BankTransaction>);
+  }
+
   async function handleManualMatch(tx: BankTransaction, contract: Contract, scheduleSeq: number) {
     const { txPatch, contractPatch } = applyMatch(tx, contract, scheduleSeq);
     await updateBankTx(tx.id, txPatch);
@@ -115,6 +119,31 @@ export default function PaymentsPage() {
     if (leftover > 0) {
       alert(`선입선출 적용 완료 — 잉여 ₩${formatCurrency(leftover)} 원은 추가 매칭 필요`);
     }
+  }
+
+  async function handleAutoMatchCardAll() {
+    const results = autoMatchCardAll(cardTx, contracts);
+    if (results.length === 0) {
+      alert('자동 매칭 가능한 카드 매출이 없습니다.\n(고객명·금액 모두 일치하는 미매칭 카드 매출이 없음)');
+      return;
+    }
+    if (!confirm(`카드 매출 자동 매칭 ${results.length}건 일괄 적용하시겠습니까?`)) return;
+
+    const txPatches: Record<string, Partial<import('@/lib/types').CardTransaction>> = {};
+    const ctxByContract = new Map<string, Contract>();
+    for (const r of results) {
+      const current = ctxByContract.get(r.candidate.contract.id) ?? r.candidate.contract;
+      const { txPatch, contractPatch } = applyCardMatch(r.tx, current, r.candidate.scheduleSeq);
+      txPatches[r.tx.id] = txPatch;
+      ctxByContract.set(current.id, { ...current, ...contractPatch });
+    }
+    await updateManyCardTx(txPatches);
+    await updateManyContracts(Array.from(ctxByContract.values()));
+    void audit.match('card_tx', 'batch', `카드 매출 자동매칭 일괄 ${results.length}건`, {
+      count: results.length,
+      total: results.reduce((s, r) => s + r.tx.amount, 0),
+    });
+    alert(`${results.length}건 자동 매칭 완료`);
   }
 
   function handleExportExcel() {
@@ -288,6 +317,7 @@ export default function PaymentsPage() {
                   toggleRow={toggleRow}
                   setSelectedIds={setSelectedIds}
                   onSubjectChange={handleSubjectChange}
+                  onNoteChange={handleNoteChange}
                   onOpenMatch={setMatchTarget}
                 />
               )}
@@ -333,7 +363,16 @@ export default function PaymentsPage() {
                 </button>
               </>
             ) : (
-              <span>카드 매출 <strong>{cardTx.length}</strong></span>
+              <>
+                <span>카드 매출 <strong>{cardTx.length}</strong></span>
+                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <span style={{ color: 'var(--green-text)' }}>매칭 <strong>{cardTx.filter((t) => t.matchedContractId).length}</strong></span>
+                <span style={{ color: 'var(--orange-text)' }}>미매칭 <strong>{cardTx.filter((t) => !t.matchedContractId).length}</strong></span>
+                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <button className="btn btn-sm btn-primary" type="button" onClick={handleAutoMatchCardAll}>
+                  자동매칭
+                </button>
+              </>
             )
           }
         />
@@ -357,7 +396,7 @@ export default function PaymentsPage() {
 /* ─────────────────── 자금일보 — 분개 테이블 ─────────────────── */
 
 function LedgerTable({
-  rows, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange, onOpenMatch,
+  rows, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange, onNoteChange, onOpenMatch,
 }: {
   rows: BankTransaction[];
   contractById: Map<string, Contract>;
@@ -366,6 +405,7 @@ function LedgerTable({
   toggleRow: (id: string) => void;
   setSelectedIds: (s: Set<string>) => void;
   onSubjectChange: (tx: BankTransaction, subject: string) => void;
+  onNoteChange: (tx: BankTransaction, note: string) => void;
   onOpenMatch: (tx: BankTransaction) => void;
 }) {
   return (
@@ -399,12 +439,13 @@ function LedgerTable({
           <th>거래상대</th>
           <th>적요</th>
           <th style={{ width: 180 }}>매칭 계약</th>
+          <th>비고</th>
         </tr>
       </thead>
       <tbody>
         {rows.length === 0 ? (
           <tr>
-            <td colSpan={11} className="muted center" style={{ padding: '32px 10px' }}>
+            <td colSpan={12} className="muted center" style={{ padding: '32px 10px' }}>
               표시할 거래가 없습니다. 사이드바 → 신규 등록 → 수납 으로 계좌 엑셀 업로드.
             </td>
           </tr>
@@ -464,6 +505,17 @@ function LedgerTable({
                 ) : (
                   <span className="dim" style={{ fontSize: 11 }}>—</span>
                 ))}
+              </td>
+              <td>
+                <input
+                  className="input inline-edit"
+                  defaultValue={t.note ?? ''}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v !== (t.note ?? '')) onNoteChange(t, v);
+                  }}
+                  placeholder="-"
+                />
               </td>
             </tr>
           );

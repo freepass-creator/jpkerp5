@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
 import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
+import { audit } from './audit-store';
 import type { Contract } from '@/lib/types';
 
 const CONTRACTS_PATH = icarPath('contracts');
@@ -73,8 +74,10 @@ export function useContracts(): {
       const db = getRtdb();
       if (!db) return;
       await rtdbUpdate(ref(db, `${CONTRACTS_PATH}/${c.id}`), c as unknown as Record<string, unknown>);
+      void audit.update('contract', c.id, `계약 수정 ${c.contractNo ?? ''} ${c.vehiclePlate} ${c.customerName}`);
     },
     remove: async (id: string) => {
+      const target = contracts.find((c) => c.id === id);
       if (!configured) {
         setContracts((prev) => prev.filter((x) => x.id !== id));
         return;
@@ -83,6 +86,7 @@ export function useContracts(): {
       const db = getRtdb();
       if (!db) return;
       await rtdbRemove(ref(db, `${CONTRACTS_PATH}/${id}`));
+      void audit.delete('contract', id, `계약 삭제 ${target?.contractNo ?? id} ${target?.vehiclePlate ?? ''} ${target?.customerName ?? ''}`);
     },
     add: async (c: Omit<Contract, 'id'>) => {
       if (!configured) {
@@ -98,6 +102,7 @@ export function useContracts(): {
       if (!id) throw new Error('Firebase push failed: no key');
       const full = { ...c, id } as Contract;
       await set(newRef, full);
+      void audit.create('contract', id, `계약 등록 ${full.contractNo ?? ''} ${full.vehiclePlate} ${full.customerName}`);
       return id;
     },
     addMany: async (rows: Array<Omit<Contract, 'id'>>) => {
@@ -121,6 +126,7 @@ export function useContracts(): {
         batch[id] = { ...row, id } as Contract;
       }
       await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
+      void audit.import('contract', `계약 일괄 등록 ${rows.length}건`, { count: rows.length });
       return rows.length;
     },
     updateMany: async (rows: Contract[]) => {
@@ -139,6 +145,7 @@ export function useContracts(): {
       const batch: Record<string, Contract> = {};
       for (const r of rows) batch[r.id] = r;
       await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
+      void audit.update('contract', 'batch', `계약 일괄 수정 ${rows.length}건`);
     },
   };
 }

@@ -3,20 +3,21 @@
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, push } from 'firebase/database';
 import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
-import type { BankTransaction, CardTransaction } from '@/lib/types';
+import { audit } from './audit-store';
+import type { BankTransaction, CardTransaction, AuditEntityType } from '@/lib/types';
 
 const BANK_PATH = icarPath('bank_tx');
 const CARD_PATH = icarPath('card_tx');
 
 export function useBankTx() {
-  return useTxStore<BankTransaction>(BANK_PATH);
+  return useTxStore<BankTransaction>(BANK_PATH, 'bank_tx');
 }
 
 export function useCardTx() {
-  return useTxStore<CardTransaction>(CARD_PATH);
+  return useTxStore<CardTransaction>(CARD_PATH, 'card_tx');
 }
 
-function useTxStore<T extends { id: string }>(path: string) {
+function useTxStore<T extends { id: string }>(path: string, auditType: AuditEntityType) {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [configured] = useState(() => isFirebaseConfigured());
@@ -109,6 +110,7 @@ function useTxStore<T extends { id: string }>(path: string) {
         stamped.push(full);
       }
       await rtdbUpdate(ref(db, path), batch as unknown as Record<string, unknown>);
+      void audit.import(auditType, `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 등록 ${items.length}건`, { count: items.length });
       return stamped;
     },
   };
