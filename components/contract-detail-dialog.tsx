@@ -779,7 +779,7 @@ function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => v
       </Section>
 
       <Section icon={<CurrencyKrw size={12} weight="duotone" />} title="회차별 스케줄">
-        <ScheduleTable c={c} />
+        <ScheduleTable c={c} onUpdate={onUpdate} />
       </Section>
 
       <Section icon={<CurrencyKrw size={12} weight="duotone" />} title={`입금 이력 — ${generatePaymentHistory(c).length}건`}>
@@ -907,7 +907,7 @@ function PaymentHistoryTable({ c }: { c: Contract }) {
   );
 }
 
-function ScheduleTable({ c }: { c: Contract }) {
+function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   // c.schedules 가 있으면(운영현황 업로드로 자동 분배됨) 우선 사용, 없으면 legacy derive
   const rows = c.schedules && c.schedules.length > 0
     ? c.schedules.map((s) => ({
@@ -931,6 +931,47 @@ function ScheduleTable({ c }: { c: Contract }) {
         };
       });
 
+  /**
+   * 회차 단위 액션 — 사용자가 ScheduleTable 에서 직접 status 변경.
+   * c.schedules 가 인라인 모델이므로 onUpdate 로 patch.
+   */
+  function patchSchedule(seq: number, patch: Partial<NonNullable<Contract['schedules']>[number]>) {
+    const sched = (c.schedules ?? []).map((s) => (s.seq === seq ? { ...s, ...patch } : s));
+    // 캐시 재계산
+    const totalUnpaid = sched.reduce((sum, s) => {
+      if (s.status === '연체') return sum + s.amount;
+      if (s.status === '부분납') return sum + Math.max(0, s.amount - s.paidAmount);
+      return sum;
+    }, 0);
+    const unpaidSeqCount = sched.filter((s) => s.status === '연체' || s.status === '부분납').length;
+    const overdue = sched.filter((s) => s.status === '연체' || s.status === '부분납').sort((a, b) => a.seq - b.seq);
+    const currentSeq = overdue[0]?.seq
+      ?? sched.find((s) => s.status === '예정')?.seq
+      ?? sched.length;
+    onUpdate({
+      ...c,
+      schedules: sched,
+      unpaidAmount: totalUnpaid,
+      unpaidSeqCount,
+      currentSeq,
+    });
+  }
+
+  function handleManualComplete(seq: number) {
+    if (!confirm(`${seq}회차를 '수동 완료'로 처리하시겠습니까?\n(외부 결제·현금 수령 등 영수 완료한 경우)`)) return;
+    const target = rows.find((r) => r.seq === seq);
+    patchSchedule(seq, { status: '완료', paidAmount: target?.amount ?? 0, paidAt: new Date().toISOString().slice(0, 10) });
+  }
+  function handleExempt(seq: number) {
+    if (!confirm(`${seq}회차를 '면제'로 처리하시겠습니까?\n(미수에서 제외됨)`)) return;
+    const target = rows.find((r) => r.seq === seq);
+    patchSchedule(seq, { status: '면제', paidAmount: target?.amount ?? 0 });
+  }
+  function handleRevert(seq: number) {
+    if (!confirm(`${seq}회차를 '연체'로 되돌리시겠습니까?\n(완료·면제 처리를 취소)`)) return;
+    patchSchedule(seq, { status: '연체', paidAmount: 0, paidAt: undefined });
+  }
+
   return (
     <table className="table">
       <thead>
@@ -941,6 +982,7 @@ function ScheduleTable({ c }: { c: Contract }) {
           <th className="num">입금액</th>
           <th className="num">잔액</th>
           <th className="center" style={{ width: 80 }}>상태</th>
+          <th className="center" style={{ width: 140 }}>액션</th>
         </tr>
       </thead>
       <tbody>
@@ -954,6 +996,16 @@ function ScheduleTable({ c }: { c: Contract }) {
               {formatCurrency(r.amount - r.paidAmount)}
             </td>
             <td className="center"><span className={`status ${r.status}`}>{r.status}</span></td>
+            <td className="center">
+              {(r.status === '연체' || r.status === '예정' || r.status === '부분납') ? (
+                <span style={{ display: 'inline-flex', gap: 4 }}>
+                  <button className="btn btn-sm" type="button" onClick={() => handleManualComplete(r.seq)} title="수동 완료 (현금/외부 결제)">완료</button>
+                  <button className="btn btn-sm" type="button" onClick={() => handleExempt(r.seq)} title="면제 (미수 제외)">면제</button>
+                </span>
+              ) : (r.status === '완료' || r.status === '면제') ? (
+                <button className="btn btn-sm btn-ghost" type="button" onClick={() => handleRevert(r.seq)} title="연체로 되돌리기">되돌리기</button>
+              ) : null}
+            </td>
           </tr>
         ))}
       </tbody>

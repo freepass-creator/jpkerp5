@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 import {
   House, Warning, Buildings, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, ClipboardText,
 } from '@phosphor-icons/react';
+import { useAuth } from '@/lib/use-auth';
+import { isAdmin } from '@/lib/admin-emails';
 
 type SidebarProps = Record<string, never>;
 
@@ -13,6 +15,8 @@ const COLLAPSE_KEY = 'jpkerp5_sidebar_collapsed';
 
 export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const admin = isAdmin(user?.email);
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -70,10 +74,12 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
           <Buildings size={14} weight={isActive('/companies') ? 'fill' : 'regular'} />
           <span>법인 관리</span>
         </Link>
-        <Link href="/admin/audit" className={`sb-item ${isActive('/admin/audit') ? 'active' : ''}`} title="감사 로그 — 누가 언제 무엇을">
-          <ClipboardText size={14} weight={isActive('/admin/audit') ? 'fill' : 'regular'} />
-          <span>감사 로그</span>
-        </Link>
+        {admin && (
+          <Link href="/admin/audit" className={`sb-item ${isActive('/admin/audit') ? 'active' : ''}`} title="감사 로그 — 누가 언제 무엇을 (관리자 전용)">
+            <ClipboardText size={14} weight={isActive('/admin/audit') ? 'fill' : 'regular'} />
+            <span>감사 로그</span>
+          </Link>
+        )}
         <Link href="/settings" className={`sb-item ${isActive('/settings') ? 'active' : ''}`} title="설정 (화면·계정)">
           <Gear size={14} weight={isActive('/settings') ? 'fill' : 'regular'} />
           <span>설정</span>
