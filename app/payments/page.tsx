@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import {
-  CurrencyKrw, Bank, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar,
+  CurrencyKrw, Bank, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar, DownloadSimple,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -13,7 +13,10 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { displayCompanyName } from '@/lib/company-display';
 import { applicableSubjects, ALL_SUBJECTS } from '@/lib/ledger-subjects';
-import { autoMatchAll, applyMatch } from '@/lib/receipt-match';
+import { autoMatchAll, applyMatch, reverseMatch, applyFifoPayment } from '@/lib/receipt-match';
+import { ReceiptMatchDialog } from '@/components/receipt-match-dialog';
+import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
+import { todayKr } from '@/lib/mock-data';
 import type { BankTransaction, Contract } from '@/lib/types';
 
 type Tab = 'ledger' | 'summary' | 'card';
@@ -33,6 +36,7 @@ export default function PaymentsPage() {
   const [filter, setFilter] = useState<'all' | 'unposted' | 'posted' | 'closed'>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
 
   const { rows: bankTx, update: updateBankTx, updateMany: updateManyBankTx } = useBankTx();
   const { rows: cardTx } = useCardTx();
@@ -74,6 +78,58 @@ export default function PaymentsPage() {
 
   async function handleSubjectChange(tx: BankTransaction, subject: string) {
     await updateBankTx(tx.id, { subject: subject || undefined } as Partial<BankTransaction>);
+  }
+
+  async function handleManualMatch(tx: BankTransaction, contract: Contract, scheduleSeq: number) {
+    const { txPatch, contractPatch } = applyMatch(tx, contract, scheduleSeq);
+    await updateBankTx(tx.id, txPatch);
+    await updateContract({ ...contract, ...contractPatch });
+  }
+
+  async function handleReverse(tx: BankTransaction) {
+    const c = tx.matchedContractId ? contractById.get(tx.matchedContractId) : undefined;
+    if (!c) {
+      await updateBankTx(tx.id, { matchedContractId: undefined, matchedScheduleSeq: undefined, matchedAt: undefined });
+      return;
+    }
+    const { txPatch, contractPatch } = reverseMatch(tx, c, todayKr());
+    await updateBankTx(tx.id, txPatch);
+    await updateContract({ ...c, ...contractPatch });
+  }
+
+  async function handleFifo(tx: BankTransaction, contract: Contract) {
+    const { txPatch, contractPatch, leftover } = applyFifoPayment(tx, contract);
+    await updateBankTx(tx.id, txPatch);
+    await updateContract({ ...contract, ...contractPatch });
+    if (leftover > 0) {
+      alert(`선입선출 적용 완료 — 잉여 ₩${formatCurrency(leftover)} 원은 추가 매칭 필요`);
+    }
+  }
+
+  function handleExportExcel() {
+    if (daily.length === 0 && bankTx.length === 0) {
+      alert('내보낼 거래가 없습니다.');
+      return;
+    }
+    downloadDailyLedgerExcel(
+      daily,
+      bankTx.map((t) => {
+        const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
+        return {
+          txDate: t.txDate,
+          companyCode: t.companyCode || (c?.company ?? ''),
+          account: t.account ?? '',
+          subject: t.subject ?? '',
+          counterparty: t.counterparty ?? '',
+          memo: t.memo ?? '',
+          deposit: t.amount ?? 0,
+          withdraw: t.withdraw ?? 0,
+          balance: t.balance ?? 0,
+          matchedContractNo: c?.contractNo ?? '',
+          matchedScheduleSeq: t.matchedScheduleSeq ?? '',
+        };
+      }),
+    );
   }
 
   async function handleAutoMatchAll() {
@@ -217,6 +273,7 @@ export default function PaymentsPage() {
                   toggleRow={toggleRow}
                   setSelectedIds={setSelectedIds}
                   onSubjectChange={handleSubjectChange}
+                  onOpenMatch={setMatchTarget}
                 />
               )}
               {tab === 'summary' && (
@@ -255,6 +312,10 @@ export default function PaymentsPage() {
                 <span>입금 <strong className="mono">₩{formatCurrency(dailyTotals.inSum)}</strong></span>
                 <span>출금 <strong className="mono">₩{formatCurrency(dailyTotals.outSum)}</strong></span>
                 <span>순증감 <strong className="mono" style={{ color: dailyTotals.inSum - dailyTotals.outSum < 0 ? 'var(--red-text)' : 'var(--text-main)' }}>₩{formatCurrency(dailyTotals.inSum - dailyTotals.outSum)}</strong></span>
+                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <button className="btn btn-sm" type="button" onClick={handleExportExcel} title="자금일보 엑셀 (세무사 공유용)">
+                  <DownloadSimple size={12} weight="bold" /> 엑셀
+                </button>
               </>
             ) : (
               <span>카드 매출 <strong>{cardTx.length}</strong></span>
@@ -263,6 +324,16 @@ export default function PaymentsPage() {
         />
 
         <CreateDialog open={uploadOpen} onOpenChange={setUploadOpen} initialMode="수납" />
+        <ReceiptMatchDialog
+          open={!!matchTarget}
+          onOpenChange={(v) => !v && setMatchTarget(null)}
+          tx={matchTarget}
+          contracts={contracts}
+          companyMaster={companyMaster}
+          onApply={handleManualMatch}
+          onReverse={handleReverse}
+          onFifo={handleFifo}
+        />
       </div>
     </div>
   );
@@ -271,7 +342,7 @@ export default function PaymentsPage() {
 /* ─────────────────── 자금일보 — 분개 테이블 ─────────────────── */
 
 function LedgerTable({
-  rows, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange,
+  rows, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange, onOpenMatch,
 }: {
   rows: BankTransaction[];
   contractById: Map<string, Contract>;
@@ -280,6 +351,7 @@ function LedgerTable({
   toggleRow: (id: string) => void;
   setSelectedIds: (s: Set<string>) => void;
   onSubjectChange: (tx: BankTransaction, subject: string) => void;
+  onOpenMatch: (tx: BankTransaction) => void;
 }) {
   return (
     <table className="table">
@@ -354,14 +426,29 @@ function LedgerTable({
               <td className="dim" style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.memo || '-'}</td>
               <td>
                 {c ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => onOpenMatch(t)}
+                    style={{ width: '100%', justifyContent: 'flex-start', gap: 6 }}
+                    title="매칭 정보 / 해제"
+                  >
                     <span className="plate">{c.vehiclePlate}</span>
                     <span>{c.customerName}</span>
                     {t.matchedScheduleSeq && <span className="dim">· {t.matchedScheduleSeq}회</span>}
-                  </span>
+                  </button>
+                ) : (direction === 'deposit' ? (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => onOpenMatch(t)}
+                    style={{ width: '100%' }}
+                  >
+                    <LinkSimple size={11} /> 매칭
+                  </button>
                 ) : (
                   <span className="dim" style={{ fontSize: 11 }}>—</span>
-                )}
+                ))}
               </td>
             </tr>
           );
