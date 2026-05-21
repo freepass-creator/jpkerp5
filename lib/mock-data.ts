@@ -1,12 +1,13 @@
 import type { Contract, BankTransaction, CardTransaction } from './types';
 
-/** 기준일 — 오늘 (한국 시간) */
-function todayKr(): string {
+/** 기준일 — 오늘 (한국 시간). 호출 시점에 계산되므로 자정 넘기면 자동으로 새 날짜 반환. */
+export function todayKr(): string {
   const d = new Date();
   const kr = new Date(d.getTime() + (d.getTimezoneOffset() + 540) * 60000);
   return kr.toISOString().slice(0, 10);
 }
 
+/** @deprecated 모듈 로드 시점에 고정되므로 todayKr() 함수 호출 사용 권장. 호환 위해 유지. */
 export const TODAY = todayKr();
 
 /** 운영 데이터 — RTDB /icar001/contracts 에서 실시간 로드. 빈 배열로 시작. */

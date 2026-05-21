@@ -55,7 +55,8 @@ function useTxStore<T extends { id: string }>(path: string) {
       await ensureAuth();
       const db = getRtdb(); if (!db) return '';
       const newRef = push(ref(db, path));
-      const id = newRef.key!;
+      const id = newRef.key;
+      if (!id) throw new Error('Firebase push failed: no key');
       await set(newRef, { ...row, id });
       return id;
     },
@@ -75,7 +76,8 @@ function useTxStore<T extends { id: string }>(path: string) {
       const stamped: T[] = [];
       for (const row of items) {
         const newRef = push(ref(db, path));
-        const id = newRef.key!;
+        const id = newRef.key;
+      if (!id) throw new Error('Firebase push failed: no key');
         const full = { ...row, id } as unknown as T;
         batch[id] = full;
         stamped.push(full);

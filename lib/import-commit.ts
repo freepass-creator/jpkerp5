@@ -60,17 +60,6 @@ function pickVehicleStatus(v: unknown, hasDelivered: boolean): VehicleStatus {
   return hasDelivered ? '운행' : '구매대기';
 }
 
-function maskRegNo(raw: string): string {
-  // 900101-1234567 → 900101-1******
-  const clean = raw.replace(/\s/g, '');
-  if (/^\d{6}-?\d{7}$/.test(clean)) {
-    const front = clean.slice(0, 6);
-    const back = clean.length === 13 ? clean.slice(6) : clean.slice(7);
-    return `${front}-${back[0]}******`;
-  }
-  return raw;
-}
-
 /** 헤더 alias resolver — 다양한 컬럼명 허용 */
 function get(row: Row, ...keys: string[]): unknown {
   for (const k of keys) {

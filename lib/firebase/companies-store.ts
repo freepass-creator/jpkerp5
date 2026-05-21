@@ -64,7 +64,8 @@ export function useCompanies(): {
       await ensureAuth();
       const db = getRtdb(); if (!db) return '';
       const newRef = push(ref(db, COMPANIES_PATH));
-      const id = newRef.key!;
+      const id = newRef.key;
+      if (!id) throw new Error('Firebase push failed: no key');
       await set(newRef, { ...payload, id });
       return id;
     },

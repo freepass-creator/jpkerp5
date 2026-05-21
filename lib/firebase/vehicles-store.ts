@@ -54,7 +54,8 @@ export function useVehicles(): {
       await ensureAuth();
       const db = getRtdb(); if (!db) return '';
       const newRef = push(ref(db, VEHICLES_PATH));
-      const id = newRef.key!;
+      const id = newRef.key;
+      if (!id) throw new Error('Firebase push failed: no key');
       await set(newRef, { ...v, id });
       return id;
     },
@@ -70,7 +71,8 @@ export function useVehicles(): {
       const batch: Record<string, Vehicle> = {};
       for (const row of rows) {
         const newRef = push(ref(db, VEHICLES_PATH));
-        const id = newRef.key!;
+        const id = newRef.key;
+      if (!id) throw new Error('Firebase push failed: no key');
         batch[id] = { ...row, id } as Vehicle;
       }
       await rtdbUpdate(ref(db, VEHICLES_PATH), batch as unknown as Record<string, unknown>);

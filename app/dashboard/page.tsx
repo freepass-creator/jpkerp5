@@ -12,7 +12,7 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { usePenalties } from '@/lib/firebase/penalty-store';
 import { formatCurrency, dateWithDow } from '@/lib/utils';
-import { TODAY } from '@/lib/mock-data';
+import { todayKr } from '@/lib/mock-data';
 
 export default function DashboardPage() {
   const [createOpen, setCreateOpen] = useState(false);
@@ -27,7 +27,7 @@ export default function DashboardPage() {
     const unpaidCount = contracts.filter((c) => (c.unpaidAmount ?? 0) > 0).length;
     const activeContracts = contracts.filter((c) => c.status === '운행').length;
     const overdueReturns = contracts.filter(
-      (c) => c.returnScheduledDate && !c.returnedDate && c.status === '운행' && c.returnScheduledDate < TODAY
+      (c) => c.returnScheduledDate && !c.returnedDate && c.status === '운행' && c.returnScheduledDate < todayKr()
     ).length;
     const totalDeposit = contracts.reduce((s, c) => s + (c.deposit ?? 0), 0);
     const monthlyRevenue = contracts.filter((c) => c.status === '운행').reduce((s, c) => s + (c.monthlyRent ?? 0), 0);
@@ -52,7 +52,7 @@ export default function DashboardPage() {
           </div>
           <span style={{ fontSize: 12, color: 'var(--text-weak)' }}>지표 관리 — Phase 2 (준비중)</span>
           <div style={{ flex: 1 }} />
-          <span className="topbar-date">{dateWithDow(TODAY)}</span>
+          <span className="topbar-date">{dateWithDow(todayKr())}</span>
         </header>
 
         <div style={{ padding: 10, overflow: 'auto', background: 'var(--bg-page)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, gridAutoRows: 'min-content' }}>

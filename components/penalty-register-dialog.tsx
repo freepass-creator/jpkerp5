@@ -6,7 +6,7 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import { DateInput } from '@/components/ui/date-input';
 import { cn } from '@/lib/utils';
 import type { Penalty, PenaltyDocType } from '@/lib/types-penalty';
-import { TODAY } from '@/lib/mock-data';
+import { todayKr } from '@/lib/mock-data';
 
 type Mode = 'manual' | 'ocr';
 const DOC_TYPES: PenaltyDocType[] = ['과태료', '범칙금', '통행료', '속도위반', '주정차위반', '신호위반', '기타'];
@@ -54,7 +54,7 @@ function ManualForm({ onSubmit }: { onSubmit: (p: Omit<Penalty, 'id'>) => Promis
   const [docType, setDocType] = useState<PenaltyDocType>('과태료');
   const [noticeNo, setNoticeNo] = useState('');
   const [issuer, setIssuer] = useState('');
-  const [issueDate, setIssueDate] = useState(TODAY);
+  const [issueDate, setIssueDate] = useState(todayKr());
   const [violationDate, setViolationDate] = useState('');
   const [carNumber, setCarNumber] = useState('');
   const [description, setDescription] = useState('');
@@ -157,7 +157,7 @@ function OcrPane({ onSubmit }: { onSubmit: (p: Omit<Penalty, 'id'>) => Promise<v
         docType: '속도위반',
         noticeNo: '2026-S-' + Math.floor(10000 + Math.random() * 90000),
         issuer: '서울지방경찰청',
-        issueDate: TODAY,
+        issueDate: todayKr(),
         violationDate: '2026-05-08',
         violationLocation: '강남대로 123',
         carNumber: '109호1234',

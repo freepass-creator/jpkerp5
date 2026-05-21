@@ -94,7 +94,8 @@ export function useContracts(): {
       const db = getRtdb();
       if (!db) return '';
       const newRef = push(ref(db, CONTRACTS_PATH));
-      const id = newRef.key!;
+      const id = newRef.key;
+      if (!id) throw new Error('Firebase push failed: no key');
       const full = { ...c, id } as Contract;
       await set(newRef, full);
       return id;
@@ -115,7 +116,8 @@ export function useContracts(): {
       const batch: Record<string, Contract> = {};
       for (const row of rows) {
         const newRef = push(ref(db, CONTRACTS_PATH));
-        const id = newRef.key!;
+        const id = newRef.key;
+      if (!id) throw new Error('Firebase push failed: no key');
         batch[id] = { ...row, id } as Contract;
       }
       await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);

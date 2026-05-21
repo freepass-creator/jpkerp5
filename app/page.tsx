@@ -5,7 +5,7 @@ import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Pl
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import {
-  TODAY,
+  todayKr,
   buildDeliveries,
   buildReturns,
   buildOverdue,
@@ -132,53 +132,53 @@ type VehicleState = '구매대기' | '등록대기' | '상품화중' | '인도�
 function getVehicleState(c: Contract): { name: VehicleState; days: number } {
   // Post-delivery 우선
   if (c.vehicleStatus === '휴차') {
-    return { name: '휴차', days: c.idleSince ? daysSince(c.idleSince, TODAY) : 0 };
+    return { name: '휴차', days: c.idleSince ? daysSince(c.idleSince, todayKr()) : 0 };
   }
   if (c.returnedDate || c.status === '반납') {
-    return { name: '반납', days: c.returnedDate ? daysSince(c.returnedDate, TODAY) : 0 };
+    return { name: '반납', days: c.returnedDate ? daysSince(c.returnedDate, todayKr()) : 0 };
   }
   // Pre-delivery phases — 각 phase 시작일부터 경과
   if (c.vehicleStatus === '구매대기') {
-    return { name: '구매대기', days: daysSince(c.contractDate, TODAY) };
+    return { name: '구매대기', days: daysSince(c.contractDate, todayKr()) };
   }
   if (c.vehicleStatus === '등록대기') {
-    return { name: '등록대기', days: daysSince(c.purchasedDate ?? c.contractDate, TODAY) };
+    return { name: '등록대기', days: daysSince(c.purchasedDate ?? c.contractDate, todayKr()) };
   }
   if (c.vehicleStatus === '상품화중') {
-    return { name: '상품화중', days: daysSince(c.registeredDate ?? c.contractDate, TODAY) };
+    return { name: '상품화중', days: daysSince(c.registeredDate ?? c.contractDate, todayKr()) };
   }
   if (c.vehicleStatus === '인도대기' || c.vehicleStatus === '출고대기' || !c.deliveredDate || c.status === '대기') {
-    return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, TODAY) };
+    return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
   }
   // 인도 완료 = 계약완료
-  return { name: '계약완료', days: daysSince(c.deliveredDate, TODAY) };
+  return { name: '계약완료', days: daysSince(c.deliveredDate, todayKr()) };
 }
 
 /** 계약상태 (3종) — 컴플라이언스 (정기검사·위반) */
 type ContractState = '정상' | '미수검' | '위반';
 function getContractState(c: Contract): { name: ContractState; days: number } {
-  const inspectionOverdue = !!(c.inspectionDueDate && c.inspectionDueDate < TODAY);
+  const inspectionOverdue = !!(c.inspectionDueDate && c.inspectionDueDate < todayKr());
   const hasViolations = !!c.hasViolations;
   // 위반이 미수검보다 우선 (둘 다 있을 시 위반 표시)
   if (hasViolations) {
-    return { name: '위반', days: c.violationSince ? daysSince(c.violationSince, TODAY) : 0 };
+    return { name: '위반', days: c.violationSince ? daysSince(c.violationSince, todayKr()) : 0 };
   }
   if (inspectionOverdue) {
-    return { name: '미수검', days: daysSince(c.inspectionDueDate!, TODAY) };
+    return { name: '미수검', days: daysSince(c.inspectionDueDate!, todayKr()) };
   }
   // 정상 = 컴플라이언스 OK 유지 일수 = 계약 시작일부터
-  return { name: '정상', days: daysSince(c.contractDate, TODAY) };
+  return { name: '정상', days: daysSince(c.contractDate, todayKr()) };
 }
 
 /** 수납상태 (2종) — 결제 건전성 */
 type PaymentState = '정상' | '미납';
 function getPaymentState(c: Contract): { name: PaymentState; days: number } {
   if (c.unpaidAmount <= 0) {
-    return { name: '정상', days: daysSince(c.lastPaidDate ?? c.contractDate, TODAY) };
+    return { name: '정상', days: daysSince(c.lastPaidDate ?? c.contractDate, todayKr()) };
   }
   // 미납 = 최근 입금 후 30일+ 시점부터 = 미납 발생일부터
   const ref = c.lastPaidDate || c.contractDate;
-  const days = Math.max(0, daysSince(ref, TODAY) - 30);
+  const days = Math.max(0, daysSince(ref, todayKr()) - 30);
   return { name: '미납', days };
 }
 
@@ -290,9 +290,9 @@ export default function Page() {
     return { totalUnpaid, unpaidCount };
   }, [scopedContracts]);
 
-  const deliveries = useMemo(() => buildDeliveries(scopedContracts, TODAY), [scopedContracts]);
-  const returns = useMemo(() => buildReturns(scopedContracts, TODAY, 30), [scopedContracts]);
-  const overdue = useMemo(() => buildOverdue(scopedContracts, TODAY), [scopedContracts]);
+  const deliveries = useMemo(() => buildDeliveries(scopedContracts, todayKr()), [scopedContracts]);
+  const returns = useMemo(() => buildReturns(scopedContracts, todayKr(), 30), [scopedContracts]);
+  const overdue = useMemo(() => buildOverdue(scopedContracts, todayKr()), [scopedContracts]);
 
   function handleRowDoubleClick(c: Contract) {
     setSelectedId(c.id);
@@ -302,14 +302,14 @@ export default function Page() {
   function handleExtend(contractId: string, months: number) {
     const c = contracts.find((x) => x.id === contractId);
     if (!c) return;
-    const base = c.returnScheduledDate ? new Date(c.returnScheduledDate) : new Date(TODAY);
+    const base = c.returnScheduledDate ? new Date(c.returnScheduledDate) : new Date(todayKr());
     base.setMonth(base.getMonth() + months);
     void rtdbUpdate({
       ...c,
       returnScheduledDate: base.toISOString().slice(0, 10),
       termMonths: c.termMonths + months,
       totalSeq: c.totalSeq + months,
-      notes: `${c.notes ?? ''}${c.notes ? ' / ' : ''}${TODAY} ${months}개월 연장`.trim(),
+      notes: `${c.notes ?? ''}${c.notes ? ' / ' : ''}${todayKr()} ${months}개월 연장`.trim(),
     });
   }
 
@@ -367,7 +367,7 @@ export default function Page() {
               ? `${manualSort.col} ${manualSort.dir === 'asc' ? '오름' : '내림'}`
               : sortLabel(view)}
           </span>
-          <span className="topbar-date">{dateWithDow(TODAY)}</span>
+          <span className="topbar-date">{dateWithDow(todayKr())}</span>
         </div>
       </header>
 
@@ -418,8 +418,8 @@ export default function Page() {
                   </tr>
                 ) : (
                   filteredContracts.map((c) => {
-                    const isReturnOverdue = !!(c.returnScheduledDate && !c.returnedDate && c.status === '운행' && c.returnScheduledDate < TODAY);
-                    const returnDaysToGo = c.returnScheduledDate ? daysSince(TODAY, c.returnScheduledDate) : null;
+                    const isReturnOverdue = !!(c.returnScheduledDate && !c.returnedDate && c.status === '운행' && c.returnScheduledDate < todayKr());
+                    const returnDaysToGo = c.returnScheduledDate ? daysSince(todayKr(), c.returnScheduledDate) : null;
                     const vs = getVehicleState(c);
                     const cs = getContractState(c);
                     const ps = getPaymentState(c);
@@ -751,7 +751,7 @@ function SidePanel({
 }
 
 function DDay({ date, danger }: { date: string; danger?: boolean }) {
-  const diff = daysSince(TODAY, date);
+  const diff = daysSince(todayKr(), date);
   const text = danger ? `D+${Math.abs(diff)}` : diff === 0 ? '오늘' : `D-${diff}`;
   return (
     <div className="list-item-right">

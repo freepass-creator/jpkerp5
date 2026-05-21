@@ -54,7 +54,8 @@ export function usePenalties(): {
       const db = getRtdb();
       if (!db) return '';
       const newRef = push(ref(db, PATH));
-      const id = newRef.key!;
+      const id = newRef.key;
+      if (!id) throw new Error('Firebase push failed: no key');
       await set(newRef, { ...p, id });
       return id;
     },

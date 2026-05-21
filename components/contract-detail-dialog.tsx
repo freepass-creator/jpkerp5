@@ -14,7 +14,7 @@ import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
 import { contractIdentMasked, birthFromIdent, inferKind } from '@/lib/ident';
 import { displayCompanyName } from '@/lib/company-display';
 import { useCompanies } from '@/lib/firebase/companies-store';
-import { TODAY } from '@/lib/mock-data';
+import { todayKr } from '@/lib/mock-data';
 import {
   validateDocument, summarizeIssues,
   type DocumentKind, type DocumentData, type ValidationIssue,
@@ -265,7 +265,7 @@ function VehicleSpecTab({ c }: { c: Contract }) {
 
 function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const stage = currentStage(c);
-  const [actionDate, setActionDate] = useState<string>(TODAY);
+  const [actionDate, setActionDate] = useState<string>(todayKr());
   const [idlePicker, setIdlePicker] = useState(false);
   const [idleSubReason, setIdleSubReason] = useState<IdleReason>('정비');
   const [idleMemo, setIdleMemo] = useState('');
@@ -633,7 +633,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           <Field label="시작일" value={formatDateFull(c.idleSince)} mono />
           <Field label="종료예정" value={formatDateFull(c.idleUntil) || <span className="muted">미정</span>} mono />
           <Field label="사유" value={c.idleReason || '-'} />
-          <Field label="휴차 일수" value={`${daysSince(c.idleSince, TODAY)}일`} mono />
+          <Field label="휴차 일수" value={`${daysSince(c.idleSince, todayKr())}일`} mono />
         </Section>
       )}
     </div>
@@ -695,7 +695,7 @@ function ContractInfoTab({ c }: { c: Contract }) {
 function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const [addOpen, setAddOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
-  const [payDate, setPayDate] = useState(TODAY);
+  const [payDate, setPayDate] = useState(todayKr());
 
   function submitPayment() {
     const amt = parseInt(payAmount.replace(/[^0-9]/g, ''), 10);
