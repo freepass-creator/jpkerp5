@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as XLSX from 'xlsx';
 import {
@@ -25,7 +25,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import {
   parseVehicleRow, parseContractRow, parseBankTxRow, parseCardTxRow,
   matchTransactions, applyPaymentsToContracts,
-  parseSnapshotRow, applySnapshotToContract,
+  parseSnapshotRow, applySnapshotToContract, validateSnapshotRow,
 } from '@/lib/import-commit';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 
@@ -1045,8 +1045,11 @@ function SnapshotPane({
   busy: boolean;
   result: string | null;
 }) {
+  const { companies } = useCompanies();
   const [sheets, setSheets] = useState<ParsedSheet[]>([]);
   const [drag, setDrag] = useState(false);
+  // 행별 체크 선택 (기본: valid 행만 체크) — Map<rowKey, boolean>
+  const [picks, setPicks] = useState<Record<string, boolean>>({});
   const inputId = 'icar-snapshot-bulk-file';
 
   const handleFiles = useCallback(async (files: File[]) => {
@@ -1061,6 +1064,43 @@ function SnapshotPane({
     }
     setSheets((prev) => [...prev, ...out]);
   }, []);
+
+  // 모든 행 검증 결과 (sheet idx + row idx 키)
+  const validated = useMemo(() => {
+    return sheets.flatMap((s, sIdx) =>
+      s.rows.map((r, rIdx) => ({
+        key: `${sIdx}-${rIdx}`,
+        sheetName: s.sheetName,
+        fileName: s.fileName,
+        row: r,
+        ...validateSnapshotRow(r, companies),
+      })),
+    );
+  }, [sheets, companies]);
+
+  // sheets 바뀔 때 — valid 만 기본 체크
+  useEffect(() => {
+    if (validated.length === 0) return;
+    setPicks((prev) => {
+      const next = { ...prev };
+      for (const v of validated) {
+        if (next[v.key] === undefined) next[v.key] = v.valid;
+      }
+      return next;
+    });
+  }, [validated]);
+
+  const validCount = validated.filter((v) => v.valid).length;
+  const invalidCount = validated.length - validCount;
+  const pickedCount = validated.filter((v) => picks[v.key]).length;
+
+  const togglePick = (key: string) => setPicks((p) => ({ ...p, [key]: !p[key] }));
+  const toggleAll = () => {
+    const allOn = validated.every((v) => picks[v.key]);
+    const next: Record<string, boolean> = {};
+    for (const v of validated) next[v.key] = !allOn;
+    setPicks(next);
+  };
 
   const totalRows = sheets.reduce((s, p) => s + p.rows.length, 0);
 
@@ -1103,37 +1143,111 @@ function SnapshotPane({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="dropzone compact" onClick={() => document.getElementById(inputId)?.click()}>
-        <div className="dropzone-icon"><FileArrowUp size={16} weight="duotone" /></div>
-        <div className="dropzone-title">파일 추가</div>
-        <span className="text-weak text-xs ml-auto">또는 끌어다 놓기</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* 요약 + 파일 추가 + 새로 올리기 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <FileArrowUp size={14} weight="duotone" style={{ color: 'var(--text-sub)' }} />
+        <span style={{ fontSize: 12 }}>{sheets.length}개 시트 · 전체 {totalRows}행</span>
+        <span style={{ fontSize: 11, color: 'var(--green-text)' }}>유효 {validCount}</span>
+        {invalidCount > 0 && <span style={{ fontSize: 11, color: 'var(--red-text)' }}>오류 {invalidCount}</span>}
+        <div style={{ flex: 1 }} />
+        <button className="btn btn-sm" type="button" onClick={() => document.getElementById(inputId)?.click()}>
+          <Plus size={11} /> 파일 추가
+        </button>
+        <button className="btn btn-sm btn-ghost" type="button" onClick={() => { setSheets([]); setPicks({}); }}>
+          <X size={11} /> 전부 비우기
+        </button>
         <input
           id={inputId} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden"
           onChange={(e) => { if (e.target.files) { void handleFiles(Array.from(e.target.files)); e.target.value = ''; } }}
         />
       </div>
-      {sheets.map((p, i) => (
-        <SheetPreview key={`${p.fileName}-${p.sheetName}-${i}`} sheet={p} onChangeKind={() => { /* no-op */ }} />
-      ))}
+
+      {/* 검증 결과 표 */}
+      <div style={{ maxHeight: 380, overflow: 'auto', border: '1px solid var(--border)' }}>
+        <table className="table" style={{ fontSize: 11 }}>
+          <thead>
+            <tr>
+              <th className="checkbox-col">
+                <input
+                  type="checkbox"
+                  checked={validated.length > 0 && validated.every((v) => picks[v.key])}
+                  ref={(el) => {
+                    if (!el) return;
+                    const some = validated.some((v) => picks[v.key]);
+                    const all = validated.every((v) => picks[v.key]);
+                    el.indeterminate = some && !all;
+                  }}
+                  onChange={toggleAll}
+                  aria-label="전체 선택"
+                />
+              </th>
+              <th className="center" style={{ width: 50 }}>#</th>
+              <th className="center" style={{ width: 64 }}>상태</th>
+              <th style={{ width: 110 }}>차량번호</th>
+              <th>계약자</th>
+              <th>회사</th>
+              <th className="mono">계약기간</th>
+              <th className="num" style={{ width: 110 }}>월대여료</th>
+              <th className="num" style={{ width: 110 }}>현재미수</th>
+              <th>비고</th>
+            </tr>
+          </thead>
+          <tbody>
+            {validated.length === 0 ? (
+              <tr><td colSpan={10} className="muted center" style={{ padding: '24px 10px' }}>데이터 없음</td></tr>
+            ) : validated.map((v, i) => (
+              <tr key={v.key} className={picks[v.key] ? 'selected-row' : undefined}>
+                <td className="checkbox-col">
+                  <input type="checkbox" checked={!!picks[v.key]} onChange={() => togglePick(v.key)} disabled={!v.valid} />
+                </td>
+                <td className="center mono dim">{i + 1}</td>
+                <td className="center">
+                  <span className={`status ${v.valid ? '완료' : '미납'}`}>{v.valid ? '유효' : '오류'}</span>
+                </td>
+                <td className="mono">{v.raw.plate || '-'}</td>
+                <td>{v.raw.customer || '-'}</td>
+                <td className="dim">{v.patch?.company || '-'}</td>
+                <td className="mono dim">
+                  {v.patch ? `${v.patch.contractDate?.slice(2) ?? '-'} ~ ${v.patch.returnScheduledDate?.slice(2) ?? '-'} (${v.patch.termMonths}개월)` : '-'}
+                </td>
+                <td className="num mono">{v.raw.monthlyRent > 0 ? `₩${formatCurrency(v.raw.monthlyRent)}` : '-'}</td>
+                <td className="num mono" style={{ color: v.raw.unpaid > 0 ? 'var(--red-text)' : undefined }}>
+                  {v.raw.unpaid > 0 ? `₩${formatCurrency(v.raw.unpaid)}` : '-'}
+                </td>
+                <td style={{ fontSize: 10, color: v.valid ? 'var(--text-weak)' : 'var(--red-text)' }}>
+                  {v.errors.join(', ') || (v.patch?.unpaidSeqCount ? `미납 ${v.patch.unpaidSeqCount}회차 추정` : '')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       {result && (
         <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 6, fontSize: 12, border: '1px solid var(--green-border)' }}>
           {result}
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>
+          {pickedCount}건 선택 · 차량번호 기준 UPSERT (있으면 갱신 / 없으면 신규)
+        </span>
+        <div style={{ flex: 1 }} />
         <button
           className="btn btn-primary"
           type="button"
-          disabled={busy}
+          disabled={busy || pickedCount === 0}
           onClick={async () => {
-            const rows = sheets.flatMap((s) => s.rows);
+            const rows = validated.filter((v) => picks[v.key]).map((v) => v.row);
             await onCommit(rows);
             setSheets([]);
+            setPicks({});
           }}
         >
           {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
-          {' '}현황 반영 {totalRows}건 (UPSERT)
+          {' '}{busy ? '반영 중...' : `${pickedCount}건 반영하기`}
         </button>
       </div>
     </div>

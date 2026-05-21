@@ -260,6 +260,40 @@ function resolveCompanyByRegNo(regNoOrName: string, companies?: Company[]): stri
   return regNoOrName;  // 미등록 — 사용자가 입력한 값 그대로
 }
 
+/**
+ * 검증 결과 + 패치 반환. 에러 사유 보존 → UI 에서 행별 valid/invalid 표시.
+ */
+export type SnapshotValidation = {
+  valid: boolean;
+  patch?: SnapshotPatch;
+  errors: string[];
+  /** 원본 행 값 — preview 표시용 */
+  raw: { plate: string; customer: string; monthlyRent: number; unpaid: number };
+};
+
+export function validateSnapshotRow(row: Row, companies?: Company[]): SnapshotValidation {
+  const errors: string[] = [];
+  const plate = toStr(get(row, '차량번호', 'vehiclePlate', 'plate'));
+  const customerName = toStr(get(row, '계약자', '계약자명', 'customerName'));
+  const monthlyRent = toNum(get(row, '월대여료', '월렌트료', 'monthlyRent'));
+  const unpaidAmount = toNum(get(row, '현재미수', '미수금', 'unpaidAmount'));
+
+  if (!plate) errors.push('차량번호 누락');
+  if (!customerName) errors.push('계약자명 누락');
+  if (monthlyRent <= 0) errors.push('월대여료 누락/0원');
+
+  const raw = { plate, customer: customerName, monthlyRent, unpaid: unpaidAmount };
+
+  if (errors.length > 0) return { valid: false, errors, raw };
+
+  const patch = parseSnapshotRow(row, companies);
+  if (!patch) {
+    errors.push('파싱 실패');
+    return { valid: false, errors, raw };
+  }
+  return { valid: true, patch, errors: [], raw };
+}
+
 export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch | null {
   const plate = toStr(get(row, '차량번호', 'vehiclePlate', 'plate'));
   const customerName = toStr(get(row, '계약자', '계약자명', 'customerName'));
