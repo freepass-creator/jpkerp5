@@ -50,9 +50,12 @@ export function formatRemainingHuman(from: string, to: string): string {
   if (!from || !to) return '';
   const a = new Date(from);
   const b = new Date(to);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return '날짜오류';
   const ms = b.getTime() - a.getTime();
   // 동일 일자
   if (Math.abs(ms) < 12 * 60 * 60 * 1000) return '오늘';
+  // sanity 가드 — 잔여 또는 경과가 30년 넘으면 데이터 오류로 판단
+  if (Math.abs(ms) > 30 * 365 * 86400000) return '날짜오류';
   // 경과
   if (ms < 0) {
     const dPast = Math.round(-ms / 86400000);
