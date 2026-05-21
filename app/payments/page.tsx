@@ -35,6 +35,8 @@ export default function PaymentsPage() {
   const [tab, setTab] = useState<Tab>('ledger');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'unposted' | 'posted' | 'closed'>('all');
+  const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
@@ -61,15 +63,47 @@ export default function PaymentsPage() {
       .filter((t) => {
         const st = ledgerStatus(t);
         if (filter !== 'all' && st !== filter) return false;
+        if (companyFilter !== 'all') {
+          const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
+          const co = t.companyCode || c?.company;
+          if (co !== companyFilter) return false;
+        }
+        if (subjectFilter !== 'all') {
+          if ((t.subject ?? '(미지정)') !== subjectFilter) return false;
+        }
         if (q) {
           const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
-          const hay = `${t.counterparty} ${t.memo ?? ''} ${t.account ?? ''} ${t.subject ?? ''} ${c?.vehiclePlate ?? ''} ${c?.customerName ?? ''}`.toLowerCase();
+          const hay = `${t.counterparty} ${t.memo ?? ''} ${t.note ?? ''} ${t.account ?? ''} ${t.subject ?? ''} ${c?.vehiclePlate ?? ''} ${c?.customerName ?? ''}`.toLowerCase();
           if (!hay.includes(q)) return false;
         }
         return true;
       })
       .sort((a, b) => b.txDate.localeCompare(a.txDate));
-  }, [bankTx, search, filter, contractById]);
+  }, [bankTx, search, filter, companyFilter, subjectFilter, contractById]);
+
+  /** 분개 뷰에 노출할 회사 목록 (실 데이터 기반) */
+  const companyOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of bankTx) {
+      const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
+      const co = t.companyCode || c?.company;
+      if (co) set.add(co);
+    }
+    return Array.from(set).sort();
+  }, [bankTx, contractById]);
+
+  /** 분개 뷰에 노출할 계정과목 목록 (실 데이터 기반) */
+  const subjectOptions = useMemo(() => {
+    const set = new Set<string>();
+    let hasUnposted = false;
+    for (const t of bankTx) {
+      if (t.subject) set.add(t.subject);
+      else hasUnposted = true;
+    }
+    const list = Array.from(set).sort();
+    if (hasUnposted) list.unshift('(미지정)');
+    return list;
+  }, [bankTx]);
 
   const counts = useMemo(() => {
     const c = { unposted: 0, posted: 0, closed: 0 };
@@ -300,6 +334,37 @@ export default function PaymentsPage() {
                 <button type="button" className={`chip ${filter === 'unposted' ? 'active' : ''}`} onClick={() => setFilter('unposted')}>미분개 {counts.unposted > 0 && <span className="chip-count">{counts.unposted}</span>}</button>
                 <button type="button" className={`chip ${filter === 'posted' ? 'active' : ''}`} onClick={() => setFilter('posted')}>분개 {counts.posted > 0 && <span className="chip-count">{counts.posted}</span>}</button>
                 <button type="button" className={`chip ${filter === 'closed' ? 'active' : ''}`} onClick={() => setFilter('closed')}>마감 {counts.closed > 0 && <span className="chip-count">{counts.closed}</span>}</button>
+                {companyOptions.length > 1 && (
+                  <>
+                    <span className="filter-divider" />
+                    <select
+                      className="input"
+                      value={companyFilter}
+                      onChange={(e) => setCompanyFilter(e.target.value)}
+                      style={{ height: 26, fontSize: 11, padding: '0 6px', minWidth: 90 }}
+                      title="회사별 필터"
+                    >
+                      <option value="all">회사: 전체</option>
+                      {companyOptions.map((co) => (
+                        <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                {subjectOptions.length > 0 && (
+                  <select
+                    className="input"
+                    value={subjectFilter}
+                    onChange={(e) => setSubjectFilter(e.target.value)}
+                    style={{ height: 26, fontSize: 11, padding: '0 6px', minWidth: 110 }}
+                    title="계정과목별 필터"
+                  >
+                    <option value="all">계정: 전체</option>
+                    {subjectOptions.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                )}
               </>
             )}
           </div>

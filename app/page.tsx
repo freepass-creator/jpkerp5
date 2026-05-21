@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, CurrencyKrw } from '@phosphor-icons/react';
+import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, CurrencyKrw, DownloadSimple } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import {
@@ -15,6 +15,7 @@ import type { Contract } from '@/lib/types';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { downloadContractsExcel, downloadOverdueExcel } from '@/lib/contract-export';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
@@ -640,6 +641,24 @@ export default function Page() {
             </button>
             <button className="btn" type="button" onClick={() => setSmsOpen(true)} title="문자 발송" disabled={selectedIds.size === 0}>
               <PaperPlaneTilt size={14} /> 문자 발송{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+            </button>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => downloadContractsExcel(filteredContracts, companyMaster, { filter: `${view}${companyFilter !== '전체' ? ` · ${companyFilter}` : ''}` })}
+              title="현재 표시중인 계약 리스트 엑셀로 내려받기"
+              disabled={filteredContracts.length === 0}
+            >
+              <DownloadSimple size={14} /> 계약 엑셀
+            </button>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => downloadOverdueExcel(contracts, companyMaster)}
+              title="미수금 있는 계약만 엑셀로 내려받기"
+              disabled={summary.totalUnpaid === 0}
+            >
+              <DownloadSimple size={14} /> 미수 엑셀
             </button>
           </>
         }
