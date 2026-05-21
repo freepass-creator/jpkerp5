@@ -103,6 +103,19 @@ export type Contract = {
   lastPaidAmount?: number;
   unpaidAmount: number;        // 미수 합
   unpaidSeqCount: number;      // 미납 회차 수
+  // 회차 스케줄 — 운영현황 업로드 시 자동 생성 + 미수 분배 (lib/payment-schedule.ts)
+  schedules?: PaymentScheduleInline[];
+};
+
+/** Contract에 인라인으로 박는 회차. (PaymentSchedule 전체 모델의 contract-scope subset) */
+export type PaymentScheduleInline = {
+  seq: number;
+  dueDate: string;
+  amount: number;
+  status: ScheduleStatus;
+  paidAmount: number;
+  paidAt?: string;
+  notes?: string;
 };
 
 /** 수납 스케줄 1회차 */

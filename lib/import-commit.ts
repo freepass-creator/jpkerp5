@@ -5,6 +5,8 @@ import type {
 } from './types';
 import { normalizeKoreanDate } from './parsers/date';
 import { normalizeIdent, inferKind, formatIdent, type CustomerKind } from './ident';
+import { generateSchedules, distributeUnpaid, computeCurrentSeq as computeCurrentSeqFromSchedules } from './payment-schedule';
+import { todayKr } from './mock-data';
 
 type Row = Record<string, unknown>;
 
@@ -297,11 +299,24 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
   };
 }
 
-/** 스냅샷 patch를 기존 Contract 위에 덮어 — 신규는 새 Contract 생성 */
+/** 스냅샷 patch를 기존 Contract 위에 덮어 — 신규는 새 Contract 생성. 회차 스케줄도 자동 생성. */
 export function applySnapshotToContract(
   existing: Contract | undefined,
   patch: SnapshotPatch,
 ): Contract | Omit<Contract, 'id'> {
+  const today = todayKr();
+  const paymentDay = existing?.paymentDay ?? 1;
+
+  // 회차 N개 생성 + 미수 자동 분배 (직전 회차부터 역순)
+  const baseSchedules = generateSchedules({
+    contractDate: patch.contractDate,
+    termMonths: patch.termMonths,
+    monthlyRent: patch.monthlyRent,
+    paymentDay,
+  });
+  const distributed = distributeUnpaid(baseSchedules, patch.unpaidAmount, today);
+  const currentSeqFromSched = computeCurrentSeqFromSchedules(distributed, today);
+
   if (existing) {
     return {
       ...existing,
@@ -316,10 +331,11 @@ export function applySnapshotToContract(
       deposit: patch.deposit || existing.deposit,
       monthlyRent: patch.monthlyRent || existing.monthlyRent,
       insuranceAge: patch.insuranceAge ?? existing.insuranceAge,
-      currentSeq: patch.currentSeq,
-      totalSeq: Math.max(patch.currentSeq, existing.totalSeq || patch.termMonths),
+      currentSeq: currentSeqFromSched,
+      totalSeq: Math.max(currentSeqFromSched, patch.termMonths),
       unpaidAmount: patch.unpaidAmount,
       unpaidSeqCount: patch.unpaidSeqCount,
+      schedules: distributed,
     };
   }
 
@@ -342,13 +358,14 @@ export function applySnapshotToContract(
     monthlyRent: patch.monthlyRent,
     deposit: patch.deposit,
     insuranceAge: patch.insuranceAge,
-    paymentDay: 1,
+    paymentDay,
     paymentMethod: '이체',
     status: '운행',
-    currentSeq: patch.currentSeq,
-    totalSeq: Math.max(patch.currentSeq, patch.termMonths),
+    currentSeq: currentSeqFromSched,
+    totalSeq: Math.max(currentSeqFromSched, patch.termMonths),
     unpaidAmount: patch.unpaidAmount,
     unpaidSeqCount: patch.unpaidSeqCount,
+    schedules: distributed,
   };
 }
 

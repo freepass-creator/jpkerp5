@@ -802,31 +802,62 @@ type PaymentLog = {
 
 function generatePaymentHistory(c: Contract): PaymentLog[] {
   const logs: PaymentLog[] = [];
-  // 완료된 회차 (currentSeq - 1 까지 모두 완납)
+  const source: 'CMS' | '카드' | '계좌' | '수동' =
+    c.paymentMethod === '카드' ? '카드'
+    : c.paymentMethod === 'CMS' || c.paymentMethod === '이체' ? '계좌'
+    : '수동';
+
+  // c.schedules 가 있으면 그 기준으로 (완료/부분납 회차만)
+  if (c.schedules && c.schedules.length > 0) {
+    for (const s of c.schedules) {
+      if (s.status === '완료') {
+        logs.push({
+          date: s.paidAt ?? s.dueDate,
+          seq: s.seq,
+          amount: s.amount,
+          method: c.paymentMethod,
+          source,
+          counterparty: c.customerName,
+          status: '완료',
+        });
+      } else if (s.status === '부분납' && s.paidAmount > 0) {
+        logs.push({
+          date: s.paidAt ?? s.dueDate,
+          seq: s.seq,
+          amount: s.paidAmount,
+          method: c.paymentMethod,
+          source,
+          counterparty: c.customerName,
+          status: '부분',
+        });
+      }
+    }
+    return logs.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  // Legacy fallback — schedules 없을 때
   for (let seq = 1; seq < c.currentSeq; seq++) {
     logs.push({
       date: addMonths(c.contractDate, seq - 1, c.paymentDay),
       seq,
       amount: c.monthlyRent,
       method: c.paymentMethod,
-      source: c.paymentMethod === '카드' ? '카드' : c.paymentMethod === 'CMS' || c.paymentMethod === '이체' ? '계좌' : '수동',
+      source,
       counterparty: c.customerName,
       status: '완료',
     });
   }
-  // 현재 회차 부분납 (lastPaidAmount가 있고 monthlyRent보다 작은 경우)
   if (c.lastPaidAmount && c.lastPaidAmount > 0 && c.lastPaidAmount < c.monthlyRent) {
     logs.push({
       date: c.lastPaidDate ?? c.contractDate,
       seq: c.currentSeq,
       amount: c.lastPaidAmount,
       method: c.paymentMethod,
-      source: c.paymentMethod === '카드' ? '카드' : '계좌',
+      source,
       counterparty: c.customerName,
       status: '부분',
     });
   }
-  // 최근순
   return logs.sort((a, b) => b.date.localeCompare(a.date));
 }
 
@@ -877,19 +908,28 @@ function PaymentHistoryTable({ c }: { c: Contract }) {
 }
 
 function ScheduleTable({ c }: { c: Contract }) {
-  const rows = Array.from({ length: c.totalSeq }, (_, i) => {
-    const seq = i + 1;
-    const isPaid = seq < c.currentSeq;
-    const isCurrent = seq === c.currentSeq;
-    const unpaidThis = c.unpaidAmount > 0 && (isCurrent || (c.unpaidSeqCount > 1 && seq >= c.currentSeq - c.unpaidSeqCount + 1));
-    return {
-      seq,
-      dueDate: addMonths(c.contractDate, i, c.paymentDay),
-      amount: c.monthlyRent,
-      status: isPaid ? '완료' : unpaidThis ? '미납' : isCurrent ? '예정' : '예정',
-      paidAmount: isPaid ? c.monthlyRent : unpaidThis ? Math.max(0, c.monthlyRent - c.unpaidAmount) : 0,
-    };
-  });
+  // c.schedules 가 있으면(운영현황 업로드로 자동 분배됨) 우선 사용, 없으면 legacy derive
+  const rows = c.schedules && c.schedules.length > 0
+    ? c.schedules.map((s) => ({
+        seq: s.seq,
+        dueDate: s.dueDate,
+        amount: s.amount,
+        status: s.status,
+        paidAmount: s.paidAmount,
+      }))
+    : Array.from({ length: c.totalSeq }, (_, i) => {
+        const seq = i + 1;
+        const isPaid = seq < c.currentSeq;
+        const isCurrent = seq === c.currentSeq;
+        const unpaidThis = c.unpaidAmount > 0 && (isCurrent || (c.unpaidSeqCount > 1 && seq >= c.currentSeq - c.unpaidSeqCount + 1));
+        return {
+          seq,
+          dueDate: addMonths(c.contractDate, i, c.paymentDay),
+          amount: c.monthlyRent,
+          status: (isPaid ? '완료' : unpaidThis ? '연체' : '예정') as '완료' | '연체' | '예정',
+          paidAmount: isPaid ? c.monthlyRent : unpaidThis ? Math.max(0, c.monthlyRent - c.unpaidAmount) : 0,
+        };
+      });
 
   return (
     <table className="table">
