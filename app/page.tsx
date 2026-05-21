@@ -10,7 +10,7 @@ import {
   buildReturns,
   buildOverdue,
 } from '@/lib/mock-data';
-import { formatCurrency, formatDate, daysSince, formatPeriod, dateWithDow } from '@/lib/utils';
+import { formatCurrency, formatDate, daysSince, formatPeriod, dateWithDow, formatRemainingHuman } from '@/lib/utils';
 import type { Contract } from '@/lib/types';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -557,13 +557,9 @@ export default function Page() {
                           {c.currentSeq && c.totalSeq ? `${c.currentSeq}/${c.totalSeq}` : <span className="muted">-</span>}
                         </td>
                         <td className={`center mono ${isReturnOverdue ? 'danger' : 'dim'}`}>
-                          {returnDaysToGo === null
-                            ? <span className="muted">-</span>
-                            : isReturnOverdue
-                            ? `D+${Math.abs(returnDaysToGo)}`
-                            : returnDaysToGo === 0
-                            ? '오늘'
-                            : `D-${returnDaysToGo}`}
+                          {c.returnScheduledDate
+                            ? formatRemainingHuman(todayKr(), c.returnScheduledDate)
+                            : <span className="muted">-</span>}
                         </td>
                         {/* 수납상태 + 미수금 */}
                         <td className="center">

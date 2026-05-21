@@ -8,11 +8,11 @@
  */
 export const SUPER_ADMIN_EMAILS: ReadonlyArray<string> = [
   'jpkpyh@gmail.com',
+  'dudguq@gmail.com',
 ];
 
 export const ADMIN_EMAILS: ReadonlyArray<string> = [
   ...SUPER_ADMIN_EMAILS,
-  'dudguq@gmail.com',
 ];
 
 export function isSuperAdmin(email?: string | null): boolean {
