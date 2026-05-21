@@ -740,24 +740,26 @@ export default function Page() {
             >
               <DownloadSimple size={14} /> 미수 엑셀
             </button>
-            {superAdmin && selectedIds.size > 0 && (
+            {superAdmin && (
               <>
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
                 <button
                   className="btn"
                   type="button"
                   onClick={handleBulkMarkDelivered}
-                  title="선택 계약 일괄 인도완료 (deliveredDate = 계약시작일)"
+                  disabled={selectedIds.size === 0}
+                  title={selectedIds.size === 0 ? '좌측 체크박스로 행을 선택하세요' : '선택 계약 일괄 인도완료 (deliveredDate = 계약시작일)'}
                 >
-                  <Truck size={14} /> 일괄 인도완료 ({selectedIds.size})
+                  <Truck size={14} /> 일괄 인도완료{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
                 </button>
                 <button
                   className="btn btn-danger"
                   type="button"
                   onClick={handleBulkDelete}
-                  title="선택 계약 일괄 삭제 (마스터관리자 전용)"
+                  disabled={selectedIds.size === 0}
+                  title={selectedIds.size === 0 ? '좌측 체크박스로 행을 선택하세요' : '선택 계약 일괄 삭제 (마스터관리자)'}
                 >
-                  <X size={14} /> 일괄 삭제 ({selectedIds.size})
+                  <X size={14} /> 일괄 삭제{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
                 </button>
               </>
             )}

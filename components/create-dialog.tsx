@@ -188,8 +188,8 @@ export function CreateDialog({
           plate: vp.plate,
           model: vp.model,
           company: vp.company as import('@/lib/types').CompanyCode,
-          status: '휴차',
-          notes: '스냅샷 업로드 — 계약자 미정 (휴차)',
+          status: vp.vehicleStatus,
+          notes: `스냅샷 업로드 — ${vp.vehicleStatus}`,
           createdAt: new Date().toISOString(),
         });
         existingPlates.add(vp.plate.trim());

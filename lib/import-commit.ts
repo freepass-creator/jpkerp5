@@ -205,6 +205,7 @@ export type SnapshotPatch = {
   monthlyRent: number;
   paymentDay: number;
   paymentMethod: string;
+  vehicleStatus: VehicleStatus;
   insuranceAge?: number;
   currentSeq: number;
   unpaidAmount: number;
@@ -289,7 +290,7 @@ export type SnapshotValidation = {
   valid: boolean;
   patch?: SnapshotPatch;
   /** vehicle-only 일 때 — 휴차 차량 정보 */
-  vehiclePatch?: { plate: string; model: string; company: string };
+  vehiclePatch?: { plate: string; model: string; company: string; vehicleStatus: VehicleStatus };
   errors: string[];
   raw: { plate: string; customer: string; monthlyRent: number; unpaid: number };
 };
@@ -313,12 +314,14 @@ export function validateSnapshotRow(row: Row, companies?: Company[]): SnapshotVa
     const regNoOrName = toStr(get(row, '법인등록번호', '법인번호', '사업자번호', '회사명', '회사', 'corpRegNo', 'bizRegNo', 'company'));
     const company = resolveCompanyByRegNo(regNoOrName, companies) || '기타';
     const model = toStr(get(row, '차명', '차종', 'vehicleModel')) || '미정';
-    if (!customerName) errors.push('계약자 없음 → 휴차 등록');
-    if (monthlyRent <= 0 && customerName) errors.push('월대여료 0 → 휴차 등록');
+    const vehicleStatusRaw = toStr(get(row, '차량상태', '상태', 'vehicleStatus'));
+    const vehicleStatus = pickVehicleStatus(vehicleStatusRaw, false);  // default 구매대기
+    if (!customerName) errors.push(`계약자 없음 → ${vehicleStatus} 등록`);
+    if (monthlyRent <= 0 && customerName) errors.push(`월대여료 0 → ${vehicleStatus} 등록`);
     return {
       kind: 'vehicle-only',
       valid: true,
-      vehiclePatch: { plate, model, company },
+      vehiclePatch: { plate, model, company, vehicleStatus },
       errors,
       raw,
     };
@@ -350,6 +353,8 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
     ? Math.floor(paymentDayRaw)
     : (period.start ? parseInt(period.start.slice(8, 10), 10) || 1 : 1);
   const paymentMethod = toStr(get(row, '결제방법', '결제수단', 'paymentMethod')) || '이체';
+  const vehicleStatusRaw = toStr(get(row, '차량상태', '상태', 'vehicleStatus'));
+  const vehicleStatus = pickVehicleStatus(vehicleStatusRaw, true);  // 계약 행이므로 default 운행
 
   // 계약회차는 자동 계산 (계약시작일 ~ 오늘)
   const currentSeq = computeCurrentSeq(period.start, period.months);
@@ -371,6 +376,7 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
     monthlyRent,
     paymentDay,
     paymentMethod,
+    vehicleStatus,
     insuranceAge,
     currentSeq,
     unpaidAmount,
@@ -403,6 +409,7 @@ export function applySnapshotToContract(
       company: (patch.company || existing.company) as Contract['company'],
       vehiclePlate: patch.vehiclePlate,
       vehicleModel: patch.vehicleModel || existing.vehicleModel,
+      vehicleStatus: patch.vehicleStatus || existing.vehicleStatus,
       customerName: patch.customerName || existing.customerName,
       customerPhone1: patch.customerPhone1 || existing.customerPhone1,
       contractDate: patch.contractDate || existing.contractDate,
@@ -410,6 +417,8 @@ export function applySnapshotToContract(
       termMonths: patch.termMonths || existing.termMonths,
       deposit: patch.deposit || existing.deposit,
       monthlyRent: patch.monthlyRent || existing.monthlyRent,
+      paymentDay,
+      paymentMethod: patch.paymentMethod || existing.paymentMethod,
       insuranceAge: patch.insuranceAge ?? existing.insuranceAge,
       currentSeq: currentSeqFromSched,
       totalSeq: Math.max(currentSeqFromSched, patch.termMonths),
@@ -430,7 +439,7 @@ export function applySnapshotToContract(
     customerPhone1: patch.customerPhone1,
     vehiclePlate: patch.vehiclePlate,
     vehicleModel: patch.vehicleModel,
-    vehicleStatus: '운행',
+    vehicleStatus: patch.vehicleStatus || '운행',
     contractDate: patch.contractDate,
     returnScheduledDate: patch.returnScheduledDate || undefined,
     termMonths: patch.termMonths,

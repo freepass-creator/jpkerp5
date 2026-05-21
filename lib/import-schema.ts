@@ -74,6 +74,7 @@ export const SNAPSHOT_COLUMNS: ColumnSpec[] = [
   { label: '연락처',     field: 'customerPhone1',  required: false, example: '010-1234-5678' },
   { label: '계약시작일', field: 'contractDate',    required: true,  example: '2026-01-01',  hint: '2026-01-01 / 260101 / 26.1.1 / 엑셀 날짜 모두 OK' },
   { label: '계약종료일', field: 'returnScheduledDate', required: true, example: '2026-12-31', hint: '2026-12-31 / 261231 / 26.12.31' },
+  { label: '차량상태',   field: 'vehicleStatus',   required: false, example: '운행',         hint: '구매대기 / 등록대기 / 상품화대기 / 상품화중 / 상품대기 / 운행 / 휴차대기 / 매각대기 / 매각 / 휴차 / 정비 / 사고 / 반납. 미입력 시 계약 있으면 운행, 없으면 휴차' },
   { label: '결제일',     field: 'paymentDay',      required: false, example: '15',          hint: '매월 1~31일 결제일. 미입력 시 계약시작일의 일자 적용 — 미납일수 계산 기준' },
   { label: '결제방법',   field: 'paymentMethod',   required: false, example: 'CMS',         hint: 'CMS / 카드 / 이체 / 현금 / 후불' },
   { label: '보증금',     field: 'deposit',         required: false, example: '2000000',     hint: '원 단위' },
