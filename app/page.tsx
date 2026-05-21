@@ -21,6 +21,7 @@ import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
 import { SmsDialog } from '@/components/sms-dialog';
 import { PaymentLedgerDialog } from '@/components/payment-ledger-dialog';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 
 type View = '전체' | '계약중' | '휴차' | '미수';
 const VIEWS: View[] = ['전체', '계약중', '휴차', '미수'];
@@ -194,9 +195,12 @@ export default function Page() {
   const [smsOpen, setSmsOpen] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Contract | null }>({
+    open: false, x: 0, y: 0, row: null,
+  });
 
   // Firebase RTDB 실시간 구독 — /icar001/contracts
-  const { contracts, loading: contractsLoading, update: rtdbUpdate } = useContracts();
+  const { contracts, loading: contractsLoading, update: rtdbUpdate, remove: rtdbRemove } = useContracts();
   const { companies: companyMaster } = useCompanies();
 
   // selectedId를 기준으로 fresh contract 참조 (업데이트 시 자동 반영)
@@ -208,6 +212,37 @@ export default function Page() {
   const updateContract = useCallback((updated: Contract) => {
     void rtdbUpdate(updated);
   }, [rtdbUpdate]);
+
+  // 우클릭 컨텍스트 메뉴 액션 — 빠른 인도/반납/연락/SMS/삭제
+  function ctxAction_openDetail(c: Contract) {
+    setSelectedId(c.id);
+    setDetailOpen(true);
+  }
+  function ctxAction_markDelivered(c: Contract) {
+    if (c.deliveredDate) {
+      alert(`${c.vehiclePlate} 는 이미 인도 완료 (${c.deliveredDate})`);
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    void rtdbUpdate({ ...c, deliveredDate: today, status: '운행', vehicleStatus: '운행' });
+  }
+  function ctxAction_markReturned(c: Contract) {
+    if (c.returnedDate) {
+      alert(`${c.vehiclePlate} 는 이미 반납 완료 (${c.returnedDate})`);
+      return;
+    }
+    if (!confirm(`${c.vehiclePlate} ${c.customerName} 을 오늘 반납 처리하시겠습니까?`)) return;
+    const today = new Date().toISOString().slice(0, 10);
+    void rtdbUpdate({ ...c, returnedDate: today, status: '반납', vehicleStatus: '반납' });
+  }
+  function ctxAction_sendSms(c: Contract) {
+    setSelectedIds(new Set([c.id]));
+    setSmsOpen(true);
+  }
+  function ctxAction_delete(c: Contract) {
+    if (!confirm(`정말 ${c.contractNo} ${c.vehiclePlate} ${c.customerName} 계약을 삭제하시겠습니까?\n(돌이킬 수 없음)`)) return;
+    void rtdbRemove(c.id);
+  }
 
   const toggleRow = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -437,6 +472,11 @@ export default function Page() {
                       <tr
                         key={c.id}
                         onDoubleClick={() => handleRowDoubleClick(c)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setSelectedId(c.id);
+                          setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c });
+                        }}
                         className={`status-row ${alertClass} ${selected?.id === c.id ? 'selected' : ''} ${isChecked ? 'selected-row' : ''}`}
                         onClick={() => setSelectedId(c.id)}
                       >
@@ -693,6 +733,46 @@ export default function Page() {
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filteredContracts} selectedIds={selectedIds} />
       <PaymentLedgerDialog open={ledgerOpen} onOpenChange={setLedgerOpen} contracts={contracts} />
+
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+        items={ctxMenu.row ? ([
+          {
+            label: '상세 보기',
+            icon: <MagnifyingGlass size={12} weight="bold" />,
+            onClick: () => { if (ctxMenu.row) ctxAction_openDetail(ctxMenu.row); },
+          },
+          { type: 'separator' },
+          {
+            label: ctxMenu.row.deliveredDate ? '인도 완료됨' : '인도 처리 (오늘)',
+            icon: <Truck size={12} weight="bold" />,
+            onClick: () => { if (ctxMenu.row) ctxAction_markDelivered(ctxMenu.row); },
+            disabled: !!ctxMenu.row.deliveredDate,
+          },
+          {
+            label: ctxMenu.row.returnedDate ? '반납 완료됨' : '반납 처리 (오늘)',
+            icon: <ArrowUDownLeft size={12} weight="bold" />,
+            onClick: () => { if (ctxMenu.row) ctxAction_markReturned(ctxMenu.row); },
+            disabled: !!ctxMenu.row.returnedDate,
+          },
+          { type: 'separator' },
+          {
+            label: 'SMS 발송',
+            icon: <PaperPlaneTilt size={12} weight="bold" />,
+            onClick: () => { if (ctxMenu.row) ctxAction_sendSms(ctxMenu.row); },
+          },
+          { type: 'separator' },
+          {
+            label: '계약 삭제',
+            icon: <X size={12} weight="bold" />,
+            onClick: () => { if (ctxMenu.row) ctxAction_delete(ctxMenu.row); },
+            danger: true,
+          },
+        ] satisfies ContextMenuItem[]) : []}
+      />
       </div>
     </div>
   );
