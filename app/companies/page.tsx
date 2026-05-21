@@ -505,16 +505,22 @@ function CompanyEditor({
   const canSave = !!draft.name?.trim();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button className="btn btn-ghost btn-sm" type="button" onClick={onCancel}>
-          <ArrowLeft size={12} /> 취소
-        </button>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-main)' }}>
-          {isNew ? '신규 법인 등록' : `${draft.name} — 수정`}
+      <header style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <Buildings size={16} weight="duotone" style={{ color: 'var(--text-sub)', alignSelf: 'center' }} />
+            {isNew ? '신규 법인 등록' : `${draft.name || '법인'} — 수정`}
+          </h1>
+          <div style={{ fontSize: 12, color: 'var(--text-weak)', marginTop: 2 }}>
+            {isNew ? '사업자등록증 OCR 또는 직접 입력으로 등록' : '회사 정보 / 계좌 / 거점 / 서류 수정'}
+          </div>
         </div>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-primary btn-sm" type="button" onClick={onSave} disabled={!canSave}>
-          <FloppyDisk size={12} weight="bold" /> {isNew ? '등록' : '저장'}
+        <button className="btn" type="button" onClick={onCancel}>
+          <ArrowLeft /> 취소
+        </button>
+        <button className="btn btn-primary" type="button" onClick={onSave} disabled={!canSave}>
+          <FloppyDisk weight="bold" /> {isNew ? '등록' : '저장'}
         </button>
       </header>
 
