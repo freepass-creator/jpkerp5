@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
+import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { Contract } from '@/lib/types';
 
@@ -73,7 +73,7 @@ export function useContracts(): {
       await ensureAuth();
       const db = getRtdb();
       if (!db) return;
-      await rtdbUpdate(ref(db, `${CONTRACTS_PATH}/${c.id}`), c as unknown as Record<string, unknown>);
+      await rtdbUpdate(ref(db, `${CONTRACTS_PATH}/${c.id}`), pruneUndefined(c) as unknown as Record<string, unknown>);
       void audit.update('contract', c.id, `계약 수정 ${c.contractNo ?? ''} ${c.vehiclePlate} ${c.customerName}`);
     },
     remove: async (id: string) => {
@@ -101,7 +101,7 @@ export function useContracts(): {
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
       const full = { ...c, id } as Contract;
-      await set(newRef, full);
+      await set(newRef, pruneUndefined(full));
       void audit.create('contract', id, `계약 등록 ${full.contractNo ?? ''} ${full.vehiclePlate} ${full.customerName}`);
       return id;
     },
@@ -123,7 +123,7 @@ export function useContracts(): {
         const newRef = push(ref(db, CONTRACTS_PATH));
         const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-        batch[id] = { ...row, id } as Contract;
+        batch[id] = pruneUndefined({ ...row, id } as Contract);
       }
       await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
       void audit.import('contract', `계약 일괄 등록 ${rows.length}건`, { count: rows.length });
@@ -143,7 +143,7 @@ export function useContracts(): {
       const db = getRtdb();
       if (!db) return;
       const batch: Record<string, Contract> = {};
-      for (const r of rows) batch[r.id] = r;
+      for (const r of rows) batch[r.id] = pruneUndefined(r);
       await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
       void audit.update('contract', 'batch', `계약 일괄 수정 ${rows.length}건`);
     },

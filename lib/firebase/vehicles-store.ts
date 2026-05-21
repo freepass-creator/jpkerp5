@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
+import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { Vehicle } from '@/lib/types';
 
@@ -57,7 +57,7 @@ export function useVehicles(): {
       const newRef = push(ref(db, VEHICLES_PATH));
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-      await set(newRef, { ...v, id });
+      await set(newRef, pruneUndefined({ ...v, id }));
       void audit.create('vehicle', id, `차량 등록 ${v.plate} ${v.model}`);
       return id;
     },
@@ -77,7 +77,7 @@ export function useVehicles(): {
       if (!id) throw new Error('Firebase push failed: no key');
         batch[id] = { ...row, id } as Vehicle;
       }
-      await rtdbUpdate(ref(db, VEHICLES_PATH), batch as unknown as Record<string, unknown>);
+      await rtdbUpdate(ref(db, VEHICLES_PATH), pruneUndefined(batch as unknown as Record<string, unknown>));
       void audit.import('vehicle', `차량 일괄 등록 ${rows.length}대`, { count: rows.length });
       return rows.length;
     },
@@ -88,7 +88,7 @@ export function useVehicles(): {
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbUpdate(ref(db, `${VEHICLES_PATH}/${v.id}`), v as unknown as Record<string, unknown>);
+      await rtdbUpdate(ref(db, `${VEHICLES_PATH}/${v.id}`), pruneUndefined(v as unknown as Record<string, unknown>));
       void audit.update('vehicle', v.id, `차량 수정 ${v.plate} ${v.model}`);
     },
     remove: async (id) => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
+import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { BankTransaction, CardTransaction, AuditEntityType } from '@/lib/types';
 
@@ -58,7 +58,7 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       const newRef = push(ref(db, path));
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-      await set(newRef, { ...row, id });
+      await set(newRef, pruneUndefined({ ...row, id }));
       return id;
     },
     update: async (id: string, patch: Partial<T>) => {
@@ -68,7 +68,7 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbUpdate(ref(db, `${path}/${id}`), patch as unknown as Record<string, unknown>);
+      await rtdbUpdate(ref(db, `${path}/${id}`), pruneUndefined(patch as unknown as Record<string, unknown>));
     },
     updateMany: async (patches: Record<string, Partial<T>>) => {
       const ids = Object.keys(patches);
@@ -85,7 +85,7 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
           updates[`${id}/${k}`] = v;
         }
       }
-      await rtdbUpdate(ref(db, path), updates);
+      await rtdbUpdate(ref(db, path), pruneUndefined(updates));
     },
     addMany: async (items: Array<Omit<T, 'id'>>) => {
       if (items.length === 0) return [] as T[];
@@ -109,7 +109,7 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
         batch[id] = full;
         stamped.push(full);
       }
-      await rtdbUpdate(ref(db, path), batch as unknown as Record<string, unknown>);
+      await rtdbUpdate(ref(db, path), pruneUndefined(batch as unknown as Record<string, unknown>));
       void audit.import(auditType, `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 등록 ${items.length}건`, { count: items.length });
       return stamped;
     },

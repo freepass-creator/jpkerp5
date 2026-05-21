@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth } from './client';
+import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import type { Company } from '@/lib/types';
 
 import { genCode } from '@/lib/code';
@@ -66,7 +66,7 @@ export function useCompanies(): {
       const newRef = push(ref(db, COMPANIES_PATH));
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-      await set(newRef, { ...payload, id });
+      await set(newRef, pruneUndefined({ ...payload, id }));
       return id;
     },
     update: async (c) => {
@@ -76,7 +76,7 @@ export function useCompanies(): {
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbUpdate(ref(db, `${COMPANIES_PATH}/${c.id}`), c as unknown as Record<string, unknown>);
+      await rtdbUpdate(ref(db, `${COMPANIES_PATH}/${c.id}`), pruneUndefined(c as unknown as Record<string, unknown>));
     },
     remove: async (id) => {
       if (!configured) {

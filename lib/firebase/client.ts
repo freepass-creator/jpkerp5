@@ -83,3 +83,12 @@ export function ensureAuth(): Promise<void> {
 export function icarPath(...parts: string[]): string {
   return [ICAR_ROOT, ...parts].filter(Boolean).join('/');
 }
+
+/**
+ * RTDB 는 undefined 를 거부 — set/update 직전에 undefined 필드 제거.
+ * JSON.stringify 가 undefined 를 자동 제거하므로 round-trip.
+ * 중첩 객체·배열도 모두 처리됨.
+ */
+export function pruneUndefined<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}

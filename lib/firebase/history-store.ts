@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, getFirebaseAuth } from './client';
+import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, getFirebaseAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { HistoryEntry } from '@/lib/types';
 
@@ -66,7 +66,7 @@ export function useHistoryEntries(): {
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
       const full = { ...e, id, createdAt, createdBy } as HistoryEntry;
-      await set(newRef, full);
+      await set(newRef, pruneUndefined(full));
       void audit.create('document', id, `${e.scope === 'vehicle' ? '차량이력' : '계약이력'} ${e.category} — ${e.title}`);
       return id;
     },
@@ -77,7 +77,7 @@ export function useHistoryEntries(): {
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbUpdate(ref(db, `${PATH}/${e.id}`), e as unknown as Record<string, unknown>);
+      await rtdbUpdate(ref(db, `${PATH}/${e.id}`), pruneUndefined(e as unknown as Record<string, unknown>));
       void audit.update('document', e.id, `이력 수정 ${e.title}`);
     },
     remove: async (id) => {
