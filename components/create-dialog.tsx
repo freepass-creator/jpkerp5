@@ -1273,7 +1273,8 @@ function SnapshotPane({
               <th className="center" style={{ width: 64 }}>상태</th>
               <th style={{ width: 110 }}>차량번호</th>
               <th>계약자</th>
-              <th>회사</th>
+              <th style={{ width: 80 }}>회사</th>
+              <th className="center" style={{ width: 80 }}>차량상태</th>
               <th className="mono">계약기간</th>
               <th className="num" style={{ width: 110 }}>월대여료</th>
               <th className="num" style={{ width: 110 }}>현재미수</th>
@@ -1282,7 +1283,7 @@ function SnapshotPane({
           </thead>
           <tbody>
             {validated.length === 0 ? (
-              <tr><td colSpan={10} className="muted center" style={{ padding: '24px 10px' }}>데이터 없음</td></tr>
+              <tr><td colSpan={11} className="muted center" style={{ padding: '24px 10px' }}>데이터 없음</td></tr>
             ) : validated.map((v, i) => (
               <tr key={v.key} className={picks[v.key] ? 'selected-row' : undefined}>
                 <td className="checkbox-col">
@@ -1303,6 +1304,13 @@ function SnapshotPane({
                 <td className="mono">{v.raw.plate || '-'}</td>
                 <td>{v.raw.customer || (v.kind === 'vehicle-only' ? <span className="dim">(미정)</span> : '-')}</td>
                 <td className="dim">{v.patch?.company || v.vehiclePatch?.company || '-'}</td>
+                <td className="center">
+                  {(() => {
+                    const vs = v.patch?.vehicleStatus || v.vehiclePatch?.vehicleStatus;
+                    if (!vs) return <span className="dim" style={{ fontSize: 10 }}>-</span>;
+                    return <span className="chip" style={{ height: 18, padding: '0 6px', fontSize: 10 }}>{vs}</span>;
+                  })()}
+                </td>
                 <td className="mono dim">
                   {v.patch ? `${v.patch.contractDate?.slice(2) ?? '-'} ~ ${v.patch.returnScheduledDate?.slice(2) ?? '-'} (${v.patch.termMonths}개월)` : '-'}
                 </td>

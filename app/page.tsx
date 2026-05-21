@@ -134,24 +134,32 @@ function sortLabel(view: View): string {
 type VehicleState = '구매대기' | '등록대기' | '상품화중' | '인도대기' | '계약완료' | '휴차' | '반납';
 
 function getVehicleState(c: Contract): { name: VehicleState; days: number } {
-  // Post-delivery 우선
+  // 명시적 vehicleStatus 우선 (엑셀 업로드 시 사용자가 지정한 값)
   if (c.vehicleStatus === '휴차') {
     return { name: '휴차', days: c.idleSince ? daysSince(c.idleSince, todayKr()) : 0 };
   }
-  if (c.returnedDate || c.status === '반납') {
+  if (c.returnedDate || c.status === '반납' || c.vehicleStatus === '반납') {
     return { name: '반납', days: c.returnedDate ? daysSince(c.returnedDate, todayKr()) : 0 };
   }
-  // Pre-delivery phases — 각 phase 시작일부터 경과
+  // 운행 = 계약완료 (이미 인도되어 사용중)
+  if (c.vehicleStatus === '운행') {
+    const start = c.deliveredDate ?? c.contractDate;
+    return { name: '계약완료', days: daysSince(start, todayKr()) };
+  }
   if (c.vehicleStatus === '구매대기') {
     return { name: '구매대기', days: daysSince(c.contractDate, todayKr()) };
   }
   if (c.vehicleStatus === '등록대기') {
     return { name: '등록대기', days: daysSince(c.purchasedDate ?? c.contractDate, todayKr()) };
   }
-  if (c.vehicleStatus === '상품화중') {
+  if (c.vehicleStatus === '상품화중' || c.vehicleStatus === '상품화대기') {
     return { name: '상품화중', days: daysSince(c.registeredDate ?? c.contractDate, todayKr()) };
   }
-  if (c.vehicleStatus === '인도대기' || c.vehicleStatus === '출고대기' || !c.deliveredDate || c.status === '대기') {
+  if (c.vehicleStatus === '상품대기' || c.vehicleStatus === '인도대기' || c.vehicleStatus === '출고대기') {
+    return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
+  }
+  // 명시적 vehicleStatus 없을 때 — 계약 상태로 추정
+  if (!c.deliveredDate || c.status === '대기') {
     return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
   }
   // 인도 완료 = 계약완료
