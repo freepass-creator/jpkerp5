@@ -620,8 +620,8 @@ function VehicleRegisterPane({
         </button>
       </div>
 
-      {mode === 'manual' && <VehicleManualForm onSubmit={() => { alert('mock: 차량 등록 완료'); onClose(); }} />}
-      {mode === 'ocr' && <VehicleOcrPane onSubmit={() => { alert('mock: OCR 차량 등록 완료'); onClose(); }} />}
+      {mode === 'manual' && <VehicleManualForm onSubmit={onClose} />}
+      {mode === 'ocr' && <VehicleOcrPane onSubmit={onClose} />}
       {mode === 'excel' && <VehicleExcelPane onCommit={onCommit} busy={busy} result={result} />}
     </div>
   );
@@ -637,6 +637,7 @@ function useCompanyNames(): string[] {
 
 function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
   const companyNames = useCompanyNames();
+  const { add: addVehicle } = useVehicles();
   const [company, setCompany] = useState(companyNames[0] ?? '');
   const [model, setModel] = useState('');
   const [plate, setPlate] = useState('');
@@ -649,10 +650,40 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
   const [purchasePrice, setPurchasePrice] = useState('');
   const [insuranceAge, setInsuranceAge] = useState('26');
   const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!model.trim() || saving) return;
+    setSaving(true);
+    try {
+      await addVehicle({
+        plate: plate.trim() || '미정',
+        model: model.trim(),
+        company: (company || '기타') as import('@/lib/types').CompanyCode,
+        status: vehicleStatus as import('@/lib/types').VehicleStatus,
+        purchasedDate: purchasedDate || undefined,
+        notes: [
+          vin && `차대번호 ${vin}`,
+          year && `${year}년식`,
+          color && color,
+          fuel && fuel,
+          purchasePrice && `매입 ₩${Number(purchasePrice).toLocaleString('ko-KR')}`,
+          insuranceAge && `보험연령 ${insuranceAge}세`,
+          notes,
+        ].filter(Boolean).join(' / ') || undefined,
+        createdAt: new Date().toISOString(),
+      });
+      onSubmit();
+    } catch (e) {
+      alert('차량 등록 실패: ' + ((e as Error).message ?? String(e)));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <form
-      onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+      onSubmit={(e) => { e.preventDefault(); void handleSave(); }}
       style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, overflow: 'auto' }}
     >
       {/* 필수 정보 */}
@@ -731,8 +762,9 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
       </div>
 
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8, position: 'sticky', bottom: 0, background: 'var(--bg-card)', paddingTop: 8 }}>
-        <button type="submit" className="btn btn-primary" disabled={!model}>
-          <CheckCircle size={14} /> 차량 등록
+        <button type="submit" className="btn btn-primary" disabled={!model || saving}>
+          {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+          {saving ? '저장 중...' : '차량 등록'}
         </button>
       </div>
     </form>
@@ -740,9 +772,35 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
 }
 
 function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
+  const { add: addVehicle } = useVehicles();
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<{ plate: string; model: string; company: string; vin?: string; year?: string } | null>(null);
+
+  async function handleSave() {
+    if (!extracted || saving) return;
+    setSaving(true);
+    try {
+      await addVehicle({
+        plate: extracted.plate.trim() || '미정',
+        model: extracted.model.trim() || '미정',
+        company: (extracted.company || '기타') as import('@/lib/types').CompanyCode,
+        status: '등록대기',
+        notes: [
+          extracted.vin && `차대번호 ${extracted.vin}`,
+          extracted.year && `${extracted.year}년식`,
+          'OCR 자동 등록',
+        ].filter(Boolean).join(' / ') || undefined,
+        createdAt: new Date().toISOString(),
+      });
+      onSubmit();
+    } catch (e) {
+      alert('차량 등록 실패: ' + ((e as Error).message ?? String(e)));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleImage(file: File) {
     setBusy(true);
@@ -795,13 +853,13 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
   if (extracted) {
     return (
       <form
-        onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+        onSubmit={(e) => { e.preventDefault(); void handleSave(); }}
         style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}
       >
         <div className="detail-section">
           <div className="detail-section-header" style={{ color: 'var(--green-text)' }}>
             <CheckCircle size={12} weight="duotone" />
-            <span style={{ flex: 1 }}>OCR 추출 완료 — 확인 후 저장</span>
+            <span className="title">OCR 추출 완료 — 확인 후 저장</span>
             <button type="button" className="btn btn-sm" onClick={() => setExtracted(null)}>다시 스캔</button>
           </div>
           <div className="detail-section-body">
@@ -830,8 +888,9 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
 
         <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" className="btn" onClick={() => setExtracted(null)}>취소</button>
-          <button type="submit" className="btn btn-primary">
-            <CheckCircle size={14} /> 등록
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+            {saving ? '저장 중...' : '등록'}
           </button>
         </div>
       </form>
@@ -1414,20 +1473,95 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
 }
 
 function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
+  const { add: addContract } = useContracts();
   const [busy, setBusy] = useState(false);
-  const [extracted, setExtracted] = useState<{ customerName: string; customerPhone1: string; plate: string; monthlyRent: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [extracted, setExtracted] = useState<{
+    customerName: string; customerPhone1: string; plate: string; monthlyRent: string;
+    model: string; company: string; licenseNo: string; licenseType: string;
+    contractDate: string; endDate: string; termMonths: number;
+  } | null>(null);
 
-  function handleImage(_file: File) {
+  async function handleImage(file: File) {
     setBusy(true);
-    setTimeout(() => {
-      setExtracted({
-        customerName: '이서윤',
-        customerPhone1: '010-3344-5566',
-        plate: '109호' + Math.floor(1000 + Math.random() * 9000),
-        monthlyRent: '1500000',
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('type', 'rental_contract');
+      const { getFirebaseAuth } = await import('@/lib/firebase/client');
+      const auth = getFirebaseAuth();
+      const user = auth?.currentUser;
+      const idToken = user ? await user.getIdToken() : '';
+      const res = await fetch('/api/ocr/extract', {
+        method: 'POST',
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+        body: fd,
       });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'OCR 실패');
+      const raw = json.extracted as Record<string, unknown>;
+      setExtracted({
+        customerName: String(raw.contractor_name ?? ''),
+        customerPhone1: String(raw.contractor_phone ?? ''),
+        plate: String(raw.car_number ?? ''),
+        model: String(raw.car_name ?? ''),
+        company: String(raw.company_name ?? ''),
+        licenseNo: String(raw.contractor_license_no ?? ''),
+        licenseType: '1종 보통',
+        monthlyRent: String(raw.monthly_amount ?? ''),
+        contractDate: String(raw.start_date ?? raw.contract_date ?? ''),
+        endDate: String(raw.end_date ?? ''),
+        termMonths: Number(raw.rental_period_months ?? 12) || 12,
+      });
+    } catch (e) {
+      setError((e as Error).message ?? String(e));
+    } finally {
       setBusy(false);
-    }, 1400);
+    }
+  }
+
+  async function handleSave() {
+    if (!extracted || saving) return;
+    setSaving(true);
+    try {
+      const monthly = parseInt((extracted.monthlyRent || '0').replace(/[^0-9]/g, ''), 10) || 0;
+      const today = new Date().toISOString().slice(0, 10);
+      const start = extracted.contractDate || today;
+      const yy = start.slice(2, 4);
+      const mm = start.slice(5, 7);
+      const { genCode } = await import('@/lib/code');
+      await addContract({
+        contractNo: `ICR-${yy}${mm}-${genCode(4)}`,
+        company: (extracted.company || '기타') as import('@/lib/types').CompanyCode,
+        customerName: extracted.customerName.trim() || '미상',
+        customerPhone1: extracted.customerPhone1.trim(),
+        customerLicenseNo: extracted.licenseNo.trim() || undefined,
+        customerLicenseType: extracted.licenseType,
+        vehiclePlate: extracted.plate.trim() || '미정',
+        vehicleModel: extracted.model.trim() || '미정',
+        vehicleStatus: '운행',
+        contractDate: start,
+        returnScheduledDate: extracted.endDate || undefined,
+        termMonths: extracted.termMonths,
+        longTerm: extracted.termMonths >= 12,
+        monthlyRent: monthly,
+        deposit: 0,
+        paymentDay: 1,
+        paymentMethod: '이체',
+        status: '운행',
+        currentSeq: 1,
+        totalSeq: extracted.termMonths,
+        unpaidAmount: 0,
+        unpaidSeqCount: 0,
+      });
+      onSubmit();
+    } catch (e) {
+      alert('계약 등록 실패: ' + ((e as Error).message ?? String(e)));
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (busy) {
@@ -1445,32 +1579,47 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
   if (extracted) {
     return (
       <form
-        onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+        onSubmit={(e) => { e.preventDefault(); void handleSave(); }}
         style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}
       >
         <div className="detail-section">
           <div className="detail-section-header" style={{ color: 'var(--green-text)' }}>
             <CheckCircle size={12} weight="duotone" />
-            <span style={{ flex: 1 }}>OCR 추출 완료 — 확인 후 저장</span>
+            <span className="title">OCR 추출 완료 — 확인 후 저장</span>
             <button type="button" className="btn btn-sm" onClick={() => setExtracted(null)}>다시 스캔</button>
           </div>
           <div className="detail-section-body">
-            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '10px 14px', alignItems: 'center' }}>
+            <div className="form-grid-2">
+              <label className="form-label">회사</label>
+              <input className="input" value={extracted.company} onChange={(e) => setExtracted({ ...extracted, company: e.target.value })} />
               <label className="form-label">계약자명</label>
               <input className="input" value={extracted.customerName} onChange={(e) => setExtracted({ ...extracted, customerName: e.target.value })} />
               <label className="form-label">연락처</label>
               <input className="input" value={extracted.customerPhone1} onChange={(e) => setExtracted({ ...extracted, customerPhone1: e.target.value })} />
+              <label className="form-label">면허번호</label>
+              <input className="input mono" value={extracted.licenseNo} onChange={(e) => setExtracted({ ...extracted, licenseNo: e.target.value })} />
               <label className="form-label">차량번호</label>
               <input className="input" value={extracted.plate} onChange={(e) => setExtracted({ ...extracted, plate: e.target.value })} />
+              <label className="form-label">차종</label>
+              <input className="input" value={extracted.model} onChange={(e) => setExtracted({ ...extracted, model: e.target.value })} />
               <label className="form-label">월 대여료</label>
               <input className="input" value={extracted.monthlyRent} onChange={(e) => setExtracted({ ...extracted, monthlyRent: e.target.value.replace(/[^0-9]/g, '') })} />
+              <label className="form-label">계약시작</label>
+              <DateInput value={extracted.contractDate} onChange={(v) => setExtracted({ ...extracted, contractDate: v })} />
+              <label className="form-label">계약종료</label>
+              <DateInput value={extracted.endDate} onChange={(v) => setExtracted({ ...extracted, endDate: v })} />
+              <label className="form-label">개월수</label>
+              <input className="input mono" value={String(extracted.termMonths)} onChange={(e) => setExtracted({ ...extracted, termMonths: Number(e.target.value.replace(/[^0-9]/g, '')) || 0 })} style={{ width: 120 }} />
             </div>
           </div>
         </div>
 
         <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" className="btn" onClick={() => setExtracted(null)}>취소</button>
-          <button type="submit" className="btn btn-primary"><CheckCircle size={14} /> 계약 등록</button>
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+            {saving ? '저장 중...' : '계약 등록'}
+          </button>
         </div>
       </form>
     );
@@ -1493,6 +1642,11 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
         <Camera size={14} /> 이미지 선택
       </button>
       <div className="dropzone-hint">또는 여기에 끌어다 놓기</div>
+      {error && (
+        <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--red-bg)', color: 'var(--red-text)', fontSize: 12 }}>
+          OCR 실패: {error}
+        </div>
+      )}
     </div>
   );
 }
@@ -1527,8 +1681,8 @@ function PaymentRegisterPane({
         </button>
       </div>
 
-      {mode === 'manual' && <PaymentManualForm onSubmit={() => { alert('mock: 수납 등록 완료'); onClose(); }} />}
-      {mode === 'ocr' && <PaymentOcrPane onSubmit={() => { alert('mock: OCR 수납 등록 완료'); onClose(); }} />}
+      {mode === 'manual' && <PaymentManualForm onSubmit={onClose} />}
+      {mode === 'ocr' && <PaymentOcrPane onSubmit={onClose} />}
       {mode === 'excel' && (
         <UploadPaneMulti
           files={files} drag={drag} onPick={onPick} onChangeKind={onChangeKind}
@@ -1544,6 +1698,8 @@ function PaymentRegisterPane({
 }
 
 function PaymentManualForm({ onSubmit }: { onSubmit: () => void }) {
+  const { add: addBankTx } = useBankTx();
+  const { add: addCardTx } = useCardTx();
   const [kind, setKind] = useState<'계좌' | '카드'>('계좌');
   const [txDate, setTxDate] = useState(new Date().toISOString().slice(0, 10));
   const [counterparty, setCounterparty] = useState('');
@@ -1551,12 +1707,44 @@ function PaymentManualForm({ onSubmit }: { onSubmit: () => void }) {
   const [memo, setMemo] = useState('');
   const [approvalNo, setApprovalNo] = useState('');
   const [cardLast4, setCardLast4] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const valid = txDate && counterparty && amount;
 
+  async function handleSave() {
+    if (!valid || saving) return;
+    setSaving(true);
+    try {
+      const amountN = parseInt(amount.replace(/[^0-9]/g, ''), 10) || 0;
+      if (kind === '계좌') {
+        await addBankTx({
+          txDate,
+          amount: amountN,
+          counterparty: counterparty.trim(),
+          memo: memo.trim() || undefined,
+          source: '수동',
+        });
+      } else {
+        await addCardTx({
+          txDate,
+          amount: amountN,
+          approvalNo: approvalNo.trim(),
+          cardLast4: cardLast4 || undefined,
+          customerName: counterparty.trim(),
+          source: '수동',
+        });
+      }
+      onSubmit();
+    } catch (e) {
+      alert('수납 등록 실패: ' + ((e as Error).message ?? String(e)));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <form
-      onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+      onSubmit={(e) => { e.preventDefault(); void handleSave(); }}
       style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, overflow: 'auto' }}
     >
       <div className="detail-section">
@@ -1599,8 +1787,9 @@ function PaymentManualForm({ onSubmit }: { onSubmit: () => void }) {
       </div>
 
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8, position: 'sticky', bottom: 0, background: 'var(--bg-card)', paddingTop: 8 }}>
-        <button type="submit" className="btn btn-primary" disabled={!valid}>
-          <CheckCircle size={14} /> 수납 등록
+        <button type="submit" className="btn btn-primary" disabled={!valid || saving}>
+          {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+          {saving ? '저장 중...' : '수납 등록'}
         </button>
       </div>
     </form>

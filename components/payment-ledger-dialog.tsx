@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Upload, Bank, CreditCard, CheckCircle, MagnifyingGlass, X, Link as LinkIcon, CaretLeft, ArrowsCounterClockwise, Warning } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { MOCK_BANK_TX, MOCK_CARD_TX, MOCK_CMS_TX } from '@/lib/mock-data';
+import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { formatCurrency, formatDateFull } from '@/lib/utils';
 import type { Contract } from '@/lib/types';
 
@@ -38,43 +38,34 @@ export function PaymentLedgerDialog({
   const [filter, setFilter] = useState<Filter>('전체');
   const [search, setSearch] = useState('');
   const [matchingTx, setMatchingTx] = useState<LedgerRow | null>(null);
+  const { rows: bankTx } = useBankTx();
+  const { rows: cardTx } = useCardTx();
 
   const ledger: LedgerRow[] = useMemo(() => {
-    const bank = MOCK_BANK_TX.map<LedgerRow>((t) => ({
-      id: t.id,
-      source: '계좌',
-      date: t.txDate,
-      amount: t.amount,
-      counterparty: t.counterparty,
-      memo: t.memo ?? '',
-      sourceDetail: t.source ?? '',
-      matchedContractId: t.matchedContractId,
-    }));
-    const card = MOCK_CARD_TX.map<LedgerRow>((t) => ({
+    const bank = bankTx
+      .filter((t) => (t.amount ?? 0) > 0)  // 입금만
+      .map<LedgerRow>((t) => ({
+        id: t.id,
+        source: '계좌',
+        date: t.txDate,
+        amount: t.amount,
+        counterparty: t.counterparty,
+        memo: t.memo ?? '',
+        sourceDetail: t.source ?? '',
+        matchedContractId: t.matchedContractId,
+      }));
+    const card = cardTx.map<LedgerRow>((t) => ({
       id: t.id,
       source: '카드',
       date: t.txDate,
       amount: t.amount,
       counterparty: t.customerName ?? '카드결제',
-      memo: `승인 ${t.approvalNo} · ${t.cardLast4 ?? ''}`,
+      memo: `승인 ${t.approvalNo}${t.cardLast4 ? ` · ${t.cardLast4}` : ''}`,
       sourceDetail: t.source ?? '',
       matchedContractId: t.matchedContractId,
     }));
-    const cms = MOCK_CMS_TX
-      .filter((t) => t.result !== '실패') // 출금 실패는 입금 ledger에서 제외
-      .map<LedgerRow>((t) => ({
-        id: t.id,
-        source: '이체',
-        date: t.txDate,
-        amount: t.amount,
-        counterparty: t.customerName,
-        memo: t.result === '부분' ? `자동이체 부분 (${t.failReason})` : `자동이체 ${t.cmsNo ?? ''}`,
-        sourceDetail: t.source ?? '',
-        matchedContractId: t.matchedContractId,
-        result: t.result,
-      }));
-    return [...bank, ...card, ...cms].sort((a, b) => b.date.localeCompare(a.date));
-  }, []);
+    return [...bank, ...card].sort((a, b) => b.date.localeCompare(a.date));
+  }, [bankTx, cardTx]);
 
   const counts = useMemo(() => ({
     전체: ledger.length,
