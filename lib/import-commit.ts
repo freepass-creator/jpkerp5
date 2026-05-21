@@ -273,13 +273,22 @@ function resolveCompanyByRegNo(regNoOrName: string, companies?: Company[]): stri
 }
 
 /**
- * 검증 결과 + 패치 반환. 에러 사유 보존 → UI 에서 행별 valid/invalid 표시.
+ * 검증 결과 — 행 종류 3종 분류:
+ *  - 'contract'    : 계약(임차 중) — plate + customerName + monthlyRent 모두 있음. contract UPSERT.
+ *  - 'vehicle-only': 휴차(임차인 없음) — plate 만 있고 customerName 또는 monthlyRent 없음. vehicle 만 등록.
+ *  - 'invalid'     : plate 마저 없으면 무시.
+ *
+ * 에러 사유 보존 → UI 에서 행별 표시.
  */
+export type SnapshotKind = 'contract' | 'vehicle-only' | 'invalid';
+
 export type SnapshotValidation = {
+  kind: SnapshotKind;
   valid: boolean;
   patch?: SnapshotPatch;
+  /** vehicle-only 일 때 — 휴차 차량 정보 */
+  vehiclePatch?: { plate: string; model: string; company: string };
   errors: string[];
-  /** 원본 행 값 — preview 표시용 */
   raw: { plate: string; customer: string; monthlyRent: number; unpaid: number };
 };
 
@@ -289,21 +298,36 @@ export function validateSnapshotRow(row: Row, companies?: Company[]): SnapshotVa
   const customerName = toStr(get(row, '계약자', '계약자명', 'customerName'));
   const monthlyRent = toNum(get(row, '월대여료', '월렌트료', 'monthlyRent'));
   const unpaidAmount = toNum(get(row, '현재미수', '미수금', 'unpaidAmount'));
-
-  if (!plate) errors.push('차량번호 누락');
-  if (!customerName) errors.push('계약자명 누락');
-  if (monthlyRent <= 0) errors.push('월대여료 누락/0원');
-
   const raw = { plate, customer: customerName, monthlyRent, unpaid: unpaidAmount };
 
-  if (errors.length > 0) return { valid: false, errors, raw };
+  // 차량번호 자체가 없으면 행 무시
+  if (!plate) {
+    errors.push('차량번호 누락');
+    return { kind: 'invalid', valid: false, errors, raw };
+  }
+
+  // 계약자 없거나 월대여료 0 → 휴차 차량 (vehicle-only)
+  if (!customerName || monthlyRent <= 0) {
+    const regNoOrName = toStr(get(row, '법인등록번호', '법인번호', '사업자번호', '회사명', '회사', 'corpRegNo', 'bizRegNo', 'company'));
+    const company = resolveCompanyByRegNo(regNoOrName, companies) || '기타';
+    const model = toStr(get(row, '차명', '차종', 'vehicleModel')) || '미정';
+    if (!customerName) errors.push('계약자 없음 → 휴차 등록');
+    if (monthlyRent <= 0 && customerName) errors.push('월대여료 0 → 휴차 등록');
+    return {
+      kind: 'vehicle-only',
+      valid: true,
+      vehiclePatch: { plate, model, company },
+      errors,
+      raw,
+    };
+  }
 
   const patch = parseSnapshotRow(row, companies);
   if (!patch) {
     errors.push('파싱 실패');
-    return { valid: false, errors, raw };
+    return { kind: 'invalid', valid: false, errors, raw };
   }
-  return { valid: true, patch, errors: [], raw };
+  return { kind: 'contract', valid: true, patch, errors: [], raw };
 }
 
 export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch | null {

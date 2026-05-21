@@ -25,7 +25,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import {
   parseVehicleRow, parseContractRow, parseBankTxRow, parseCardTxRow,
   matchTransactions, applyPaymentsToContracts,
-  parseSnapshotRow, applySnapshotToContract, validateSnapshotRow,
+  applySnapshotToContract, validateSnapshotRow,
 } from '@/lib/import-commit';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 
@@ -51,7 +51,7 @@ export function CreateDialog({
 
   // RTDB stores
   const { contracts, addMany: addContracts, updateMany: updateContracts } = useContracts();
-  const { addMany: addVehicles } = useVehicles();
+  const { vehicles, addMany: addVehicles } = useVehicles();
   const { addMany: addBankTx } = useBankTx();
   const { addMany: addCardTx } = useCardTx();
   const { companies } = useCompanies();
@@ -156,12 +156,17 @@ export function CreateDialog({
   async function commitSnapshotRows(rows: Record<string, unknown>[]) {
     setBusy(true);
     try {
-      const patches = rows.map((r) => parseSnapshotRow(r, companies)).filter((x): x is NonNullable<typeof x> => !!x);
-      // 차량번호 색인 — 기존 계약 매칭
+      // 행별 분류 — contract / vehicle-only / invalid
+      const validations = rows.map((r) => validateSnapshotRow(r, companies));
+      const contractValidations = validations.filter((v) => v.kind === 'contract' && v.patch);
+      const vehicleOnly = validations.filter((v) => v.kind === 'vehicle-only' && v.vehiclePatch);
+
+      // 1) 계약 행 — contract UPSERT
       const byPlate = new Map(contracts.map((c) => [c.vehiclePlate.trim(), c]));
       const updates: Contract[] = [];
       const creates: Array<Omit<Contract, 'id'>> = [];
-      for (const p of patches) {
+      for (const v of contractValidations) {
+        const p = v.patch!;
         const existing = byPlate.get(p.vehiclePlate.trim());
         const out = applySnapshotToContract(existing, p);
         if (existing && 'id' in out) updates.push(out as Contract);
@@ -169,7 +174,33 @@ export function CreateDialog({
       }
       if (updates.length > 0) await updateContracts(updates);
       const created = creates.length > 0 ? await addContracts(creates) : 0;
-      setResult(`스냅샷 반영 — 기존 ${updates.length}건 갱신, 신규 ${created}건 등록 (전체 ${rows.length}행 중 ${rows.length - patches.length}건 제외)`);
+
+      // 2) 휴차 차량 — vehicle 만 등록 (이미 같은 plate 의 vehicle 있으면 skip)
+      const existingPlates = new Set([
+        ...contracts.map((c) => c.vehiclePlate.trim()),
+        ...vehicles.map((v) => v.plate.trim()),
+      ]);
+      const newVehicles: Array<Omit<import('@/lib/types').Vehicle, 'id'>> = [];
+      for (const v of vehicleOnly) {
+        const vp = v.vehiclePatch!;
+        if (existingPlates.has(vp.plate.trim())) continue;  // 이미 있으면 skip
+        newVehicles.push({
+          plate: vp.plate,
+          model: vp.model,
+          company: vp.company as import('@/lib/types').CompanyCode,
+          status: '휴차',
+          notes: '스냅샷 업로드 — 계약자 미정 (휴차)',
+          createdAt: new Date().toISOString(),
+        });
+        existingPlates.add(vp.plate.trim());
+      }
+      const vehiclesAdded = newVehicles.length > 0 ? await addVehicles(newVehicles) : 0;
+
+      const invalid = validations.filter((v) => v.kind === 'invalid').length;
+      setResult(
+        `스냅샷 반영 완료 — 계약 갱신 ${updates.length}, 계약 신규 ${created}, 휴차 차량 신규 ${vehiclesAdded}`
+        + (invalid > 0 ? ` (오류 ${invalid}건 제외)` : ''),
+      );
     } catch (e) {
       console.error(e);
       setResult(`오류 — ${String((e as Error).message ?? e)}`);
@@ -1090,8 +1121,9 @@ function SnapshotPane({
     });
   }, [validated]);
 
-  const validCount = validated.filter((v) => v.valid).length;
-  const invalidCount = validated.length - validCount;
+  const contractCount = validated.filter((v) => v.kind === 'contract').length;
+  const vehicleOnlyCount = validated.filter((v) => v.kind === 'vehicle-only').length;
+  const invalidCount = validated.filter((v) => v.kind === 'invalid').length;
   const pickedCount = validated.filter((v) => picks[v.key]).length;
 
   const togglePick = (key: string) => setPicks((p) => ({ ...p, [key]: !p[key] }));
@@ -1148,7 +1180,8 @@ function SnapshotPane({
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <FileArrowUp size={14} weight="duotone" style={{ color: 'var(--text-sub)' }} />
         <span style={{ fontSize: 12 }}>{sheets.length}개 시트 · 전체 {totalRows}행</span>
-        <span style={{ fontSize: 11, color: 'var(--green-text)' }}>유효 {validCount}</span>
+        {contractCount > 0 && <span style={{ fontSize: 11, color: 'var(--green-text)' }}>계약 {contractCount}</span>}
+        {vehicleOnlyCount > 0 && <span style={{ fontSize: 11, color: 'var(--orange-text)' }}>휴차 {vehicleOnlyCount}</span>}
         {invalidCount > 0 && <span style={{ fontSize: 11, color: 'var(--red-text)' }}>오류 {invalidCount}</span>}
         <div style={{ flex: 1 }} />
         <button className="btn btn-sm" type="button" onClick={() => document.getElementById(inputId)?.click()}>
@@ -1199,15 +1232,17 @@ function SnapshotPane({
             ) : validated.map((v, i) => (
               <tr key={v.key} className={picks[v.key] ? 'selected-row' : undefined}>
                 <td className="checkbox-col">
-                  <input type="checkbox" checked={!!picks[v.key]} onChange={() => togglePick(v.key)} disabled={!v.valid} />
+                  <input type="checkbox" checked={!!picks[v.key]} onChange={() => togglePick(v.key)} disabled={v.kind === 'invalid'} />
                 </td>
                 <td className="center mono dim">{i + 1}</td>
                 <td className="center">
-                  <span className={`status ${v.valid ? '완료' : '미납'}`}>{v.valid ? '유효' : '오류'}</span>
+                  {v.kind === 'contract' && <span className="status 완료">계약</span>}
+                  {v.kind === 'vehicle-only' && <span className="status 예정">휴차</span>}
+                  {v.kind === 'invalid' && <span className="status 미납">오류</span>}
                 </td>
                 <td className="mono">{v.raw.plate || '-'}</td>
-                <td>{v.raw.customer || '-'}</td>
-                <td className="dim">{v.patch?.company || '-'}</td>
+                <td>{v.raw.customer || (v.kind === 'vehicle-only' ? <span className="dim">(미정)</span> : '-')}</td>
+                <td className="dim">{v.patch?.company || v.vehiclePatch?.company || '-'}</td>
                 <td className="mono dim">
                   {v.patch ? `${v.patch.contractDate?.slice(2) ?? '-'} ~ ${v.patch.returnScheduledDate?.slice(2) ?? '-'} (${v.patch.termMonths}개월)` : '-'}
                 </td>
@@ -1215,7 +1250,7 @@ function SnapshotPane({
                 <td className="num mono" style={{ color: v.raw.unpaid > 0 ? 'var(--red-text)' : undefined }}>
                   {v.raw.unpaid > 0 ? `₩${formatCurrency(v.raw.unpaid)}` : '-'}
                 </td>
-                <td style={{ fontSize: 10, color: v.valid ? 'var(--text-weak)' : 'var(--red-text)' }}>
+                <td style={{ fontSize: 10, color: v.kind === 'invalid' ? 'var(--red-text)' : v.kind === 'vehicle-only' ? 'var(--orange-text)' : 'var(--text-weak)' }}>
                   {v.errors.join(', ') || (v.patch?.unpaidSeqCount ? `미납 ${v.patch.unpaidSeqCount}회차 추정` : '')}
                 </td>
               </tr>
@@ -1232,7 +1267,7 @@ function SnapshotPane({
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>
-          {pickedCount}건 선택 · 차량번호 기준 UPSERT (있으면 갱신 / 없으면 신규)
+          {pickedCount}건 선택 · 계약은 UPSERT, 휴차 차량은 신규 등록 (이미 있으면 skip)
         </span>
         <div style={{ flex: 1 }} />
         <button
