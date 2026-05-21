@@ -68,10 +68,10 @@ export async function logAudit(entry: Omit<AuditLog, 'id' | 'at'> & { at?: strin
     };
     // newRef 에 set (push는 ref 자체에 push)
     const { set } = await import('firebase/database');
-    await set(newRef, full);
-  } catch (e) {
-    // 로그만, 본 동작은 막지 않음
-    console.error('[audit log]', e);
+    const { pruneUndefined } = await import('./client');
+    await set(newRef, pruneUndefined(full));
+  } catch {
+    // silent — audit 실패가 본 동작 막지 않음. Rules 누락 등 흔한 케이스라 console 도 비움.
   }
 }
 
