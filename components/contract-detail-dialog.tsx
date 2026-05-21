@@ -15,6 +15,8 @@ import { contractIdentMasked, birthFromIdent, inferKind } from '@/lib/ident';
 import { displayCompanyName } from '@/lib/company-display';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useContracts as useContractsList } from '@/lib/firebase/contracts-store';
+import { useHistoryEntries } from '@/lib/firebase/history-store';
+import { HistoryAddDialog } from '@/components/history-add-dialog';
 import { todayKr } from '@/lib/mock-data';
 import {
   validateDocument, summarizeIssues,
@@ -1016,11 +1018,13 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
 
 function HistoryListTab({ scope, c }: { scope: 'contract' | 'vehicle'; c: Contract }) {
   const { contracts } = useContractsList();
+  const { entries, remove: removeEntry } = useHistoryEntries();
+  const [addOpen, setAddOpen] = useState(false);
   const title = scope === 'vehicle' ? '차량 이력' : '계약 이력';
   const target = scope === 'vehicle' ? `차량번호 ${c.vehiclePlate}` : `계약 ${c.contractNo}`;
   const hint = scope === 'vehicle'
-    ? '정비·검사·사고·세차·위반·보험 + 같은 차량의 과거/현재 계약 — 차량번호에 영구 귀속'
-    : '연락기록·분쟁·클레임·수납이슈·메모 등 — 이 계약에만 귀속';
+    ? '정비·검사·사고·세차·위반·보험·부품교체 — 차량번호에 영구 귀속 (계약 종료되어도 차량에 따라감)'
+    : '연락기록·분쟁·클레임·수납이슈·메모 — 이 계약에만 귀속';
 
   // 차량 이력 — 같은 plate 의 다른 계약 (현재 계약 제외, 계약일 내림차순)
   const sameVehicleContracts = scope === 'vehicle'
@@ -1029,59 +1033,124 @@ function HistoryListTab({ scope, c }: { scope: 'contract' | 'vehicle'; c: Contra
         .sort((a, b) => b.contractDate.localeCompare(a.contractDate))
     : [];
 
+  // 본인 이력 (scope + 매칭)
+  const myEntries = entries.filter((e) =>
+    scope === 'vehicle' ? e.scope === 'vehicle' && e.vehiclePlate === c.vehiclePlate
+                        : e.scope === 'contract' && e.contractId === c.id,
+  );
+  const totalCost = myEntries.reduce((s, e) => s + (e.cost ?? 0), 0);
+
   return (
-    <Section
-      icon={scope === 'vehicle' ? <Car size={12} weight="duotone" /> : <ClipboardText size={12} weight="duotone" />}
-      title={`${title} — ${target}`}
-      action={<button type="button" className="btn btn-sm btn-primary">+ 이력 추가</button>}
-    >
-      <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8 }}>{hint}</div>
+    <>
+      <Section
+        icon={scope === 'vehicle' ? <Car size={12} weight="duotone" /> : <ClipboardText size={12} weight="duotone" />}
+        title={`${title} — ${target}`}
+        action={
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => setAddOpen(true)}>
+            <Plus size={11} weight="bold" /> 이력 추가
+          </button>
+        }
+      >
+        <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8 }}>{hint}</div>
 
-      {/* 차량 이력 탭일 때 — 같은 차량의 다른 계약 노출 */}
-      {scope === 'vehicle' && sameVehicleContracts.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            같은 차량 과거/현재 계약 ({sameVehicleContracts.length}건)
-          </div>
-          <table className="table" style={{ fontSize: 11 }}>
-            <thead>
-              <tr>
-                <th style={{ width: 110 }}>계약번호</th>
-                <th>계약자</th>
-                <th>회사</th>
-                <th className="mono">계약기간</th>
-                <th className="num">월대여료</th>
-                <th className="num">미수</th>
-                <th className="center">상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sameVehicleContracts.map((p) => (
-                <tr key={p.id}>
-                  <td className="mono">{p.contractNo}</td>
-                  <td>{p.customerName}</td>
-                  <td className="dim">{p.company}</td>
-                  <td className="mono dim">
-                    {p.contractDate?.slice(2)}{p.returnScheduledDate ? ` ~ ${p.returnScheduledDate.slice(2)}` : ''}
-                  </td>
-                  <td className="num mono">₩{formatCurrency(p.monthlyRent ?? 0)}</td>
-                  <td className="num mono" style={{ color: (p.unpaidAmount ?? 0) > 0 ? 'var(--red-text)' : undefined }}>
-                    {(p.unpaidAmount ?? 0) > 0 ? `₩${formatCurrency(p.unpaidAmount!)}` : '-'}
-                  </td>
-                  <td className="center"><span className={`status ${p.status}`}>{p.status}</span></td>
+        {/* 차량 이력 탭일 때 — 같은 차량의 다른 계약 노출 */}
+        {scope === 'vehicle' && sameVehicleContracts.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              같은 차량 과거/현재 계약 ({sameVehicleContracts.length}건)
+            </div>
+            <table className="table" style={{ fontSize: 11 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 110 }}>계약번호</th>
+                  <th>계약자</th>
+                  <th>회사</th>
+                  <th className="mono">계약기간</th>
+                  <th className="num">월대여료</th>
+                  <th className="num">미수</th>
+                  <th className="center">상태</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {sameVehicleContracts.map((p) => (
+                  <tr key={p.id}>
+                    <td className="mono">{p.contractNo}</td>
+                    <td>{p.customerName}</td>
+                    <td className="dim">{p.company}</td>
+                    <td className="mono dim">
+                      {p.contractDate?.slice(2)}{p.returnScheduledDate ? ` ~ ${p.returnScheduledDate.slice(2)}` : ''}
+                    </td>
+                    <td className="num mono">₩{formatCurrency(p.monthlyRent ?? 0)}</td>
+                    <td className="num mono" style={{ color: (p.unpaidAmount ?? 0) > 0 ? 'var(--red-text)' : undefined }}>
+                      {(p.unpaidAmount ?? 0) > 0 ? `₩${formatCurrency(p.unpaidAmount!)}` : '-'}
+                    </td>
+                    <td className="center"><span className={`status ${p.status}`}>{p.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      <div style={{ padding: 32, color: 'var(--text-weak)', textAlign: 'center', fontSize: 12 }}>
-        {scope === 'vehicle'
-          ? '정비·사고·검사 이력은 Phase 2 — 등록 UI 준비 중.'
-          : '아직 계약 이력 기록이 없습니다.'}
-      </div>
-    </Section>
+        {/* 이력 본문 — 실 데이터 */}
+        {myEntries.length === 0 ? (
+          <div style={{ padding: 32, color: 'var(--text-weak)', textAlign: 'center', fontSize: 12 }}>
+            아직 {title} 기록이 없습니다. 우측 상단 [이력 추가] 로 등록하세요.
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title} ({myEntries.length}건)</span>
+              {totalCost > 0 && <span>누적 비용 <strong className="mono" style={{ color: 'var(--text-main)' }}>₩{formatCurrency(totalCost)}</strong></span>}
+            </div>
+            <table className="table" style={{ fontSize: 11 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 110 }}>일자</th>
+                  <th className="center" style={{ width: 80 }}>분류</th>
+                  <th>제목 / 내용</th>
+                  {scope === 'vehicle' && <th style={{ width: 120 }}>업체</th>}
+                  {scope === 'vehicle' && <th className="num" style={{ width: 80 }}>주행거리</th>}
+                  <th className="num" style={{ width: 100 }}>비용</th>
+                  <th className="center" style={{ width: 64 }}>상태</th>
+                  <th style={{ width: 36 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {myEntries.map((e) => (
+                  <tr key={e.id}>
+                    <td className="mono">{e.date}</td>
+                    <td className="center"><span className="chip" style={{ height: 18, padding: '0 8px', fontSize: 10 }}>{e.category}</span></td>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{e.title}</div>
+                      {e.description && <div className="dim" style={{ fontSize: 10, marginTop: 2 }}>{e.description}</div>}
+                    </td>
+                    {scope === 'vehicle' && <td className="dim">{e.vendor ?? '-'}</td>}
+                    {scope === 'vehicle' && <td className="num mono dim">{e.mileage ? `${e.mileage.toLocaleString('ko-KR')} km` : '-'}</td>}
+                    <td className="num mono">{e.cost ? `₩${formatCurrency(e.cost)}` : '-'}</td>
+                    <td className="center"><span className={`status ${e.status === '완료' ? '완료' : e.status === '진행' ? '예정' : '예정'}`}>{e.status}</span></td>
+                    <td className="center">
+                      <button
+                        className="btn btn-sm btn-ghost btn-icon"
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`이력 "${e.title}" 삭제하시겠습니까?`)) void removeEntry(e.id);
+                        }}
+                        title="삭제"
+                      >
+                        <XIcon size={11} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </Section>
+
+      <HistoryAddDialog open={addOpen} onOpenChange={setAddOpen} scope={scope} contract={c} />
+    </>
   );
 }
 
