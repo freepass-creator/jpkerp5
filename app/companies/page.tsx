@@ -301,26 +301,27 @@ function CompanyView({
   onRemove: () => void;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <header className="page-header">
+        <div className="page-header-title-group">
+          <h1 className="page-header-title">
             {company.code && <span className="mono" style={{ fontSize: 13, color: 'var(--brand)', fontWeight: 600 }}>{company.code}</span>}
             {company.name}
           </h1>
-          <div style={{ fontSize: 12, color: 'var(--text-weak)', marginTop: 2 }}>
+          <div className="page-header-title-sub">
             {company.bizRegNo && <span className="mono">{company.bizRegNo}</span>}
             {company.ceo && <> · 대표 {company.ceo}</>}
             <> · 계약 {contractCount}건</>
           </div>
         </div>
-        <div style={{ flex: 1 }} />
-        <button className="btn" type="button" onClick={onEdit}>
-          <Pencil /> 수정
-        </button>
-        <button className="btn btn-danger" type="button" onClick={onRemove}>
-          <Trash /> 삭제
-        </button>
+        <div className="page-header-actions">
+          <button className="btn" type="button" onClick={onEdit}>
+            <Pencil /> 수정
+          </button>
+          <button className="btn btn-danger" type="button" onClick={onRemove}>
+            <Trash /> 삭제
+          </button>
+        </div>
       </header>
 
       <CompanyTabs
@@ -524,24 +525,25 @@ function CompanyEditor({
 }) {
   const canSave = !!draft.name?.trim();
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <Buildings size={16} weight="duotone" style={{ color: 'var(--text-sub)', alignSelf: 'center' }} />
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <header className="page-header">
+        <div className="page-header-title-group">
+          <h1 className="page-header-title">
+            <Buildings size={16} weight="duotone" />
             {isNew ? '신규 법인 등록' : `${draft.name || '법인'} — 수정`}
           </h1>
-          <div style={{ fontSize: 12, color: 'var(--text-weak)', marginTop: 2 }}>
+          <div className="page-header-title-sub">
             {isNew ? '사업자등록증 OCR 또는 직접 입력으로 등록' : '회사 정보 / 계좌 / 거점 / 서류 수정'}
           </div>
         </div>
-        <div style={{ flex: 1 }} />
-        <button className="btn" type="button" onClick={onCancel}>
-          <ArrowLeft /> 취소
-        </button>
-        <button className="btn btn-primary" type="button" onClick={onSave} disabled={!canSave}>
-          <FloppyDisk weight="bold" /> {isNew ? '등록' : '저장'}
-        </button>
+        <div className="page-header-actions">
+          <button className="btn" type="button" onClick={onCancel}>
+            <ArrowLeft /> 취소
+          </button>
+          <button className="btn btn-primary" type="button" onClick={onSave} disabled={!canSave}>
+            <FloppyDisk weight="bold" /> {isNew ? '등록' : '저장'}
+          </button>
+        </div>
       </header>
 
       <CompanyTabs

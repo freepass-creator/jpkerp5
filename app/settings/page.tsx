@@ -115,13 +115,16 @@ function DisplaySettings() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
-      <header style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <h1 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>화면</h1>
-        <span style={{ fontSize: 12, color: 'var(--text-weak)' }}>테마 · 글꼴 · 글자 크기 · 행 밀도</span>
-        <div style={{ flex: 1 }} />
-        <button className="btn" type="button" onClick={reset}>
-          <ArrowCounterClockwise /> 기본값 복원
-        </button>
+      <header className="page-header">
+        <div className="page-header-title-group">
+          <h1 className="page-header-title">화면</h1>
+          <div className="page-header-title-sub">테마 · 글꼴 · 글자 크기 · 행 밀도</div>
+        </div>
+        <div className="page-header-actions">
+          <button className="btn" type="button" onClick={reset}>
+            <ArrowCounterClockwise /> 기본값 복원
+          </button>
+        </div>
       </header>
 
       <Section title="테마">
@@ -256,9 +259,11 @@ function AccountSettings() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 560 }}>
-      <header>
-        <h1 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>계정</h1>
-        <p style={{ fontSize: 12, color: 'var(--text-weak)', marginTop: 4 }}>로그인 정보 · 세션 관리</p>
+      <header className="page-header">
+        <div className="page-header-title-group">
+          <h1 className="page-header-title">계정</h1>
+          <div className="page-header-title-sub">로그인 정보 · 세션 관리</div>
+        </div>
       </header>
 
       <section className="detail-section">

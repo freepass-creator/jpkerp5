@@ -470,61 +470,100 @@ a { color: var(--text-link); text-decoration: none; }
 .page-shell-main .detail-section-body { padding: 0; }
 
 /* ── 컨텐츠 내부 탭 (master-detail 의 detail 영역 상단) — /companies 의 4탭 등 */
+/* 페이지 본문 헤더 — 페이지/섹션 상단의 타이틀 + 보조 텍스트 + 우측 액션 패턴 통일 */
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.page-header-title-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.page-header-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.2;
+  margin: 0;
+}
+.page-header-title > svg { color: var(--text-sub); flex-shrink: 0; }
+.page-header-title-sub {
+  font-size: 12px;
+  color: var(--text-weak);
+}
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 페이지 탭 — .tabs-trigger 시각언어 통일 (pill 버튼, 활성=brand 채움) */
 .page-shell-tabs {
   display: flex;
   gap: 4px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: none;
   border-bottom: 1px solid var(--border);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  padding: 4px 6px 0;
+  padding: 4px 0 12px;
+  align-items: center;
 }
 .page-shell-tabs .tab {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 11px 16px;
-  border: none;
-  background: transparent;
-  border-bottom: 2px solid transparent;
-  font-size: 13px;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12px;
   font-weight: var(--font-weight-medium);
   color: var(--text-sub);
   cursor: pointer;
-  margin-bottom: -1px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  transition: background-color 0.1s, border-color 0.1s, color 0.1s;
+  white-space: nowrap;
   font-family: inherit;
-  transition: color 0.12s, background 0.12s;
 }
-.page-shell-tabs .tab > svg { width: 14px; height: 14px; }
-.page-shell-tabs .tab:hover { color: var(--text-main); background: var(--bg-sunken); }
-.page-shell-tabs .tab:active { background: var(--bg-stripe); }
+.page-shell-tabs .tab > svg { width: 13px; height: 13px; }
+.page-shell-tabs .tab:hover {
+  background: var(--bg-sunken);
+  color: var(--text-main);
+}
 .page-shell-tabs .tab:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--focus-ring) inset;
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 .page-shell-tabs .tab.active {
-  color: var(--brand);
-  border-bottom-color: var(--brand);
-  font-weight: var(--font-weight-semibold, 600);
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--text-inverse);
+}
+.page-shell-tabs .tab.active:hover {
+  background: var(--brand-h);
+  border-color: var(--brand-h);
+  color: var(--text-inverse);
 }
 .page-shell-tabs .tab-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 5px;
-  border-radius: 9px;
   background: var(--bg-sunken);
   color: var(--text-sub);
   font-size: 10px;
-  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-sm);
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   margin-left: 2px;
 }
 .page-shell-tabs .tab.active .tab-count {
-  background: var(--brand-bg);
-  color: var(--brand);
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--text-inverse);
 }
 
 /* ── 카드형 nav 아이템 (네비 안에 정보 풍부한 카드 — 법인 리스트 등) */
@@ -2160,34 +2199,8 @@ kbd {
 .modal-body { /* dialog-body */ }
 .modal-footer { /* dialog-footer */ }
 
-/* 작은 tab 스타일 — v4 .tabs */
-.tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-card);
-  padding: 0 16px;
-  min-height: 36px;
-  align-items: stretch;
-}
-.tabs .tab {
-  padding: 8px 14px;
-  border: none;
-  background: transparent;
-  border-bottom: 2px solid transparent;
-  font-size: 12px;
-  font-weight: var(--font-weight-medium);
-  color: var(--text-sub);
-  cursor: pointer;
-  margin-bottom: -1px;
-  transition: color 0.12s, border-color 0.12s;
-}
-.tabs .tab:hover { color: var(--text-main); }
-.tabs .tab.active { color: var(--brand); border-bottom-color: var(--brand); font-weight: var(--font-weight-medium); }
-
 /* OCR Upload Stage 컴포넌트 보조 */
 .ocr-upload-stage { /* component-specific styles */ }
-.btn-ghost { background: transparent; border: none; cursor: pointer; }
 .flex { display: flex; }
 .items-center { align-items: center; }
 .justify-center { justify-content: center; }
