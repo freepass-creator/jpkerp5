@@ -183,6 +183,8 @@ export type BankTransaction = {
   source?: string;             // KB/우리/신한/하나/농협 등 — 은행
   account?: string;            // 계좌번호 (회사 마스터의 BankAccount.accountNo와 매칭)
   companyCode?: string;        // 회사 코드 (자금일보 회사별 집계용)
+  /** 결제 채널 — 적요에서 파생. 자동이체/카드/무통장/현금/인터넷뱅킹 */
+  method?: string;
   /** 계정과목 — 분개. ledger-subjects.ts 의 enum */
   subject?: string;
   matchedContractId?: string;

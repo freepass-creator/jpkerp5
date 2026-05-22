@@ -128,9 +128,9 @@ export function CreateDialog({
   async function commitPaymentFiles() {
     setBusy(true);
     try {
-      const bankRows = paymentFiles.filter((p) => p.kind === '계좌').flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName })));
+      const bankRows = paymentFiles.filter((p) => p.kind === '계좌').flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName, bank: p.bankHint })));
       const cardRows = paymentFiles.filter((p) => p.kind === '카드').flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName })));
-      const bankParsed = bankRows.map((x) => parseBankTxRow(x.row, x.file)).filter((x): x is NonNullable<typeof x> => !!x);
+      const bankParsed = bankRows.map((x) => parseBankTxRow(x.row, x.file, x.bank)).filter((x): x is NonNullable<typeof x> => !!x);
       const cardParsed = cardRows.map((x) => parseCardTxRow(x.row, x.file)).filter((x): x is NonNullable<typeof x> => !!x);
       const bankSaved = await addBankTx(bankParsed);
       const cardSaved = await addCardTx(cardParsed);
@@ -576,6 +576,11 @@ function SheetPreview({ sheet, onChangeKind }: { sheet: ParsedSheet; onChangeKin
         <div className="text-sub">{sheet.sheetName}</div>
         <span className="text-weak">·</span>
         <div className="text-sub mono">{sheet.rows.length}행</div>
+        {sheet.kind === '계좌' && sheet.bankHint && (
+          <span className="chip" style={{ height: 18, padding: '0 8px', fontSize: 10, background: 'var(--blue-bg)', color: 'var(--blue-text)' }}>
+            {sheet.bankHint}은행
+          </span>
+        )}
         {isLowConfidence && (
           <span className="flex items-center gap-1 text-[var(--alert-orange-text)] text-xs">
             <Warning size={12} /> 분류 신뢰도 낮음

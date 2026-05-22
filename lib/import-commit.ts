@@ -489,28 +489,78 @@ export function applySnapshotToContract(
 /* ──────────────── 은행 거래 (입금 + 출금) ──────────────── */
 
 /**
+ * 적요 / 거래내용 → method 자동 분류 (자금일보 ledger method 호환).
+ * 키워드 기반 — 대소문자/공백 무시.
+ */
+function deriveBankMethod(summary: string, memo: string): string | undefined {
+  const t = (summary + ' ' + memo).toUpperCase();
+  if (!t.trim()) return undefined;
+  if (t.includes('CMS') || t.includes('자동이체') || t.includes('자동') && t.includes('이체')) return '자동이체';
+  if (t.includes('카드') || t.includes('VISA') || t.includes('마스터') || t.includes('JCB') || t.includes('BC')) return '카드';
+  if (t.includes('ATM') || t.includes('무통장')) return '무통장';
+  if (t.includes('현금')) return '현금';
+  if (t.includes('이체') || t.includes('송금') || t.includes('타행') || t.includes('당행')) return '인터넷뱅킹';
+  return undefined;
+}
+
+/**
  * 은행 통장 엑셀 한 행 파싱 — 입금·출금 모두 수용 (자금일보).
  * 한 줄에 입금/출금 둘 다 0이면 null (헤더 등 잡음).
+ *
+ * 대응 은행: KB·우리·신한·하나·농협·IBK·SC제일·카카오뱅크·토스뱅크·케이뱅크·새마을금고·우체국 등.
+ * 컬럼명이 달라도 fuzzy alias 매칭으로 흡수.
  */
-export function parseBankTxRow(row: Row, fileName: string): Omit<BankTransaction, 'id'> | null {
-  const txDate = toDate(get(row, '거래일자', '거래일', '거래일시', '입금일', '출금일', '일자', 'txDate'));
-  const counterparty = toStr(get(row, '입금자', '거래상대', '상대', '예금주', '수취인', 'counterparty'));
-  const deposit = toNum(get(row, '입금액', '입금', '받은금액', 'deposit', 'amount'));
-  const withdraw = toNum(get(row, '출금액', '출금', '지급액', '인출액', 'withdraw'));
-  const balance = toNum(get(row, '잔액', '잔고', 'balance'));
+export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): Omit<BankTransaction, 'id'> | null {
+  const txDate = toDate(get(row,
+    '거래일자', '거래일', '거래일시', '거래시각', '거래시간',
+    '입금일', '출금일', '일자', '발생일', '발생일자', '처리일',
+    'txDate', 'date',
+  ));
+
+  // 입출금 — 양수/음수 모두 처리. 일부 은행은 '금액' 단일 컬럼에 +/-로 표기.
+  const deposit = toNum(get(row, '입금액', '입금', '받은금액', '받은액', '입금금액', '예입액', 'deposit', 'credit'));
+  const withdraw = toNum(get(row, '출금액', '출금', '지급액', '인출액', '낸돈', '출금금액', 'withdraw', 'debit'));
+  const amountSingle = toNum(get(row, '거래금액', '금액', '거래액', 'amount'));
   if (!txDate) return null;
-  if (deposit <= 0 && withdraw <= 0) return null;
+  const useSingle = deposit <= 0 && withdraw <= 0 && Math.abs(amountSingle) > 0;
+  const finalDeposit = useSingle ? (amountSingle > 0 ? amountSingle : 0) : deposit;
+  const finalWithdraw = useSingle ? (amountSingle < 0 ? -amountSingle : 0) : withdraw;
+  if (finalDeposit <= 0 && finalWithdraw <= 0) return null;
+
+  // 거래상대 — 14가지 alias + memo fallback
+  const counterparty = toStr(get(row,
+    '입금자', '입금자명', '거래상대', '상대', '상대방',
+    '예금주', '수취인', '받는분', '받는사람',
+    '송금인', '보낸이', '보내는분', '의뢰인', '의뢰자',
+    '상대계좌', '상대은행',
+    'counterparty', 'name',
+  ));
+
+  // 적요 (BZ뱅크·CMS 등 결제 채널) — method 파생용
+  const summary = toStr(get(row, '적요', '거래종류', '구분', 'summary'));
+  // 내용·메모 (거래 메모) — fallback chain
+  const memo = toStr(get(row,
+    '내용', '거래내용', '거래메모', '메모', '용도', '비고',
+    'memo', 'description', 'note',
+  ));
+
+  const balance = toNum(get(row, '잔액', '잔고', '거래후잔액', '거래후잔고', 'balance'));
+
+  // counterparty 없으면 memo→summary로 fallback (signature dedup 호환)
+  const cpFinal = counterparty || memo || summary || (finalWithdraw > 0 ? '(출금)' : '(미상)');
+  const method = deriveBankMethod(summary, memo);
 
   return {
     txDate,
-    amount: deposit > 0 ? deposit : 0,
-    withdraw: withdraw > 0 ? withdraw : undefined,
+    amount: finalDeposit > 0 ? finalDeposit : 0,
+    withdraw: finalWithdraw > 0 ? finalWithdraw : undefined,
     balance: balance > 0 ? balance : undefined,
-    counterparty: counterparty || (withdraw > 0 ? '(출금)' : '(미상)'),
-    memo: toStr(get(row, '적요', '내용', '메모', '거래내용', 'memo')) || undefined,
-    source: toStr(get(row, '은행', '거래은행', 'source')) || fileName,
-    account: toStr(get(row, '계좌번호', '계좌', 'account')) || undefined,
+    counterparty: cpFinal,
+    memo: memo || summary || undefined,
+    source: toStr(get(row, '은행', '거래은행', '은행명', 'source')) || bankHint || fileName,
+    account: toStr(get(row, '계좌번호', '계좌', '나의계좌', '본인계좌', 'account')) || undefined,
     companyCode: toStr(get(row, '회사', '회사코드', 'companyCode')) || undefined,
+    method,
     raw: row,
   };
 }
