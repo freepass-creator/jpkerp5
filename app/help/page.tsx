@@ -2,11 +2,20 @@
 
 import {
   BookOpen, Buildings, House, CurrencyKrw, Warning, FileXls, Camera, MagnifyingGlass,
-  CheckCircle, ArrowRight, Question, Plus, ChartBar, ClipboardText, Phone,
+  CheckCircle, ArrowRight, Question, Plus, ChartBar, ClipboardText, Phone, Sparkle,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
+import { useAuth } from '@/lib/use-auth';
 
 export default function HelpPage() {
+  const { user } = useAuth();
+  function restartTour() {
+    if (!user) return;
+    try {
+      localStorage.removeItem(`jpkerp5_onboarding_done_${user.uid}`);
+      location.reload();
+    } catch { /* ignore */ }
+  }
   return (
     <div className="layout">
       <Sidebar />
@@ -30,6 +39,11 @@ export default function HelpPage() {
               <div className="page-header-title-sub">
                 직원용 사용 가이드 · 처음 쓰시면 위에서 아래로 한 번 읽어보세요
               </div>
+            </div>
+            <div className="page-header-actions">
+              <button className="btn btn-primary" type="button" onClick={restartTour} title="환영 튜토리얼 다시 보기">
+                <Sparkle weight="duotone" /> 튜토리얼 다시 보기
+              </button>
             </div>
           </header>
 

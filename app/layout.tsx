@@ -3,6 +3,7 @@ import './globals.css';
 import { AuthGate } from '@/components/auth/auth-gate';
 import { SettingsInit } from '@/components/settings-init';
 import { GlobalSearch } from '@/components/global-search';
+import { OnboardingTour } from '@/components/onboarding/onboarding-tour';
 
 export const metadata: Metadata = {
   title: 'jpkerp5 — 차량 렌탈 ERP',
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthGate>
           {children}
           <GlobalSearch />
+          <OnboardingTour />
         </AuthGate>
       </body>
     </html>
