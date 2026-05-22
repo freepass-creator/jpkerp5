@@ -185,13 +185,34 @@ function getContractState(c: Contract): { name: ContractState; days: number } {
 /** 수납상태 (2종) — 결제 건전성 */
 type PaymentState = '정상' | '미납';
 function getPaymentState(c: Contract): { name: PaymentState; days: number } {
+  const today = todayKr();
   if (c.unpaidAmount <= 0) {
-    return { name: '정상', days: daysSince(c.lastPaidDate ?? c.contractDate, todayKr()) };
+    return { name: '정상', days: daysSince(c.lastPaidDate ?? c.contractDate, today) };
   }
-  // 미납 = 최근 입금 후 30일+ 시점부터 = 미납 발생일부터
-  const ref = c.lastPaidDate || c.contractDate;
-  const days = Math.max(0, daysSince(ref, todayKr()) - 30);
-  return { name: '미납', days };
+  // 미납 = 가장 오래된 연체·부분납 회차의 dueDate ~ 오늘
+  const overdueSchedules = (c.schedules ?? [])
+    .filter((s) => s.status === '연체' || s.status === '부분납')
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  if (overdueSchedules.length > 0) {
+    const oldestDue = overdueSchedules[0].dueDate;
+    const days = Math.max(0, daysSince(oldestDue, today));
+    return { name: '미납', days };
+  }
+  // 스케줄 없는 legacy 계약 — currentSeq 기준으로 미납 회차 dueDate 역산
+  // 미납 회차의 첫번째 = currentSeq (currentSeq 자체가 미납 회차)
+  // dueDate = contractDate + (currentSeq - 1)개월의 paymentDay
+  if (c.currentSeq && c.contractDate) {
+    const [y, m] = c.contractDate.split('-').map((s) => parseInt(s, 10));
+    const targetM0 = (m - 1) + (c.currentSeq - 1);
+    const year = y + Math.floor(targetM0 / 12);
+    const month = ((targetM0 % 12) + 12) % 12 + 1;
+    const lastDay = new Date(year, month, 0).getDate();
+    const d = Math.min(c.paymentDay || 1, lastDay);
+    const oldestDue = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const days = Math.max(0, daysSince(oldestDue, today));
+    return { name: '미납', days };
+  }
+  return { name: '미납', days: 0 };
 }
 
 export default function Page() {
