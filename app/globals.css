@@ -472,29 +472,30 @@ a { color: var(--text-link); text-decoration: none; }
 /* ── 컨텐츠 내부 탭 (master-detail 의 detail 영역 상단) — /companies 의 4탭 등 */
 .page-shell-tabs {
   display: flex;
-  gap: 0;
+  gap: 4px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-bottom: none;
+  border-bottom: 1px solid var(--border);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
-  padding: 0 4px;
+  padding: 4px 6px 0;
 }
 .page-shell-tabs .tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 7px;
+  padding: 11px 16px;
   border: none;
   background: transparent;
   border-bottom: 2px solid transparent;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: var(--font-weight-medium);
   color: var(--text-sub);
   cursor: pointer;
   margin-bottom: -1px;
   font-family: inherit;
+  transition: color 0.12s, background 0.12s;
 }
-.page-shell-tabs .tab > svg { width: 13px; height: 13px; }
+.page-shell-tabs .tab > svg { width: 14px; height: 14px; }
 .page-shell-tabs .tab:hover { color: var(--text-main); background: var(--bg-sunken); }
 .page-shell-tabs .tab:active { background: var(--bg-stripe); }
 .page-shell-tabs .tab:focus-visible {
@@ -504,7 +505,26 @@ a { color: var(--text-link); text-decoration: none; }
 .page-shell-tabs .tab.active {
   color: var(--brand);
   border-bottom-color: var(--brand);
+  font-weight: var(--font-weight-semibold, 600);
+}
+.page-shell-tabs .tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--bg-sunken);
+  color: var(--text-sub);
+  font-size: 10px;
   font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  margin-left: 2px;
+}
+.page-shell-tabs .tab.active .tab-count {
+  background: var(--brand-bg);
+  color: var(--brand);
 }
 
 /* ── 카드형 nav 아이템 (네비 안에 정보 풍부한 카드 — 법인 리스트 등) */

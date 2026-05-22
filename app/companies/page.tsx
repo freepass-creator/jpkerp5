@@ -259,20 +259,30 @@ export default function CompaniesPage() {
 
 /* ──────────────────── 탭 공통 ──────────────────── */
 
-function CompanyTabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+function CompanyTabs({ tab, onChange, counts }: {
+  tab: Tab;
+  onChange: (t: Tab) => void;
+  counts?: { finance?: number; locations?: number; documents?: number };
+}) {
+  const finance = counts?.finance ?? 0;
+  const locations = counts?.locations ?? 0;
+  const documents = counts?.documents ?? 0;
   return (
     <nav className="page-shell-tabs">
       <button type="button" className={`tab ${tab === 'info' ? 'active' : ''}`} onClick={() => onChange('info')}>
-        <Buildings /> 기본 정보
+        <Buildings weight={tab === 'info' ? 'fill' : 'regular'} /> 기본 정보
       </button>
       <button type="button" className={`tab ${tab === 'finance' ? 'active' : ''}`} onClick={() => onChange('finance')}>
-        <Bank /> 계좌 · 카드
+        <Bank weight={tab === 'finance' ? 'fill' : 'regular'} /> 계좌·카드
+        {finance > 0 && <span className="tab-count">{finance}</span>}
       </button>
       <button type="button" className={`tab ${tab === 'locations' ? 'active' : ''}`} onClick={() => onChange('locations')}>
-        <MapPin /> 거점 (사무실 · 차고지 · 주차장)
+        <MapPin weight={tab === 'locations' ? 'fill' : 'regular'} /> 거점
+        {locations > 0 && <span className="tab-count">{locations}</span>}
       </button>
       <button type="button" className={`tab ${tab === 'documents' ? 'active' : ''}`} onClick={() => onChange('documents')}>
-        <FileText /> 서류
+        <FileText weight={tab === 'documents' ? 'fill' : 'regular'} /> 서류
+        {documents > 0 && <span className="tab-count">{documents}</span>}
       </button>
     </nav>
   );
@@ -313,7 +323,15 @@ function CompanyView({
         </button>
       </header>
 
-      <CompanyTabs tab={tab} onChange={onTabChange} />
+      <CompanyTabs
+        tab={tab}
+        onChange={onTabChange}
+        counts={{
+          finance: (company.accounts?.length ?? 0) + (company.cards?.length ?? 0),
+          locations: company.locations?.length ?? 0,
+          documents: company.documents?.length ?? 0,
+        }}
+      />
 
       {tab === 'info' && <InfoView company={company} />}
       {tab === 'finance' && <FinanceView company={company} />}
@@ -526,7 +544,15 @@ function CompanyEditor({
         </button>
       </header>
 
-      <CompanyTabs tab={tab} onChange={onTabChange} />
+      <CompanyTabs
+        tab={tab}
+        onChange={onTabChange}
+        counts={{
+          finance: (draft.accounts?.length ?? 0) + (draft.cards?.length ?? 0),
+          locations: draft.locations?.length ?? 0,
+          documents: draft.documents?.length ?? 0,
+        }}
+      />
 
       {tab === 'info' && <InfoEditor draft={draft} onChange={onChange} />}
       {tab === 'finance' && <FinanceEditor draft={draft} onChange={onChange} />}
