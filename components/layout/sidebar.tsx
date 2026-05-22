@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  House, Warning, Buildings, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, ClipboardText,
+  House, Warning, Buildings, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, ClipboardText, BookOpen,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { isAdmin } from '@/lib/admin-emails';
@@ -80,6 +80,10 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
             <span>감사 로그</span>
           </Link>
         )}
+        <Link href="/help" className={`sb-item ${isActive('/help') ? 'active' : ''}`} title="사용 안내 — 처음 쓰는 직원 가이드">
+          <BookOpen size={14} weight={isActive('/help') ? 'fill' : 'regular'} />
+          <span>사용 안내</span>
+        </Link>
         <Link href="/settings" className={`sb-item ${isActive('/settings') ? 'active' : ''}`} title="설정 (화면·계정)">
           <Gear size={14} weight={isActive('/settings') ? 'fill' : 'regular'} />
           <span>설정</span>
