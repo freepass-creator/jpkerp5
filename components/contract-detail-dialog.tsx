@@ -142,6 +142,7 @@ type Stage =
 function currentStage(c: Contract): Stage {
   // 명시적 vehicleStatus 우선
   switch (c.vehicleStatus) {
+    case '운행': return '운행';
     case '매각': return '매각';
     case '매각대기': return '매각대기';
     case '휴차대기': return '휴차대기';
@@ -152,12 +153,22 @@ function currentStage(c: Contract): Stage {
     case '구매대기': return '구매대기';
     case '휴차': return '휴차';
     case '임시배차': return '임시배차';
+    case '인도대기':
+    case '출고대기': return '상품대기';
   }
-  // legacy 케이스 파생
+  // legacy 케이스 파생 — vehicleStatus 없을 때만
   if (c.returnedDate || c.status === '반납') return '휴차대기';
   if (c.deliveredDate && c.status === '운행') return '운행';
-  if (c.vehicleStatus === '인도대기' || c.vehicleStatus === '출고대기') return '상품대기';
+  // 손님 있는 계약은 인도일 없어도 운행 (스냅샷 업로드 시점)
+  if (c.status === '운행') return '운행';
   return '구매대기';
+}
+
+/** 표시용 라벨 — 내부값 '운행' → '계약완료', '매각' → '매각완료' (리스트뷰와 통일) */
+function stageLabel(s: Stage): string {
+  if (s === '운행') return '계약완료';
+  if (s === '매각') return '매각완료';
+  return s;
 }
 
 const IDLE_REASONS = ['사고', '정비', '검수', '대기'] as const;
@@ -187,7 +198,7 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
   },
   '상품대기': {
     label: '영업 가능 — 다음 임차 대기',
-    nextLabel: '계약 생성 (외부) → 운행',
+    nextLabel: '계약 생성 (외부) → 계약완료',
     items: [],  // 새 계약 생성은 외부 액션
   },
   '운행': {
@@ -202,7 +213,7 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
   },
   '매각대기': {
     label: '매각 진행 체크',
-    nextLabel: '매각 완료 → 매각',
+    nextLabel: '매각완료',
     items: ['매각 가격 산정', '매각처 확정', '대금 입금 확인', '명의 이전 서류', '말소 등록'],
   },
 };
@@ -393,8 +404,8 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
       {/* 상태 전환 */}
       <Section
         icon={<ArrowsLeftRight size={12} weight="duotone" />}
-        title={`현재 ${stage}`}
-        action={<span className={`status ${stage}`}>{stage}{stage === '휴차' && c.idleReason ? ` (${c.idleReason.split(' — ')[0]})` : ''}</span>}
+        title={`현재 ${stageLabel(stage)}`}
+        action={<span className={`status ${stage}`}>{stageLabel(stage)}{stage === '휴차' && c.idleReason ? ` (${c.idleReason.split(' — ')[0]})` : ''}</span>}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <span style={{ fontSize: 11, color: 'var(--text-weak)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -505,7 +516,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           )}
           {stage === '상품대기' && (
             <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>
-              영업 가능 — 다음 임차인이 정해지면 [+ 신규생성 → 계약생성]에서 매칭 후 운행으로 전환됩니다.
+              영업 가능 — 다음 임차인이 정해지면 [+ 신규생성 → 계약생성]에서 매칭 후 계약완료로 전환됩니다.
             </div>
           )}
           {stage === '운행' && !idlePicker && !tempPicker && (
@@ -557,19 +568,19 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
                 onUpdate({ ...c, vehicleStatus: '매각' });
               }}
             >
-              <CheckCircle size={14} /> 매각완료 → 매각
+              <CheckCircle size={14} /> 매각 처리 → 매각완료
             </button>
           )}
           {stage === '매각' && (
             <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>
-              매각 완료 — fleet에서 제외됨 (terminal)
+              매각완료 — fleet에서 제외됨 (terminal)
             </div>
           )}
           {/* legacy 휴차/임시배차 */}
           {stage === '휴차' && (
             <>
               <button className="btn btn-primary" onClick={resumeFromIdle}>
-                <PlayCircle size={14} weight="fill" /> 운행 복귀
+                <PlayCircle size={14} weight="fill" /> 계약완료 복귀
               </button>
               <button className="btn" onClick={processReturn}>
                 <ArrowUUpLeft size={14} /> 반납회수 → 휴차대기
@@ -579,7 +590,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           {stage === '임시배차' && (
             <>
               <button className="btn btn-primary" onClick={clearTemp}>
-                <PlayCircle size={14} weight="fill" /> 원본 복귀 → 운행
+                <PlayCircle size={14} weight="fill" /> 원본 복귀 → 계약완료
               </button>
               <button className="btn" onClick={processReturn}>
                 <ArrowUUpLeft size={14} /> 반납회수 → 휴차대기
