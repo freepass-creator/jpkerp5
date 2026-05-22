@@ -696,6 +696,14 @@ function ContractInfoTab({ c }: { c: Contract }) {
 /* ─────────────── 수납내역 탭 (스케줄 + 입금 + 추가) ─────────────── */
 
 function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+  const totalDiscount = (c.schedules ?? []).reduce(
+    (sum, s) => sum + ((s.discounts ?? []).reduce((d, x) => d + x.amount, 0)),
+    0,
+  );
+  const totalPaid = (c.schedules ?? []).reduce(
+    (sum, s) => sum + ((s.payments ?? []).reduce((p, x) => p + x.amount, 0)),
+    0,
+  );
   return (
     <div className="detail-stack">
       <Section
@@ -705,8 +713,13 @@ function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => v
         <div className="detail-grid-2" style={{ marginTop: 4 }}>
           <div>
             <Field label="현재 회차" value={`${c.currentSeq} / ${c.totalSeq}`} mono />
+            <Field label="누적 청구할인" value={
+              totalDiscount > 0
+                ? <span style={{ color: 'var(--red-text)' }}>-₩{formatCurrency(totalDiscount)}</span>
+                : <span className="muted">없음</span>
+            } mono />
+            <Field label="누적 납부액" value={totalPaid > 0 ? `₩${formatCurrency(totalPaid)}` : <span className="muted">-</span>} mono />
             <Field label="최근 결제일" value={formatDateFull(c.lastPaidDate) || <span className="muted">-</span>} mono />
-            <Field label="최근 결제액" value={c.lastPaidAmount ? `₩${formatCurrency(c.lastPaidAmount)}` : <span className="muted">-</span>} mono />
           </div>
           <div>
             <Field
@@ -834,12 +847,17 @@ function PaymentHistoryTable({ c }: { c: Contract }) {
   );
 }
 
+type AddMode = 'payment' | 'discount';
+type DiscountReason = '자가조치' | '보상' | '사은품' | '캠페인' | '기타';
+
 function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [addOpenSeq, setAddOpenSeq] = useState<number | null>(null);
+  const [addMode, setAddMode] = useState<AddMode>('payment');
   const [addDate, setAddDate] = useState(todayKr());
   const [addAmount, setAddAmount] = useState('');
   const [addMemo, setAddMemo] = useState('');
+  const [addReason, setAddReason] = useState<DiscountReason>('자가조치');
 
   // legacy 회차 (payments 없음, paidAmount만 있음) → migrate-on-read
   const schedulesNorm: PaymentScheduleInline[] = (c.schedules && c.schedules.length > 0)
@@ -863,9 +881,12 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
       });
 
   function persist(sched: PaymentScheduleInline[]) {
+    // 미수 = 실청구(amount - discount) - 납부합
     const totalUnpaidNow = sched.reduce((sum, s) => {
-      if (s.status === '연체') return sum + s.amount;
-      if (s.status === '부분납') return sum + Math.max(0, s.amount - s.paidAmount);
+      const disc = (s.discounts ?? []).reduce((d, x) => d + x.amount, 0);
+      const effective = Math.max(0, s.amount - disc);
+      if (s.status === '연체') return sum + effective;
+      if (s.status === '부분납') return sum + Math.max(0, effective - s.paidAmount);
       return sum;
     }, 0);
     const unpaidSeqCount = sched.filter((s) => s.status === '연체' || s.status === '부분납').length;
@@ -885,6 +906,24 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
     });
   }
 
+  function recalcRow(s: PaymentScheduleInline, today: string): PaymentScheduleInline {
+    if (s.status === '면제') {
+      const paid = (s.payments ?? []).reduce((sum, p) => sum + p.amount, 0);
+      const disc = (s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
+      return { ...s, paidAmount: paid, discountAmount: disc };
+    }
+    const paid = (s.payments ?? []).reduce((sum, p) => sum + p.amount, 0);
+    const disc = (s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
+    const effective = Math.max(0, s.amount - disc);
+    const lastDate = (s.payments ?? []).reduce<string>((mx, p) => p.date > mx ? p.date : mx, '');
+    let status: ScheduleStatus;
+    if (effective === 0 && disc > 0) status = '완료';
+    else if (paid >= effective) status = '완료';
+    else if (paid > 0 || disc > 0) status = '부분납';
+    else status = s.dueDate < today ? '연체' : '예정';
+    return { ...s, paidAmount: paid, discountAmount: disc, paidAt: lastDate || undefined, status };
+  }
+
   function toggleExpand(seq: number) {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -893,45 +932,73 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
     });
   }
 
-  function startAddPayment(seq: number) {
+  function startAdd(seq: number, mode: AddMode) {
     const s = schedulesNorm.find((x) => x.seq === seq);
     if (!s) return;
+    const existingDisc = (s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
+    const effective = Math.max(0, s.amount - existingDisc);
+    const owed = Math.max(0, effective - s.paidAmount);
     setAddOpenSeq(seq);
+    setAddMode(mode);
     setAddDate(todayKr());
-    setAddAmount(String(Math.max(0, s.amount - s.paidAmount)));
+    setAddAmount(String(mode === 'payment' ? owed : Math.max(0, effective)));
     setAddMemo('');
+    setAddReason('자가조치');
     setExpanded((prev) => new Set([...prev, seq]));
   }
 
-  function commitAddPayment() {
+  function commitAdd() {
     if (addOpenSeq == null) return;
     const amt = parseInt(addAmount.replace(/[^0-9]/g, ''), 10);
     if (!amt || amt <= 0) { alert('금액을 입력하세요.'); return; }
     const today = todayKr();
-    const entry: PaymentEntry = {
-      date: addDate || today, amount: amt, source: '수동',
-      memo: addMemo || undefined, at: new Date().toISOString(),
-    };
-    // 선납 자동 분배 — 해당 회차부터 시작해서 초과분은 다음 회차로
-    let remaining = amt;
-    const next = schedulesNorm.map((s) => ({ ...s, payments: [...(s.payments ?? [])] }));
-    const startIdx = next.findIndex((s) => s.seq === addOpenSeq);
-    for (let i = startIdx; i < next.length && remaining > 0; i++) {
-      const s = next[i];
-      if (s.status === '면제') continue;
-      const owed = Math.max(0, s.amount - s.payments.reduce((sum, p) => sum + p.amount, 0));
-      if (owed <= 0) continue;
-      const apply = Math.min(owed, remaining);
-      s.payments.push({ ...entry, amount: apply, memo: i > startIdx ? `${entry.memo ?? '선납'} (선납 from ${addOpenSeq}회차)` : entry.memo });
-      const paid = s.payments.reduce((sum, p) => sum + p.amount, 0);
-      const lastDate = s.payments.reduce<string>((mx, p) => p.date > mx ? p.date : mx, '');
-      s.paidAmount = paid;
-      s.paidAt = lastDate || undefined;
-      if (paid >= s.amount) s.status = '완료';
-      else if (paid > 0) s.status = '부분납';
-      remaining -= apply;
+
+    if (addMode === 'discount') {
+      // 할인 — 해당 회차에만 적용 (다음 회차로 흘리지 않음)
+      const next = schedulesNorm.map((s) => {
+        if (s.seq !== addOpenSeq) return { ...s };
+        const existing = (s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
+        const cap = Math.max(0, s.amount - existing);
+        const applied = Math.min(amt, cap);
+        if (applied <= 0) return { ...s };
+        const list = [...(s.discounts ?? []), {
+          date: addDate || today,
+          amount: applied,
+          reason: addReason,
+          memo: addMemo || undefined,
+          at: new Date().toISOString(),
+        }];
+        return recalcRow({ ...s, discounts: list }, today);
+      });
+      persist(next);
+    } else {
+      // 입금 — 선납 자동 분배 (해당 회차부터 시작해서 초과분은 다음 회차로)
+      let remaining = amt;
+      const next = schedulesNorm.map((s) => ({ ...s, payments: [...(s.payments ?? [])] }));
+      const startIdx = next.findIndex((s) => s.seq === addOpenSeq);
+      for (let i = startIdx; i < next.length && remaining > 0; i++) {
+        const s = next[i];
+        if (s.status === '면제') continue;
+        const discSum = (s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
+        const effective = Math.max(0, s.amount - discSum);
+        const paidSum = s.payments.reduce((sum, p) => sum + p.amount, 0);
+        const owed = Math.max(0, effective - paidSum);
+        if (owed <= 0) continue;
+        const apply = Math.min(owed, remaining);
+        s.payments.push({
+          date: addDate || today,
+          amount: apply,
+          source: '수동',
+          memo: i > startIdx ? `${addMemo || '선납'} (선납 from ${addOpenSeq}회차)` : (addMemo || undefined),
+          at: new Date().toISOString(),
+        });
+        const next2 = recalcRow(s, today);
+        Object.assign(s, next2);
+        remaining -= apply;
+      }
+      persist(next);
     }
-    persist(next);
+
     setAddOpenSeq(null);
     setAddAmount('');
     setAddMemo('');
@@ -944,15 +1011,19 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
       if (s.seq !== seq) return { ...s };
       const payments = [...(s.payments ?? [])];
       payments.splice(idx, 1);
-      const paid = payments.reduce((sum, p) => sum + p.amount, 0);
-      const lastDate = payments.reduce<string>((mx, p) => p.date > mx ? p.date : mx, '');
-      let status: ScheduleStatus = s.status;
-      if (s.status !== '면제') {
-        if (paid >= s.amount) status = '완료';
-        else if (paid > 0) status = '부분납';
-        else status = s.dueDate < today ? '연체' : '예정';
-      }
-      return { ...s, payments, paidAmount: paid, paidAt: lastDate || undefined, status };
+      return recalcRow({ ...s, payments }, today);
+    });
+    persist(next);
+  }
+
+  function removeDiscount(seq: number, idx: number) {
+    if (!confirm(`이 할인 기록을 삭제하시겠습니까?`)) return;
+    const today = todayKr();
+    const next = schedulesNorm.map((s) => {
+      if (s.seq !== seq) return { ...s };
+      const discounts = [...(s.discounts ?? [])];
+      discounts.splice(idx, 1);
+      return recalcRow({ ...s, discounts }, today);
     });
     persist(next);
   }
@@ -964,11 +1035,11 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
   }
 
   function handleRevert(seq: number) {
-    if (!confirm(`${seq}회차의 모든 입금/면제 처리를 취소하시겠습니까?`)) return;
+    if (!confirm(`${seq}회차의 모든 입금·할인·면제 처리를 취소하시겠습니까?`)) return;
     const today = todayKr();
     const next = schedulesNorm.map((s) => {
       if (s.seq !== seq) return { ...s };
-      return { ...s, payments: [], paidAmount: 0, paidAt: undefined, status: (s.dueDate < today ? '연체' : '예정') as ScheduleStatus };
+      return { ...s, payments: [], discounts: [], paidAmount: 0, discountAmount: 0, paidAt: undefined, status: (s.dueDate < today ? '연체' : '예정') as ScheduleStatus };
     });
     persist(next);
   }
@@ -980,64 +1051,78 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
           <th className="center" style={{ width: 36 }}></th>
           <th className="center" style={{ width: 50 }}>회차</th>
           <th>예정일</th>
-          <th className="num">예정금액</th>
-          <th className="num">입금액</th>
+          <th className="num">청구금액</th>
+          <th className="num" style={{ color: 'var(--red-text)' }}>청구할인</th>
+          <th className="num">납부금액</th>
           <th className="num">잔액</th>
           <th className="mono" style={{ width: 100 }}>최종입금일</th>
           <th className="center" style={{ width: 70 }}>상태</th>
-          <th className="center" style={{ width: 160 }}>액션</th>
+          <th className="center" style={{ width: 200 }}>액션</th>
         </tr>
       </thead>
       <tbody>
         {schedulesNorm.map((r) => {
           const isExpanded = expanded.has(r.seq);
-          const balance = r.amount - r.paidAmount;
           const pays = r.payments ?? [];
-          const owed = r.status === '면제' ? 0 : balance;
+          const discs = r.discounts ?? [];
+          const discSum = discs.reduce((sum, d) => sum + d.amount, 0);
+          const effective = Math.max(0, r.amount - discSum);
+          const bal = Math.max(0, effective - r.paidAmount);
+          const hasEntries = pays.length > 0 || discs.length > 0;
+          const owed = r.status === '면제' ? 0 : bal;
           return (
             <Fragment key={r.seq}>
-              <tr style={{ cursor: pays.length > 0 ? 'pointer' : undefined }} onClick={() => pays.length > 0 && toggleExpand(r.seq)}>
+              <tr style={{ cursor: hasEntries ? 'pointer' : undefined }} onClick={() => hasEntries && toggleExpand(r.seq)}>
                 <td className="center">
-                  {pays.length > 0 ? (
+                  {hasEntries ? (
                     <CaretRight size={10} weight="bold" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-weak)' }} />
                   ) : null}
                 </td>
                 <td className="center mono">{r.seq}</td>
                 <td className="mono">{formatDateFull(r.dueDate)}</td>
                 <td className="num mono">{formatCurrency(r.amount)}</td>
+                <td className="num mono" style={{ color: discSum > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>
+                  {discSum > 0 ? `-${formatCurrency(discSum)}` : '-'}
+                </td>
                 <td className="num mono">{formatCurrency(r.paidAmount)}</td>
                 <td className={`num mono ${owed > 0 ? 'danger' : ''}`}>
-                  {formatCurrency(balance)}
+                  {formatCurrency(bal)}
                 </td>
                 <td className="mono dim">{r.paidAt ? formatDateFull(r.paidAt) : '-'}</td>
                 <td className="center"><span className={`status ${r.status}`}>{r.status}</span></td>
                 <td className="center" onClick={(e) => e.stopPropagation()}>
                   {r.status !== '면제' && owed > 0 ? (
                     <span style={{ display: 'inline-flex', gap: 4 }}>
-                      <button className="btn btn-sm btn-primary" type="button" onClick={() => startAddPayment(r.seq)} title="분할/일부 입금 기록">
+                      <button className="btn btn-sm btn-primary" type="button" onClick={() => startAdd(r.seq, 'payment')} title="분할/일부 입금 기록">
                         <Plus size={10} weight="bold" /> 입금
+                      </button>
+                      <button className="btn btn-sm" type="button" onClick={() => startAdd(r.seq, 'discount')} title="청구할인 (자가조치 등)" style={{ color: 'var(--red-text)' }}>
+                        <Plus size={10} weight="bold" /> 할인
                       </button>
                       <button className="btn btn-sm" type="button" onClick={() => handleExempt(r.seq)} title="면제 (미수 제외)">면제</button>
                     </span>
                   ) : (r.status === '완료' || r.status === '면제') ? (
                     <span style={{ display: 'inline-flex', gap: 4 }}>
                       {r.status === '완료' && owed === 0 && (
-                        <button className="btn btn-sm" type="button" onClick={() => startAddPayment(r.seq)} title="선납 추가">
+                        <button className="btn btn-sm" type="button" onClick={() => startAdd(r.seq, 'payment')} title="선납 추가">
                           <Plus size={10} weight="bold" /> 선납
                         </button>
                       )}
-                      <button className="btn btn-sm btn-ghost" type="button" onClick={() => handleRevert(r.seq)} title="모든 입금·면제 취소">되돌리기</button>
+                      <button className="btn btn-sm btn-ghost" type="button" onClick={() => handleRevert(r.seq)} title="모든 입금·할인·면제 취소">되돌리기</button>
                     </span>
                   ) : null}
                 </td>
               </tr>
 
-              {/* 입금 추가 입력 행 */}
+              {/* 입금/할인 추가 입력 행 */}
               {addOpenSeq === r.seq && (
                 <tr>
-                  <td colSpan={9} style={{ background: 'var(--bg-sunken)', padding: 10 }}>
+                  <td colSpan={10} style={{ background: addMode === 'discount' ? 'var(--red-bg)' : 'var(--bg-sunken)', padding: 10 }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>입금일</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: addMode === 'discount' ? 'var(--red-text)' : 'var(--text-sub)' }}>
+                        {addMode === 'discount' ? '청구할인 추가' : '입금 추가'}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>{addMode === 'discount' ? '할인일' : '입금일'}</span>
                       <DateInput value={addDate} onChange={setAddDate} style={{ width: 150 }} />
                       <span style={{ fontSize: 11, color: 'var(--text-sub)', marginLeft: 6 }}>금액</span>
                       <input
@@ -1047,68 +1132,101 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
                         style={{ width: 140 }}
                         autoFocus
                       />
+                      {addMode === 'discount' && (
+                        <>
+                          <span style={{ fontSize: 11, color: 'var(--text-sub)', marginLeft: 6 }}>사유</span>
+                          <select className="input" value={addReason} onChange={(e) => setAddReason(e.target.value as DiscountReason)} style={{ width: 110 }}>
+                            <option value="자가조치">자가조치</option>
+                            <option value="보상">보상</option>
+                            <option value="사은품">사은품</option>
+                            <option value="캠페인">캠페인</option>
+                            <option value="기타">기타</option>
+                          </select>
+                        </>
+                      )}
                       <span style={{ fontSize: 11, color: 'var(--text-sub)', marginLeft: 6 }}>메모</span>
                       <input
-                        type="text" className="input" placeholder="현금/외부결제 등"
+                        type="text" className="input" placeholder={addMode === 'discount' ? '예: 타이어 자가교체 차감' : '현금/외부결제 등'}
                         value={addMemo} onChange={(e) => setAddMemo(e.target.value)}
                         style={{ width: 200 }}
                       />
-                      <button className="btn btn-sm btn-primary" type="button" onClick={commitAddPayment}>
+                      <button className="btn btn-sm btn-primary" type="button" onClick={commitAdd}>
                         <CheckCircle size={11} /> 저장
                       </button>
                       <button className="btn btn-sm" type="button" onClick={() => setAddOpenSeq(null)}>취소</button>
                       <span style={{ fontSize: 10, color: 'var(--text-weak)' }}>
-                        ※ 회차 금액 초과분은 다음 회차로 자동 선납 처리
+                        {addMode === 'discount'
+                          ? '※ 청구할인 — 청구금액에서 차감 (미수 X). 이번 회차에만 적용'
+                          : '※ 회차 금액 초과분은 다음 회차로 자동 선납 처리'}
                       </span>
                     </div>
                   </td>
                 </tr>
               )}
 
-              {/* 펼침 — 분납 내역 */}
-              {isExpanded && pays.length > 0 && (
+              {/* 펼침 — 분납 + 할인 내역 통합 (날짜순) */}
+              {isExpanded && hasEntries && (
                 <tr>
-                  <td colSpan={9} style={{ background: 'var(--bg-sunken)', padding: 8 }}>
+                  <td colSpan={10} style={{ background: 'var(--bg-sunken)', padding: 8 }}>
                     <table className="table" style={{ fontSize: 11, margin: 0 }}>
                       <thead>
                         <tr>
-                          <th style={{ width: 100 }}>입금일</th>
+                          <th style={{ width: 100 }}>일자</th>
+                          <th className="center" style={{ width: 60 }}>구분</th>
                           <th className="num" style={{ width: 110 }}>금액</th>
-                          <th className="center" style={{ width: 60 }}>출처</th>
+                          <th className="center" style={{ width: 70 }}>출처/사유</th>
                           <th>메모</th>
                           <th className="mono dim" style={{ width: 140 }}>등록자</th>
                           <th className="center" style={{ width: 50 }}></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pays.map((p, idx) => (
-                          <tr key={idx}>
-                            <td className="mono">{formatDateFull(p.date)}</td>
-                            <td className="num mono">₩{formatCurrency(p.amount)}</td>
-                            <td className="center">
-                              <span className="chip" style={{
-                                height: 16, padding: '0 6px', fontSize: 10,
-                                background: p.source === '정산' ? 'var(--bg-sunken)'
-                                  : p.source === '계좌' ? 'var(--blue-bg)'
-                                  : p.source === '카드' ? 'var(--purple-bg)'
-                                  : 'var(--green-bg)',
-                                color: p.source === '정산' ? 'var(--text-weak)'
-                                  : p.source === '계좌' ? 'var(--blue-text)'
-                                  : p.source === '카드' ? 'var(--purple-text)'
-                                  : 'var(--green-text)',
-                              }}>{p.source}</span>
-                            </td>
-                            <td className="dim">{p.memo || '-'}</td>
-                            <td className="mono dim">{p.by ?? (p.source === '정산' ? '(자동)' : '-')}</td>
-                            <td className="center">
-                              {p.source !== '계좌' && p.source !== '카드' && (
-                                <button className="btn btn-sm btn-ghost btn-icon" type="button" onClick={() => removePayment(r.seq, idx)} title="삭제">
-                                  <X size={10} />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {[
+                          ...pays.map((p, idx) => ({ kind: 'payment' as const, idx, date: p.date, amount: p.amount, label: p.source, memo: p.memo, by: p.by, source: p.source })),
+                          ...discs.map((d, idx) => ({ kind: 'discount' as const, idx, date: d.date, amount: d.amount, label: d.reason ?? '할인', memo: d.memo, by: d.by, source: '할인' as const })),
+                        ]
+                          .sort((a, b) => b.date.localeCompare(a.date))
+                          .map((e, i) => (
+                            <tr key={`${e.kind}-${e.idx}-${i}`}>
+                              <td className="mono">{formatDateFull(e.date)}</td>
+                              <td className="center">
+                                {e.kind === 'discount'
+                                  ? <span className="chip" style={{ height: 16, padding: '0 6px', fontSize: 10, background: 'var(--red-bg)', color: 'var(--red-text)' }}>할인</span>
+                                  : <span className="chip" style={{ height: 16, padding: '0 6px', fontSize: 10, background: 'var(--green-bg)', color: 'var(--green-text)' }}>입금</span>}
+                              </td>
+                              <td className="num mono" style={{ color: e.kind === 'discount' ? 'var(--red-text)' : undefined }}>
+                                {e.kind === 'discount' ? '-' : ''}₩{formatCurrency(e.amount)}
+                              </td>
+                              <td className="center">
+                                <span className="chip" style={{
+                                  height: 16, padding: '0 6px', fontSize: 10,
+                                  background: e.kind === 'discount' ? 'var(--bg-sunken)'
+                                    : e.source === '정산' ? 'var(--bg-sunken)'
+                                    : e.source === '계좌' ? 'var(--blue-bg)'
+                                    : e.source === '카드' ? 'var(--purple-bg)'
+                                    : 'var(--green-bg)',
+                                  color: e.kind === 'discount' ? 'var(--text-weak)'
+                                    : e.source === '정산' ? 'var(--text-weak)'
+                                    : e.source === '계좌' ? 'var(--blue-text)'
+                                    : e.source === '카드' ? 'var(--purple-text)'
+                                    : 'var(--green-text)',
+                                }}>{e.label}</span>
+                              </td>
+                              <td className="dim">{e.memo || '-'}</td>
+                              <td className="mono dim">{e.by ?? (e.kind === 'payment' && e.source === '정산' ? '(자동)' : '-')}</td>
+                              <td className="center">
+                                {e.kind === 'discount' ? (
+                                  <button className="btn btn-sm btn-ghost btn-icon" type="button" onClick={() => removeDiscount(r.seq, e.idx)} title="삭제">
+                                    <X size={10} />
+                                  </button>
+                                ) : (e.source !== '계좌' && e.source !== '카드') ? (
+                                  <button className="btn btn-sm btn-ghost btn-icon" type="button" onClick={() => removePayment(r.seq, e.idx)} title="삭제">
+                                    <X size={10} />
+                                  </button>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </td>

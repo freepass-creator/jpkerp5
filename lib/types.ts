@@ -122,16 +122,30 @@ export type PaymentEntry = {
   at?: string;           // 등록 시각 ISO
 };
 
+/** 청구할인 entry — 회차 청구금액을 차감 (자가조치/보상/사은품 등) */
+export type DiscountEntry = {
+  date: string;          // YYYY-MM-DD
+  amount: number;        // 할인액 (양수로 저장, 표시는 마이너스)
+  reason?: '자가조치' | '보상' | '사은품' | '캠페인' | '기타';
+  memo?: string;
+  by?: string;
+  at?: string;
+};
+
 /** Contract에 인라인으로 박는 회차. (PaymentSchedule 전체 모델의 contract-scope subset) */
 export type PaymentScheduleInline = {
   seq: number;
   dueDate: string;
-  amount: number;
+  amount: number;             // 청구금액 (원본 — 변경되지 않음)
   status: ScheduleStatus;
   /** 분납·선납 누적 — 빈 배열이면 미납. legacy: 없으면 paidAmount에서 derive. */
   payments?: PaymentEntry[];
+  /** 청구할인 누적 — sum(discounts.amount)만큼 청구금액 차감됨 */
+  discounts?: DiscountEntry[];
   /** sum(payments.amount) — payments에서 derive되지만 캐시 (legacy 호환) */
   paidAmount: number;
+  /** sum(discounts.amount) — discounts에서 derive 캐시 */
+  discountAmount?: number;
   /** 가장 최근 payments.date — legacy 호환 */
   paidAt?: string;
   notes?: string;

@@ -14,25 +14,43 @@
  *   applyPayment(schedules, amount, txDate) → 선입선출로 가장 오래된 미납부터 차감.
  */
 
-import type { Contract, PaymentSchedule, PaymentScheduleInline, PaymentEntry, ScheduleStatus } from './types';
+import type { Contract, PaymentSchedule, PaymentScheduleInline, PaymentEntry, DiscountEntry, ScheduleStatus } from './types';
 
-/* ──────────────── 분납·선납 entry 헬퍼 ──────────────── */
+/* ──────────────── 분납·선납·할인 entry 헬퍼 ──────────────── */
 
 /** payments 합계 — undefined 안전 */
 export function sumPayments(s: { payments?: PaymentEntry[] }): number {
   return (s.payments ?? []).reduce((sum, p) => sum + (p.amount || 0), 0);
 }
 
-/** payments 배열로부터 status·paidAmount·paidAt 자동 재계산 */
+/** discounts 합계 — undefined 안전 */
+export function sumDiscounts(s: { discounts?: DiscountEntry[] }): number {
+  return (s.discounts ?? []).reduce((sum, d) => sum + (d.amount || 0), 0);
+}
+
+/** 실 청구금액 = amount - 할인합계 */
+export function effectiveAmount(s: { amount: number; discounts?: DiscountEntry[] }): number {
+  return Math.max(0, s.amount - sumDiscounts(s));
+}
+
+/** 잔액 = 실청구 - 납부합계 (음수면 0) */
+export function balance(s: { amount: number; discounts?: DiscountEntry[]; payments?: PaymentEntry[] }): number {
+  return Math.max(0, effectiveAmount(s) - sumPayments(s));
+}
+
+/** payments·discounts 배열로부터 status·paidAmount·discountAmount·paidAt 자동 재계산 */
 export function recalcSchedule<T extends PaymentScheduleInline>(s: T, today: string): T {
-  if (s.status === '면제') return { ...s, paidAmount: s.amount };
   const paid = sumPayments(s);
+  const disc = sumDiscounts(s);
   const lastDate = (s.payments ?? []).reduce<string>((mx, p) => p.date > mx ? p.date : mx, '');
+  if (s.status === '면제') return { ...s, paidAmount: paid, discountAmount: disc };
+  const effective = Math.max(0, s.amount - disc);
   let status: ScheduleStatus;
-  if (paid >= s.amount) status = '완료';
-  else if (paid > 0) status = '부분납';
+  if (effective === 0 && disc > 0) status = '완료';        // 할인으로 전액 처리
+  else if (paid >= effective) status = '완료';
+  else if (paid > 0 || disc > 0) status = '부분납';        // 일부 납부 또는 일부 할인
   else status = s.dueDate < today ? '연체' : '예정';
-  return { ...s, status, paidAmount: paid, paidAt: lastDate || undefined };
+  return { ...s, status, paidAmount: paid, discountAmount: disc, paidAt: lastDate || undefined };
 }
 
 /** 한 회차에 payment entry 추가 + 재계산 + 초과분 반환 (선납 처리용) */
@@ -42,14 +60,29 @@ export function addPaymentEntry<T extends PaymentScheduleInline>(
   today: string,
 ): { schedule: T; leftover: number } {
   const list = [...(s.payments ?? []), entry];
+  const effective = effectiveAmount(s);
   const paid = list.reduce((sum, p) => sum + p.amount, 0);
-  const leftover = Math.max(0, paid - s.amount);
+  const leftover = Math.max(0, paid - effective);
   // 초과분은 entry.amount에서 깎고 leftover만큼 빼서 마지막 entry 조정
   if (leftover > 0) {
     list[list.length - 1] = { ...entry, amount: entry.amount - leftover };
   }
   const next = recalcSchedule({ ...s, payments: list }, today);
   return { schedule: next, leftover };
+}
+
+/** 한 회차에 할인 entry 추가 + 재계산. 할인 합계가 청구금액 초과 시 자동 cap. */
+export function addDiscountEntry<T extends PaymentScheduleInline>(
+  s: T,
+  entry: DiscountEntry,
+  today: string,
+): T {
+  const existing = sumDiscounts(s);
+  const cap = Math.max(0, s.amount - existing);
+  const capped: DiscountEntry = { ...entry, amount: Math.min(entry.amount, cap) };
+  if (capped.amount <= 0) return s;
+  const list = [...(s.discounts ?? []), capped];
+  return recalcSchedule({ ...s, discounts: list }, today);
 }
 
 /** 입금 한 건을 FIFO로 여러 회차에 자동 분배 (선납·분납·정산 통합) */
@@ -71,7 +104,7 @@ export function distributeEntry<T extends PaymentScheduleInline>(
   for (const s of ordered) {
     if (remaining <= 0) break;
     if (s.status === '면제') continue;
-    const owed = Math.max(0, s.amount - sumPayments(s));
+    const owed = Math.max(0, effectiveAmount(s) - sumPayments(s));
     if (owed <= 0) continue;
     const apply = Math.min(owed, remaining);
     const idx = list.findIndex((x) => x.seq === s.seq);
@@ -209,12 +242,14 @@ export function computeCurrentSeq(schedules: Array<Pick<PaymentSchedule, 'seq' |
   return schedules.length;
 }
 
-/** 회차 배열 → 미수 합계 (연체·부분납의 미지급 부분 합) */
-export function totalUnpaid(schedules: Array<Pick<PaymentSchedule, 'amount' | 'status' | 'paidAmount'>>): number {
+/** 회차 배열 → 미수 합계 (연체·부분납의 미지급 부분 합, 할인 차감) */
+export function totalUnpaid(schedules: Array<Pick<PaymentScheduleInline, 'amount' | 'status' | 'paidAmount' | 'discountAmount' | 'discounts'>>): number {
   let s = 0;
   for (const x of schedules) {
-    if (x.status === '연체') s += x.amount;
-    else if (x.status === '부분납') s += Math.max(0, x.amount - x.paidAmount);
+    const disc = x.discountAmount ?? (x.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
+    const effective = Math.max(0, x.amount - disc);
+    if (x.status === '연체') s += effective;
+    else if (x.status === '부분납') s += Math.max(0, effective - x.paidAmount);
   }
   return s;
 }
