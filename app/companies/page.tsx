@@ -120,10 +120,12 @@ export default function CompaniesPage() {
           {/* ───── 좌측: 법인 리스트 ───── */}
           <aside className="page-shell-nav">
             {sortedCompanies.length === 0 && unregistered.length === 0 ? (
-              <div className="empty-state" style={{ minHeight: 200 }}>
-                등록된 법인이 없습니다.<br />
-                <span style={{ fontSize: 11 }}>+ 신규 법인 으로 시작하세요.</span>
-              </div>
+              isEditing ? null : (
+                <div className="empty-state" style={{ minHeight: 200 }}>
+                  등록된 법인이 없습니다.<br />
+                  <span style={{ fontSize: 11 }}>+ 신규 법인 으로 시작하세요.</span>
+                </div>
+              )
             ) : (
               <>
                 {sortedCompanies.map((c) => {
@@ -578,23 +580,23 @@ function InfoEditor({ draft, onChange }: { draft: Company; onChange: (c: Company
       <section className="detail-section">
         <div className="detail-section-header">
           <Camera size={12} weight="duotone" />
-          사업자등록증 OCR (선택)
+          <span className="title">사업자등록증 OCR (선택)</span>
         </div>
         <div className="detail-section-body">
           {ocrBusy ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, color: 'var(--text-sub)' }}>
-              <CircleNotch size={12} weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
+              <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
               <span style={{ fontSize: 12 }}>분석 중...</span>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <input id="companies-ocr-file" type="file" accept="image/*,.pdf" className="hidden"
                 onChange={(e) => { if (e.target.files?.[0]) handleOcr(e.target.files[0]); }} />
-              <button className="btn btn-sm" type="button" onClick={() => document.getElementById('companies-ocr-file')?.click()}>
-                <Camera size={12} weight="duotone" /> 등록증 이미지 업로드
+              <button className="btn btn-primary" type="button" onClick={() => document.getElementById('companies-ocr-file')?.click()}>
+                <Camera weight="duotone" /> 등록증 이미지 업로드
               </button>
-              <span style={{ fontSize: 11, color: 'var(--text-weak)' }}>
-                사업자등록증 사진/스캔 → 자동 채움
+              <span style={{ fontSize: 12, color: 'var(--text-weak)' }}>
+                사업자등록증 사진/스캔 → 회사명·대표자·법인번호 자동 채움
               </span>
               {ocrError && (
                 <span style={{ fontSize: 11, color: 'var(--red-text)' }}>오류: {ocrError}</span>
