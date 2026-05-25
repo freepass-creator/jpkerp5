@@ -136,13 +136,33 @@ type Stage =
   | '구매대기' | '등록대기'
   | '상품화대기' | '상품화중' | '상품대기'
   | '운행'
+  | '종료임박' | '연장대기' | '종료대기'   // 만기 라이프사이클
   | '휴차대기' | '매각대기' | '매각'
   | '휴차' | '임시배차';  // legacy (이전 데이터 호환)
+
+/** 만기까지 남은 일수 — 음수면 경과 */
+function daysToExpiry(c: Contract, today: string): number | null {
+  if (!c.returnScheduledDate) return null;
+  const a = new Date(today).getTime();
+  const b = new Date(c.returnScheduledDate).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
+
+/** 만기 D-90 이내 (음수 = 경과 포함) — 운행 계약일 때 종료임박으로 자동 표시 */
+function isNearExpiry(c: Contract, today: string): boolean {
+  const d = daysToExpiry(c, today);
+  return d !== null && d <= 90;
+}
 
 function currentStage(c: Contract): Stage {
   // 명시적 vehicleStatus 우선
   switch (c.vehicleStatus) {
-    case '운행': return '운행';
+    case '운행':
+      // 운행 + 반납예정일 D-90 이내 → 종료임박 자동 표시
+      return isNearExpiry(c, todayKr()) ? '종료임박' : '운행';
+    case '연장대기': return '연장대기';
+    case '종료대기': return '종료대기';
     case '매각': return '매각';
     case '매각대기': return '매각대기';
     case '휴차대기': return '휴차대기';
@@ -158,9 +178,13 @@ function currentStage(c: Contract): Stage {
   }
   // legacy 케이스 파생 — vehicleStatus 없을 때만
   if (c.returnedDate || c.status === '반납') return '휴차대기';
-  if (c.deliveredDate && c.status === '운행') return '운행';
+  if (c.deliveredDate && c.status === '운행') {
+    return isNearExpiry(c, todayKr()) ? '종료임박' : '운행';
+  }
   // 손님 있는 계약은 인도일 없어도 운행 (스냅샷 업로드 시점)
-  if (c.status === '운행') return '운행';
+  if (c.status === '운행') {
+    return isNearExpiry(c, todayKr()) ? '종료임박' : '운행';
+  }
   return '구매대기';
 }
 
@@ -203,6 +227,21 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
   },
   '운행': {
     label: '반납 검수 체크 (반납회수 시)',
+    nextLabel: '반납회수 → 휴차대기',
+    items: ['차량 외관 공동 검수', '내부 청소 상태 확인', '주행거리 기록', '연료 잔량 확인', '키·매뉴얼 회수', '면책금/위약금 정산'],
+  },
+  '종료임박': {
+    label: '만기 협의 — 통화 후 결정',
+    nextLabel: '연장 / 종료 결정',
+    items: [],  // 결정 분기라 체크 없음
+  },
+  '연장대기': {
+    label: '연장 협의 — 새 조건 협상',
+    nextLabel: '연장 처리 (새 반납예정일) → 운행',
+    items: [],
+  },
+  '종료대기': {
+    label: '반납 검수 체크 (반납 약속일 도래 시)',
     nextLabel: '반납회수 → 휴차대기',
     items: ['차량 외관 공동 검수', '내부 청소 상태 확인', '주행거리 기록', '연료 잔량 확인', '키·매뉴얼 회수', '면책금/위약금 정산'],
   },
@@ -287,6 +326,13 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
   const [tempPlate, setTempPlate] = useState('');
   const [tempModel, setTempModel] = useState('');
   const [tempReason, setTempReason] = useState('');
+  const [renewPicker, setRenewPicker] = useState(false);
+  const [renewNewReturn, setRenewNewReturn] = useState('');
+  const [renewNewRent, setRenewNewRent] = useState('');
+  const [renewMemo, setRenewMemo] = useState('');
+  const [endPicker, setEndPicker] = useState(false);
+  const [endPromisedDate, setEndPromisedDate] = useState('');
+  const [endMemo, setEndMemo] = useState('');
   const [checks, setChecks] = useState<Record<string, boolean>>({});
 
   const checklist = STAGE_CHECKLISTS[stage];
@@ -356,6 +402,45 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
       tempSince: undefined,
       notifyOnAvailable: undefined,
     });
+  }
+
+  /** 연장 처리 — 새 반납예정일 + (선택) 월대여료 갱신, 운행 복귀 */
+  function commitRenewal() {
+    if (!renewNewReturn) { alert('새 반납예정일을 입력하세요.'); return; }
+    if (renewNewReturn <= c.contractDate) { alert('반납예정일은 계약일 이후여야 합니다.'); return; }
+    const newRent = renewNewRent ? parseInt(renewNewRent.replace(/[^0-9]/g, ''), 10) || c.monthlyRent : c.monthlyRent;
+    // 새 종료일까지 약정개월 재계산
+    const start = new Date(c.contractDate);
+    const end = new Date(renewNewReturn);
+    const newTerm = Math.max(c.termMonths, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+    onUpdate({
+      ...c,
+      vehicleStatus: '운행',
+      returnScheduledDate: renewNewReturn,
+      termMonths: newTerm,
+      monthlyRent: newRent,
+      totalSeq: newTerm,
+      notes: [c.notes, `[${actionDate}] 연장 처리 — 새 반납예정일 ${renewNewReturn}${renewMemo ? ' / ' + renewMemo : ''}`].filter(Boolean).join('\n'),
+    });
+    setRenewPicker(false); setRenewNewReturn(''); setRenewNewRent(''); setRenewMemo('');
+  }
+
+  /** 종료 결정 — 반납 약속일 기록, 종료대기 전환 */
+  function commitEndPromise() {
+    if (!endPromisedDate) { alert('반납 약속일을 입력하세요.'); return; }
+    onUpdate({
+      ...c,
+      vehicleStatus: '종료대기',
+      returnScheduledDate: endPromisedDate,
+      notes: [c.notes, `[${actionDate}] 종료 결정 — 반납 약속 ${endPromisedDate}${endMemo ? ' / ' + endMemo : ''}`].filter(Boolean).join('\n'),
+    });
+    setEndPicker(false); setEndPromisedDate(''); setEndMemo('');
+  }
+
+  /** 연장대기 / 종료대기 → 운행 복귀 (결정 취소) */
+  function revertToRunning() {
+    if (!window.confirm('결정을 취소하고 계약완료(운행)로 되돌립니다. 계속하시겠습니까?')) return;
+    onUpdate({ ...c, vehicleStatus: '운행' });
   }
 
   /** 되돌리기 — 한 단계 이전으로 (실수 정정용) */
@@ -493,6 +578,93 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           </div>
         )}
 
+        {/* 종료임박 배너 — 운행 + 만기 D-90 이내 자동 표시 */}
+        {stage === '종료임박' && !renewPicker && !endPicker && (() => {
+          const d = daysToExpiry(c, todayKr()) ?? 0;
+          const tone = d < 0 ? 'red' : d <= 7 ? 'red' : d <= 30 ? 'orange' : 'yellow';
+          const bg = tone === 'red' ? 'var(--red-bg)' : tone === 'orange' ? 'var(--orange-bg)' : '#fef9c3';
+          const text = tone === 'red' ? 'var(--red-text)' : tone === 'orange' ? 'var(--orange-text)' : '#854d0e';
+          const label = d < 0 ? `만기 경과 D+${-d}일` : d === 0 ? '오늘 만기' : `만기 D-${d}일`;
+          return (
+            <div style={{
+              padding: 14, marginBottom: 12, background: bg, color: text,
+              borderRadius: 8, border: `1px solid ${text}`,
+            }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
+                ⚠ 계약 만기 임박 — {label}
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 12, opacity: 0.85 }}>
+                반납예정일 <strong>{c.returnScheduledDate}</strong> · 월대여료 ₩{formatCurrency(c.monthlyRent)}
+                <br />고객과 통화하여 연장 / 종료 의사를 확인하세요.
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" onClick={() => {
+                  setRenewPicker(true);
+                  setRenewNewReturn(c.returnScheduledDate || '');
+                  setRenewNewRent(String(c.monthlyRent));
+                }}>
+                  <PlayCircle size={14} /> 연장 처리
+                </button>
+                <button className="btn" onClick={() => {
+                  setEndPicker(true);
+                  setEndPromisedDate(c.returnScheduledDate || todayKr());
+                }}>
+                  <ArrowUUpLeft size={14} /> 종료 결정
+                </button>
+                <button className="btn btn-ghost" onClick={() => {
+                  onUpdate({ ...c, vehicleStatus: '연장대기' });
+                }} title="협의 중 — 결정 보류">
+                  <PauseCircle size={14} /> 연장대기 (협의 중)
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 연장 picker */}
+        {renewPicker && (
+          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 6, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8, fontWeight: 500 }}>연장 처리 — 새 반납예정일 / 월대여료</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '8px 12px', alignItems: 'center', marginBottom: 10 }}>
+              <label className="form-label">새 반납예정일 *</label>
+              <DateInput value={renewNewReturn} onChange={setRenewNewReturn} style={{ width: 200 }} />
+              <label className="form-label">월대여료 (선택)</label>
+              <input className="input mono" placeholder={`현재 ₩${formatCurrency(c.monthlyRent)}`}
+                value={renewNewRent} onChange={(e) => setRenewNewRent(e.target.value.replace(/[^0-9]/g, ''))}
+                style={{ width: 200 }} />
+              <label className="form-label">메모</label>
+              <input className="input" placeholder="예: 12개월 연장, 동일 조건"
+                value={renewMemo} onChange={(e) => setRenewMemo(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn btn-primary" onClick={commitRenewal}>
+                <CheckCircle size={14} /> 연장 처리 완료 → 운행 복귀
+              </button>
+              <button className="btn" onClick={() => setRenewPicker(false)}>취소</button>
+            </div>
+          </div>
+        )}
+
+        {/* 종료 picker */}
+        {endPicker && (
+          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 6, marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8, fontWeight: 500 }}>종료 결정 — 반납 약속일</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '8px 12px', alignItems: 'center', marginBottom: 10 }}>
+              <label className="form-label">반납 약속일 *</label>
+              <DateInput value={endPromisedDate} onChange={setEndPromisedDate} style={{ width: 200 }} />
+              <label className="form-label">메모</label>
+              <input className="input" placeholder="예: 5/30 본사 반납, 검수 약속"
+                value={endMemo} onChange={(e) => setEndMemo(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn btn-primary" onClick={commitEndPromise}>
+                <CheckCircle size={14} /> 종료대기 전환
+              </button>
+              <button className="btn" onClick={() => setEndPicker(false)}>취소</button>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {stage === '구매대기' && (
             <button className="btn btn-primary" disabled={!allChecked} onClick={() => advance('등록대기', 'purchasedDate')}>
@@ -536,6 +708,50 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
                 title={allChecked ? '반납 검수 완료 — 처리 진행' : '체크리스트 모두 완료 후 가능'}
               >
                 <ArrowUUpLeft size={14} /> 반납회수 → 휴차대기
+              </button>
+            </>
+          )}
+          {stage === '연장대기' && !renewPicker && !endPicker && (
+            <>
+              <button className="btn btn-primary" onClick={() => {
+                setRenewPicker(true);
+                setRenewNewReturn(c.returnScheduledDate || '');
+                setRenewNewRent(String(c.monthlyRent));
+              }}>
+                <PlayCircle size={14} /> 연장 처리 → 운행 복귀
+              </button>
+              <button className="btn" onClick={() => {
+                setEndPicker(true);
+                setEndPromisedDate(c.returnScheduledDate || todayKr());
+              }}>
+                <ArrowUUpLeft size={14} /> 종료로 변경
+              </button>
+              <button className="btn btn-ghost" onClick={revertToRunning}>
+                결정 취소
+              </button>
+            </>
+          )}
+          {stage === '종료대기' && !endPicker && (
+            <>
+              <button
+                className="btn btn-primary"
+                disabled={!allChecked}
+                onClick={() => {
+                  onUpdate({ ...c, vehicleStatus: '휴차대기', status: '반납', returnedDate: actionDate });
+                }}
+                title={allChecked ? '반납 검수 완료 — 처리 진행' : '체크리스트 모두 완료 후 가능'}
+              >
+                <ArrowUUpLeft size={14} /> 반납회수 → 휴차대기
+              </button>
+              <button className="btn" onClick={() => {
+                setRenewPicker(true);
+                setRenewNewReturn(c.returnScheduledDate || '');
+                setRenewNewRent(String(c.monthlyRent));
+              }}>
+                <PlayCircle size={14} /> 연장으로 변경
+              </button>
+              <button className="btn btn-ghost" onClick={revertToRunning}>
+                결정 취소
               </button>
             </>
           )}

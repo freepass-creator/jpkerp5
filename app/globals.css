@@ -1342,6 +1342,9 @@ input[type="radio"]:disabled {
 .status.상품화중  { background: var(--blue-bg);   color: var(--blue-text); }     /* 준비중 */
 .status.인도대기, .status.출고대기, .status.상품대기  { background: var(--indigo-bg); color: var(--indigo-text); } /* 영업 가능 */
 .status.계약완료, .status.계약, .status.계약중, .status.운행 { background: var(--green-bg); color: var(--green-text); } /* 운영 정상 */
+.status.종료임박 { background: #fef9c3; color: #854d0e; }   /* 만기 D-90 이내 — 결정 필요 */
+.status.연장대기 { background: var(--blue-bg); color: var(--blue-text); }   /* 연장 협의 중 */
+.status.종료대기 { background: var(--orange-bg); color: var(--orange-text); }   /* 반납 약속 잡힘 */
 .status.휴차, .status.휴차중, .status.정비, .status.사고 { background: var(--purple-bg); color: var(--purple-text); }   /* 예외 */
 .status.임시배차 { background: var(--amber-bg); color: var(--amber-text); }   /* 임시 대체 출고 */
 .status.휴차대기, .status.대기, .status.반납, .status.반납완료, .status.반납예정 { background: var(--zinc-bg); color: var(--zinc-text); }   /* 반납 회수 후 결정 대기 */

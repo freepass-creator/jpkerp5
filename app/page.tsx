@@ -56,7 +56,7 @@ function matchesCompany(c: Contract, co: string): boolean {
 type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '계약기간' | '회차' | '반납까지' | '수납상태' | '미수금' | '담당';
 type SortDir = 'asc' | 'desc';
 
-const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약완료', '휴차', '반납'];
+const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약완료', '종료임박', '연장대기', '종료대기', '휴차', '반납'];
 const CS_ORDER: ContractState[] = ['위반', '미수검', '정상'];
 const PS_ORDER: PaymentState[] = ['미납', '정상'];
 
@@ -130,8 +130,17 @@ function sortLabel(view: View): string {
   }
 }
 
-/** 차량상태 (7종) — 차량 전체 라이프사이클 */
-type VehicleState = '구매대기' | '등록대기' | '상품화중' | '인도대기' | '계약완료' | '휴차' | '반납';
+/** 차량상태 (10종) — 차량 전체 라이프사이클 */
+type VehicleState = '구매대기' | '등록대기' | '상품화중' | '인도대기' | '계약완료' | '종료임박' | '연장대기' | '종료대기' | '휴차' | '반납';
+
+/** 만기까지 남은 일수 — 음수면 경과. returnScheduledDate 없으면 null */
+function daysToExpiry(c: Contract): number | null {
+  if (!c.returnScheduledDate) return null;
+  const a = new Date(todayKr()).getTime();
+  const b = new Date(c.returnScheduledDate).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
 
 function getVehicleState(c: Contract): { name: VehicleState; days: number } {
   // 명시적 vehicleStatus 우선 (엑셀 업로드 시 사용자가 지정한 값)
@@ -141,8 +150,20 @@ function getVehicleState(c: Contract): { name: VehicleState; days: number } {
   if (c.returnedDate || c.status === '반납' || c.vehicleStatus === '반납') {
     return { name: '반납', days: c.returnedDate ? daysSince(c.returnedDate, todayKr()) : 0 };
   }
-  // 운행 = 계약완료 (이미 인도되어 사용중)
+  // 연장대기 / 종료대기 — 사용자가 명시 결정한 상태
+  if (c.vehicleStatus === '연장대기') {
+    return { name: '연장대기', days: 0 };
+  }
+  if (c.vehicleStatus === '종료대기') {
+    const d = daysToExpiry(c);
+    return { name: '종료대기', days: d !== null ? Math.max(0, -d) : 0 };
+  }
+  // 운행 = 계약완료 — 만기 D-90 이내면 자동 종료임박
   if (c.vehicleStatus === '운행') {
+    const d = daysToExpiry(c);
+    if (d !== null && d <= 90) {
+      return { name: '종료임박', days: d };  // 양수: 남은일수, 음수: 경과일수
+    }
     const start = c.deliveredDate ?? c.contractDate;
     return { name: '계약완료', days: daysSince(start, todayKr()) };
   }
@@ -162,7 +183,11 @@ function getVehicleState(c: Contract): { name: VehicleState; days: number } {
   if (!c.deliveredDate || c.status === '대기') {
     return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
   }
-  // 인도 완료 = 계약완료
+  // 인도 완료 = 계약완료 — 만기 D-90 이내면 종료임박
+  const d = daysToExpiry(c);
+  if (d !== null && d <= 90) {
+    return { name: '종료임박', days: d };
+  }
   return { name: '계약완료', days: daysSince(c.deliveredDate, todayKr()) };
 }
 
