@@ -10,7 +10,7 @@ import {
   buildReturns,
   buildOverdue,
 } from '@/lib/mock-data';
-import { formatCurrency, formatDate, daysSince, formatPeriod, dateWithDow, formatRemainingHuman } from '@/lib/utils';
+import { formatCurrency, formatDate, daysSince, shortDate, dateWithDow, formatRemainingHuman } from '@/lib/utils';
 import type { Contract } from '@/lib/types';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -77,7 +77,7 @@ function matchesCompany(c: Contract, co: string): boolean {
 }
 
 /** 컬럼 정렬 키 — 수동 정렬 시 클릭한 컬럼명 */
-type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '계약기간' | '회차' | '반납까지' | '수납상태' | '미수금' | '담당';
+type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '계약시작' | '계약종료' | '회차' | '반납까지' | '수납상태' | '미수금' | '담당';
 type SortDir = 'asc' | 'desc';
 
 const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약완료', '종료임박', '연장대기', '종료대기', '휴차', '반납'];
@@ -94,7 +94,12 @@ function compareForCol(a: Contract, b: Contract, col: SortCol): number {
     case '연락처': return a.customerPhone1.localeCompare(b.customerPhone1);
     case '보험연령': return (a.insuranceAge ?? 0) - (b.insuranceAge ?? 0);
     case '계약상태': return CS_ORDER.indexOf(getContractState(a).name) - CS_ORDER.indexOf(getContractState(b).name);
-    case '계약기간': return a.contractDate.localeCompare(b.contractDate);
+    case '계약시작': return a.contractDate.localeCompare(b.contractDate);
+    case '계약종료': {
+      const aD = a.returnScheduledDate ?? '9999-12-31';
+      const bD = b.returnScheduledDate ?? '9999-12-31';
+      return aD.localeCompare(bD);
+    }
     case '회차': return (a.currentSeq ?? 0) - (b.currentSeq ?? 0);
     case '반납까지': {
       const aD = a.returnScheduledDate ?? '9999-12-31';
@@ -560,7 +565,8 @@ export default function Page() {
                   <SortableTh col="연락처" width={116} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="보험연령" align="center" width={70} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="계약상태" align="center" width={80} sort={manualSort} onSort={toggleSort} />
-                  <SortableTh col="계약기간" align="center" width={152} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="계약시작" align="center" width={88} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="계약종료" align="center" width={88} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="회차" align="center" width={64} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="반납까지" align="center" width={76} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="수납상태" align="center" width={86} sort={manualSort} onSort={toggleSort} />
@@ -572,7 +578,7 @@ export default function Page() {
               <tbody>
                 {filteredContracts.length === 0 ? (
                   <tr>
-                    <td colSpan={16} className="muted center" style={{ padding: 32 }}>표시할 계약이 없습니다.</td>
+                    <td colSpan={17} className="muted center" style={{ padding: 32 }}>표시할 계약이 없습니다.</td>
                   </tr>
                 ) : (
                   filteredContracts.map((c) => {
@@ -631,8 +637,13 @@ export default function Page() {
                         <td className="center">
                           <span className={`status ${cs.name}`}>{cs.name}</span>
                         </td>
+                        {/* 계약시작 */}
                         <td className="center mono dim">
-                          {formatPeriod(c.deliveredDate ?? c.contractDate, c.returnScheduledDate) || <span className="muted">-</span>}
+                          {shortDate(c.deliveredDate ?? c.contractDate) || <span className="muted">-</span>}
+                        </td>
+                        {/* 계약종료 */}
+                        <td className="center mono dim">
+                          {shortDate(c.returnScheduledDate) || <span className="muted">-</span>}
                         </td>
                         {/* 회차 */}
                         <td className="center mono dim">

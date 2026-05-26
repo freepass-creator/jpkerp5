@@ -220,6 +220,7 @@ export function distributeUnpaid<T extends PaymentScheduleInline>(
   schedules: T[],
   unpaidAmount: number,
   today: string,
+  lastPaidDate?: string,
 ): T[] {
   const list = schedules.map((s) => ({ ...s, payments: [] as PaymentEntry[] }));
   let remaining = Math.max(0, Math.round(unpaidAmount));
@@ -233,6 +234,14 @@ export function distributeUnpaid<T extends PaymentScheduleInline>(
       s.status = '예정';
       s.paidAmount = 0;
       s.paidAt = undefined;
+      continue;
+    }
+    // lastPaidDate 이전(또는 같음) 회차는 자동 완료 처리 — 그 시점까지는 정산됨
+    if (lastPaidDate && s.dueDate <= lastPaidDate) {
+      s.payments = [{ date: lastPaidDate, amount: s.amount, source: '정산', memo: `마지막입금일(${lastPaidDate}) 이전 자동 정산` }];
+      s.status = '완료';
+      s.paidAmount = s.amount;
+      s.paidAt = lastPaidDate;
       continue;
     }
     if (remaining <= 0) {

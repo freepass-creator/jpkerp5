@@ -210,6 +210,8 @@ export type SnapshotPatch = {
   currentSeq: number;
   unpaidAmount: number;
   unpaidSeqCount: number;
+  /** 마지막 입금된 회차의 결제일 (있으면 그 이전 회차는 자동 완료 처리) */
+  lastPaidDate?: string;
 };
 
 /** 계약시작일/계약종료일 셀 파싱 — 별도 두 셀. legacy "계약기간" 단일 셀도 fallback 처리. */
@@ -396,6 +398,8 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
   const unpaidSeqCount = unpaidAmount > 0 && monthlyRent > 0
     ? Math.ceil(unpaidAmount / monthlyRent)
     : 0;
+  // 마지막입금일 — 이 날짜 이전 회차는 자동 완료 처리됨 (정산 entry 자동 부착)
+  const lastPaidDate = toDate(get(row, '마지막입금일', '최종입금일', '최근입금일', 'lastPaidDate')) || undefined;
 
   return {
     vehiclePlate: plate,
@@ -415,6 +419,7 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
     currentSeq,
     unpaidAmount,
     unpaidSeqCount,
+    lastPaidDate,
   };
 }
 
@@ -434,7 +439,7 @@ export function applySnapshotToContract(
     monthlyRent: patch.monthlyRent,
     paymentDay,
   });
-  const distributed = distributeUnpaid(baseSchedules, patch.unpaidAmount, today);
+  const distributed = distributeUnpaid(baseSchedules, patch.unpaidAmount, today, patch.lastPaidDate);
   const currentSeqFromSched = computeCurrentSeqFromSchedules(distributed, today);
 
   if (existing) {
@@ -458,6 +463,7 @@ export function applySnapshotToContract(
       totalSeq: Math.max(currentSeqFromSched, patch.termMonths),
       unpaidAmount: patch.unpaidAmount,
       unpaidSeqCount: patch.unpaidSeqCount,
+      lastPaidDate: patch.lastPaidDate || existing.lastPaidDate,
       schedules: distributed,
     };
   }
@@ -488,6 +494,7 @@ export function applySnapshotToContract(
     totalSeq: Math.max(currentSeqFromSched, patch.termMonths),
     unpaidAmount: patch.unpaidAmount,
     unpaidSeqCount: patch.unpaidSeqCount,
+    lastPaidDate: patch.lastPaidDate,
     schedules: distributed,
   };
 }
