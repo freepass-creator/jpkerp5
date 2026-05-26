@@ -128,22 +128,29 @@ export function buildOverdue(contracts: Contract[], today: string): OverdueItem[
       });
     }
     if (c.unpaidAmount > 0) {
-      // 미납 일수 = 가장 오래된 연체·부분납 회차의 dueDate ~ 오늘
+      // 미납 일수 = 가장 최근(이번달) 미납 회차의 dueDate ~ 오늘
+      //   여러 회차 밀려있어도 가장 최근 결제일 기준 (직전월 끌어쓰지 않음)
       const overdue = (c.schedules ?? [])
-        .filter((s) => s.status === '연체' || s.status === '부분납')
-        .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+        .filter((s) => (s.status === '연체' || s.status === '부분납') && s.dueDate <= today)
+        .sort((a, b) => b.dueDate.localeCompare(a.dueDate));  // 최신 → 과거
       let referenceDate: string;
       if (overdue.length > 0) {
         referenceDate = overdue[0].dueDate;
-      } else if (c.currentSeq && c.contractDate) {
-        // legacy 폴백 — currentSeq 기준 dueDate 역산
-        const [y, m] = c.contractDate.split('-').map((s) => parseInt(s, 10));
-        const targetM0 = (m - 1) + (c.currentSeq - 1);
-        const year = y + Math.floor(targetM0 / 12);
-        const month = ((targetM0 % 12) + 12) % 12 + 1;
-        const lastDay = new Date(year, month, 0).getDate();
-        const d = Math.min(c.paymentDay || 1, lastDay);
-        referenceDate = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      } else if (c.contractDate) {
+        // legacy 폴백 — 이번달(or 가장 최근 지난) 결제일 역산
+        const [yy, mm] = today.split('-').map(Number);
+        const payDay = c.paymentDay || parseInt(c.contractDate.slice(8, 10), 10) || 1;
+        const thisMonthLast = new Date(yy, mm, 0).getDate();
+        const thisMonthDay = Math.min(payDay, thisMonthLast);
+        let ref = `${yy}-${String(mm).padStart(2, '0')}-${String(thisMonthDay).padStart(2, '0')}`;
+        if (ref > today) {
+          const prevY = mm === 1 ? yy - 1 : yy;
+          const prevM = mm === 1 ? 12 : mm - 1;
+          const prevLast = new Date(prevY, prevM, 0).getDate();
+          const prevDay = Math.min(payDay, prevLast);
+          ref = `${prevY}-${String(prevM).padStart(2, '0')}-${String(prevDay).padStart(2, '0')}`;
+        }
+        referenceDate = ref;
       } else {
         continue;
       }

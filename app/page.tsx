@@ -214,27 +214,35 @@ function getPaymentState(c: Contract): { name: PaymentState; days: number } {
   if (c.unpaidAmount <= 0) {
     return { name: '정상', days: daysSince(c.lastPaidDate ?? c.contractDate, today) };
   }
-  // 미납 = 가장 오래된 연체·부분납 회차의 dueDate ~ 오늘
+  // 미납 = 가장 최근(이번달) 미납 회차의 dueDate ~ 오늘
+  //   - 여러 회차 밀려있어도 가장 최근의 이번달 결제일 기준으로 카운트
+  //   - dueDate <= today 인 연체·부분납 회차 중 latest
   const overdueSchedules = (c.schedules ?? [])
-    .filter((s) => s.status === '연체' || s.status === '부분납')
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    .filter((s) => (s.status === '연체' || s.status === '부분납') && s.dueDate <= today)
+    .sort((a, b) => b.dueDate.localeCompare(a.dueDate));  // 최신 → 과거
   if (overdueSchedules.length > 0) {
-    const oldestDue = overdueSchedules[0].dueDate;
-    const days = Math.max(0, daysSince(oldestDue, today));
+    const latestDue = overdueSchedules[0].dueDate;
+    const days = Math.max(0, daysSince(latestDue, today));
     return { name: '미납', days };
   }
-  // 스케줄 없는 legacy 계약 — currentSeq 기준으로 미납 회차 dueDate 역산
-  // 미납 회차의 첫번째 = currentSeq (currentSeq 자체가 미납 회차)
-  // dueDate = contractDate + (currentSeq - 1)개월의 paymentDay
-  if (c.currentSeq && c.contractDate) {
-    const [y, m] = c.contractDate.split('-').map((s) => parseInt(s, 10));
-    const targetM0 = (m - 1) + (c.currentSeq - 1);
-    const year = y + Math.floor(targetM0 / 12);
-    const month = ((targetM0 % 12) + 12) % 12 + 1;
-    const lastDay = new Date(year, month, 0).getDate();
-    const d = Math.min(c.paymentDay || 1, lastDay);
-    const oldestDue = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const days = Math.max(0, daysSince(oldestDue, today));
+  // 스케줄 없는 legacy 계약 — 이번달(or 가장 최근 지난) 결제일 역산
+  if (c.contractDate) {
+    const [yy, mm, dd] = today.split('-').map(Number);
+    const payDay = c.paymentDay || parseInt(c.contractDate.slice(8, 10), 10) || 1;
+    // 이번달 결제일
+    const thisMonthLast = new Date(yy, mm, 0).getDate();
+    const thisMonthDay = Math.min(payDay, thisMonthLast);
+    const thisMonthDue = `${yy}-${String(mm).padStart(2, '0')}-${String(thisMonthDay).padStart(2, '0')}`;
+    let refDue = thisMonthDue;
+    if (refDue > today) {
+      // 이번달 결제일이 아직 안 됨 → 전달 결제일
+      const prevY = mm === 1 ? yy - 1 : yy;
+      const prevM = mm === 1 ? 12 : mm - 1;
+      const prevLast = new Date(prevY, prevM, 0).getDate();
+      const prevDay = Math.min(payDay, prevLast);
+      refDue = `${prevY}-${String(prevM).padStart(2, '0')}-${String(prevDay).padStart(2, '0')}`;
+    }
+    const days = Math.max(0, daysSince(refDue, today));
     return { name: '미납', days };
   }
   return { name: '미납', days: 0 };
