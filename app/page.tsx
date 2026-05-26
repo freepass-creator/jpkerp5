@@ -25,8 +25,8 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 
-type View = '전체' | '계약중' | '휴차' | '미수';
-const VIEWS: View[] = ['전체', '계약중', '휴차', '미수'];
+type View = '전체' | '계약중' | '종료임박' | '휴차' | '미수';
+const VIEWS: View[] = ['전체', '계약중', '종료임박', '휴차', '미수'];
 
 /** 계약중 = 아직 반납·해지 안된 진행 계약 (운행·대기·휴차·채권 포함) */
 function isActiveContract(c: Contract): boolean {
@@ -66,6 +66,12 @@ function isRunning(c: Contract): boolean {
 function matchesView(c: Contract, v: View): boolean {
   if (v === '전체') return true;
   if (v === '계약중') return isRunning(c);
+  // 종료임박 = 계약중 + 반납예정일 D-90 이내 (경과 포함)
+  if (v === '종료임박') {
+    if (!isRunning(c)) return false;
+    const d = daysToExpiry(c);
+    return d !== null && d <= 90;
+  }
   // 휴차 = "계약중이 아닌 모든 차" — 구매대기/등록/상품화/상품대기/반납/대기 등 비운행 전체
   if (v === '휴차') return !isRunning(c);
   if (v === '미수') return c.unpaidAmount > 0;
@@ -80,7 +86,7 @@ function matchesCompany(c: Contract, co: string): boolean {
 type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '계약시작' | '계약종료' | '회차' | '반납까지' | '수납상태' | '미수금' | '담당';
 type SortDir = 'asc' | 'desc';
 
-const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약완료', '종료임박', '연장대기', '종료대기', '휴차', '반납'];
+const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약중', '종료임박', '연장대기', '종료대기', '휴차', '반납'];
 const CS_ORDER: ContractState[] = ['위반', '미수검', '정상'];
 const PS_ORDER: PaymentState[] = ['미납', '정상'];
 
@@ -160,7 +166,7 @@ function sortLabel(view: View): string {
 }
 
 /** 차량상태 (10종) — 차량 전체 라이프사이클 */
-type VehicleState = '구매대기' | '등록대기' | '상품화중' | '인도대기' | '계약완료' | '종료임박' | '연장대기' | '종료대기' | '휴차' | '반납';
+type VehicleState = '구매대기' | '등록대기' | '상품화중' | '인도대기' | '계약중' | '종료임박' | '연장대기' | '종료대기' | '휴차' | '반납';
 
 /** 만기까지 남은 일수 — 음수면 경과. returnScheduledDate 없으면 null */
 function daysToExpiry(c: Contract): number | null {
@@ -194,7 +200,7 @@ function getVehicleState(c: Contract): { name: VehicleState; days: number } {
       return { name: '종료임박', days: d };  // 양수: 남은일수, 음수: 경과일수
     }
     const start = c.deliveredDate ?? c.contractDate;
-    return { name: '계약완료', days: daysSince(start, todayKr()) };
+    return { name: '계약중', days: daysSince(start, todayKr()) };
   }
   if (c.vehicleStatus === '구매대기') {
     return { name: '구매대기', days: daysSince(c.contractDate, todayKr()) };
@@ -217,7 +223,7 @@ function getVehicleState(c: Contract): { name: VehicleState; days: number } {
   if (d !== null && d <= 90) {
     return { name: '종료임박', days: d };
   }
-  return { name: '계약완료', days: daysSince(c.deliveredDate, todayKr()) };
+  return { name: '계약중', days: daysSince(c.deliveredDate, todayKr()) };
 }
 
 /** 계약상태 (3종) — 컴플라이언스 (정기검사·위반) */
@@ -589,13 +595,16 @@ export default function Page() {
                     const ps = getPaymentState(c);
 
                     const isChecked = selectedIds.has(c.id);
-                    // status strip — 빨강(미수 30일+ 또는 반납지연) / 주황(미수 0~30) / 초록(정상 운영)
+                    // 행 배경 색칠 — 이슈만 강조 (정상은 색칠 안 함)
+                    //   빨강: 미납 30일+ / 반납지연
+                    //   주황: 미납 0-30 / 종료임박 (만기 D-90 이내)
+                    //   호박색: 위반 / 미수검
                     let alertClass = '';
                     if (ps.name === '미납' && ps.days > 30) alertClass = 'alert-red';
                     else if (isReturnOverdue) alertClass = 'alert-red';
                     else if (ps.name === '미납') alertClass = 'alert-orange';
+                    else if (vs.name === '종료임박') alertClass = 'alert-orange';
                     else if (cs.name === '위반' || cs.name === '미수검') alertClass = 'alert-amber';
-                    else if (isRunning(c)) alertClass = 'alert-green';
                     return (
                       <tr
                         key={c.id}

@@ -43,7 +43,7 @@ export const CONTRACT_COLUMNS: ColumnSpec[] = [
   { label: '지역',         field: 'customerRegion',   required: false, example: '서울' },
   { label: '행정구',       field: 'customerDistrict', required: false, example: '강남구' },
   { label: '차량상태',     field: 'vehicleStatus',    required: false, example: '구매대기', hint: '구매대기/등록대기/상품화중/인도대기/운행' },
-  { label: '인도일',       field: 'deliveredDate',    required: false, example: '2026-05-05', hint: '입력 시 계약완료 상태' },
+  { label: '인도일',       field: 'deliveredDate',    required: false, example: '2026-05-05', hint: '입력 시 계약중 상태' },
   { label: '약정개월',     field: 'termMonths',       required: false, example: '12', hint: '미입력 시 계약일~반납예정일로 자동 계산' },
   { label: '장단기',       field: 'longTerm',         required: false, example: '장기', hint: '장기/단기 (12개월 이상 자동 장기)' },
   { label: '보증금',       field: 'deposit',          required: false, example: '2000000' },

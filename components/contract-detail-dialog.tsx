@@ -188,9 +188,9 @@ function currentStage(c: Contract): Stage {
   return '구매대기';
 }
 
-/** 표시용 라벨 — 내부값 '운행' → '계약완료', '매각' → '매각완료' (리스트뷰와 통일) */
+/** 표시용 라벨 — 내부값 '운행' → '계약중', '매각' → '매각완료' (리스트뷰와 통일) */
 function stageLabel(s: Stage): string {
-  if (s === '운행') return '계약완료';
+  if (s === '운행') return '계약중';
   if (s === '매각') return '매각완료';
   return s;
 }
@@ -222,7 +222,7 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
   },
   '상품대기': {
     label: '영업 가능 — 다음 임차 대기',
-    nextLabel: '계약 생성 (외부) → 계약완료',
+    nextLabel: '계약 생성 (외부) → 계약중',
     items: [],  // 새 계약 생성은 외부 액션
   },
   '운행': {
@@ -439,7 +439,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
   /** 연장대기 / 종료대기 → 운행 복귀 (결정 취소) */
   function revertToRunning() {
-    if (!window.confirm('결정을 취소하고 계약완료(운행)로 되돌립니다. 계속하시겠습니까?')) return;
+    if (!window.confirm('결정을 취소하고 계약중(운행)로 되돌립니다. 계속하시겠습니까?')) return;
     onUpdate({ ...c, vehicleStatus: '운행' });
   }
 
@@ -688,7 +688,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           )}
           {stage === '상품대기' && (
             <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>
-              영업 가능 — 다음 임차인이 정해지면 [+ 신규생성 → 계약생성]에서 매칭 후 계약완료로 전환됩니다.
+              영업 가능 — 다음 임차인이 정해지면 [+ 신규생성 → 계약생성]에서 매칭 후 계약중로 전환됩니다.
             </div>
           )}
           {stage === '운행' && !idlePicker && !tempPicker && (
@@ -796,7 +796,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           {stage === '휴차' && (
             <>
               <button className="btn btn-primary" onClick={resumeFromIdle}>
-                <PlayCircle size={14} weight="fill" /> 계약완료 복귀
+                <PlayCircle size={14} weight="fill" /> 계약중 복귀
               </button>
               <button className="btn" onClick={processReturn}>
                 <ArrowUUpLeft size={14} /> 반납회수 → 휴차대기
@@ -806,7 +806,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           {stage === '임시배차' && (
             <>
               <button className="btn btn-primary" onClick={clearTemp}>
-                <PlayCircle size={14} weight="fill" /> 원본 복귀 → 계약완료
+                <PlayCircle size={14} weight="fill" /> 원본 복귀 → 계약중
               </button>
               <button className="btn" onClick={processReturn}>
                 <ArrowUUpLeft size={14} /> 반납회수 → 휴차대기
