@@ -1227,14 +1227,7 @@ input[type="radio"]:disabled {
 .table tbody tr { cursor: pointer; position: relative; }
 .table tbody tr:last-child td { border-bottom: none; }
 
-/* 행 상태 색칠 — 좌측 색띠 대신 행 전체 은은한 배경 (이슈 직관 인식) */
-.table tbody tr.status-row.alert-red    { background: color-mix(in srgb, var(--red-text)    7%, transparent); }
-.table tbody tr.status-row.alert-orange { background: color-mix(in srgb, var(--orange-text) 7%, transparent); }
-.table tbody tr.status-row.alert-amber  { background: color-mix(in srgb, var(--amber-text)  6%, transparent); }
-/* alert-green (정상)은 색칠 안 함 — 이슈만 강조하는 게 의도 */
-.table tbody tr.status-row.alert-red:hover    { background: color-mix(in srgb, var(--red-text)    11%, transparent); }
-.table tbody tr.status-row.alert-orange:hover { background: color-mix(in srgb, var(--orange-text) 11%, transparent); }
-.table tbody tr.status-row.alert-amber:hover  { background: color-mix(in srgb, var(--amber-text)  10%, transparent); }
+/* 행 색칠 제거 — 상태는 칩(뱃지)으로 표현. status-row 클래스만 유지 (셀렉터 호환). */
 
 /* KPI 칩 (운영현황 상단 / 대시보드용) */
 .kpi-strip {

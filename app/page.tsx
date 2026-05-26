@@ -595,16 +595,8 @@ export default function Page() {
                     const ps = getPaymentState(c);
 
                     const isChecked = selectedIds.has(c.id);
-                    // 행 배경 색칠 — 이슈만 강조 (정상은 색칠 안 함)
-                    //   빨강: 미납 30일+ / 반납지연
-                    //   주황: 미납 0-30 / 종료임박 (만기 D-90 이내)
-                    //   호박색: 위반 / 미수검
-                    let alertClass = '';
-                    if (ps.name === '미납' && ps.days > 30) alertClass = 'alert-red';
-                    else if (isReturnOverdue) alertClass = 'alert-red';
-                    else if (ps.name === '미납') alertClass = 'alert-orange';
-                    else if (vs.name === '종료임박') alertClass = 'alert-orange';
-                    else if (cs.name === '위반' || cs.name === '미수검') alertClass = 'alert-amber';
+                    // 행 배경 색칠 제거 — 상태는 칩(뱃지)으로 충분히 구분 가능
+                    const alertClass = '';
                     return (
                       <tr
                         key={c.id}
