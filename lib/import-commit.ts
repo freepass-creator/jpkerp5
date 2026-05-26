@@ -337,13 +337,19 @@ export function validateSnapshotRow(row: Row, companies?: Company[]): SnapshotVa
     return { kind: 'contract', valid: true, patch, errors, raw };
   }
 
-  // 계약자 없거나 월대여료 0 → 휴차 차량 (vehicle-only)
+  // 계약자 없거나 월대여료 0 → 휴차대기 차량 (vehicle-only)
   if (!customerName || monthlyRent <= 0) {
     const regNoOrName = toStr(get(row, '법인등록번호', '법인번호', '사업자번호', '회사명', '회사', 'corpRegNo', 'bizRegNo', 'company'));
     const company = resolveCompanyByRegNo(regNoOrName, companies) || '기타';
     const model = toStr(get(row, '차명', '차종', 'vehicleModel')) || '미정';
     const vehicleStatusRaw = toStr(get(row, '차량상태', '상태', 'vehicleStatus'));
-    const vehicleStatus = pickVehicleStatus(vehicleStatusRaw, false);  // default 구매대기
+    // 사용자가 명시한 값이 있으면 우선, 없으면 휴차대기 (계약자 없는 차량의 기본값)
+    const ALL: VehicleStatus[] = [
+      '구매대기', '등록대기', '상품화대기', '상품화중', '상품대기', '운행',
+      '휴차대기', '매각대기', '매각', '인도대기', '출고대기', '재고', '반납', '휴차', '임시배차', '정비', '사고',
+    ];
+    let vehicleStatus: VehicleStatus = '휴차대기';
+    for (const x of ALL) if (vehicleStatusRaw === x) { vehicleStatus = x; break; }
     if (!customerName) errors.push(`계약자 없음 → ${vehicleStatus} 등록`);
     if (monthlyRent <= 0 && customerName) errors.push(`월대여료 0 → ${vehicleStatus} 등록`);
     return {

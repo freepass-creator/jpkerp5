@@ -78,6 +78,9 @@ export function displayCompanyName(
     if (co.code === raw) return true;
     if (co.name === raw) return true;
     if (stripCorpSuffix(co.name) === stripped) return true;
+    // raw가 법인번호/사업자번호 문자열이면 그것도 매칭
+    if (co.corpRegNo && normalizeIdent(co.corpRegNo) === normalizeIdent(raw)) return true;
+    if (co.bizRegNo && normalizeIdent(co.bizRegNo) === normalizeIdent(raw)) return true;
     return false;
   });
 
@@ -85,7 +88,12 @@ export function displayCompanyName(
     return stripCorpSuffix(matched.name) || matched.name;
   }
 
-  // 마스터 못 찾음 → 식별번호 뒷자리 시도
+  // 마스터 못 찾음 — 원본이 식별번호 모양이면 뒷자리 추출
+  const digits = normalizeIdent(raw);
+  if (digits.length === 13) return digits.slice(6);  // 법인번호 13자리 → 뒷 7자리
+  if (digits.length === 10) return digits.slice(5);  // 사업자번호 10자리 → 뒷 5자리
+
+  // 별도 인자로 들어온 식별번호 시도
   const fallback = fallbackNameFromIdent(fallbackBizRegNo, fallbackCorpRegNo);
   if (fallback) return fallback;
 

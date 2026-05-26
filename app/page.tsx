@@ -34,9 +34,33 @@ function isActiveContract(c: Contract): boolean {
   return c.status !== '반납' && c.status !== '해지';
 }
 
-/** 운행 중 = 인도 완료 + 미반납 + 미해지 (= 고객에게 출고된 상태) */
+/**
+ * 계약중(고객 있음) — 인도일 / 손님이름 / 운행 vehicleStatus 중 하나라도 있으면 계약중.
+ * 스냅샷 업로드 후 인도일이 비어있어도 손님이 있으면 계약중으로 인식.
+ */
 function isRunning(c: Contract): boolean {
-  return !!c.deliveredDate && !c.returnedDate && c.status !== '해지';
+  if (c.returnedDate) return false;
+  if (c.status === '해지' || c.status === '반납') return false;
+  // 손님이 있고 휴차/매각 상태가 아니면 계약중
+  const isIdleStatus = c.vehicleStatus === '휴차'
+    || c.vehicleStatus === '휴차대기'
+    || c.vehicleStatus === '매각'
+    || c.vehicleStatus === '매각대기'
+    || c.vehicleStatus === '반납'
+    || c.vehicleStatus === '구매대기'
+    || c.vehicleStatus === '등록대기'
+    || c.vehicleStatus === '상품화중'
+    || c.vehicleStatus === '상품화대기'
+    || c.vehicleStatus === '상품대기'
+    || c.vehicleStatus === '인도대기'
+    || c.vehicleStatus === '출고대기';
+  if (isIdleStatus) return false;
+  // 손님 있거나 인도일 있거나 운행/연장대기/종료대기 상태면 계약중
+  return !!c.customerName?.trim()
+    || !!c.deliveredDate
+    || c.vehicleStatus === '운행'
+    || c.vehicleStatus === '연장대기'
+    || c.vehicleStatus === '종료대기';
 }
 
 function matchesView(c: Contract, v: View): boolean {
@@ -476,12 +500,16 @@ export default function Page() {
               </button>
             );
           })}
-          {companies.length > 2 && (
+          {/* 회사 필터 — 회사가 1곳 이상이면 표시 (전체 + 회사 1개도 차량대수 보여줌) */}
+          {companies.length > 1 && (
             <>
               <span className="filter-divider" />
               {companies.map((co) => {
                 const cnt = companyCounts[co] ?? 0;
-                const label = co === '전체' ? '전체' : displayCompanyName(co, companyMaster);
+                // 전체는 그냥 '전체', 나머지는 회사명 (없으면 법인번호 뒤 7자리)
+                const label = co === '전체'
+                  ? '전체 회사'
+                  : displayCompanyName(co, companyMaster) || co;
                 return (
                   <button
                     key={co}
