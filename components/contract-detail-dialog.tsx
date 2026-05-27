@@ -15,6 +15,7 @@ import { contractIdentMasked, birthFromIdent, inferKind } from '@/lib/ident';
 import { displayCompanyName } from '@/lib/company-display';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useContracts as useContractsList } from '@/lib/firebase/contracts-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { HistoryAddDialog } from '@/components/history-add-dialog';
 import { todayKr } from '@/lib/mock-data';
@@ -263,8 +264,33 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
 
 function VehicleSpecTab({ c }: { c: Contract }) {
   const { companies } = useCompanies();
+  const { vehicles } = useVehicles();
+  const { contracts: allContracts } = useContractsList();
+
+  // 같은 plate 차량 마스터 (있으면 매입·등록·상품화 일자 가져옴)
+  const vehicle = useMemo(
+    () => vehicles.find((v) => v.plate?.trim() === c.vehiclePlate?.trim()),
+    [vehicles, c.vehiclePlate]
+  );
+
+  // 같은 차량의 모든 계약 — 누적 통계 계산용
+  const vehicleContracts = useMemo(() => {
+    const plate = c.vehiclePlate?.trim();
+    if (!plate || plate === '미정') return [c];
+    return allContracts.filter((x) => x.vehiclePlate?.trim() === plate);
+  }, [allContracts, c]);
+
+  // 누적 입금액
+  const totalPaid = vehicleContracts.reduce(
+    (sum, con) => sum + (con.schedules ?? []).reduce(
+      (s, sch) => s + (sch.payments ?? []).reduce((p, x) => p + x.amount, 0),
+      0,
+    ), 0,
+  );
+
   return (
     <div className="detail-stack">
+      {/* 기본 식별 */}
       <Section icon={<Car size={12} weight="duotone" />} title="차량 식별">
         <div className="detail-grid-2">
           <div>
@@ -276,13 +302,97 @@ function VehicleSpecTab({ c }: { c: Contract }) {
             )}
           </div>
           <div>
-            <Field label="계약번호" value={c.contractNo} mono />
-            <Field label="계약일" value={formatDateFull(c.contractDate)} mono />
+            <Field label="계약번호" value={c.contractNo || <span className="muted">-</span>} mono />
+            <Field label="현재 계약자" value={c.customerName || <span className="muted">-</span>} />
+            <Field label="총 임차 횟수" value={`${vehicleContracts.length}건`} mono />
           </div>
         </div>
       </Section>
 
-      <Section icon={<Car size={12} weight="duotone" />} title="제조사·등록증 정보">
+      {/* 라이프사이클 일자 — vehicles 마스터에서 가져옴 */}
+      <Section icon={<Car size={12} weight="duotone" />} title="차량 라이프사이클">
+        <div className="detail-grid-2">
+          <div>
+            <Field label="매입일" value={formatDateFull(vehicle?.purchasedDate ?? c.purchasedDate) || <span className="muted">-</span>} mono />
+            <Field label="등록일" value={formatDateFull(vehicle?.registeredDate ?? c.registeredDate) || <span className="muted">-</span>} mono />
+            <Field label="상품화일" value={formatDateFull(vehicle?.readiedDate ?? c.readiedDate) || <span className="muted">-</span>} mono />
+          </div>
+          <div>
+            <Field label="인도일 (현재 계약)" value={formatDateFull(c.deliveredDate) || <span className="muted">-</span>} mono />
+            <Field label="반납예정일" value={formatDateFull(c.returnScheduledDate) || <span className="muted">-</span>} mono />
+            <Field label="반납일" value={formatDateFull(c.returnedDate) || <span className="muted">-</span>} mono />
+          </div>
+        </div>
+      </Section>
+
+      {/* 계약 조건 — 운영 데이터 */}
+      <Section icon={<Car size={12} weight="duotone" />} title="계약 조건 (현재 계약)">
+        <div className="detail-grid-2">
+          <div>
+            <Field label="계약일" value={formatDateFull(c.contractDate) || <span className="muted">-</span>} mono />
+            <Field label="약정 개월" value={c.termMonths ? `${c.termMonths}개월` : <span className="muted">-</span>} mono />
+            <Field label="장단기" value={c.longTerm ? '장기' : '단기'} />
+            <Field label="결제일" value={c.paymentDay ? `매월 ${c.paymentDay}일` : <span className="muted">-</span>} mono />
+          </div>
+          <div>
+            <Field label="월 대여료" value={c.monthlyRent ? `₩${formatCurrency(c.monthlyRent)}` : <span className="muted">-</span>} mono />
+            <Field label="보증금" value={c.deposit ? `₩${formatCurrency(c.deposit)}` : <span className="muted">-</span>} mono />
+            <Field label="결제방법" value={c.paymentMethod || <span className="muted">-</span>} />
+            <Field label="누적 입금액" value={`₩${formatCurrency(totalPaid)}`} mono />
+          </div>
+        </div>
+      </Section>
+
+      {/* 보험·옵션 */}
+      <Section icon={<Car size={12} weight="duotone" />} title="보험·옵션">
+        <div className="detail-grid-2">
+          <div>
+            <Field label="보험연령" value={c.insuranceAge ? `${c.insuranceAge}세 이상` : <span className="muted">-</span>} />
+            <Field label="자차여부" value={c.selfInsured ? '가입' : (c.selfInsured === false ? '미가입' : <span className="muted">-</span>)} />
+          </div>
+          <div>
+            <Field label="거리한도" value={c.distanceLimitKm ? `${c.distanceLimitKm.toLocaleString()}km` : <span className="muted">-</span>} mono />
+            <Field label="보험만기" value={formatDateFull(c.insuranceExpiryDate) || <span className="muted">-</span>} mono />
+          </div>
+        </div>
+      </Section>
+
+      {/* 컴플라이언스 — 검사·세금·위반 */}
+      <Section icon={<Car size={12} weight="duotone" />} title="검사·세금·위반">
+        <div className="detail-grid-2">
+          <div>
+            <Field label="정기검사 만기" value={formatDateFull(c.inspectionDueDate) || <span className="muted">-</span>} mono />
+            <Field label="자동차세 납부일" value={formatDateFull(c.vehicleTaxDueDate) || <span className="muted">-</span>} mono />
+          </div>
+          <div>
+            <Field
+              label="위반 사항"
+              value={c.hasViolations
+                ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>있음</span>
+                : <span className="muted">-</span>}
+            />
+            <Field label="위반 발생일" value={formatDateFull(c.violationSince) || <span className="muted">-</span>} mono />
+          </div>
+        </div>
+      </Section>
+
+      {/* 비고 */}
+      {(c.notes || vehicle?.notes) && (
+        <Section icon={<ClipboardText size={12} weight="duotone" />} title="비고">
+          <div style={{ fontSize: 12, color: 'var(--text-main)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+            {c.notes && <div>{c.notes}</div>}
+            {vehicle?.notes && vehicle.notes !== c.notes && (
+              <div style={{ marginTop: c.notes ? 8 : 0, color: 'var(--text-sub)' }}>
+                <span className="dim" style={{ fontSize: 11 }}>차량 마스터: </span>
+                {vehicle.notes}
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* 등록증 정보 — OCR 자동입력 영역 (현재 mock) */}
+      <Section icon={<Car size={12} weight="duotone" />} title="자동차등록증 (OCR 자동입력)">
         <div className="detail-grid-2">
           <div>
             <Field label="차대번호" value={<span className="muted">-</span>} mono />
@@ -292,24 +402,13 @@ function VehicleSpecTab({ c }: { c: Contract }) {
           </div>
           <div>
             <Field label="배기량" value={<span className="muted">-</span>} mono />
-            <Field label="등록일" value={<span className="muted">-</span>} mono />
             <Field label="용도" value={<span className="muted">-</span>} />
+            <Field label="제조사" value={<span className="muted">-</span>} />
+            <Field label="형식" value={<span className="muted">-</span>} />
           </div>
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-weak)', marginTop: 8 }}>
-          ↑ OCR로 자동차등록증 스캔 시 자동 입력 — 현재 mock에 미포함
-        </div>
-      </Section>
-
-      <Section icon={<Car size={12} weight="duotone" />} title="보험·옵션">
-        <div className="detail-grid-2">
-          <div>
-            <Field label="보험연령" value={c.insuranceAge ? `${c.insuranceAge}세 이상` : '-'} />
-            <Field label="자차여부" value={c.selfInsured ? '가입' : '미가입'} />
-          </div>
-          <div>
-            <Field label="거리한도" value={c.distanceLimitKm ? `${c.distanceLimitKm.toLocaleString()}km` : '-'} mono />
-          </div>
+          ↑ 자동차등록증 사진 스캔 시 자동 채움 — 현재 데이터 미보유
         </div>
       </Section>
     </div>
