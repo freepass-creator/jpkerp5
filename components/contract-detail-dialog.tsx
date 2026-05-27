@@ -1187,9 +1187,8 @@ function VehiclePaymentsTab({ c }: { c: Contract }) {
           <table className="table">
             <thead>
               <tr>
-                <th style={{ width: 100 }}>일자</th>
+                <th style={{ width: 110 }}>입금일</th>
                 <th>계약자</th>
-                <th className="mono dim" style={{ width: 100 }}>계약일자</th>
                 <th className="center mono" style={{ width: 56 }}>회차</th>
                 <th className="num" style={{ width: 110 }}>청구액</th>
                 <th className="num" style={{ width: 110 }}>입금액</th>
@@ -1205,7 +1204,6 @@ function VehiclePaymentsTab({ c }: { c: Contract }) {
                   <tr key={i} style={{ background: tint === 0 ? undefined : 'var(--bg-sunken)' }}>
                     <td className="mono">{formatDateFull(r.date)}</td>
                     <td style={{ fontWeight: 500 }}>{r.customerName}</td>
-                    <td className="mono dim">{formatDateFull(r.contractDate)}</td>
                     <td className="center mono dim">{r.seq}회</td>
                     <td className="num mono dim">₩{formatCurrency(r.chargeAmount)}</td>
                     <td className="num mono" style={{ fontWeight: 600, color: partial ? 'var(--orange-text)' : undefined }}>

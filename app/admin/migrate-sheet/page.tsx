@@ -101,10 +101,74 @@ export default function MigrateSheetPage() {
       append('DB 현재 상태 조회 중...');
       const snap = await get(ref(db, icarPath('contracts')));
       const existing: Record<string, Contract> = snap.val() ?? {};
-      const existingContracts = Object.values(existing);
+      let existingContracts = Object.values(existing);
       append(`현재 DB: 계약 ${existingContracts.length}건`);
 
-      // ─── 1. (차량+고객) 그룹 인덱스 — 중복 통합 기반 ───
+      // ─── 0-A. DB 자체 중복 정리 (시드 무관) ───
+      // 같은 (plate+customer) 가 여러 건 있으면 → 실입금 많은 쪽 keeper, 나머지 입금 이전 후 삭제
+      append('DB 자체 중복 검사 중 (plate+customer 그룹)...');
+      const preCleanupBatch: Record<string, Contract | null> = {};
+      {
+        const preGroups = new Map<string, Contract[]>();
+        for (const c of existingContracts) {
+          const k = groupKey(c);
+          const arr = preGroups.get(k) ?? [];
+          arr.push(c);
+          preGroups.set(k, arr);
+        }
+        let preDeleted = 0;
+        for (const [k, group] of preGroups) {
+          if (group.length <= 1) continue;
+          const sorted = [...group].sort((a, b) => {
+            const ra = countRealPayments(a); const rb = countRealPayments(b);
+            if (ra !== rb) return rb - ra;
+            return (b.contractDate || '').localeCompare(a.contractDate || '');
+          });
+          const keeper = sorted[0];
+          const losers = sorted.slice(1);
+          // 작업할 keeper 복사본 — schedule + payments deep copy
+          const keeperWork: Contract = {
+            ...keeper,
+            schedules: (keeper.schedules ?? []).map((s) => ({ ...s, payments: [...(s.payments ?? [])] })),
+          };
+          for (const loser of losers) {
+            // loser 의 실 입금 entry 들 keeper로 이전
+            for (const ls of loser.schedules ?? []) {
+              for (const p of ls.payments ?? []) {
+                if (p.source === '정산') continue;
+                // keeper 의 같은 회차 찾아 추가
+                const [cy, cm] = keeperWork.contractDate.split('-').map(Number);
+                const [py, pm] = p.date.split('-').map(Number);
+                const seqGuess = Math.max(1, Math.min(keeperWork.totalSeq || 99, (py - cy) * 12 + (pm - cm) + 1));
+                const target = keeperWork.schedules?.find((s) => s.seq === seqGuess);
+                if (!target) continue;
+                const exists = (target.payments ?? []).some((e) => e.date === p.date && e.amount === p.amount && e.source !== '정산');
+                if (exists) continue;
+                if (!target.payments) target.payments = [];
+                target.payments.push(p);
+              }
+            }
+            preCleanupBatch[loser.id] = null;  // 삭제
+            preDeleted += 1;
+            append(`  중복 삭제: ${loser.vehiclePlate} ${loser.customerName} (${loser.contractDate}) → keeper ${keeper.contractDate}`);
+          }
+          preCleanupBatch[keeper.id] = keeperWork;
+        }
+        if (preDeleted > 0) {
+          append(`DB 자체 중복 ${preDeleted}건 발견 — 삭제 + 입금 이전`);
+        } else {
+          append('DB 자체 중복 없음');
+        }
+        // existingContracts 갱신 (다음 단계에서 사용)
+        existingContracts = existingContracts.filter((c) => preCleanupBatch[c.id] !== null);
+        // keeper 업데이트 반영
+        existingContracts = existingContracts.map((c) => {
+          const updated = preCleanupBatch[c.id];
+          return updated && typeof updated === 'object' ? updated : c;
+        });
+      }
+
+      // ─── 1. (차량+고객) 그룹 인덱스 — 시드 매칭용 (cleanup 후 상태) ───
       const groupMap = new Map<string, Contract[]>();
       for (const c of existingContracts) {
         const k = groupKey(c);
@@ -349,6 +413,12 @@ export default function MigrateSheetPage() {
       }
 
       // ─── 5. DB 일괄 적용 (null = 삭제) ───
+      // preCleanupBatch 결과를 writeBatch에 머지 (writeBatch 가 우선 — 시드 보정 반영된 값)
+      for (const [id, v] of Object.entries(preCleanupBatch)) {
+        if (writeBatch[id] === undefined) {
+          writeBatch[id] = v;
+        }
+      }
       append(`DB 일괄 적용 중... (${Object.keys(writeBatch).length}건)`);
       const updateOnly: Record<string, unknown> = {};
       const removeIds: string[] = [];
