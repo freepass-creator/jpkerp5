@@ -27,7 +27,9 @@ import {
   matchTransactions, applyPaymentsToContracts,
   applySnapshotToContract, validateSnapshotRow,
   parseHorizontalContractsRow, isHorizontalMultiContractSheet,
+  parseReceivablesRow, isHorizontalReceivablesSheet, inferSeqFromDate, mapPaymentMethodToSource,
 } from '@/lib/import-commit';
+import { todayKr } from '@/lib/mock-data';
 import { dedupAgainst } from '@/lib/dedup';
 import { bankTxKeys, cardTxKeys, vehicleKeys, contractKeys } from '@/lib/dedup-keys';
 import { toast } from '@/lib/toast';
@@ -214,6 +216,94 @@ export function CreateDialog({
     }
   }
 
+  /** 가로확장 채권 시트 import — 한 행에서 N개 월 payment entry 추출 → 매칭 contract의 schedule에 payment 추가 */
+  async function commitHorizontalReceivables(sheet: ParsedSheet) {
+    setBusy(true);
+    try {
+      const dataRows = sheet.rawAoa.slice(sheet.headerRow + 1);
+      const byPlate = new Map(contracts.map((c) => [c.vehiclePlate.trim(), c]));
+      const updates: Contract[] = [];
+      let totalPaymentsAdded = 0;
+      let unmatchedRows = 0;
+      const today = todayKr();
+
+      for (const row of dataRows) {
+        if (!row || row.every((v) => v == null || String(v).trim() === '')) continue;
+        const parsed = parseReceivablesRow(sheet.headers, row);
+        if (!parsed || parsed.payments.length === 0) continue;
+
+        // 매칭 — 차량번호 + (가능하면 contractDate 일치)
+        const target = byPlate.get(parsed.vehiclePlate.trim());
+        if (!target) { unmatchedRows += 1; continue; }
+        // contractDate가 시트와 너무 다르면 (1개월 이상 차이) 다른 계약일 수 있음 — 그래도 일단 매칭
+        const updatedContract: Contract = JSON.parse(JSON.stringify(target));
+        const schedules = updatedContract.schedules ?? [];
+        if (schedules.length === 0) { unmatchedRows += 1; continue; }
+
+        for (const p of parsed.payments) {
+          if (p.paid <= 0 || !p.date) continue;
+          // 결제일자 → 회차 추정
+          const seq = inferSeqFromDate(updatedContract.contractDate, p.date, updatedContract.totalSeq);
+          const sched = schedules.find((s) => s.seq === seq);
+          if (!sched) continue;
+          // 중복 체크 — 같은 날짜+금액 entry 이미 있으면 skip
+          const exists = (sched.payments ?? []).some(
+            (e) => e.date === p.date && e.amount === p.paid && e.source !== '정산'
+          );
+          if (exists) continue;
+          if (!sched.payments) sched.payments = [];
+          sched.payments.push({
+            date: p.date,
+            amount: p.paid,
+            source: mapPaymentMethodToSource(p.method),
+            memo: p.method ? `채권탭 import (${p.method})` : '채권탭 import',
+          });
+          sched.paidAmount = sched.payments.reduce((sum, e) => sum + e.amount, 0);
+          sched.paidAt = sched.payments.reduce((mx, e) => e.date > mx ? e.date : mx, '');
+          // 정산 entry 있으면 제거 (실제 입금으로 대체)
+          sched.payments = sched.payments.filter((e) => e.source !== '정산');
+          if (sched.paidAmount >= sched.amount) sched.status = '완료';
+          else if (sched.paidAmount > 0) sched.status = '부분납';
+          totalPaymentsAdded += 1;
+        }
+
+        // 캐시 재계산
+        const unpaidAmount = schedules.reduce((sum, s) => {
+          if (s.status === '연체') return sum + s.amount;
+          if (s.status === '부분납') return sum + Math.max(0, s.amount - s.paidAmount);
+          return sum;
+        }, 0);
+        const unpaidSeqCount = schedules.filter((s) => s.status === '연체' || s.status === '부분납').length;
+        const overdue = schedules.filter((s) => (s.status === '연체' || s.status === '부분납') && s.dueDate <= today).sort((a, b) => a.seq - b.seq);
+        const currentSeq = overdue[0]?.seq
+          ?? schedules.find((s) => s.status === '예정')?.seq
+          ?? schedules.length;
+        const lastPayment = schedules.flatMap((s) => s.payments ?? []).sort((a, b) => b.date.localeCompare(a.date))[0];
+        updates.push({
+          ...updatedContract,
+          schedules,
+          unpaidAmount,
+          unpaidSeqCount,
+          currentSeq,
+          lastPaidDate: lastPayment?.date,
+          lastPaidAmount: lastPayment?.amount,
+        });
+      }
+
+      if (updates.length > 0) await updateContracts(updates);
+      const msg = `채권탭 import 완료 — 입금 ${totalPaymentsAdded}건 추가 (계약 ${updates.length}건 갱신)${unmatchedRows > 0 ? `, 미매칭 ${unmatchedRows}행` : ''}`;
+      setResult(msg);
+      if (totalPaymentsAdded > 0) toast.success(`입금 ${totalPaymentsAdded}건 import`);
+      else toast.warning('매칭되는 계약이 없습니다 — 계약탭 먼저 import 하세요');
+    } catch (e) {
+      const m = friendlyError(e);
+      setResult(`오류 — ${m}`);
+      toast.error(m);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function commitSnapshotRows(rows: Record<string, unknown>[]) {
     setBusy(true);
     try {
@@ -353,7 +443,7 @@ export function CreateDialog({
               onDrop={(e) => { if (mode !== '이력' && mode !== '차량' && mode !== '현황') onDrop(e); }}
             >
               <Tabs.Content value="현황">
-                <SnapshotPane onCommit={commitSnapshotRows} onCommitHorizontal={commitHorizontalSheet} busy={busy} result={result} />
+                <SnapshotPane onCommit={commitSnapshotRows} onCommitHorizontal={commitHorizontalSheet} onCommitReceivables={commitHorizontalReceivables} busy={busy} result={result} />
               </Tabs.Content>
               <Tabs.Content value="차량">
                 <VehicleRegisterPane
@@ -1159,10 +1249,11 @@ function VehicleExcelPane({
 /* ─────────────── 현황 스냅샷 Pane — 차량번호 upsert ─────────────── */
 
 function SnapshotPane({
-  onCommit, onCommitHorizontal, busy, result,
+  onCommit, onCommitHorizontal, onCommitReceivables, busy, result,
 }: {
   onCommit: (rows: Record<string, unknown>[]) => Promise<void>;
   onCommitHorizontal?: (sheet: ParsedSheet) => Promise<void>;
+  onCommitReceivables?: (sheet: ParsedSheet) => Promise<void>;
   busy: boolean;
   result: string | null;
 }) {
@@ -1188,9 +1279,15 @@ function SnapshotPane({
     setSheets((prev) => [...prev, ...out]);
   }, []);
 
-  // 가로확장 다중계약 시트 자동감지
+  // 가로확장 다중계약 시트 자동감지 (계약탭)
   const horizontalSheets = useMemo(
     () => sheets.filter((s) => isHorizontalMultiContractSheet(s.headers)),
+    [sheets],
+  );
+
+  // 가로확장 채권 시트 자동감지 (채권탭)
+  const receivablesSheets = useMemo(
+    () => sheets.filter((s) => isHorizontalReceivablesSheet(s.headers)),
     [sheets],
   );
 
@@ -1354,7 +1451,7 @@ function SnapshotPane({
         }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--brand)' }}>
-              📋 가로확장 다중계약 시트 감지 ({horizontalSheets.length}개)
+              📋 가로확장 계약 시트 감지 ({horizontalSheets.length}개)
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 2 }}>
               한 차량 행에 [고객명·인도일·종료일·반납일·대여료·보증금·영업자] 블록이 N개 반복.<br />
@@ -1368,6 +1465,36 @@ function SnapshotPane({
               type="button"
               disabled={busy}
               onClick={() => onCommitHorizontal(s)}
+            >
+              <CheckCircle weight="bold" /> {s.sheetName} import
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 가로확장 채권 시트 감지 시 */}
+      {receivablesSheets.length > 0 && onCommitReceivables && (
+        <div style={{
+          padding: 14, background: 'var(--green-bg)', border: '1px solid var(--green-text)',
+          borderRadius: 6, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--green-text)' }}>
+              💰 가로확장 채권 시트 감지 ({receivablesSheets.length}개)
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 2 }}>
+              한 행에 [청구·결제·일자·수단·미납] 블록이 월별로 반복.<br />
+              import 시 차량번호 매칭 → 기존 계약의 회차에 결제이력 자동 추가 (계약탭 먼저 import 필요).
+            </div>
+          </div>
+          {receivablesSheets.map((s, i) => (
+            <button
+              key={i}
+              className="btn"
+              style={{ borderColor: 'var(--green-text)', color: 'var(--green-text)', fontWeight: 600 }}
+              type="button"
+              disabled={busy}
+              onClick={() => onCommitReceivables(s)}
             >
               <CheckCircle weight="bold" /> {s.sheetName} import
             </button>

@@ -599,6 +599,104 @@ export function isHorizontalMultiContractSheet(headers: string[]): boolean {
   return count >= 2;
 }
 
+/* ──────────────── 가로확장 채권 시트 파싱 (월별 청구·결제 반복) ──────────────── */
+
+export type ReceivablesPaymentEntry = {
+  charged: number; paid: number; date: string; method: string; unpaid: number;
+};
+
+export type ReceivablesRowResult = {
+  customerName: string;
+  vehiclePlate: string;
+  contractDate: string;
+  returnScheduledDate: string;
+  deposit: number;
+  monthlyRent: number;
+  payments: ReceivablesPaymentEntry[];
+};
+
+const CHARGE_KEY_RE = /^(청구금액|월청구금액)$/;
+const PAID_KEY_RE = /^(결제금액|입금금액|납입금액)$/;
+const PAYDATE_KEY_RE = /^(결제일자|결제일|입금일|입금일자)$/;
+const METHOD_KEY_RE = /^(결제수단|결제방법|입금방식|방식)$/;
+const UNPAID_KEY_RE = /^(미납금액|미수금|미수)$/;
+
+/**
+ * 한 차량/계약 행에서 좌→우로 N개 월 블록 (청구|결제|일자|수단|미납) 분해.
+ * 좌측 = 최근 월, 우측 = 과거 월.
+ */
+export function parseReceivablesRow(headers: string[], row: unknown[]): ReceivablesRowResult | null {
+  const normHeaders = headers.map(normHeader);
+
+  const plateIdx = normHeaders.findIndex((h) => VEHICLE_KEY_RE.test(h));
+  const customerIdx = normHeaders.findIndex((h) => /^(코드명|고객명|계약자|계약자명|임차인|임차인명)$/.test(h));
+  const startIdx = normHeaders.findIndex((h) => /^(시작|시작일|계약일|계약일자|계약시작일)$/.test(h));
+  const endIdx = normHeaders.findIndex((h) => /^(종료|종료일|반납예정|반납예정일|계약종료일)$/.test(h));
+  const depositIdx = normHeaders.findIndex((h) => /^(보증금|보증금액)$/.test(h));
+  const rentIdx = normHeaders.findIndex((h) => /^(대여료|월대여료|렌트료|월렌트료)$/.test(h));
+
+  if (plateIdx < 0) return null;
+  const plate = toStr(row[plateIdx]);
+  if (!plate) return null;
+
+  const customerName = customerIdx >= 0 ? toStr(row[customerIdx]) : '';
+  const contractDate = startIdx >= 0 ? toDate(row[startIdx]) : '';
+  const returnScheduledDate = endIdx >= 0 ? toDate(row[endIdx]) : '';
+  const deposit = depositIdx >= 0 ? toNum(row[depositIdx]) : 0;
+  const monthlyRent = rentIdx >= 0 ? toNum(row[rentIdx]) : 0;
+
+  // 청구금액 컬럼들이 각 월 anchor
+  const chargeAnchors: number[] = [];
+  normHeaders.forEach((h, i) => { if (CHARGE_KEY_RE.test(h)) chargeAnchors.push(i); });
+
+  const payments: ReceivablesPaymentEntry[] = [];
+  for (let n = 0; n < chargeAnchors.length; n++) {
+    const anchor = chargeAnchors[n];
+    const blockEnd = n + 1 < chargeAnchors.length ? chargeAnchors[n + 1] : headers.length;
+    const findInBlock = (re: RegExp): unknown => {
+      for (let i = anchor; i < blockEnd; i++) if (re.test(normHeaders[i])) return row[i];
+      return undefined;
+    };
+    const charged = toNum(findInBlock(CHARGE_KEY_RE));
+    const paid = toNum(findInBlock(PAID_KEY_RE));
+    const date = toDate(findInBlock(PAYDATE_KEY_RE));
+    const method = toStr(findInBlock(METHOD_KEY_RE));
+    const unpaid = toNum(findInBlock(UNPAID_KEY_RE));
+    if (charged === 0 && paid === 0 && !date && unpaid === 0) continue;
+    payments.push({ charged, paid, date, method, unpaid });
+  }
+
+  return { customerName, vehiclePlate: plate, contractDate, returnScheduledDate, deposit, monthlyRent, payments };
+}
+
+/** 채권탭 패턴 자동감지 — '청구금액' + '결제일자' 모두 2회 이상 */
+export function isHorizontalReceivablesSheet(headers: string[]): boolean {
+  const charge = headers.filter((h) => CHARGE_KEY_RE.test(normHeader(h))).length;
+  const date = headers.filter((h) => PAYDATE_KEY_RE.test(normHeader(h))).length;
+  return charge >= 2 && date >= 2;
+}
+
+/** 입금일자로부터 회차 번호 추정 — contractDate 기준 (paymentYM - contractYM) + 1 */
+export function inferSeqFromDate(contractDate: string, paymentDate: string, totalSeq: number): number {
+  if (!contractDate || !paymentDate) return 0;
+  const [cy, cm] = contractDate.split('-').map(Number);
+  const [py, pm] = paymentDate.split('-').map(Number);
+  if (!cy || !cm || !py || !pm) return 0;
+  const seq = (py - cy) * 12 + (pm - cm) + 1;
+  return Math.max(1, Math.min(totalSeq || 99, seq));
+}
+
+/** 결제수단 텍스트 → PaymentEntry.source */
+export function mapPaymentMethodToSource(method: string): import('./types').PaymentEntry['source'] {
+  const t = (method || '').toLowerCase();
+  if (!t) return '수동';
+  if (t.includes('카드')) return '카드';
+  if (t.includes('자동') || t.includes('cms')) return '계좌';
+  if (t.includes('입금') || t.includes('이체')) return '계좌';
+  if (t.includes('현금')) return '현금';
+  return '수동';
+}
+
 /* ──────────────── 은행 거래 (입금 + 출금) ──────────────── */
 
 /**
