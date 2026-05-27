@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx-js-style';
 import type { Contract, PaymentEntry, PaymentScheduleInline } from '@/lib/types';
 import { CONTRACT_HISTORY_TEMPLATE, RECEIPT_HISTORY_TEMPLATE } from '@/lib/import-schema';
 import { toDate as normalizeDate } from '@/lib/parse-helpers';
-import { generateSchedules } from '@/lib/payment-schedule';
+import { generateSchedules, distributeUnpaid } from '@/lib/payment-schedule';
 
 /* ─────────────── 공통 유틸 ─────────────── */
 
@@ -58,6 +58,7 @@ export type ParsedContractRow = {
   vehiclePlate: string;
   company: string;
   vehicleModel: string;
+  vehicleStatus: string;
   blocks: Array<{
     kind?: string;
     customerName: string;
@@ -88,6 +89,7 @@ export async function parseContractHistory(file: File): Promise<ParsedContractRo
   const plateIdx = headers.findIndex((h) => h === '차량번호');
   const companyIdx = headers.findIndex((h) => h === '회사');
   const modelIdx = headers.findIndex((h) => h === '차종');
+  const vstatusIdx = headers.findIndex((h) => h === '차량상태');
   // 첫 블록 컬럼 시작 인덱스 — '구분' 첫 등장
   const blockStartIdx = headers.findIndex((h) => h === '구분');
   if (blockStartIdx < 0) throw new Error("'구분' 컬럼을 찾을 수 없음");
@@ -124,6 +126,7 @@ export async function parseContractHistory(file: File): Promise<ParsedContractRo
       vehiclePlate: plate,
       company: companyIdx >= 0 ? cellStr(r[companyIdx]) : '',
       vehicleModel: modelIdx >= 0 ? cellStr(r[modelIdx]) : '',
+      vehicleStatus: vstatusIdx >= 0 ? cellStr(r[vstatusIdx]) : '',
       blocks,
     });
   }
@@ -177,6 +180,12 @@ export function buildContractsFromParsed(
       const termMonths = monthDiff(contractDate, returnSch);
       const paymentDay = b.paymentDay > 0 ? b.paymentDay : (parseInt(contractDate.slice(8, 10), 10) || 1);
 
+      // 차량상태: 명시값 우선, 없으면 자동 (반납일 유무로)
+      const autoVStatus: Contract['vehicleStatus'] = isCurrent ? '운행' : (b.returnedDate ? '반납' : '운행');
+      const rowVStatus = (row.vehicleStatus?.trim() || autoVStatus) as Contract['vehicleStatus'];
+      // status (계약상태)도 차량상태에 맞춰 결정
+      const contractStatus: Contract['status'] = b.returnedDate ? '반납' : (rowVStatus === '운행' || rowVStatus === '인도대기' || rowVStatus === '출고대기' ? '운행' : '대기');
+
       const base: Omit<Contract, 'id'> = {
         contractNo: exist?.contractNo ?? `ICR-${contractDate.slice(2, 7).replace('-', '')}-${String(++contractSeq).padStart(4, '0')}`,
         company: rowCompany,
@@ -187,7 +196,7 @@ export function buildContractsFromParsed(
         customerPhone1: b.customerPhone1 || exist?.customerPhone1 || '',
         vehiclePlate: row.vehiclePlate,
         vehicleModel: row.vehicleModel || exist?.vehicleModel || '',
-        vehicleStatus: isCurrent ? '운행' : (b.returnedDate ? '반납' : '운행'),
+        vehicleStatus: rowVStatus,
         contractDate,
         deliveredDate: b.deliveredDate || undefined,
         returnScheduledDate: returnSch,
@@ -198,12 +207,13 @@ export function buildContractsFromParsed(
         deposit: b.deposit,
         paymentDay: Math.min(31, Math.max(1, paymentDay)),
         paymentMethod: exist?.paymentMethod ?? '이체',
-        status: b.returnedDate ? '반납' : (isCurrent ? '운행' : '반납'),
+        status: contractStatus,
         notes: exist?.notes,
         currentSeq: 1,
         totalSeq: Math.max(1, termMonths),
         unpaidAmount: 0,
         unpaidSeqCount: 0,
+        lastPaidDate: exist?.lastPaidDate,
         schedules: exist?.schedules,
       };
 
@@ -215,7 +225,14 @@ export function buildContractsFromParsed(
           monthlyRent: base.monthlyRent,
           paymentDay: base.paymentDay,
         });
-        base.schedules = sch.map((s, i) => ({ ...s, id: `s${i + 1}` }) as PaymentScheduleInline);
+        let inlineList: PaymentScheduleInline[] = sch.map((s, i) => ({ ...s, id: `s${i + 1}` }) as PaymentScheduleInline);
+        // 수납이력 업로드 안 한 계약 → lastPaidDate = 오늘 자동 셋팅
+        // 오늘 기준 이전 회차는 정산 entry로 자동 완료 처리 (미수=0)
+        if (!exist?.lastPaidDate && !b.returnedDate) {
+          inlineList = distributeUnpaid(inlineList, 0, today, today);
+          base.lastPaidDate = today;
+        }
+        base.schedules = inlineList;
       }
 
       out.push({ ...base, _existingId: exist?.id });
