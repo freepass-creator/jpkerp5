@@ -144,6 +144,17 @@ export default function MigrateSheetPage() {
       let existingContracts = Object.values(existing);
       append(`현재 DB: 계약 ${existingContracts.length}건`);
 
+      // ─── 0-Z. 회사='아이카' 잘못 박힌 계약 일괄 삭제 (시드에 아이카 없음 — 모두 잔재) ───
+      const icarTargets = existingContracts.filter((c) => c.company === '아이카');
+      if (icarTargets.length > 0) {
+        append(`'아이카' 잘못 박힌 계약 ${icarTargets.length}건 삭제 중...`);
+        for (const c of icarTargets) {
+          await rtdbRemove(ref(db, `${icarPath('contracts')}/${c.id}`));
+        }
+        existingContracts = existingContracts.filter((c) => c.company !== '아이카');
+        append(`✓ '아이카' ${icarTargets.length}건 삭제`);
+      }
+
       // ─── 0-A. DB 자체 중복 정리 (시드 무관) ───
       // 같은 (plate+customer) 가 여러 건 있으면 → 실입금 많은 쪽 keeper, 나머지 입금 이전 후 삭제
       append('DB 자체 중복 검사 중 (plate+customer 그룹)...');
