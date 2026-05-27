@@ -477,10 +477,11 @@ export type HorizontalParseResult = {
   contracts: SnapshotPatch[];
 };
 
-const NAME_KEY_RE = /^(고객명|계약자|계약자명|임차인|임차인명)$/;
-const VEHICLE_KEY_RE = /^(차량번호|자산번호|차량|번호판|plate)$/;
-const VEHICLE_MODEL_RE = /^(차종|차명|model)$/;
-const COMPANY_RE = /^(회사|법인|company)$/;
+// loose contains 매칭 — '1차고객명', '고객명1', '현재고객명', '직전계약자' 등 변형 흡수
+const NAME_KEY_RE = /(고객명|계약자|임차인|코드명|성명|이름)/;
+const VEHICLE_KEY_RE = /(차량번호|자산번호|번호판|plate)/;
+const VEHICLE_MODEL_RE = /(차종|차명|model)/;
+const COMPANY_RE = /(회사|법인|소속|company)/;
 
 /** 한 텍스트 = 컬럼 헤더 정규화 (공백/별표 제거, 소문자) */
 function normHeader(s: string): string {
@@ -530,17 +531,18 @@ export function parseHorizontalContractsRow(
       return undefined;
     };
 
-    const customerKindRaw = toStr(findInBlock(/^구분$/));
+    // loose contains 매칭 — 컬럼명 변형(1차_, 현재_, 직전_, _1, _2) 흡수
+    const customerKindRaw = toStr(findInBlock(/^구분$|^kind$/));
     const customerKind = pickCustomerKind(customerKindRaw);
-    const deliveredDate = toDate(findInBlock(/^(인도일|인도일자|출고일|출고일자)$/));
-    const returnScheduled = toDate(findInBlock(/^(종료일|종료일자|반납예정|반납예정일)$/));
-    const returnedDate = toDate(findInBlock(/^(반납일|반납일자)$/));
-    const monthlyRent = toNum(findInBlock(/^(대여료|월대여료|렌트료|월렌트료)$/));
-    const deposit = toNum(findInBlock(/^(보증금|보증금액)$/));
-    const salesperson = toStr(findInBlock(/^(영업자|영업담당|영업담당자|담당자|매니저|manager)$/));
-    const contractDateOpt = toDate(findInBlock(/^(계약일|계약일자|계약시작일)$/));
-    const paymentDayRaw = toNum(findInBlock(/^(결제일|납기일|paymentday)$/));
-    const phone = toStr(findInBlock(/^(연락처|연락처1|전화|핸드폰|hp|phone)$/));
+    const deliveredDate = toDate(findInBlock(/(인도일|출고일|delivered|deliver)/));
+    const returnScheduled = toDate(findInBlock(/(종료일|반납예정|만기일|expir)/));
+    const returnedDate = toDate(findInBlock(/(반납일자|반납일|returned|return일)/));
+    const monthlyRent = toNum(findInBlock(/(월대여료|월렌트|^대여료$|^렌트료$|rent)/));
+    const deposit = toNum(findInBlock(/(보증금|deposit)/));
+    const salesperson = toStr(findInBlock(/(영업자|영업담당|담당자|매니저|manager|sales)/));
+    const contractDateOpt = toDate(findInBlock(/(계약일|계약시작|시작일|contractdate|contract_date|^시작$)/));
+    const paymentDayRaw = toNum(findInBlock(/(결제일|납기일|payday|paymentday)/));
+    const phone = toStr(findInBlock(/(연락처|전화|핸드폰|phone|hp)/));
 
     // 계약일 = 계약일 컬럼 우선, 없으면 인도일, 없으면 종료일에서 termMonths 만큼 뺀 추정
     const contractDate = contractDateOpt || deliveredDate
@@ -592,11 +594,38 @@ export function parseHorizontalContractsRow(
 }
 
 /**
- * 가로확장 패턴 자동 감지 — 헤더에 '고객명'/'계약자' 가 2회 이상 등장하면 multi-contract.
+ * 가로확장 패턴 자동 감지 — 고객명 또는 인도일자 컬럼이 2회 이상 등장하면 multi-contract.
  */
 export function isHorizontalMultiContractSheet(headers: string[]): boolean {
-  const count = headers.filter((h) => NAME_KEY_RE.test(normHeader(h))).length;
-  return count >= 2;
+  const normH = headers.map(normHeader);
+  const nameCount = normH.filter((h) => NAME_KEY_RE.test(h)).length;
+  const indoCount = normH.filter((h) => /(인도일|출고일)/.test(h)).length;
+  return nameCount >= 2 || indoCount >= 2;
+}
+
+/** 진단용 — 헤더 분석 결과 반환 (UI에 노출해 매칭 확인) */
+export function diagnoseHorizontalSheet(headers: string[]): {
+  customerCols: string[]; deliveryCols: string[]; returnCols: string[];
+  rentCols: string[]; depositCols: string[]; vehiclePlateCol?: string;
+} {
+  const out = {
+    customerCols: [] as string[],
+    deliveryCols: [] as string[],
+    returnCols: [] as string[],
+    rentCols: [] as string[],
+    depositCols: [] as string[],
+    vehiclePlateCol: undefined as string | undefined,
+  };
+  for (const h of headers) {
+    const n = normHeader(h);
+    if (NAME_KEY_RE.test(n)) out.customerCols.push(h);
+    if (/(인도일|출고일)/.test(n)) out.deliveryCols.push(h);
+    if (/(종료일|반납예정|만기일)/.test(n)) out.returnCols.push(h);
+    if (/(대여료|월렌트|rent)/.test(n) && !/보증/.test(n)) out.rentCols.push(h);
+    if (/(보증금|deposit)/.test(n)) out.depositCols.push(h);
+    if (VEHICLE_KEY_RE.test(n) && !out.vehiclePlateCol) out.vehiclePlateCol = h;
+  }
+  return out;
 }
 
 /* ──────────────── 가로확장 채권 시트 파싱 (월별 청구·결제 반복) ──────────────── */

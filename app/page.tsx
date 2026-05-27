@@ -210,12 +210,16 @@ function getVehicleState(c: Contract): { name: VehicleState; days: number } {
 }
 
 /**
- * 계약상태 (6종) — 계약 라이프사이클 + 컴플라이언스.
- *   정상 / 종료임박 / 연장대기 / 종료대기 / 위반 / 미수검
- * 우선순위: 위반 > 미수검 > 연장대기 > 종료대기 > 종료임박 > 정상
+ * 계약상태 (7종) — 계약 라이프사이클 + 컴플라이언스 + 무계약.
+ *   무계약 / 정상 / 종료임박 / 연장대기 / 종료대기 / 위반 / 미수검
+ * 우선순위: 위반 > 미수검 > 연장대기 > 종료대기 > 종료임박 > 정상 > 무계약
  */
-type ContractState = '정상' | '종료임박' | '연장대기' | '종료대기' | '미수검' | '위반';
+type ContractState = '무계약' | '정상' | '종료임박' | '연장대기' | '종료대기' | '미수검' | '위반';
 function getContractState(c: Contract): { name: ContractState; days: number } {
+  // 계약자 없으면 (휴차차량 / 구매대기 차량) — 계약 자체가 없음
+  if (!c.customerName?.trim()) {
+    return { name: '무계약', days: 0 };
+  }
   const inspectionOverdue = !!(c.inspectionDueDate && c.inspectionDueDate < todayKr());
   const hasViolations = !!c.hasViolations;
   // 컴플라이언스 위반은 최우선 (계약 진행 막힘)

@@ -1794,11 +1794,18 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
     : '연락기록·분쟁·클레임·수납이슈·메모 — 이 계약에만 귀속';
 
   // 같은 plate 의 모든 계약 (현재 계약 포함, 계약일 내림차순) — 계약이력 탭에서만 사용
-  const allVehicleContracts = scope === 'contract'
-    ? contracts
-        .filter((x) => x.vehiclePlate === c.vehiclePlate && c.vehiclePlate && c.vehiclePlate !== '미정')
-        .sort((a, b) => b.contractDate.localeCompare(a.contractDate))
-    : [];
+  // 차량번호 공백·대소문자 차이로 매칭 안 잡히던 버그 → 정규화 매칭
+  const allVehicleContracts = scope === 'contract' ? (() => {
+    const targetPlate = (c.vehiclePlate ?? '').trim().toLowerCase();
+    // 현재 계약 본인은 무조건 포함, 같은 plate 의 다른 계약도 추가
+    const matched = contracts.filter((x) => {
+      const xp = (x.vehiclePlate ?? '').trim().toLowerCase();
+      return xp && xp === targetPlate;
+    });
+    // 자기 자신이 안 들어왔으면 강제 추가 (orphan 동기화 이슈 대비)
+    if (!matched.some((x) => x.id === c.id)) matched.push(c);
+    return matched.sort((a, b) => (b.contractDate ?? '').localeCompare(a.contractDate ?? ''));
+  })() : [];
 
   // 본인 이력 (scope + 매칭)
   const myEntries = entries.filter((e) =>
@@ -1810,13 +1817,25 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
   return (
     <>
       {/* 계약이력 탭 — 같은 차량의 모든 계약 (임차이력) — 최상단 */}
-      {scope === 'contract' && allVehicleContracts.length > 0 && (
+      {scope === 'contract' && (
         <Section
           icon={<Car size={12} weight="duotone" />}
-          title={`임차이력 — ${c.vehiclePlate} (${allVehicleContracts.length}건)`}
+          title={`임차이력 — ${c.vehiclePlate || '(차량번호 없음)'} (${allVehicleContracts.length}건)`}
         >
+          {allVehicleContracts.length === 0 && (
+            <div style={{ padding: 16, color: 'var(--text-weak)', fontSize: 12 }}>
+              <div style={{ marginBottom: 4 }}>이 차량에 매칭되는 계약이 없습니다.</div>
+              <div style={{ fontSize: 11 }}>
+                현재 계약: <span className="mono">{c.vehiclePlate || '(없음)'}</span> · 계약자: <strong>{c.customerName || '(없음)'}</strong>
+              </div>
+              <div style={{ fontSize: 11, marginTop: 6 }}>
+                같은 차량번호의 다른 계약이 등록되어 있어야 임차이력이 보입니다.
+              </div>
+            </div>
+          )}
+          {allVehicleContracts.length > 0 && (<>
           <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8 }}>
-            이 차량의 모든 계약 — 현재 계약 포함 시간순
+            이 차량의 모든 계약 — 최근 → 과거 순 (시트의 우측 = 직전 계약 순서대로)
           </div>
           <div style={{ overflow: 'auto' }}>
             <table className="table" style={{ fontSize: 11, minWidth: 1400 }}>
@@ -1918,6 +1937,7 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
               </tbody>
             </table>
           </div>
+          </>)}
         </Section>
       )}
 

@@ -26,7 +26,7 @@ import {
   parseVehicleRow, parseContractRow, parseBankTxRow, parseCardTxRow,
   matchTransactions, applyPaymentsToContracts,
   applySnapshotToContract, validateSnapshotRow,
-  parseHorizontalContractsRow, isHorizontalMultiContractSheet,
+  parseHorizontalContractsRow, isHorizontalMultiContractSheet, diagnoseHorizontalSheet,
   parseReceivablesRow, isHorizontalReceivablesSheet, inferSeqFromDate, mapPaymentMethodToSource,
 } from '@/lib/import-commit';
 import { todayKr } from '@/lib/mock-data';
@@ -1443,34 +1443,50 @@ function SnapshotPane({
         />
       </div>
 
-      {/* 가로확장 다중계약 시트 감지 시 — 별도 import 안내 */}
-      {horizontalSheets.length > 0 && onCommitHorizontal && (
-        <div style={{
-          padding: 14, background: 'var(--brand-bg)', border: '1px solid var(--brand)',
-          borderRadius: 6, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--brand)' }}>
-              📋 가로확장 계약 시트 감지 ({horizontalSheets.length}개)
+      {/* 가로확장 다중계약 시트 감지 시 — 진단 정보 + import 버튼 */}
+      {horizontalSheets.length > 0 && onCommitHorizontal && horizontalSheets.map((s, i) => {
+        const diag = diagnoseHorizontalSheet(s.headers);
+        const canImport = !!diag.vehiclePlateCol && (diag.customerCols.length > 0 || diag.deliveryCols.length > 0);
+        return (
+          <div
+            key={`hc-${i}`}
+            style={{
+              padding: 14, background: 'var(--brand-bg)', border: '1px solid var(--brand)',
+              borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--brand)' }}>
+                  📋 가로확장 계약 시트 감지 — {s.sheetName}
+                </div>
+              </div>
+              <button
+                className="btn btn-primary"
+                type="button"
+                disabled={busy || !canImport}
+                onClick={() => onCommitHorizontal(s)}
+              >
+                <CheckCircle weight="bold" /> import {diag.customerCols.length > 0 ? `(차량당 ${diag.customerCols.length}개 계약)` : ''}
+              </button>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 2 }}>
-              한 차량 행에 [고객명·인도일·종료일·반납일·대여료·보증금·영업자] 블록이 N개 반복.<br />
-              우측 버튼으로 import 하면 차량당 N개 계약(현재 + 과거)이 모두 등록됩니다.
+            <div style={{ fontSize: 11, color: 'var(--text-sub)', display: 'grid', gridTemplateColumns: '90px 1fr', gap: '4px 8px' }}>
+              <span style={{ fontWeight: 600 }}>차량번호 컬럼</span>
+              <span className="mono">{diag.vehiclePlateCol ?? <span style={{ color: 'var(--red-text)' }}>❌ 못 찾음 (차량번호/자산번호/번호판 중 하나 필요)</span>}</span>
+              <span style={{ fontWeight: 600 }}>고객명 ({diag.customerCols.length})</span>
+              <span className="mono">{diag.customerCols.length > 0 ? diag.customerCols.join(' · ') : <span className="dim">없음</span>}</span>
+              <span style={{ fontWeight: 600 }}>인도일 ({diag.deliveryCols.length})</span>
+              <span className="mono">{diag.deliveryCols.length > 0 ? diag.deliveryCols.join(' · ') : <span className="dim">없음</span>}</span>
+              <span style={{ fontWeight: 600 }}>종료일 ({diag.returnCols.length})</span>
+              <span className="mono">{diag.returnCols.length > 0 ? diag.returnCols.join(' · ') : <span className="dim">없음</span>}</span>
+              <span style={{ fontWeight: 600 }}>대여료 ({diag.rentCols.length})</span>
+              <span className="mono">{diag.rentCols.length > 0 ? diag.rentCols.join(' · ') : <span className="dim">없음</span>}</span>
+              <span style={{ fontWeight: 600 }}>보증금 ({diag.depositCols.length})</span>
+              <span className="mono">{diag.depositCols.length > 0 ? diag.depositCols.join(' · ') : <span className="dim">없음</span>}</span>
             </div>
           </div>
-          {horizontalSheets.map((s, i) => (
-            <button
-              key={i}
-              className="btn btn-primary"
-              type="button"
-              disabled={busy}
-              onClick={() => onCommitHorizontal(s)}
-            >
-              <CheckCircle weight="bold" /> {s.sheetName} import
-            </button>
-          ))}
-        </div>
-      )}
+        );
+      })}
 
       {/* 가로확장 채권 시트 감지 시 */}
       {receivablesSheets.length > 0 && onCommitReceivables && (
