@@ -200,13 +200,20 @@ function getVehicleState(c: Contract): { name: VehicleState; days: number } {
     return { name: '상품화중', days: daysSince(c.registeredDate ?? c.contractDate, todayKr()) };
   }
   if (c.vehicleStatus === '상품대기' || c.vehicleStatus === '인도대기' || c.vehicleStatus === '출고대기') {
+    // 손님이 이미 있는 계약이면 인도일 미입력이어도 계약중 (스냅샷 업로드 후 상태값만 남은 케이스)
+    if (c.customerName?.trim() && c.monthlyRent > 0) {
+      return { name: '계약중', days: daysSince(c.deliveredDate ?? c.contractDate, todayKr()) };
+    }
     return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
   }
-  // 명시적 vehicleStatus 없을 때 — 계약 상태로 추정
+  // 명시적 vehicleStatus 없을 때 — 손님 있으면 계약중, 없으면 인도대기
+  // (스냅샷 업로드로 인도일 누락된 운영중 계약도 정상 인식)
+  if (c.customerName?.trim()) {
+    return { name: '계약중', days: daysSince(c.deliveredDate ?? c.contractDate, todayKr()) };
+  }
   if (!c.deliveredDate || c.status === '대기') {
     return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
   }
-  // 인도 완료 = 계약중
   return { name: '계약중', days: daysSince(c.deliveredDate, todayKr()) };
 }
 
