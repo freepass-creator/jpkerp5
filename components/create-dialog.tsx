@@ -29,6 +29,8 @@ import {
 } from '@/lib/import-commit';
 import { dedupAgainst } from '@/lib/dedup';
 import { bankTxKeys, cardTxKeys, vehicleKeys, contractKeys } from '@/lib/dedup-keys';
+import { toast } from '@/lib/toast';
+import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 
 type Mode = '현황' | '차량' | '계약' | '수납' | '이력';
@@ -125,11 +127,14 @@ export function CreateDialog({
         invalid > 0 ? `필수값 누락 ${invalid}` : '',
         skipped > 0 ? `중복 ${skipped}` : '',
       ].filter(Boolean).join(' / ');
-      setResult(`계약 ${n}건 저장 완료 (전체 ${rows.length}행${note ? ` · 제외: ${note}` : ''})`);
+      const msg = `계약 ${n}건 저장 완료 (전체 ${rows.length}행${note ? ` · 제외: ${note}` : ''})`;
+      setResult(msg);
+      toast.success(`계약 ${n}건 저장`);
       setParsed((all) => all.filter((p) => p.kind !== '계약'));
     } catch (e) {
-      console.error(e);
-      setResult(`오류 — ${String((e as Error).message ?? e)}`);
+      const msg = friendlyError(e);
+      setResult(`오류 — ${msg}`);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -161,11 +166,15 @@ export function CreateDialog({
       if (patches.length > 0) await updateContracts(patches);
       const matchedCount = matches.filter((m) => m.contractId).length;
       const skippedNote = bankSkipped + cardSkipped > 0 ? ` (중복 ${bankSkipped + cardSkipped}건 제외)` : '';
-      setResult(`수납 ${bankSaved.length + cardSaved.length}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)${skippedNote}`);
+      const total = bankSaved.length + cardSaved.length;
+      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)${skippedNote}`);
+      if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount}`);
+      else if (bankSkipped + cardSkipped > 0) toast.warning(`전부 중복 — ${bankSkipped + cardSkipped}건 제외됨`);
       setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '카드'));
     } catch (e) {
-      console.error(e);
-      setResult(`오류 — ${String((e as Error).message ?? e)}`);
+      const msg = friendlyError(e);
+      setResult(`오류 — ${msg}`);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -221,8 +230,9 @@ export function CreateDialog({
         + (invalid > 0 ? ` (오류 ${invalid}건 제외)` : ''),
       );
     } catch (e) {
-      console.error(e);
-      setResult(`오류 — ${String((e as Error).message ?? e)}`);
+      const msg = friendlyError(e);
+      setResult(`오류 — ${msg}`);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -252,9 +262,12 @@ export function CreateDialog({
         skipped > 0 ? `차량번호 중복 ${skipped}` : '',
       ].filter(Boolean).join(' / ');
       setResult(`차량 ${n}건 등록 (전체 ${rows.length}행${note ? ` · 제외: ${note}` : ''})`);
+      if (n > 0) toast.success(`차량 ${n}건 등록`);
+      else if (skipped > 0) toast.warning(`전부 중복 — ${skipped}건 제외됨`);
     } catch (e) {
-      console.error(e);
-      setResult(`오류 — ${String((e as Error).message ?? e)}`);
+      const msg = friendlyError(e);
+      setResult(`오류 — ${msg}`);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }

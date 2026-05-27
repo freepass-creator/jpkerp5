@@ -3,39 +3,14 @@
 import type {
   Contract, Vehicle, CompanyCode, VehicleStatus, BankTransaction, CardTransaction, Company,
 } from './types';
-import { normalizeKoreanDate } from './parsers/date';
 import { normalizeIdent, inferKind, formatIdent, type CustomerKind } from './ident';
 import { generateSchedules, distributeUnpaid, computeCurrentSeq as computeCurrentSeqFromSchedules } from './payment-schedule';
 import { todayKr } from './mock-data';
+import { toStr, toNum, toDate, get, type Row } from './parse-helpers';
 
-type Row = Record<string, unknown>;
-
-/* ──────────────── 공통 유틸 ──────────────── */
+/* ──────────────── 도메인별 picker ──────────────── */
 
 const COMPANIES: CompanyCode[] = ['아이카', '달카', '렌트로', '직카', '기타'];
-
-function toStr(v: unknown): string {
-  if (v == null) return '';
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  return String(v).trim();
-}
-
-function toNum(v: unknown): number {
-  if (v == null || v === '') return 0;
-  if (typeof v === 'number') return v;
-  const cleaned = String(v).replace(/[^0-9.-]/g, '');
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function toDate(v: unknown): string {
-  // 위임 — lib/parsers/date.ts 의 normalizeKoreanDate가 모든 포맷 처리:
-  // yyyy-mm-dd / yy-mm-dd / yyyymmdd / yymmdd / yyyy.mm.dd / yyyy/mm/dd / 한글 / 엑셀 직렬
-  if (v == null || v === '') return '';
-  if (v instanceof Date) return normalizeKoreanDate(v);
-  if (typeof v === 'number') return normalizeKoreanDate(v);
-  return normalizeKoreanDate(String(v));
-}
 
 function pickCompany(v: unknown): CompanyCode {
   const s = toStr(v);
@@ -60,26 +35,6 @@ function pickVehicleStatus(v: unknown, hasDelivered: boolean): VehicleStatus {
   ];
   for (const x of ALL) if (s === x) return x;
   return hasDelivered ? '운행' : '구매대기';
-}
-
-/** 헤더 키 정규화 — 공백/별표/대소문자/괄호 등 무시 */
-function normKey(s: string): string {
-  return s.replace(/\s+/g, '').replace(/\*/g, '').replace(/[()]/g, '').toLowerCase();
-}
-
-/** 헤더 alias resolver — 다양한 컬럼명 허용 + fuzzy 매칭 (별표·공백·대소문자 무관) */
-function get(row: Row, ...keys: string[]): unknown {
-  // 1차: 정확 매칭
-  for (const k of keys) {
-    if (k in row && row[k] != null && row[k] !== '') return row[k];
-  }
-  // 2차: 정규화 매칭 (예: "차량번호" ↔ "차량번호 *" ↔ "차량 번호")
-  const targets = new Set(keys.map(normKey));
-  for (const [rowKey, rowVal] of Object.entries(row)) {
-    if (rowVal == null || rowVal === '') continue;
-    if (targets.has(normKey(rowKey))) return rowVal;
-  }
-  return undefined;
 }
 
 /* ──────────────── 차량 (자산) ──────────────── */
