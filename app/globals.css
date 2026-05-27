@@ -1361,7 +1361,8 @@ input[type="radio"]:disabled {
 .status.매각대기 { background: var(--orange-bg); color: var(--orange-text); }   /* 매각 진행 */
 .status.매각 { background: var(--red-bg); color: var(--red-text); }   /* terminal */
 
-/* 계약상태 (컴플라이언스 3종) — 정상=긍정 */
+/* 계약상태 — 무계약/정상/종료임박/연장대기/종료대기/미수검/위반 */
+.status.무계약 { background: var(--bg-sunken); color: var(--text-weak); }
 .status.정상 { background: var(--green-bg); color: var(--green-text); }
 .status.미수검 { background: var(--amber-bg); color: var(--amber-text); }
 .status.위반 { background: var(--red-bg); color: var(--red-text); }
