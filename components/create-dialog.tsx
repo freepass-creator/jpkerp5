@@ -27,6 +27,8 @@ import {
   matchTransactions, applyPaymentsToContracts,
   applySnapshotToContract, validateSnapshotRow,
 } from '@/lib/import-commit';
+import { dedupAgainst } from '@/lib/dedup';
+import { bankTxKeys, cardTxKeys, vehicleKeys, contractKeys } from '@/lib/dedup-keys';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 
 type Mode = '현황' | '차량' | '계약' | '수납' | '이력';
@@ -52,8 +54,8 @@ export function CreateDialog({
   // RTDB stores
   const { contracts, addMany: addContracts, updateMany: updateContracts } = useContracts();
   const { vehicles, addMany: addVehicles } = useVehicles();
-  const { addMany: addBankTx } = useBankTx();
-  const { addMany: addCardTx } = useCardTx();
+  const { rows: existingBankTx, addMany: addBankTx } = useBankTx();
+  const { rows: existingCardTx, addMany: addCardTx } = useCardTx();
   const { companies } = useCompanies();
 
   const reset = useCallback(() => {
@@ -114,8 +116,16 @@ export function CreateDialog({
     try {
       const rows = contractFiles.flatMap((p) => p.rows);
       const valid = rows.map((r) => parseContractRow(r)).filter((x): x is NonNullable<typeof x> => !!x);
-      const n = await addContracts(valid);
-      setResult(`계약 ${n}건 저장 완료 (전체 ${rows.length}행 중 ${rows.length - n}건은 필수값 미달로 제외)`);
+      // 중복 검증 — 계약번호 또는 차량번호+계약일+고객 기준
+      const dedup = dedupAgainst(valid, contracts, contractKeys);
+      const skipped = dedup.duplicates.length;
+      const n = await addContracts(dedup.unique);
+      const invalid = rows.length - valid.length;
+      const note = [
+        invalid > 0 ? `필수값 누락 ${invalid}` : '',
+        skipped > 0 ? `중복 ${skipped}` : '',
+      ].filter(Boolean).join(' / ');
+      setResult(`계약 ${n}건 저장 완료 (전체 ${rows.length}행${note ? ` · 제외: ${note}` : ''})`);
       setParsed((all) => all.filter((p) => p.kind !== '계약'));
     } catch (e) {
       console.error(e);
@@ -132,9 +142,16 @@ export function CreateDialog({
       const cardRows = paymentFiles.filter((p) => p.kind === '카드').flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName })));
       const bankParsed = bankRows.map((x) => parseBankTxRow(x.row, x.file, x.bank)).filter((x): x is NonNullable<typeof x> => !!x);
       const cardParsed = cardRows.map((x) => parseCardTxRow(x.row, x.file)).filter((x): x is NonNullable<typeof x> => !!x);
-      const bankSaved = await addBankTx(bankParsed);
-      const cardSaved = await addCardTx(cardParsed);
-      // 매칭
+
+      // 중복 검증 — DB 기존 거래 + 시트 내 중복 동시 처리
+      const bankDedup = dedupAgainst(bankParsed, existingBankTx, bankTxKeys);
+      const cardDedup = dedupAgainst(cardParsed, existingCardTx, cardTxKeys);
+      const bankSkipped = bankDedup.duplicates.length;
+      const cardSkipped = cardDedup.duplicates.length;
+
+      const bankSaved = await addBankTx(bankDedup.unique);
+      const cardSaved = await addCardTx(cardDedup.unique);
+      // 매칭 (신규 저장된 것만 대상)
       const txList = [
         ...bankSaved.map((t) => ({ id: t.id, amount: t.amount, counterparty: t.counterparty })),
         ...cardSaved.map((t) => ({ id: t.id, amount: t.amount, counterparty: t.customerName ?? '' })),
@@ -143,7 +160,8 @@ export function CreateDialog({
       const patches = applyPaymentsToContracts(contracts, matches);
       if (patches.length > 0) await updateContracts(patches);
       const matchedCount = matches.filter((m) => m.contractId).length;
-      setResult(`수납 ${bankSaved.length + cardSaved.length}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)`);
+      const skippedNote = bankSkipped + cardSkipped > 0 ? ` (중복 ${bankSkipped + cardSkipped}건 제외)` : '';
+      setResult(`수납 ${bankSaved.length + cardSaved.length}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)${skippedNote}`);
       setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '카드'));
     } catch (e) {
       console.error(e);
@@ -214,8 +232,26 @@ export function CreateDialog({
     setBusy(true);
     try {
       const valid = rows.map((r) => parseVehicleRow(r)).filter((x): x is NonNullable<typeof x> => !!x);
-      const n = await addVehicles(valid);
-      setResult(`차량 ${n}건 등록 (전체 ${rows.length}행 중 ${rows.length - n}건 제외)`);
+      // 차량번호 중복 검증 (계약 테이블의 차량번호도 포함)
+      const usedPlates = new Set<string>([
+        ...vehicles.map((v) => v.plate?.trim().toLowerCase() ?? '').filter(Boolean),
+        ...contracts.map((c) => c.vehiclePlate?.trim().toLowerCase() ?? '').filter(Boolean),
+      ]);
+      const fresh: typeof valid = [];
+      let skipped = 0;
+      for (const v of valid) {
+        const p = v.plate?.trim().toLowerCase();
+        if (p && p !== '미정' && usedPlates.has(p)) { skipped += 1; continue; }
+        if (p && p !== '미정') usedPlates.add(p);  // 같은 시트 안 중복 방지
+        fresh.push(v);
+      }
+      const invalid = rows.length - valid.length;
+      const n = await addVehicles(fresh);
+      const note = [
+        invalid > 0 ? `필수값 누락 ${invalid}` : '',
+        skipped > 0 ? `차량번호 중복 ${skipped}` : '',
+      ].filter(Boolean).join(' / ');
+      setResult(`차량 ${n}건 등록 (전체 ${rows.length}행${note ? ` · 제외: ${note}` : ''})`);
     } catch (e) {
       console.error(e);
       setResult(`오류 — ${String((e as Error).message ?? e)}`);

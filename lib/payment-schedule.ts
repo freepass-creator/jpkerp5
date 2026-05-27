@@ -128,6 +128,9 @@ export function distributeEntry<T extends PaymentScheduleInline>(
   today: string,
 ): { schedules: T[]; consumed: Array<{ seq: number; amount: number }> } {
   const list = schedules.map((s) => ({ ...s }));
+  // seq → 원본 인덱스 Map (find 반복 회피 — O(N²) → O(N))
+  const idxBySeq = new Map<number, number>();
+  list.forEach((s, i) => idxBySeq.set(s.seq, i));
   // 미납 우선 (연체·부분납 → 예정), 같은 카테고리 안에서는 seq 오름차순
   const ordered = [...list].sort((a, b) => {
     const ra = rank(a.status);
@@ -143,8 +146,8 @@ export function distributeEntry<T extends PaymentScheduleInline>(
     const owed = Math.max(0, effectiveAmount(s) - sumPayments(s));
     if (owed <= 0) continue;
     const apply = Math.min(owed, remaining);
-    const idx = list.findIndex((x) => x.seq === s.seq);
-    if (idx < 0) continue;
+    const idx = idxBySeq.get(s.seq);
+    if (idx === undefined) continue;
     const { schedule } = addPaymentEntry(list[idx], { ...entry, amount: apply }, today);
     list[idx] = schedule;
     consumed.push({ seq: s.seq, amount: apply });

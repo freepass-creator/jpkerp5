@@ -665,9 +665,11 @@ export function applyPaymentsToContracts(
     byContract.set(m.contractId, arr);
   }
 
+  // O(N) — contracts를 Map으로 한 번만 인덱싱 (기존: find가 N건마다 O(N) → 총 O(N²))
+  const contractById = new Map(contracts.map((c) => [c.id, c]));
   const out: Contract[] = [];
   for (const [contractId, ms] of byContract) {
-    const c = contracts.find((x) => x.id === contractId);
+    const c = contractById.get(contractId);
     if (!c) continue;
     const totalPaid = ms.reduce((s, m) => s + m.amount, 0);
     const lastM = ms[ms.length - 1];
