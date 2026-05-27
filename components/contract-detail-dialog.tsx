@@ -1795,15 +1795,25 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
   // 차량번호 공백·대소문자 차이로 매칭 안 잡히던 버그 → 정규화 매칭
   const allVehicleContracts = scope === 'contract' ? (() => {
     const targetPlate = (c.vehiclePlate ?? '').trim().toLowerCase();
-    // 현재 계약 본인은 무조건 포함, 같은 plate 의 다른 계약도 추가
     const matched = contracts.filter((x) => {
       const xp = (x.vehiclePlate ?? '').trim().toLowerCase();
       return xp && xp === targetPlate;
     });
-    // 자기 자신이 안 들어왔으면 강제 추가 (orphan 동기화 이슈 대비)
     if (!matched.some((x) => x.id === c.id)) matched.push(c);
     return matched.sort((a, b) => (b.contractDate ?? '').localeCompare(a.contractDate ?? ''));
   })() : [];
+
+  // 진짜 현재 계약 = 반납 안 됨 + 해지 안 됨 + 최신 contractDate
+  // (클릭해서 다른 행으로 진입해도 ● 마커는 진짜 현재 계약에만 표시)
+  const trulyCurrentId = (() => {
+    if (scope !== 'contract' || allVehicleContracts.length === 0) return null;
+    const active = allVehicleContracts.filter(
+      (x) => !x.returnedDate && x.status !== '반납' && x.status !== '해지',
+    );
+    if (active.length === 0) return null;
+    // active 중 가장 최근 contractDate (이미 desc sort 되어 있어서 첫 번째)
+    return active[0].id;
+  })();
 
   // 본인 이력 (scope + 매칭)
   const myEntries = entries.filter((e) =>
@@ -1858,33 +1868,39 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
               </thead>
               <tbody>
                 {allVehicleContracts.map((p) => {
-                  const isCurrent = p.id === c.id;
+                  const isCurrent = p.id === trulyCurrentId;  // 진짜 현재 계약 (클릭한 것 아님)
+                  const isOpenedHere = p.id === c.id;  // 현재 다이얼로그가 보고 있는 계약
                   // 계약자 옆 링크 — 면허번호 있으면 면허 표시, 계약서 발송했으면 계약서 표시
                   const hasLicense = !!p.customerLicenseNo;
                   const hasDocument = !!p.documentStatus && p.documentStatus !== '미발송';
                   return (
-                    <tr key={p.id} style={isCurrent ? { background: 'var(--brand-bg)', fontWeight: 500 } : undefined}>
+                    <tr key={p.id} style={
+                      isCurrent ? { background: 'var(--brand-bg)', fontWeight: 500 }
+                      : isOpenedHere ? { background: 'var(--bg-sunken)' }  // 클릭으로 진입한 행은 옅은 회색
+                      : undefined
+                    }>
                       <td>
                         {p.customerName ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            {isCurrent ? (
-                              <span style={{ color: 'var(--brand)', fontWeight: 600 }}>
-                                ● {p.customerName} <span className="dim" style={{ fontWeight: 400, fontSize: 10 }}>(현재)</span>
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => onNavigate?.(p.id)}
-                                title="이 계약 상세로 이동"
-                                style={{
-                                  background: 'transparent', border: 0, padding: 0, cursor: onNavigate ? 'pointer' : 'default',
-                                  color: 'var(--brand)', textDecoration: 'underline', textUnderlineOffset: 3,
-                                  fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 500,
-                                }}
-                              >
-                                {p.customerName}
-                              </button>
-                            )}
+                            {isCurrent && <span style={{ color: 'var(--brand)', fontWeight: 700 }}>●</span>}
+                            {isOpenedHere && !isCurrent && <span style={{ color: 'var(--text-weak)' }}>▸</span>}
+                            <button
+                              type="button"
+                              onClick={() => onNavigate?.(p.id)}
+                              title={isCurrent ? '진짜 현재 계약' : (isOpenedHere ? '현재 보는 계약' : '이 계약 상세로 이동')}
+                              style={{
+                                background: 'transparent', border: 0, padding: 0,
+                                cursor: onNavigate && !isOpenedHere ? 'pointer' : 'default',
+                                color: isCurrent ? 'var(--brand)' : 'var(--text-main)',
+                                textDecoration: !isCurrent && !isOpenedHere ? 'underline' : 'none',
+                                textUnderlineOffset: 3,
+                                fontFamily: 'inherit', fontSize: 'inherit',
+                                fontWeight: isCurrent ? 700 : (isOpenedHere ? 600 : 500),
+                              }}
+                            >
+                              {p.customerName}
+                            </button>
+                            {isCurrent && <span className="dim" style={{ fontWeight: 400, fontSize: 10 }}>(현재)</span>}
                             {/* 면허·계약서 링크 칩 */}
                             {hasLicense && (
                               <span

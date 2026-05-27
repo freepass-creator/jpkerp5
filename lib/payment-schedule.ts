@@ -82,8 +82,16 @@ export function addPaymentEntry<T extends PaymentScheduleInline>(
  */
 export function recalcContract<T extends Contract>(c: T, today: string): T {
   if (!c.schedules || c.schedules.length === 0) return c;
-  const recalcedSchedules = c.schedules.map((s) => recalcSchedule(s, today));
-  // 미수 = sum(연체·부분납 회차의 잔액)
+  // 반납완료된 계약은 returnedDate 이후 회차 = 자동 면제 처리 (미수 0)
+  const returnedCutoff = c.returnedDate;
+  const recalcedSchedules = c.schedules.map((s) => {
+    if (returnedCutoff && s.dueDate > returnedCutoff) {
+      // 반납일 이후 → 면제 처리 (위약금 0 가정)
+      return { ...s, status: '면제' as const, paidAmount: s.amount, paidAt: s.paidAt };
+    }
+    return recalcSchedule(s, today);
+  });
+  // 미수 = sum(연체·부분납 회차의 잔액). 면제는 제외.
   let unpaidAmount = 0;
   let unpaidSeqCount = 0;
   for (const s of recalcedSchedules) {
