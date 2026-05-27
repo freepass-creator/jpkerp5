@@ -56,14 +56,18 @@ function inferKind(ident: string): '개인' | '사업자' | '법인' | undefined
 
 export type ParsedContractRow = {
   vehiclePlate: string;
+  company: string;
+  vehicleModel: string;
   blocks: Array<{
     kind?: string;
     customerName: string;
+    customerPhone1: string;
     deliveredDate: string;
     returnScheduledDate: string;
     returnedDate: string;
     monthlyRent: number;
     deposit: number;
+    paymentDay: number;
     salesperson: string;
   }>;
 };
@@ -81,18 +85,21 @@ export async function parseContractHistory(file: File): Promise<ParsedContractRo
   if (headerRowIdx < 0) throw new Error("'차량번호' 헤더를 찾을 수 없음");
 
   const headers = aoa[headerRowIdx].map(cellStr);
+  const plateIdx = headers.findIndex((h) => h === '차량번호');
+  const companyIdx = headers.findIndex((h) => h === '회사');
+  const modelIdx = headers.findIndex((h) => h === '차종');
   // 첫 블록 컬럼 시작 인덱스 — '구분' 첫 등장
   const blockStartIdx = headers.findIndex((h) => h === '구분');
   if (blockStartIdx < 0) throw new Error("'구분' 컬럼을 찾을 수 없음");
 
-  const blockSize = CONTRACT_HISTORY_TEMPLATE.blockColumns.length;  // 8
+  const blockSize = CONTRACT_HISTORY_TEMPLATE.blockColumns.length;  // 10
   const blockCount = Math.floor((headers.length - blockStartIdx) / blockSize);
 
   const dataRows = aoa.slice(headerRowIdx + 1);
   const out: ParsedContractRow[] = [];
 
   for (const r of dataRows) {
-    const plate = cellStr(r[0]);
+    const plate = cellStr(r[plateIdx >= 0 ? plateIdx : 0]);
     if (!plate) continue;
 
     const blocks: ParsedContractRow['blocks'] = [];
@@ -103,15 +110,22 @@ export async function parseContractHistory(file: File): Promise<ParsedContractRo
       blocks.push({
         kind: cellStr(r[base + 0]) || undefined,
         customerName: name,
-        deliveredDate: normalizeDate(cellStr(r[base + 2])) || '',
-        returnScheduledDate: normalizeDate(cellStr(r[base + 3])) || '',
-        returnedDate: normalizeDate(cellStr(r[base + 4])) || '',
-        monthlyRent: cellNum(r[base + 5]),
-        deposit: cellNum(r[base + 6]),
-        salesperson: cellStr(r[base + 7]),
+        customerPhone1: cellStr(r[base + 2]),
+        deliveredDate: normalizeDate(cellStr(r[base + 3])) || '',
+        returnScheduledDate: normalizeDate(cellStr(r[base + 4])) || '',
+        returnedDate: normalizeDate(cellStr(r[base + 5])) || '',
+        monthlyRent: cellNum(r[base + 6]),
+        deposit: cellNum(r[base + 7]),
+        paymentDay: cellNum(r[base + 8]),
+        salesperson: cellStr(r[base + 9]),
       });
     }
-    out.push({ vehiclePlate: plate, blocks });
+    out.push({
+      vehiclePlate: plate,
+      company: companyIdx >= 0 ? cellStr(r[companyIdx]) : '',
+      vehicleModel: modelIdx >= 0 ? cellStr(r[modelIdx]) : '',
+      blocks,
+    });
   }
 
   return out;
@@ -132,7 +146,7 @@ export type ApplyContractResult = {
 export function buildContractsFromParsed(
   rows: ParsedContractRow[],
   existing: Contract[],
-  companyCode: Contract['company'] = '기타',
+  fallbackCompany: Contract['company'] = '기타',
 ): { newOrUpdated: Array<Omit<Contract, 'id'> & { _existingId?: string }>; touched: Set<string> } {
   const today = new Date().toISOString().slice(0, 10);
   const touched = new Set<string>();
@@ -150,6 +164,7 @@ export function buildContractsFromParsed(
     touched.add(normPlate(row.vehiclePlate));
     // 첫 블록 = 현재 계약자(반납일 없으면). 비어있으면 휴차 차량.
     const isFirstActive = row.blocks[0] && !row.blocks[0].returnedDate;
+    const rowCompany = (row.company?.trim() || fallbackCompany) as Contract['company'];
 
     for (let bi = 0; bi < row.blocks.length; bi++) {
       const b = row.blocks[bi];
@@ -160,18 +175,18 @@ export function buildContractsFromParsed(
       const contractDate = b.deliveredDate || today;
       const returnSch = b.returnScheduledDate || addMonths(contractDate, 12);
       const termMonths = monthDiff(contractDate, returnSch);
-      const paymentDay = parseInt(contractDate.slice(8, 10), 10) || 1;
+      const paymentDay = b.paymentDay > 0 ? b.paymentDay : (parseInt(contractDate.slice(8, 10), 10) || 1);
 
       const base: Omit<Contract, 'id'> = {
         contractNo: exist?.contractNo ?? `ICR-${contractDate.slice(2, 7).replace('-', '')}-${String(++contractSeq).padStart(4, '0')}`,
-        company: exist?.company ?? companyCode,
+        company: rowCompany,
         manager: b.salesperson || exist?.manager,
         customerName: b.customerName,
         customerKind: (b.kind as '개인' | '사업자' | '법인' | undefined) ?? exist?.customerKind,
         customerIdentNo: exist?.customerIdentNo,
-        customerPhone1: exist?.customerPhone1 ?? '',
+        customerPhone1: b.customerPhone1 || exist?.customerPhone1 || '',
         vehiclePlate: row.vehiclePlate,
-        vehicleModel: exist?.vehicleModel ?? '',
+        vehicleModel: row.vehicleModel || exist?.vehicleModel || '',
         vehicleStatus: isCurrent ? '운행' : (b.returnedDate ? '반납' : '운행'),
         contractDate,
         deliveredDate: b.deliveredDate || undefined,
