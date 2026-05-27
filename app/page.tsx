@@ -178,18 +178,24 @@ function daysToExpiry(c: Contract): number | null {
 }
 
 function getVehicleState(c: Contract): { name: VehicleState; days: number } {
-  // 명시적 vehicleStatus 우선 (엑셀 업로드 시 사용자가 지정한 값)
+  // 명시적 휴차 / 반납 — 최우선
   if (c.vehicleStatus === '휴차') {
     return { name: '휴차', days: c.idleSince ? daysSince(c.idleSince, todayKr()) : 0 };
   }
   if (c.returnedDate || c.status === '반납' || c.vehicleStatus === '반납') {
     return { name: '반납', days: c.returnedDate ? daysSince(c.returnedDate, todayKr()) : 0 };
   }
-  // 운행 / 연장대기 / 종료대기 → 차량은 모두 계약중 (임차인 사용중)
-  if (c.vehicleStatus === '운행' || c.vehicleStatus === '연장대기' || c.vehicleStatus === '종료대기') {
+
+  // ── 규칙: 계약자 있으면 계약중 / 없으면 휴차 (또는 차량 준비 단계) ──
+  const hasCustomer = !!c.customerName?.trim();
+
+  if (hasCustomer) {
+    // 손님 있음 → 인도 여부 무관 모두 '계약중'
     const start = c.deliveredDate ?? c.contractDate;
     return { name: '계약중', days: daysSince(start, todayKr()) };
   }
+
+  // 손님 없음 → 차량 라이프사이클 단계만 표시, 그 외는 휴차로 통합
   if (c.vehicleStatus === '구매대기') {
     return { name: '구매대기', days: daysSince(c.contractDate, todayKr()) };
   }
@@ -199,22 +205,8 @@ function getVehicleState(c: Contract): { name: VehicleState; days: number } {
   if (c.vehicleStatus === '상품화중' || c.vehicleStatus === '상품화대기') {
     return { name: '상품화중', days: daysSince(c.registeredDate ?? c.contractDate, todayKr()) };
   }
-  if (c.vehicleStatus === '상품대기' || c.vehicleStatus === '인도대기' || c.vehicleStatus === '출고대기') {
-    // 손님이 이미 있는 계약이면 인도일 미입력이어도 계약중 (스냅샷 업로드 후 상태값만 남은 케이스)
-    if (c.customerName?.trim() && c.monthlyRent > 0) {
-      return { name: '계약중', days: daysSince(c.deliveredDate ?? c.contractDate, todayKr()) };
-    }
-    return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
-  }
-  // 명시적 vehicleStatus 없을 때 — 손님 있으면 계약중, 없으면 인도대기
-  // (스냅샷 업로드로 인도일 누락된 운영중 계약도 정상 인식)
-  if (c.customerName?.trim()) {
-    return { name: '계약중', days: daysSince(c.deliveredDate ?? c.contractDate, todayKr()) };
-  }
-  if (!c.deliveredDate || c.status === '대기') {
-    return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
-  }
-  return { name: '계약중', days: daysSince(c.deliveredDate, todayKr()) };
+  // 상품대기 / 인도대기 / 출고대기 / 휴차대기 / 매각대기 등 손님 없는 모든 비운영 → 휴차
+  return { name: '휴차', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
 }
 
 /**
