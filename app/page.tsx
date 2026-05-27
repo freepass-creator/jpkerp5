@@ -66,12 +66,8 @@ function isRunning(c: Contract): boolean {
 function matchesView(c: Contract, v: View): boolean {
   if (v === '전체') return true;
   if (v === '계약중') return isRunning(c);
-  // 종료임박 = 계약중 + 반납예정일 D-90 이내 (경과 포함)
-  if (v === '종료임박') {
-    if (!isRunning(c)) return false;
-    const d = daysToExpiry(c);
-    return d !== null && d <= 90;
-  }
+  // 종료임박 = 계약상태 = '종료임박' (계약중 + 만기 D-90 이내, 위반/미수검/연장대기/종료대기 제외)
+  if (v === '종료임박') return getContractState(c).name === '종료임박';
   // 휴차 = "계약중이 아닌 모든 차" — 구매대기/등록/상품화/상품대기/반납/대기 등 비운행 전체
   if (v === '휴차') return !isRunning(c);
   if (v === '미수') return c.unpaidAmount > 0;
@@ -86,8 +82,8 @@ function matchesCompany(c: Contract, co: string): boolean {
 type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '계약시작' | '계약종료' | '회차' | '반납까지' | '수납상태' | '미수금' | '담당';
 type SortDir = 'asc' | 'desc';
 
-const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약중', '종료임박', '연장대기', '종료대기', '휴차', '반납'];
-const CS_ORDER: ContractState[] = ['위반', '미수검', '정상'];
+const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약중', '휴차', '반납'];
+const CS_ORDER: ContractState[] = ['위반', '미수검', '연장대기', '종료대기', '종료임박', '정상'];
 const PS_ORDER: PaymentState[] = ['미납', '정상'];
 
 function compareForCol(a: Contract, b: Contract, col: SortCol): number {
@@ -165,8 +161,8 @@ function sortLabel(view: View): string {
   }
 }
 
-/** 차량상태 (10종) — 차량 전체 라이프사이클 */
-type VehicleState = '구매대기' | '등록대기' | '상품화중' | '인도대기' | '계약중' | '종료임박' | '연장대기' | '종료대기' | '휴차' | '반납';
+/** 차량상태 (7종) — 차량 자체의 물리적 라이프사이클 */
+type VehicleState = '구매대기' | '등록대기' | '상품화중' | '인도대기' | '계약중' | '휴차' | '반납';
 
 /** 만기까지 남은 일수 — 음수면 경과. returnScheduledDate 없으면 null */
 function daysToExpiry(c: Contract): number | null {
@@ -185,20 +181,8 @@ function getVehicleState(c: Contract): { name: VehicleState; days: number } {
   if (c.returnedDate || c.status === '반납' || c.vehicleStatus === '반납') {
     return { name: '반납', days: c.returnedDate ? daysSince(c.returnedDate, todayKr()) : 0 };
   }
-  // 연장대기 / 종료대기 — 사용자가 명시 결정한 상태
-  if (c.vehicleStatus === '연장대기') {
-    return { name: '연장대기', days: 0 };
-  }
-  if (c.vehicleStatus === '종료대기') {
-    const d = daysToExpiry(c);
-    return { name: '종료대기', days: d !== null ? Math.max(0, -d) : 0 };
-  }
-  // 운행 = 계약완료 — 만기 D-90 이내면 자동 종료임박
-  if (c.vehicleStatus === '운행') {
-    const d = daysToExpiry(c);
-    if (d !== null && d <= 90) {
-      return { name: '종료임박', days: d };  // 양수: 남은일수, 음수: 경과일수
-    }
+  // 운행 / 연장대기 / 종료대기 → 차량은 모두 계약중 (임차인 사용중)
+  if (c.vehicleStatus === '운행' || c.vehicleStatus === '연장대기' || c.vehicleStatus === '종료대기') {
     const start = c.deliveredDate ?? c.contractDate;
     return { name: '계약중', days: daysSince(start, todayKr()) };
   }
@@ -218,27 +202,43 @@ function getVehicleState(c: Contract): { name: VehicleState; days: number } {
   if (!c.deliveredDate || c.status === '대기') {
     return { name: '인도대기', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
   }
-  // 인도 완료 = 계약완료 — 만기 D-90 이내면 종료임박
-  const d = daysToExpiry(c);
-  if (d !== null && d <= 90) {
-    return { name: '종료임박', days: d };
-  }
+  // 인도 완료 = 계약중
   return { name: '계약중', days: daysSince(c.deliveredDate, todayKr()) };
 }
 
-/** 계약상태 (3종) — 컴플라이언스 (정기검사·위반) */
-type ContractState = '정상' | '미수검' | '위반';
+/**
+ * 계약상태 (6종) — 계약 라이프사이클 + 컴플라이언스.
+ *   정상 / 종료임박 / 연장대기 / 종료대기 / 위반 / 미수검
+ * 우선순위: 위반 > 미수검 > 연장대기 > 종료대기 > 종료임박 > 정상
+ */
+type ContractState = '정상' | '종료임박' | '연장대기' | '종료대기' | '미수검' | '위반';
 function getContractState(c: Contract): { name: ContractState; days: number } {
   const inspectionOverdue = !!(c.inspectionDueDate && c.inspectionDueDate < todayKr());
   const hasViolations = !!c.hasViolations;
-  // 위반이 미수검보다 우선 (둘 다 있을 시 위반 표시)
+  // 컴플라이언스 위반은 최우선 (계약 진행 막힘)
   if (hasViolations) {
     return { name: '위반', days: c.violationSince ? daysSince(c.violationSince, todayKr()) : 0 };
   }
   if (inspectionOverdue) {
     return { name: '미수검', days: daysSince(c.inspectionDueDate!, todayKr()) };
   }
-  // 정상 = 컴플라이언스 OK 유지 일수 = 계약 시작일부터
+  // 사용자가 명시한 만기 결정 상태
+  if (c.vehicleStatus === '연장대기') {
+    return { name: '연장대기', days: 0 };
+  }
+  if (c.vehicleStatus === '종료대기') {
+    const d = daysToExpiry(c);
+    return { name: '종료대기', days: d !== null ? Math.max(0, -d) : 0 };
+  }
+  // 계약중 + 만기 D-90 이내 → 종료임박 자동
+  const isRunningStatus = c.vehicleStatus === '운행' || (c.deliveredDate && c.status === '운행');
+  if (isRunningStatus) {
+    const d = daysToExpiry(c);
+    if (d !== null && d <= 90) {
+      return { name: '종료임박', days: d };  // 양수: 남은일수, 음수: 경과
+    }
+  }
+  // 정상 = 컴플라이언스 OK + 만기 여유 (계약 시작일부터 운영 일수)
   return { name: '정상', days: daysSince(c.contractDate, todayKr()) };
 }
 
