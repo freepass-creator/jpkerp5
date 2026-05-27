@@ -25,8 +25,11 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 
-type View = '전체' | '계약중' | '종료임박' | '휴차' | '미수';
-const VIEWS: View[] = ['전체', '계약중', '종료임박', '휴차', '미수'];
+type View = '전체' | '계약중' | '종료임박' | '연장대기' | '종료대기' | '휴차' | '미수';
+/** 항상 표시되는 기본 필터 */
+const BASE_VIEWS: View[] = ['전체', '계약중', '휴차', '미수'];
+/** 데이터 있을 때만 표시되는 조건부 필터 */
+const CONDITIONAL_VIEWS: View[] = ['종료임박', '연장대기', '종료대기'];
 
 /** 계약중 = 아직 반납·해지 안된 진행 계약 (운행·대기·휴차·채권 포함) */
 function isActiveContract(c: Contract): boolean {
@@ -66,9 +69,9 @@ function isRunning(c: Contract): boolean {
 function matchesView(c: Contract, v: View): boolean {
   if (v === '전체') return true;
   if (v === '계약중') return isRunning(c);
-  // 종료임박 = 계약상태 = '종료임박' (계약중 + 만기 D-90 이내, 위반/미수검/연장대기/종료대기 제외)
   if (v === '종료임박') return getContractState(c).name === '종료임박';
-  // 휴차 = "계약중이 아닌 모든 차" — 구매대기/등록/상품화/상품대기/반납/대기 등 비운행 전체
+  if (v === '연장대기') return c.vehicleStatus === '연장대기';
+  if (v === '종료대기') return c.vehicleStatus === '종료대기';
   if (v === '휴차') return !isRunning(c);
   if (v === '미수') return c.unpaidAmount > 0;
   return true;
@@ -414,12 +417,28 @@ export default function Page() {
   }, [contracts, companyFilter]);
 
   /** 상태 칩 카운트 — 회사 필터를 적용한 상태에서 각 view 별 수 (양방향 연동) */
-  const viewCounts = useMemo(() => ({
-    전체: contracts.filter((c) => matchesCompany(c, companyFilter)).length,
-    계약중: contracts.filter((c) => matchesCompany(c, companyFilter) && matchesView(c, '계약중')).length,
-    휴차: contracts.filter((c) => matchesCompany(c, companyFilter) && matchesView(c, '휴차')).length,
-    미수: contracts.filter((c) => matchesCompany(c, companyFilter) && matchesView(c, '미수')).length,
-  } as Record<View, number>), [contracts, companyFilter]);
+  const viewCounts = useMemo<Record<View, number>>(() => {
+    const scoped = contracts.filter((c) => matchesCompany(c, companyFilter));
+    return {
+      전체: scoped.length,
+      계약중: scoped.filter((c) => matchesView(c, '계약중')).length,
+      종료임박: scoped.filter((c) => matchesView(c, '종료임박')).length,
+      연장대기: scoped.filter((c) => matchesView(c, '연장대기')).length,
+      종료대기: scoped.filter((c) => matchesView(c, '종료대기')).length,
+      휴차: scoped.filter((c) => matchesView(c, '휴차')).length,
+      미수: scoped.filter((c) => matchesView(c, '미수')).length,
+    };
+  }, [contracts, companyFilter]);
+
+  /** 화면에 표시할 view 칩 목록 — 데이터 있는 conditional view만 포함 */
+  const visibleViews = useMemo<View[]>(() => {
+    const out: View[] = ['전체', '계약중'];
+    for (const v of CONDITIONAL_VIEWS) {
+      if (viewCounts[v] > 0) out.push(v);
+    }
+    out.push('휴차', '미수');
+    return out;
+  }, [viewCounts]);
 
   /** 회사 칩 카운트 — 상태 필터를 적용한 상태에서 각 회사별 수 (양방향 연동) */
   const companyCounts = useMemo(() => {
@@ -494,10 +513,21 @@ export default function Page() {
         </div>
 
         <div className="filter-bar">
-          {VIEWS.map((v) => {
+          {visibleViews.map((v) => {
             const count = viewCounts[v];
+            // view별 고유 색상 — 활성 시 chip-{color} 클래스로 brand 대신 해당 색 사용
+            const tone = v === '미수' ? 'red'
+              : v === '종료임박' ? 'amber'
+              : v === '연장대기' ? 'blue'
+              : v === '종료대기' ? 'orange'
+              : v === '휴차' ? 'gray'
+              : 'brand';
             return (
-              <button key={v} className={`chip ${view === v ? 'active' : ''}`} onClick={() => setView(v)}>
+              <button
+                key={v}
+                className={`chip chip-tone-${tone} ${view === v ? 'active' : ''}`}
+                onClick={() => setView(v)}
+              >
                 {v}
                 {count > 0 && <span className="chip-count">{count}</span>}
               </button>

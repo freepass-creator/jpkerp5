@@ -1125,6 +1125,27 @@ input[type="radio"]:disabled {
   color: var(--text-sub);
 }
 
+/* ── Chip tone — view filter 등에서 항목별 고유 색상 (active 시 적용) ──
+   비활성은 모두 같은 회색 그대로. active 시 톤별 색으로 채움.
+   `chip-tone-{red|amber|orange|blue|gray|brand}` */
+.chip.chip-tone-red.active     { background: var(--red-text);    border-color: var(--red-text);    color: #fff; }
+.chip.chip-tone-red.active:hover    { background: var(--red-text);    border-color: var(--red-text);    filter: brightness(0.92); }
+.chip.chip-tone-amber.active   { background: var(--amber-text);  border-color: var(--amber-text);  color: #fff; }
+.chip.chip-tone-amber.active:hover  { background: var(--amber-text);  border-color: var(--amber-text);  filter: brightness(0.92); }
+.chip.chip-tone-orange.active  { background: var(--orange-text); border-color: var(--orange-text); color: #fff; }
+.chip.chip-tone-orange.active:hover { background: var(--orange-text); border-color: var(--orange-text); filter: brightness(0.92); }
+.chip.chip-tone-blue.active    { background: var(--blue-text);   border-color: var(--blue-text);   color: #fff; }
+.chip.chip-tone-blue.active:hover   { background: var(--blue-text);   border-color: var(--blue-text);   filter: brightness(0.92); }
+.chip.chip-tone-gray.active    { background: var(--text-sub);    border-color: var(--text-sub);    color: #fff; }
+.chip.chip-tone-gray.active:hover   { background: var(--text-sub);    border-color: var(--text-sub);    filter: brightness(0.92); }
+/* chip-tone-brand 는 기본 .chip.active 와 동일 → 별도 정의 불필요 */
+
+/* 비활성 chip 의 텍스트 미세 색상 — 톤 힌트 (옅게) */
+.chip.chip-tone-red:not(.active)    { color: var(--red-text); }
+.chip.chip-tone-amber:not(.active)  { color: var(--amber-text); }
+.chip.chip-tone-orange:not(.active) { color: var(--orange-text); }
+.chip.chip-tone-blue:not(.active)   { color: var(--blue-text); }
+
 /* ────────────── Table ────────────── */
 .table-wrap { width: 100%; overflow: auto; height: 100%; }
 
