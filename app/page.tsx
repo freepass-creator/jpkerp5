@@ -301,9 +301,15 @@ export default function Page() {
   /**
    * 운영현황 통합 view — 계약 + 휴차차량(계약 없는 차량 = 휴차중).
    * 사용자 명시: "계약탭에 계약정보가 없는건 휴차중이라고 보면됨"
+   *
+   * 차량 테이블에 존재 = 이미 구매됨. 따라서 '구매대기'/'운행'은 부적절.
+   * 적절한 후보: 등록대기/상품화중/상품대기/휴차대기/매각대기 등. 그 외는 휴차대기로 통일.
    */
   const contracts = useMemo<Contract[]>(() => {
     const contractedPlates = new Set(rawContracts.map((c) => c.vehiclePlate?.trim()).filter(Boolean));
+    // 차량 테이블에 있으면 = 구매 완료. 구매대기/운행 은 의미상 어색하므로 휴차대기로 정규화.
+    const isIdleAppropriate = (s: string): boolean =>
+      ['등록대기', '상품화대기', '상품화중', '상품대기', '인도대기', '출고대기', '휴차대기', '휴차', '매각대기', '정비', '사고', '반납'].includes(s);
     const orphans = vehicles
       .filter((v) => v.plate && !contractedPlates.has(v.plate.trim()))
       .map<Contract>((v) => ({
@@ -314,7 +320,7 @@ export default function Page() {
         customerPhone1: '',
         vehiclePlate: v.plate,
         vehicleModel: v.model,
-        vehicleStatus: v.status === '운행' ? '휴차대기' : v.status,
+        vehicleStatus: isIdleAppropriate(v.status) ? v.status : '휴차대기',
         contractDate: v.purchasedDate ?? v.createdAt?.slice(0, 10) ?? '',
         termMonths: 0,
         longTerm: false,
