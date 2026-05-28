@@ -213,6 +213,8 @@ export default function ReceivablesPage() {
                         aria-label="전체 선택"
                       />
                     </th>
+                    <th className="center" style={{ width: 64 }}>회사</th>
+                    <th className="center" style={{ width: 84 }}>차량상태</th>
                     <th style={{ width: 92 }}>차량번호</th>
                     <th style={{ width: 96 }}>계약자</th>
                     <th style={{ width: 116 }}>연락처</th>
@@ -229,7 +231,7 @@ export default function ReceivablesPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="muted center" style={{ padding: 32 }}>
+                      <td colSpan={14} className="muted center" style={{ padding: 32 }}>
                         {filter} 해당 계약 없음
                       </td>
                     </tr>
@@ -256,6 +258,8 @@ export default function ReceivablesPage() {
                               aria-label="행 선택"
                             />
                           </td>
+                          <td className="center dim">{c.company || '-'}</td>
+                          <td className="center"><span className={`status ${c.vehicleStatus}`}>{c.vehicleStatus || '-'}</span></td>
                           <td className="mono">{c.vehiclePlate}</td>
                           <td>{c.customerName}</td>
                           <td className="mono">{c.customerPhone1 || '-'}</td>
