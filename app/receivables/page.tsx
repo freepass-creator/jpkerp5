@@ -257,70 +257,64 @@ export default function ReceivablesPage() {
                           </td>
                           <td className="mono">{c.vehiclePlate}</td>
                           <td>{c.customerName}</td>
-                          <td className="mono" style={{ fontSize: 11 }}>{c.customerPhone1 || '-'}</td>
+                          <td className="mono">{c.customerPhone1 || '-'}</td>
                           <td className="num">{(c.unpaidAmount ?? 0).toLocaleString()}</td>
                           <td className="center">{c.unpaidSeqCount ?? 0}</td>
                           <td className="center" style={{ color: days > 60 ? 'var(--red-text)' : days > 30 ? 'var(--orange-text)' : undefined }}>
                             {days > 0 ? `${days}일` : '-'}
                           </td>
-                          <td className="center mono" style={{ fontSize: 11 }}>{lastC ?? '-'}</td>
+                          <td className="center mono">{lastC ?? '-'}</td>
                           <td className="center">
                             <button
                               type="button"
-                              className="btn"
+                              className="btn btn-sm"
                               onClick={() => toggleEngineLock(c)}
                               style={{
-                                height: 22,
-                                padding: '0 8px',
-                                fontSize: 10,
                                 background: c.engineDisabled ? 'var(--red-text)' : 'transparent',
                                 color: c.engineDisabled ? '#fff' : 'var(--text-sub)',
-                                border: '1px solid ' + (c.engineDisabled ? 'var(--red-text)' : 'var(--border)'),
+                                borderColor: c.engineDisabled ? 'var(--red-text)' : 'var(--border)',
                               }}
                               title={c.engineDisabled ? `${c.engineDisabledAt?.slice(0, 10) ?? ''} 제어 시작` : '시동제어 ON'}
                             >
-                              <Power size={11} weight={c.engineDisabled ? 'fill' : 'regular'} />
+                              <Power weight={c.engineDisabled ? 'fill' : 'regular'} />
                               {c.engineDisabled ? 'ON' : 'OFF'}
                             </button>
                           </td>
                           <td className="center">
                             <button
                               type="button"
-                              className="btn"
+                              className="btn btn-sm"
                               onClick={() => toggleDebtFlag(c)}
                               style={{
-                                height: 22,
-                                padding: '0 8px',
-                                fontSize: 10,
                                 background: c.status === '채권' ? 'var(--zinc-text)' : 'transparent',
                                 color: c.status === '채권' ? '#fff' : 'var(--text-sub)',
-                                border: '1px solid ' + (c.status === '채권' ? 'var(--zinc-text)' : 'var(--border)'),
+                                borderColor: c.status === '채권' ? 'var(--zinc-text)' : 'var(--border)',
                               }}
                               title={c.status === '채권' ? '채권 해제' : '채권화 (회수불가)'}
                             >
-                              <Gavel size={11} weight={c.status === '채권' ? 'fill' : 'regular'} />
+                              <Gavel weight={c.status === '채권' ? 'fill' : 'regular'} />
                               {c.status === '채권' ? 'ON' : 'OFF'}
                             </button>
                           </td>
-                          <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                            <button
-                              type="button"
-                              className="btn"
-                              onClick={() => setContactOpen(c)}
-                              style={{ height: 22, padding: '0 8px', fontSize: 10 }}
-                              title="연락기록 추가"
-                            >
-                              <ChatCircleDots size={11} /> 연락
-                            </button>
-                            <button
-                              type="button"
-                              className="btn"
-                              onClick={() => window.open(`/notice/cert/${c.id}`, '_blank')}
-                              style={{ height: 22, padding: '0 8px', fontSize: 10 }}
-                              title="내용증명 (최고서) — 새 탭"
-                            >
-                              <FileText size={11} /> 내용증명
-                            </button>
+                          <td>
+                            <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                onClick={() => setContactOpen(c)}
+                                title="연락기록 추가"
+                              >
+                                <ChatCircleDots /> 연락
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                onClick={() => window.open(`/notice/cert/${c.id}`, '_blank')}
+                                title="내용증명 (최고서) — 새 탭"
+                              >
+                                <FileText /> 내용증명
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
