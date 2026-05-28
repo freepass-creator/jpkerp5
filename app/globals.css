@@ -880,26 +880,6 @@ a { color: var(--text-link); text-decoration: none; }
   color: var(--text-main);
 }
 
-/* Panel header 큰 버전 — 운영현황 같은 메인 화면 박스 (jpkerp4 v3 박스 패턴) */
-.panel-header.is-page {
-  height: 46px;
-  padding: 10px 14px;
-}
-.panel-title-lg {
-  font-weight: var(--font-weight-bold, 600);
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-main);
-  letter-spacing: -0.01em;
-}
-.panel-title-lg .panel-subtitle {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-weak);
-  margin-left: 4px;
-}
 
 .panel-title .badge {
   display: inline-flex;
