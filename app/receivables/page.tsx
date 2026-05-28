@@ -222,13 +222,14 @@ export default function ReceivablesPage() {
                     <th className="center" style={{ width: 88 }}>마지막연락</th>
                     <th className="center" style={{ width: 80 }}>시동제어</th>
                     <th className="center" style={{ width: 64 }}>채권</th>
-                    <th>액션</th>
+                    <th style={{ width: 170 }}>액션</th>
+                    <th>비고</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="muted center" style={{ padding: 32 }}>
+                      <td colSpan={12} className="muted center" style={{ padding: 32 }}>
                         {filter} 해당 계약 없음
                       </td>
                     </tr>
@@ -315,6 +316,9 @@ export default function ReceivablesPage() {
                                 <FileText /> 내용증명
                               </button>
                             </div>
+                          </td>
+                          <td className="dim" style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.notes || ''}>
+                            {c.notes || <span className="muted">-</span>}
                           </td>
                         </tr>
                       );
