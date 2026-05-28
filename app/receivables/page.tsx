@@ -1,8 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Warning, Power, FileXls, ChatCircleDots, X, MagnifyingGlass } from '@phosphor-icons/react';
+import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
+import { BottomBar } from '@/components/layout/bottom-bar';
+import dynamic from 'next/dynamic';
+const CreateDialog = dynamic(() => import('@/components/create-dialog').then((m) => m.CreateDialog), { ssr: false });
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useAuth } from '@/lib/use-auth';
@@ -51,6 +54,7 @@ export default function ReceivablesPage() {
   const [filter, setFilter] = useState<Filter>('전체');
   const [search, setSearch] = useState('');
   const [contactOpen, setContactOpen] = useState<Contract | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const today = todayKr();
 
@@ -94,6 +98,27 @@ export default function ReceivablesPage() {
       검사지연: base.filter((c) => isInspectionOverdue(c, today)).length,
     };
   }, [contracts, today]);
+
+  /** 채권화 토글 — 회수 어려운 미수금 분류 (수동) */
+  async function toggleDebtFlag(c: Contract) {
+    if (!admin) { toast.error('관리자만 채권 변경 가능'); return; }
+    const isDebt = c.status === '채권';
+    if (!isDebt) {
+      if (!window.confirm(`${c.vehiclePlate} ${c.customerName} — 채권화 처리 (회수불가/법적조치 검토)?`)) return;
+    } else {
+      if (!window.confirm(`${c.vehiclePlate} ${c.customerName} — 채권 해제하시겠습니까?`)) return;
+    }
+    try {
+      // 채권화 시 status='채권', 해제 시 returnedDate 있으면 '반납', 없으면 '운행'
+      const nextStatus: Contract['status'] = isDebt
+        ? (c.returnedDate ? '반납' : '운행')
+        : '채권';
+      await updateContract({ ...c, status: nextStatus });
+      toast.success(isDebt ? `${c.vehiclePlate} 채권 해제` : `${c.vehiclePlate} 채권화`);
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
 
   async function toggleEngineLock(c: Contract) {
     if (!admin) { toast.error('관리자만 시동제어 가능'); return; }
@@ -175,13 +200,14 @@ export default function ReceivablesPage() {
                     <th className="center" style={{ width: 76 }}>경과일</th>
                     <th className="center" style={{ width: 100 }}>마지막연락</th>
                     <th className="center" style={{ width: 80 }}>시동제어</th>
+                    <th className="center" style={{ width: 70 }}>채권</th>
                     <th style={{ width: 100 }}>액션</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="muted center" style={{ padding: 32 }}>
+                      <td colSpan={10} className="muted center" style={{ padding: 32 }}>
                         {filter} 해당 계약 없음
                       </td>
                     </tr>
@@ -217,6 +243,25 @@ export default function ReceivablesPage() {
                             >
                               <Power size={11} weight={c.engineDisabled ? 'fill' : 'regular'} />
                               {c.engineDisabled ? 'ON' : 'OFF'}
+                            </button>
+                          </td>
+                          <td className="center">
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={() => toggleDebtFlag(c)}
+                              style={{
+                                height: 22,
+                                padding: '0 8px',
+                                fontSize: 10,
+                                background: c.status === '채권' ? 'var(--zinc-text)' : 'transparent',
+                                color: c.status === '채권' ? '#fff' : 'var(--text-sub)',
+                                border: '1px solid ' + (c.status === '채권' ? 'var(--zinc-text)' : 'var(--border)'),
+                              }}
+                              title={c.status === '채권' ? '채권 해제' : '채권화 (회수불가)'}
+                            >
+                              <Gavel size={11} weight={c.status === '채권' ? 'fill' : 'regular'} />
+                              {c.status === '채권' ? 'ON' : 'OFF'}
                             </button>
                           </td>
                           <td>
@@ -296,7 +341,35 @@ export default function ReceivablesPage() {
             </div>
           </div>
         </div>
+
+        <BottomBar
+          left={
+            <>
+              <button className="btn btn-primary" type="button" onClick={() => setCreateOpen(true)}>
+                <Plus size={14} weight="bold" /> 신규 등록
+              </button>
+              <button className="btn" type="button" onClick={() => setContactOpen(filtered[0] ?? null)} disabled={filtered.length === 0} title="첫 행 연락기록 — 행 선택 후 우측 연락 버튼 권장">
+                <ChatCircleDots size={14} /> 연락기록
+              </button>
+            </>
+          }
+          right={
+            <>
+              <span>표시 <strong>{filtered.length}</strong>건</span>
+              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+              <span>미수 <strong className="mono" style={{ color: 'var(--red-text)' }}>₩{filtered.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0).toLocaleString()}</strong></span>
+              {counts['시동제어'] > 0 && (
+                <>
+                  <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                  <span><Power size={11} weight="fill" style={{ color: 'var(--red-text)', verticalAlign: 'middle' }} /> {counts['시동제어']}</span>
+                </>
+              )}
+            </>
+          }
+        />
       </div>
+
+      <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
 
       {/* 연락기록 다이얼로그 */}
       {contactOpen && (
