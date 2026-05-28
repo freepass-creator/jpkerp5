@@ -12,9 +12,20 @@ import { todayKr } from '@/lib/mock-data';
 import { friendlyError } from '@/lib/friendly-error';
 import type { Contract } from '@/lib/types';
 
-type Filter = '연체중' | '부분납' | '시동제어' | '채권화';
+type Filter = '연체중' | '부분납' | '시동제어' | '채권화' | '미검' | '보험만료';
 
-const FILTERS: Filter[] = ['연체중', '부분납', '시동제어', '채권화'];
+const FILTERS: Filter[] = ['연체중', '부분납', '시동제어', '채권화', '미검', '보험만료'];
+
+/** 보험만료 임박 — 만료일 이미 지났거나 14일 이내 */
+function isInsuranceExpiring(c: Contract, today: string): boolean {
+  if (!c.insuranceExpiryDate) return false;
+  const diff = Math.round((new Date(c.insuranceExpiryDate).getTime() - new Date(today).getTime()) / 86400000);
+  return diff <= 14;
+}
+/** 미검 — 정기검사 예정일 지남 */
+function isInspectionOverdue(c: Contract, today: string): boolean {
+  return !!(c.inspectionDueDate && c.inspectionDueDate < today);
+}
 
 function hasOverdue(c: Contract): boolean {
   return (c.schedules ?? []).some((s) => s.status === '연체');
@@ -56,6 +67,8 @@ export default function ReceivablesPage() {
     else if (filter === '부분납') list = base.filter(hasPartial);
     else if (filter === '시동제어') list = base.filter((c) => c.engineDisabled === true);
     else if (filter === '채권화') list = base.filter((c) => c.status === '채권');
+    else if (filter === '미검') list = base.filter((c) => isInspectionOverdue(c, today));
+    else if (filter === '보험만료') list = base.filter((c) => isInsuranceExpiring(c, today));
     else list = base;
 
     const q = search.trim().toLowerCase();
@@ -73,12 +86,14 @@ export default function ReceivablesPage() {
     부분납: contracts.filter(hasPartial).length,
     시동제어: contracts.filter((c) => c.engineDisabled === true).length,
     채권화: contracts.filter((c) => c.status === '채권').length,
-  }), [contracts]);
+    미검: contracts.filter((c) => isInspectionOverdue(c, today)).length,
+    보험만료: contracts.filter((c) => isInsuranceExpiring(c, today)).length,
+  }), [contracts, today]);
 
   async function toggleEngineLock(c: Contract) {
     if (!admin) { toast.error('관리자만 시동제어 가능'); return; }
     const next = !c.engineDisabled;
-    const reason = next ? prompt('시동제어 사유 (선택)') ?? '' : '';
+    const reason = next ? (prompt('시동제어 사유\n(미납 / 미검 / 보험만료 / 자동차세 / 기타 중 입력)') ?? '') : '';
     if (next && reason === null) return;
     try {
       await updateContract({
@@ -99,6 +114,8 @@ export default function ReceivablesPage() {
     if (f === '부분납') return 'orange';
     if (f === '시동제어') return 'amber';
     if (f === '채권화') return 'gray';
+    if (f === '미검') return 'blue';
+    if (f === '보험만료') return 'amber';
     return 'brand';
   };
 
@@ -109,7 +126,7 @@ export default function ReceivablesPage() {
         <header className="topbar">
           <div className="topbar-title">
             <Warning size={16} weight="fill" style={{ color: 'var(--red-text)' }} />
-            <span>미수관리</span>
+            <span>리스크 관리</span>
           </div>
           <div className="topbar-search">
             <MagnifyingGlass size={14} className="icon" />
@@ -217,7 +234,7 @@ export default function ReceivablesPage() {
             </div>
           </div>
 
-          {/* 보조 패널 — 시동제어 현황 */}
+          {/* 보조 패널 — 시동제어 현황 (사유별 그룹) */}
           <div className="sidebar-stack">
             <div className="panel">
               <div className="panel-header">
@@ -237,45 +254,61 @@ export default function ReceivablesPage() {
               <div className="panel-body">
                 {counts['시동제어'] === 0 ? (
                   <div className="empty-state">시동제어 중 차량 없음</div>
-                ) : (
-                  <div>
-                    {contracts
-                      .filter((c) => c.engineDisabled)
-                      .sort((a, b) => (b.engineDisabledAt ?? '').localeCompare(a.engineDisabledAt ?? ''))
-                      .map((c) => {
-                        const startDate = c.engineDisabledAt?.slice(0, 10) ?? '';
-                        const daysSince = startDate
-                          ? Math.max(0, Math.round((new Date(today).getTime() - new Date(startDate).getTime()) / 86400000))
-                          : 0;
-                        return (
-                          <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
-                            <span className="tag over">제어</span>
-                            <div className="list-item-main">
-                              <div className="list-item-top">
-                                {c.customerName}
-                                <span className="text-weak text-xs">{c.company}</span>
+                ) : (() => {
+                    const locked = contracts.filter((c) => c.engineDisabled);
+                    // 사유별 그룹
+                    const reasonOrder = ['미납', '미검', '보험만료', '자동차세', '기타'];
+                    const groups = new Map<string, Contract[]>();
+                    for (const c of locked) {
+                      const r = (c.engineDisabledReason || '').trim();
+                      const key = reasonOrder.find((k) => r.includes(k)) ?? (r || '기타');
+                      const arr = groups.get(key) ?? [];
+                      arr.push(c);
+                      groups.set(key, arr);
+                    }
+                    const orderedKeys = [...reasonOrder.filter((k) => groups.has(k)), ...Array.from(groups.keys()).filter((k) => !reasonOrder.includes(k))];
+                    return (
+                      <div>
+                        {orderedKeys.map((reason) => {
+                          const list = groups.get(reason) ?? [];
+                          return (
+                            <div key={reason}>
+                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-weak)', background: 'var(--bg-sunken)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>· {reason}</span>
+                                <span className="mono">{list.length}건</span>
                               </div>
-                              <div className="list-item-sub">
-                                <span className="plate">{c.vehiclePlate}</span>
-                                <span className="text-weak">·</span>
-                                <span className="danger mono">₩{(c.unpaidAmount ?? 0).toLocaleString()}</span>
-                                {c.engineDisabledReason && (
-                                  <>
-                                    <span className="text-weak">·</span>
-                                    <span className="text-weak text-xs">{c.engineDisabledReason}</span>
-                                  </>
-                                )}
-                              </div>
+                              {list.sort((a, b) => (b.engineDisabledAt ?? '').localeCompare(a.engineDisabledAt ?? '')).map((c) => {
+                                const startDate = c.engineDisabledAt?.slice(0, 10) ?? '';
+                                const daysSince = startDate
+                                  ? Math.max(0, Math.round((new Date(today).getTime() - new Date(startDate).getTime()) / 86400000))
+                                  : 0;
+                                return (
+                                  <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
+                                    <span className="tag over">제어</span>
+                                    <div className="list-item-main">
+                                      <div className="list-item-top">
+                                        {c.customerName}
+                                        <span className="text-weak text-xs">{c.company}</span>
+                                      </div>
+                                      <div className="list-item-sub">
+                                        <span className="plate">{c.vehiclePlate}</span>
+                                        <span className="text-weak">·</span>
+                                        <span className="danger mono">₩{(c.unpaidAmount ?? 0).toLocaleString()}</span>
+                                      </div>
+                                    </div>
+                                    <div className="list-item-right">
+                                      <div className="dday danger">D+{daysSince}</div>
+                                      <div className="date">{startDate}</div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                            <div className="list-item-right">
-                              <div className="dday danger">D+{daysSince}</div>
-                              <div className="date">{startDate}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
               </div>
             </div>
           </div>

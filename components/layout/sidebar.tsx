@@ -56,9 +56,9 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
           <House size={14} weight={pathname === '/' ? 'fill' : 'regular'} />
           <span>운영 현황</span>
         </Link>
-        <Link href="/receivables" className={`sb-item ${isActive('/receivables') ? 'active' : ''}`} title="미수관리 — 연체/부분납/시동제어/채권화 전문 관리">
+        <Link href="/receivables" className={`sb-item ${isActive('/receivables') ? 'active' : ''}`} title="리스크 관리 — 미수/시동제어/미검/보험만료 등 전체 위반 관리">
           <HandCoins size={14} weight={isActive('/receivables') ? 'fill' : 'regular'} />
-          <span>미수관리</span>
+          <span>리스크 관리</span>
         </Link>
         <Link href="/payments" className={`sb-item ${isActive('/payments') ? 'active' : ''}`} title="계좌 관리 (계좌·카드)">
           <CurrencyKrw size={14} weight={isActive('/payments') ? 'fill' : 'regular'} />
