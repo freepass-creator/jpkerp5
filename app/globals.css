@@ -680,8 +680,7 @@ a { color: var(--text-link); text-decoration: none; }
   padding-right: 12px;
   align-items: center;
 }
-:root[data-sidebar="collapsed"] .sb-item,
-:root[data-sidebar="collapsed"] .page-shell-nav-item {
+:root[data-sidebar="collapsed"] .sb-item {
   width: 32px;
   height: 32px;
   padding: 0;

@@ -143,8 +143,6 @@ export default function ReceivablesPage() {
           <div className="panel">
             <div className="panel-header is-page">
               <div className="panel-title-lg">
-                <Warning size={14} weight="duotone" style={{ color: 'var(--red-text)' }} />
-                <span>미수관리</span>
                 <span className="badge">{filtered.length}건</span>
                 <span className="panel-subtitle">{filter}</span>
               </div>

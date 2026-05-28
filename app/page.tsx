@@ -623,8 +623,6 @@ export default function Page() {
         <div className="panel">
           <div className="panel-header is-page">
             <div className="panel-title-lg">
-              <House size={14} weight="duotone" style={{ color: 'var(--brand)' }} />
-              <span>운영 현황</span>
               <span className="badge">{filteredContracts.length}건</span>
               <span className="panel-subtitle">{view}{companyFilter !== '전체' ? ` · ${displayCompanyName(companyFilter, companyMaster) || companyFilter}` : ''}</span>
             </div>
