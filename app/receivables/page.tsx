@@ -12,17 +12,11 @@ import { todayKr } from '@/lib/mock-data';
 import { friendlyError } from '@/lib/friendly-error';
 import type { Contract } from '@/lib/types';
 
-type Filter = '전체' | '연체중' | '부분납' | '시동제어' | '채권화' | '검사지연' | '보험만료';
+type Filter = '전체' | '연체중' | '부분납' | '시동제어' | '채권화' | '검사지연';
 
-const FILTERS: Filter[] = ['전체', '연체중', '부분납', '시동제어', '채권화', '검사지연', '보험만료'];
+const FILTERS: Filter[] = ['전체', '연체중', '부분납', '시동제어', '채권화', '검사지연'];
 
-/** 보험만료 임박 — 만료일 이미 지났거나 14일 이내 */
-function isInsuranceExpiring(c: Contract, today: string): boolean {
-  if (!c.insuranceExpiryDate) return false;
-  const diff = Math.round((new Date(c.insuranceExpiryDate).getTime() - new Date(today).getTime()) / 86400000);
-  return diff <= 14;
-}
-/** 검사지연 — 정기검사 예정일 지남 */
+/** 검사지연 — 정기검사 예정일 지남 (임차인이 받아야 하는 책임 사항) */
 function isInspectionOverdue(c: Contract, today: string): boolean {
   return !!(c.inspectionDueDate && c.inspectionDueDate < today);
 }
@@ -65,7 +59,7 @@ export default function ReceivablesPage() {
     // 전체 = 한 가지 이상 리스크 가진 계약만 (정상 계약 제외)
     const hasAnyRisk = (c: Contract) =>
       hasOverdue(c) || hasPartial(c) || c.engineDisabled === true || c.status === '채권'
-      || isInspectionOverdue(c, today) || isInsuranceExpiring(c, today);
+      || isInspectionOverdue(c, today);
 
     let list: Contract[];
     if (filter === '전체') list = base.filter(hasAnyRisk);
@@ -74,7 +68,6 @@ export default function ReceivablesPage() {
     else if (filter === '시동제어') list = base.filter((c) => c.engineDisabled === true);
     else if (filter === '채권화') list = base.filter((c) => c.status === '채권');
     else if (filter === '검사지연') list = base.filter((c) => isInspectionOverdue(c, today));
-    else if (filter === '보험만료') list = base.filter((c) => isInsuranceExpiring(c, today));
     else list = base;
 
     const q = search.trim().toLowerCase();
@@ -91,7 +84,7 @@ export default function ReceivablesPage() {
     const base = contracts.filter((c) => c.id && !c.id.startsWith('vehicle-orphan-'));
     const hasAnyRisk = (c: Contract) =>
       hasOverdue(c) || hasPartial(c) || c.engineDisabled === true || c.status === '채권'
-      || isInspectionOverdue(c, today) || isInsuranceExpiring(c, today);
+      || isInspectionOverdue(c, today);
     return {
       전체: base.filter(hasAnyRisk).length,
       연체중: base.filter(hasOverdue).length,
@@ -99,14 +92,13 @@ export default function ReceivablesPage() {
       시동제어: base.filter((c) => c.engineDisabled === true).length,
       채권화: base.filter((c) => c.status === '채권').length,
       검사지연: base.filter((c) => isInspectionOverdue(c, today)).length,
-      보험만료: base.filter((c) => isInsuranceExpiring(c, today)).length,
     };
   }, [contracts, today]);
 
   async function toggleEngineLock(c: Contract) {
     if (!admin) { toast.error('관리자만 시동제어 가능'); return; }
     const next = !c.engineDisabled;
-    const reason = next ? (prompt('시동제어 사유\n(미납 / 검사지연 / 보험만료 / 자동차세 / 기타 중 입력)') ?? '') : '';
+    const reason = next ? (prompt('시동제어 사유\n(미납 / 검사지연 / 기타 중 입력)') ?? '') : '';
     if (next && reason === null) return;
     try {
       await updateContract({
@@ -129,7 +121,6 @@ export default function ReceivablesPage() {
     if (f === '시동제어') return 'amber';
     if (f === '채권화') return 'gray';
     if (f === '검사지연') return 'blue';
-    if (f === '보험만료') return 'amber';
     return 'brand';
   };
 
@@ -278,7 +269,7 @@ export default function ReceivablesPage() {
                         ? Math.max(0, Math.round((new Date(today).getTime() - new Date(startDate).getTime()) / 86400000))
                         : 0;
                       const reason = (c.engineDisabledReason || '').trim();
-                      const reasonKey = ['미납', '검사지연', '보험만료', '자동차세'].find((k) => reason.includes(k)) ?? (reason || '기타');
+                      const reasonKey = ['미납', '검사지연'].find((k) => reason.includes(k)) ?? (reason || '기타');
                       return (
                         <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
                           <span className="tag over">{reasonKey}</span>
