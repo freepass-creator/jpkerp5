@@ -2,12 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import {
-  CurrencyKrw, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar, DownloadSimple, Receipt,
+  CurrencyKrw, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar, DownloadSimple,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { CreateDialog } from '@/components/create-dialog';
-import { PaymentLedgerDialog } from '@/components/payment-ledger-dialog';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -21,7 +20,7 @@ import { audit } from '@/lib/firebase/audit-store';
 import { todayKr } from '@/lib/mock-data';
 import type { BankTransaction, Contract } from '@/lib/types';
 
-type Tab = 'ledger' | 'summary' | 'card';
+type Tab = 'all' | 'receipt' | 'expense' | 'summary' | 'card';
 
 /** 자금일보 분개 상태 */
 function ledgerStatus(tx: BankTransaction): 'unposted' | 'posted' | 'closed' {
@@ -33,13 +32,12 @@ function ledgerStatus(tx: BankTransaction): 'unposted' | 'posted' | 'closed' {
 const STATUS_LABEL = { unposted: '미분개', posted: '분개', closed: '마감' } as const;
 
 export default function PaymentsPage() {
-  const [tab, setTab] = useState<Tab>('ledger');
+  const [tab, setTab] = useState<Tab>('all');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'unposted' | 'posted' | 'closed'>('all');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [ledgerOpen, setLedgerOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
 
@@ -63,6 +61,9 @@ export default function PaymentsPage() {
     const q = search.trim().toLowerCase();
     return bankTx
       .filter((t) => {
+        // 탭별 분기: 수납내역=입금만 / 지출내역=출금만 / 계좌내역=전체
+        if (tab === 'receipt' && !((t.amount ?? 0) > 0)) return false;
+        if (tab === 'expense' && !((t.withdraw ?? 0) > 0)) return false;
         const st = ledgerStatus(t);
         if (filter !== 'all' && st !== filter) return false;
         if (companyFilter !== 'all') {
@@ -81,7 +82,7 @@ export default function PaymentsPage() {
         return true;
       })
       .sort((a, b) => b.txDate.localeCompare(a.txDate));
-  }, [bankTx, search, filter, companyFilter, subjectFilter, contractById]);
+  }, [bankTx, search, filter, companyFilter, subjectFilter, contractById, tab]);
 
   /** 분개 뷰에 노출할 회사 목록 (실 데이터 기반) */
   const companyOptions = useMemo(() => {
@@ -317,19 +318,31 @@ export default function PaymentsPage() {
           </div>
 
           <div className="filter-bar">
-            <button type="button" className={`chip ${tab === 'ledger' ? 'active' : ''}`} onClick={() => setTab('ledger')}>
-              <ListChecks /> 자금일보 — 분개
+            <button type="button" className={`chip ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>
+              <ListChecks /> 계좌내역
               {bankTx.length > 0 && <span className="chip-count">{bankTx.length}</span>}
             </button>
             <button type="button" className={`chip ${tab === 'summary' ? 'active' : ''}`} onClick={() => setTab('summary')}>
-              <ChartBar /> 일자별 집계
+              <ChartBar /> 자금일보
               {daily.length > 0 && <span className="chip-count">{daily.length}</span>}
+            </button>
+            <button type="button" className={`chip ${tab === 'receipt' ? 'active' : ''}`} onClick={() => setTab('receipt')}>
+              수납내역
+              {bankTx.filter((t) => (t.amount ?? 0) > 0).length > 0 && (
+                <span className="chip-count">{bankTx.filter((t) => (t.amount ?? 0) > 0).length}</span>
+              )}
+            </button>
+            <button type="button" className={`chip ${tab === 'expense' ? 'active' : ''}`} onClick={() => setTab('expense')}>
+              지출내역
+              {bankTx.filter((t) => (t.withdraw ?? 0) > 0).length > 0 && (
+                <span className="chip-count">{bankTx.filter((t) => (t.withdraw ?? 0) > 0).length}</span>
+              )}
             </button>
             <button type="button" className={`chip ${tab === 'card' ? 'active' : ''}`} onClick={() => setTab('card')}>
               <CreditCard /> 카드 매출
               {cardTx.length > 0 && <span className="chip-count">{cardTx.length}</span>}
             </button>
-            {tab === 'ledger' && (
+            {(tab === 'all' || tab === 'receipt' || tab === 'expense') && (
               <>
                 <span className="filter-divider" />
                 <button type="button" className={`chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>전체</button>
@@ -375,7 +388,7 @@ export default function PaymentsPage() {
         <div className="dashboard" style={{ gridTemplateColumns: '1fr' }}>
           <div className="panel">
             <div className="panel-body">
-              {tab === 'ledger' && (
+              {(tab === 'all' || tab === 'receipt' || tab === 'expense') && (
                 <LedgerTable
                   rows={ledgerRows}
                   contractById={contractById}
@@ -400,23 +413,21 @@ export default function PaymentsPage() {
 
         <BottomBar
           left={
-            <>
-              <button className="btn btn-primary" type="button" onClick={() => setUploadOpen(true)}>
-                <Plus weight="bold" /> 계좌내역 올리기
-              </button>
-              <button className="btn" type="button" onClick={() => setLedgerOpen(true)} title="회사 전체 수납이력 원장">
-                <Receipt size={14} /> 수납 이력
-              </button>
-            </>
+            <button className="btn btn-primary" type="button" onClick={() => setUploadOpen(true)}>
+              <Plus weight="bold" /> 신규 등록
+            </button>
           }
           right={
-            tab === 'ledger' ? (
+            (tab === 'all' || tab === 'receipt' || tab === 'expense') ? (
               <>
-                <span>전체 <strong>{bankTx.length}</strong></span>
+                <span>표시 <strong>{ledgerRows.length}</strong></span>
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <span style={{ color: 'var(--text-weak)' }}>미분개 <strong>{counts.unposted}</strong></span>
-                <span style={{ color: 'var(--green-text)' }}>분개 <strong>{counts.posted}</strong></span>
-                <span style={{ color: 'var(--brand)' }}>마감 <strong>{counts.closed}</strong></span>
+                {tab !== 'expense' && (
+                  <span style={{ color: 'var(--green-text)' }}>입금 <strong className="mono">₩{formatCurrency(ledgerRows.reduce((s, r) => s + (r.amount ?? 0), 0))}</strong></span>
+                )}
+                {tab !== 'receipt' && (
+                  <span style={{ color: 'var(--red-text)' }}>출금 <strong className="mono">₩{formatCurrency(ledgerRows.reduce((s, r) => s + (r.withdraw ?? 0), 0))}</strong></span>
+                )}
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
                 <button className="btn btn-sm btn-primary" type="button" onClick={handleAutoMatchAll}>
                   자동매칭
@@ -450,7 +461,6 @@ export default function PaymentsPage() {
         />
 
         <CreateDialog open={uploadOpen} onOpenChange={setUploadOpen} visibleModes={['수납', '지출']} initialMode="수납" />
-        <PaymentLedgerDialog open={ledgerOpen} onOpenChange={setLedgerOpen} contracts={contracts} />
         <ReceiptMatchDialog
           open={!!matchTarget}
           onOpenChange={(v) => !v && setMatchTarget(null)}
