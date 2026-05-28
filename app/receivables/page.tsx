@@ -436,7 +436,7 @@ export default function ReceivablesPage() {
         />
       </div>
 
-      <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['이력']} initialMode="이력" />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filtered} selectedIds={selectedIds} />
 
       {/* 연락기록 다이얼로그 */}

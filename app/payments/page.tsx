@@ -449,7 +449,7 @@ export default function PaymentsPage() {
           }
         />
 
-        <CreateDialog open={uploadOpen} onOpenChange={setUploadOpen} initialMode="수납" />
+        <CreateDialog open={uploadOpen} onOpenChange={setUploadOpen} visibleModes={['수납', '지출']} initialMode="수납" />
         <PaymentLedgerDialog open={ledgerOpen} onOpenChange={setLedgerOpen} contracts={contracts} />
         <ReceiptMatchDialog
           open={!!matchTarget}

@@ -36,21 +36,26 @@ import { toast } from '@/lib/toast';
 import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 
-type Mode = '현황' | '차량' | '계약' | '수납' | '이력';
+type Mode = '현황' | '차량' | '계약' | '수납' | '지출' | '이력';
+
+const ALL_MODES: Mode[] = ['현황', '차량', '계약', '수납', '지출', '이력'];
 
 export function CreateDialog({
-  open, onOpenChange, initialMode = '현황',
+  open, onOpenChange, initialMode, visibleModes = ALL_MODES,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initialMode?: Mode;
+  /** 노출할 탭 화이트리스트. 미지정 시 전체 노출 */
+  visibleModes?: Mode[];
 }) {
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const defaultMode = initialMode && visibleModes.includes(initialMode) ? initialMode : visibleModes[0] ?? '현황';
+  const [mode, setMode] = useState<Mode>(defaultMode);
 
-  // open 될 때마다 initialMode 로 리셋 (다른 페이지에서 다른 탭으로 진입 가능)
+  // open 될 때마다 defaultMode 로 리셋 (다른 페이지에서 다른 탭으로 진입 가능)
   React.useEffect(() => {
-    if (open) setMode(initialMode);
-  }, [open, initialMode]);
+    if (open) setMode(defaultMode);
+  }, [open, defaultMode]);
   const [parsed, setParsed] = useState<ParsedSheet[]>([]);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -431,17 +436,30 @@ export function CreateDialog({
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
           <Tabs.Root value={mode} onValueChange={(v) => setMode(v as Mode)} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <Tabs.List className="tabs-list">
-              <Tabs.Trigger value="현황" className="tabs-trigger">운영 현황 업로드</Tabs.Trigger>
-              <Tabs.Trigger value="차량" className="tabs-trigger">차량 등록</Tabs.Trigger>
-              <Tabs.Trigger value="계약" className="tabs-trigger">
-                계약 생성
-                {contractsCount > 0 && <span className="count">{contractsCount}</span>}
-              </Tabs.Trigger>
-              <Tabs.Trigger value="수납" className="tabs-trigger">
-                수납 등록
-                {paymentsCount > 0 && <span className="count">{paymentsCount}</span>}
-              </Tabs.Trigger>
-              <Tabs.Trigger value="이력" className="tabs-trigger">이력 등록</Tabs.Trigger>
+              {visibleModes.includes('현황') && (
+                <Tabs.Trigger value="현황" className="tabs-trigger">운영 현황 업로드</Tabs.Trigger>
+              )}
+              {visibleModes.includes('차량') && (
+                <Tabs.Trigger value="차량" className="tabs-trigger">차량 등록</Tabs.Trigger>
+              )}
+              {visibleModes.includes('계약') && (
+                <Tabs.Trigger value="계약" className="tabs-trigger">
+                  계약 생성
+                  {contractsCount > 0 && <span className="count">{contractsCount}</span>}
+                </Tabs.Trigger>
+              )}
+              {visibleModes.includes('수납') && (
+                <Tabs.Trigger value="수납" className="tabs-trigger">
+                  수납 등록
+                  {paymentsCount > 0 && <span className="count">{paymentsCount}</span>}
+                </Tabs.Trigger>
+              )}
+              {visibleModes.includes('지출') && (
+                <Tabs.Trigger value="지출" className="tabs-trigger">지출 등록</Tabs.Trigger>
+              )}
+              {visibleModes.includes('이력') && (
+                <Tabs.Trigger value="이력" className="tabs-trigger">이력 등록</Tabs.Trigger>
+              )}
             </Tabs.List>
 
             <div
@@ -484,6 +502,9 @@ export function CreateDialog({
                   busy={busy}
                   result={result}
                 />
+              </Tabs.Content>
+              <Tabs.Content value="지출">
+                <ExpenseRegisterPane onClose={() => onOpenChange(false)} />
               </Tabs.Content>
               <Tabs.Content value="이력">
                 <HistoryAddPane onClose={() => onOpenChange(false)} />
@@ -2397,6 +2418,109 @@ function PaymentOcrPane({ onSubmit }: { onSubmit: () => void }) {
 
 const VEHICLE_CATEGORIES: HistoryCategory[] = ['정비', '사고', '검사', '세차', '위반', '보험', '부품교체', '기타'];
 const CONTRACT_CATEGORIES: HistoryCategory[] = ['연락기록', '분쟁', '클레임', '수납이슈', '메모', '기타'];
+
+/* ─────────────── 지출 등록 (출금 항목) ─────────────── */
+const EXPENSE_CATEGORIES = ['차량유지비', '보험료', '자동차세', '수수료', '임차료', '인건비', '광고비', '소모품', '기타'] as const;
+type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
+function ExpenseRegisterPane({ onClose }: { onClose: () => void }) {
+  const { add: addBankTx } = useBankTx();
+  const [txDate, setTxDate] = useState(new Date().toISOString().slice(0, 10));
+  const [category, setCategory] = useState<ExpenseCategory>('차량유지비');
+  const [counterparty, setCounterparty] = useState('');
+  const [amount, setAmount] = useState('');
+  const [memo, setMemo] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const valid = txDate && counterparty.trim() && amount;
+  const amountN = parseInt(amount.replace(/[^0-9]/g, ''), 10) || 0;
+
+  async function handleSave() {
+    if (!valid || saving) return;
+    setSaving(true);
+    try {
+      // bank_tx 에 출금으로 push — 자금일보에 자동 노출
+      await addBankTx({
+        txDate,
+        amount: 0,
+        withdraw: amountN,
+        counterparty: counterparty.trim(),
+        memo: `[${category}] ${memo.trim()}`.trim(),
+        source: '수동',
+      });
+      onClose();
+    } catch (e) {
+      alert('지출 등록 실패: ' + ((e as Error).message ?? String(e)));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); void handleSave(); }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, overflow: 'auto' }}
+    >
+      <div className="detail-section">
+        <div className="detail-section-header">필수 정보</div>
+        <div className="detail-section-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '10px 14px', alignItems: 'center' }}>
+            <label className="form-label">지출일자 *</label>
+            <input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} required />
+
+            <label className="form-label">계정과목 *</label>
+            <div className="filter-bar" style={{ flexWrap: 'wrap' }}>
+              {EXPENSE_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`chip ${category === cat ? 'active' : ''}`}
+                  onClick={() => setCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            <label className="form-label">수취인 *</label>
+            <input
+              type="text"
+              placeholder="ex) ○○주유소 / ○○정비 / 법인카드"
+              value={counterparty}
+              onChange={(e) => setCounterparty(e.target.value)}
+              required
+            />
+
+            <label className="form-label">금액 *</label>
+            <input
+              type="text"
+              placeholder="원 단위"
+              value={amount ? amountN.toLocaleString() : ''}
+              onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
+              required
+              className="num"
+            />
+
+            <label className="form-label">적요</label>
+            <input
+              type="text"
+              placeholder="ex) 5월 1주차 주유 / 정기 점검 등"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+        <button type="button" className="btn" onClick={onClose} disabled={saving}>취소</button>
+        <button type="submit" className="btn btn-primary" disabled={!valid || saving}>
+          {saving ? '저장 중...' : `지출 등록 ₩${amount ? amountN.toLocaleString() : '0'}`}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 function HistoryAddPane({ onClose }: { onClose: () => void }) {
   const [search, setSearch] = useState('');
