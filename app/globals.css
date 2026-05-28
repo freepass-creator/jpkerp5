@@ -858,16 +858,16 @@ a { color: var(--text-link); text-decoration: none; }
   overflow: hidden;
 }
 
-/* Panel header — 테이블 thead 와 시각 무게 동일하게 (높이 38px) */
+/* Panel header — 테이블 thead 와 시각 무게/높이 동일 (row-height 30px) */
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 12px;
-  height: 38px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-card);
+  padding: 0 12px;
+  height: var(--row-height);
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-strong);
   flex-shrink: 0;
 }
 
@@ -910,7 +910,7 @@ a { color: var(--text-link); text-decoration: none; }
 
 .sidebar-stack {
   display: grid;
-  grid-template-rows: minmax(220px, 1.5fr) minmax(180px, 1fr) minmax(160px, 1fr);
+  grid-template-rows: 1fr 1fr;
   gap: 8px;
   overflow: hidden;
 }

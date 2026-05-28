@@ -762,59 +762,8 @@ export default function Page() {
           </div>
         </div>
 
-        {/* 보조 패널 — 연체 / 반납·만기 / 출고 예정 */}
+        {/* 보조 패널 — 반납·만기 / 출고 예정 (연체알림은 리스크 관리로 이동) */}
         <div className="sidebar-stack">
-          <SidePanel
-            icon={<Warning size={14} weight="fill" />}
-            title="연체 알림"
-            count={overdue.length}
-            tone="red"
-            empty="연체 항목 없음"
-            meta={summary.totalUnpaid > 0 ? (
-              <span className="panel-meta danger">₩{formatCurrencyShort(summary.totalUnpaid)}</span>
-            ) : undefined}
-          >
-            {overdue.map((o) => (
-              <div key={`od-${o.contractId}-${o.type}`} className="list-item" onClick={() => {
-                const c = contracts.find((x) => x.id === o.contractId);
-                if (c) handleRowDoubleClick(c);
-              }}>
-                <span className="tag over">{o.type === '반납지연' ? '반납' : '미납'}</span>
-                <div className="list-item-main">
-                  <div className="list-item-top">
-                    {o.customerName}
-                    <span className="text-weak text-xs">{o.company}</span>
-                  </div>
-                  <div className="list-item-sub">
-                    <span className="plate">{o.vehiclePlate}</span>
-                    <span className="text-weak">·</span>
-                    {o.vehicleModel}
-                    {o.type === '결제지연' && o.unpaidAmount && (
-                      <>
-                        <span className="text-weak">·</span>
-                        <span className="danger mono">₩{formatCurrency(o.unpaidAmount)}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="list-item-right">
-                  <div className="dday danger">D+{o.overdueDays}</div>
-                  <div className="date">{formatDate(o.referenceDate)}</div>
-                </div>
-                {o.type === '반납지연' && (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <ExtendPopover
-                      currentReturnDate={o.referenceDate}
-                      customerName={o.customerName}
-                      vehiclePlate={o.vehiclePlate}
-                      onExtend={(months) => handleExtend(o.contractId, months)}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </SidePanel>
-
           <SidePanel
             icon={<ArrowUDownLeft size={14} />}
             title="반납 / 만기"
