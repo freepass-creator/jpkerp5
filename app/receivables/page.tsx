@@ -18,9 +18,9 @@ import { todayKr } from '@/lib/mock-data';
 import { friendlyError } from '@/lib/friendly-error';
 import type { Contract } from '@/lib/types';
 
-type Filter = '미납중' | '시동제어' | '검사지연' | '기타';
+type Filter = '미납중' | '시동제어' | '검사지연' | '종료' | '기타';
 
-const FILTERS: Filter[] = ['미납중', '시동제어', '검사지연', '기타'];
+const FILTERS: Filter[] = ['미납중', '시동제어', '검사지연', '종료', '기타'];
 
 /** 검사지연 — 정기검사 예정일 지남 (임차인이 받아야 하는 책임 사항) */
 function isInspectionOverdue(c: Contract, today: string): boolean {
@@ -64,15 +64,19 @@ export default function ReceivablesPage() {
 
   const today = todayKr();
 
-  // 4개 필터 정의 (사용자 명시):
+  // 5개 필터 정의:
   // · 미납중   = unpaidAmount > 0 OR 부분납 (회수해야 할 돈이 있는 경우)
   // · 시동제어 = engineDisabled
   // · 검사지연 = inspectionDueDate < today
-  // · 기타     = 위 3개에 안 잡히지만 status='채권' 또는 기타 위반 (추후 직원 피드백 반영)
+  // · 종료     = 반납/해지/채권 OR returnedDate 있음 (이미 종결된 계약, 정상+비정상 모두)
+  // · 기타     = 위 4개에 안 잡히는 기타 위반 (추후 직원 피드백 반영)
   const isLatePay = (c: Contract) => (c.unpaidAmount ?? 0) > 0 || hasPartial(c);
   const isEngineLock = (c: Contract) => c.engineDisabled === true;
   const isInspection = (c: Contract) => isInspectionOverdue(c, today);
-  const isOther = (c: Contract) => c.status === '채권' && !isLatePay(c) && !isEngineLock(c) && !isInspection(c);
+  const isClosed = (c: Contract) =>
+    c.status === '반납' || c.status === '해지' || c.status === '채권' || !!c.returnedDate;
+  const isOther = (c: Contract) =>
+    !isLatePay(c) && !isEngineLock(c) && !isInspection(c) && !isClosed(c) && c.status === '채권';
 
   const filtered = useMemo<Contract[]>(() => {
     const base = contracts.filter((c) => c.id && !c.id.startsWith('vehicle-orphan-'));
@@ -80,6 +84,7 @@ export default function ReceivablesPage() {
     if (filter === '미납중') list = base.filter(isLatePay);
     else if (filter === '시동제어') list = base.filter(isEngineLock);
     else if (filter === '검사지연') list = base.filter(isInspection);
+    else if (filter === '종료') list = base.filter(isClosed);
     else if (filter === '기타') list = base.filter(isOther);
     else list = base;
 
@@ -100,6 +105,7 @@ export default function ReceivablesPage() {
       미납중: base.filter(isLatePay).length,
       시동제어: base.filter(isEngineLock).length,
       검사지연: base.filter(isInspection).length,
+      종료: base.filter(isClosed).length,
       기타: base.filter(isOther).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,6 +155,7 @@ export default function ReceivablesPage() {
     if (f === '미납중') return 'red';
     if (f === '시동제어') return 'amber';
     if (f === '검사지연') return 'blue';
+    if (f === '종료') return 'gray';
     if (f === '기타') return 'gray';
     return 'brand';
   };
