@@ -11,6 +11,21 @@
   --font: 'Pretendard Variable', Pretendard, 'Inter', 'Apple SD Gothic Neo', 'Segoe UI', sans-serif;
   --font-mono: 'Pretendard Variable', 'JetBrains Mono', Consolas, ui-monospace, monospace;
   --font-size: 12px;
+
+  /* ─── 폰트 사이즈 토큰 (jpkerp5 표준) ─── */
+  --text-xs:   10px;   /* 보조 메타·작은 라벨 */
+  --text-sm:   11px;   /* 부가 정보·각주 */
+  --text-base: 12px;   /* 기본 본문·표·버튼 */
+  --text-md:   13px;   /* 강조 본문·서브 타이틀 */
+  --text-lg:   14px;   /* 페이지 타이틀·중요 액션 */
+  --text-xl:   16px;   /* 메인 헤딩 */
+  --text-2xl:  18px;   /* 페이지 헤더 (page-header-title) */
+
+  /* ─── 폰트 weight 정책 ─── */
+  --fw-normal:   400;
+  --fw-medium:   500;
+  --fw-semibold: 600;   /* 페이지 타이틀·KPI·중요 라벨 */
+  --fw-bold:     700;   /* 거의 안 씀 — 강조는 색상으로 */
   --line-height: 1.5;
 
   /* Neutral palette — Zinc/Slate */

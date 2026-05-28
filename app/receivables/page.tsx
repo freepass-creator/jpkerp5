@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple } from '@phosphor-icons/react';
+import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple, PaperPlaneTilt } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { SmsDialog } from '@/components/sms-dialog';
 import dynamic from 'next/dynamic';
 const CreateDialog = dynamic(() => import('@/components/create-dialog').then((m) => m.CreateDialog), { ssr: false });
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -17,9 +18,9 @@ import { todayKr } from '@/lib/mock-data';
 import { friendlyError } from '@/lib/friendly-error';
 import type { Contract } from '@/lib/types';
 
-type Filter = '전체' | '연체중' | '부분납' | '시동제어' | '채권화' | '검사지연';
+type Filter = '미납중' | '시동제어' | '검사지연' | '기타';
 
-const FILTERS: Filter[] = ['전체', '연체중', '부분납', '시동제어', '채권화', '검사지연'];
+const FILTERS: Filter[] = ['미납중', '시동제어', '검사지연', '기타'];
 
 /** 검사지연 — 정기검사 예정일 지남 (임차인이 받아야 하는 책임 사항) */
 function isInspectionOverdue(c: Contract, today: string): boolean {
@@ -54,27 +55,32 @@ export default function ReceivablesPage() {
   const { entries: history, add: addHistory } = useHistoryEntries();
   const { user } = useAuth();
   const admin = isAdmin(user?.email);
-  const [filter, setFilter] = useState<Filter>('전체');
+  const [filter, setFilter] = useState<Filter>('미납중');
   const [search, setSearch] = useState('');
   const [contactOpen, setContactOpen] = useState<Contract | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [smsOpen, setSmsOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const today = todayKr();
 
+  // 4개 필터 정의 (사용자 명시):
+  // · 미납중   = unpaidAmount > 0 OR 부분납 (회수해야 할 돈이 있는 경우)
+  // · 시동제어 = engineDisabled
+  // · 검사지연 = inspectionDueDate < today
+  // · 기타     = 위 3개에 안 잡히지만 status='채권' 또는 기타 위반 (추후 직원 피드백 반영)
+  const isLatePay = (c: Contract) => (c.unpaidAmount ?? 0) > 0 || hasPartial(c);
+  const isEngineLock = (c: Contract) => c.engineDisabled === true;
+  const isInspection = (c: Contract) => isInspectionOverdue(c, today);
+  const isOther = (c: Contract) => c.status === '채권' && !isLatePay(c) && !isEngineLock(c) && !isInspection(c);
+
   const filtered = useMemo<Contract[]>(() => {
     const base = contracts.filter((c) => c.id && !c.id.startsWith('vehicle-orphan-'));
-    // 전체 = 한 가지 이상 리스크 가진 계약만 (정상 계약 제외)
-    const hasAnyRisk = (c: Contract) =>
-      hasOverdue(c) || hasPartial(c) || c.engineDisabled === true || c.status === '채권'
-      || isInspectionOverdue(c, today);
-
     let list: Contract[];
-    if (filter === '전체') list = base.filter(hasAnyRisk);
-    else if (filter === '연체중') list = base.filter(hasOverdue);
-    else if (filter === '부분납') list = base.filter(hasPartial);
-    else if (filter === '시동제어') list = base.filter((c) => c.engineDisabled === true);
-    else if (filter === '채권화') list = base.filter((c) => c.status === '채권');
-    else if (filter === '검사지연') list = base.filter((c) => isInspectionOverdue(c, today));
+    if (filter === '미납중') list = base.filter(isLatePay);
+    else if (filter === '시동제어') list = base.filter(isEngineLock);
+    else if (filter === '검사지연') list = base.filter(isInspection);
+    else if (filter === '기타') list = base.filter(isOther);
     else list = base;
 
     const q = search.trim().toLowerCase();
@@ -85,21 +91,18 @@ export default function ReceivablesPage() {
       || (c.vehicleModel ?? '').toLowerCase().includes(q)
       || (c.manager ?? '').toLowerCase().includes(q),
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, filter, search]);
 
   const counts = useMemo(() => {
     const base = contracts.filter((c) => c.id && !c.id.startsWith('vehicle-orphan-'));
-    const hasAnyRisk = (c: Contract) =>
-      hasOverdue(c) || hasPartial(c) || c.engineDisabled === true || c.status === '채권'
-      || isInspectionOverdue(c, today);
     return {
-      전체: base.filter(hasAnyRisk).length,
-      연체중: base.filter(hasOverdue).length,
-      부분납: base.filter(hasPartial).length,
-      시동제어: base.filter((c) => c.engineDisabled === true).length,
-      채권화: base.filter((c) => c.status === '채권').length,
-      검사지연: base.filter((c) => isInspectionOverdue(c, today)).length,
+      미납중: base.filter(isLatePay).length,
+      시동제어: base.filter(isEngineLock).length,
+      검사지연: base.filter(isInspection).length,
+      기타: base.filter(isOther).length,
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, today]);
 
   /** 채권화 토글 — 회수 어려운 미수금 분류 (수동) */
@@ -143,12 +146,10 @@ export default function ReceivablesPage() {
   }
 
   const filterTone = (f: Filter): string => {
-    if (f === '전체') return 'brand';
-    if (f === '연체중') return 'red';
-    if (f === '부분납') return 'orange';
+    if (f === '미납중') return 'red';
     if (f === '시동제어') return 'amber';
-    if (f === '채권화') return 'gray';
     if (f === '검사지연') return 'blue';
+    if (f === '기타') return 'gray';
     return 'brand';
   };
 
@@ -195,6 +196,23 @@ export default function ReceivablesPage() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th className="checkbox-col">
+                      <input
+                        type="checkbox"
+                        checked={filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id))}
+                        ref={(el) => {
+                          if (!el) return;
+                          const some = filtered.some((c) => selectedIds.has(c.id));
+                          const all = filtered.every((c) => selectedIds.has(c.id));
+                          el.indeterminate = some && !all;
+                        }}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds(new Set(filtered.map((c) => c.id)));
+                          else setSelectedIds(new Set());
+                        }}
+                        aria-label="전체 선택"
+                      />
+                    </th>
                     <th style={{ width: 90 }}>차량번호</th>
                     <th>계약자</th>
                     <th style={{ width: 110 }}>연락처</th>
@@ -210,7 +228,7 @@ export default function ReceivablesPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="muted center" style={{ padding: 32 }}>
+                      <td colSpan={11} className="muted center" style={{ padding: 32 }}>
                         {filter} 해당 계약 없음
                       </td>
                     </tr>
@@ -218,8 +236,25 @@ export default function ReceivablesPage() {
                     filtered.map((c) => {
                       const days = maxOverdueDays(c, today);
                       const lastC = lastContactDate(c.id, history);
+                      const isChecked = selectedIds.has(c.id);
                       return (
                         <tr key={c.id}>
+                          <td className="checkbox-col">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(c.id)) next.delete(c.id);
+                                  else next.add(c.id);
+                                  return next;
+                                });
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="행 선택"
+                            />
+                          </td>
                           <td className="mono">{c.vehiclePlate}</td>
                           <td>{c.customerName}</td>
                           <td className="mono" style={{ fontSize: 11 }}>{c.customerPhone1 || '-'}</td>
@@ -351,6 +386,15 @@ export default function ReceivablesPage() {
               <button className="btn btn-primary" type="button" onClick={() => setCreateOpen(true)}>
                 <Plus size={14} weight="bold" /> 신규 등록
               </button>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => setSmsOpen(true)}
+                disabled={selectedIds.size === 0}
+                title={selectedIds.size === 0 ? '체크박스로 행을 선택하세요' : '선택 계약 문자 발송'}
+              >
+                <PaperPlaneTilt size={14} /> 문자 발송{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+              </button>
               <button className="btn" type="button" onClick={() => setContactOpen(filtered[0] ?? null)} disabled={filtered.length === 0} title="첫 행 연락기록 — 행 선택 후 우측 연락 버튼 권장">
                 <ChatCircleDots size={14} /> 연락기록
               </button>
@@ -382,6 +426,7 @@ export default function ReceivablesPage() {
       </div>
 
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filtered} selectedIds={selectedIds} />
 
       {/* 연락기록 다이얼로그 */}
       {contactOpen && (
