@@ -234,82 +234,60 @@ export default function ReceivablesPage() {
             </div>
           </div>
 
-          {/* 보조 패널 — 시동제어 현황 (사유별 그룹) */}
-          <div className="sidebar-stack">
-            <div className="panel">
-              <div className="panel-header">
-                <div className="panel-title">
-                  <span style={{ color: 'var(--red-text)' }}>
-                    <Power size={14} weight="fill" />
-                  </span>
-                  시동제어 현황
-                  <span className="badge" style={{ background: 'var(--red-bg)', color: 'var(--red-text)' }}>
-                    {counts['시동제어']}
-                  </span>
-                </div>
-                <div className="panel-meta danger">
-                  ₩{contracts.filter((c) => c.engineDisabled).reduce((s, c) => s + (c.unpaidAmount ?? 0), 0).toLocaleString()}
-                </div>
+          {/* 보조 패널 — 시동제어 현황 (사유 뱃지) */}
+          <div className="panel">
+            <div className="panel-header">
+              <div className="panel-title">
+                <span style={{ color: 'var(--red-text)' }}>
+                  <Power size={14} weight="fill" />
+                </span>
+                시동제어 현황
+                <span className="badge" style={{ background: 'var(--red-bg)', color: 'var(--red-text)' }}>
+                  {counts['시동제어']}
+                </span>
               </div>
-              <div className="panel-body">
-                {counts['시동제어'] === 0 ? (
-                  <div className="empty-state">시동제어 중 차량 없음</div>
-                ) : (() => {
-                    const locked = contracts.filter((c) => c.engineDisabled);
-                    // 사유별 그룹
-                    const reasonOrder = ['미납', '미검', '보험만료', '자동차세', '기타'];
-                    const groups = new Map<string, Contract[]>();
-                    for (const c of locked) {
-                      const r = (c.engineDisabledReason || '').trim();
-                      const key = reasonOrder.find((k) => r.includes(k)) ?? (r || '기타');
-                      const arr = groups.get(key) ?? [];
-                      arr.push(c);
-                      groups.set(key, arr);
-                    }
-                    const orderedKeys = [...reasonOrder.filter((k) => groups.has(k)), ...Array.from(groups.keys()).filter((k) => !reasonOrder.includes(k))];
-                    return (
-                      <div>
-                        {orderedKeys.map((reason) => {
-                          const list = groups.get(reason) ?? [];
-                          return (
-                            <div key={reason}>
-                              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-weak)', background: 'var(--bg-sunken)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>· {reason}</span>
-                                <span className="mono">{list.length}건</span>
-                              </div>
-                              {list.sort((a, b) => (b.engineDisabledAt ?? '').localeCompare(a.engineDisabledAt ?? '')).map((c) => {
-                                const startDate = c.engineDisabledAt?.slice(0, 10) ?? '';
-                                const daysSince = startDate
-                                  ? Math.max(0, Math.round((new Date(today).getTime() - new Date(startDate).getTime()) / 86400000))
-                                  : 0;
-                                return (
-                                  <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
-                                    <span className="tag over">제어</span>
-                                    <div className="list-item-main">
-                                      <div className="list-item-top">
-                                        {c.customerName}
-                                        <span className="text-weak text-xs">{c.company}</span>
-                                      </div>
-                                      <div className="list-item-sub">
-                                        <span className="plate">{c.vehiclePlate}</span>
-                                        <span className="text-weak">·</span>
-                                        <span className="danger mono">₩{(c.unpaidAmount ?? 0).toLocaleString()}</span>
-                                      </div>
-                                    </div>
-                                    <div className="list-item-right">
-                                      <div className="dday danger">D+{daysSince}</div>
-                                      <div className="date">{startDate}</div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+              <div className="panel-meta danger">
+                ₩{contracts.filter((c) => c.engineDisabled).reduce((s, c) => s + (c.unpaidAmount ?? 0), 0).toLocaleString()}
+              </div>
+            </div>
+            <div className="panel-body">
+              {counts['시동제어'] === 0 ? (
+                <div className="empty-state">시동제어 중 차량 없음</div>
+              ) : (
+                <div>
+                  {contracts
+                    .filter((c) => c.engineDisabled)
+                    .sort((a, b) => (b.engineDisabledAt ?? '').localeCompare(a.engineDisabledAt ?? ''))
+                    .map((c) => {
+                      const startDate = c.engineDisabledAt?.slice(0, 10) ?? '';
+                      const daysSince = startDate
+                        ? Math.max(0, Math.round((new Date(today).getTime() - new Date(startDate).getTime()) / 86400000))
+                        : 0;
+                      const reason = (c.engineDisabledReason || '').trim();
+                      const reasonKey = ['미납', '미검', '보험만료', '자동차세'].find((k) => reason.includes(k)) ?? (reason || '기타');
+                      return (
+                        <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
+                          <span className="tag over">{reasonKey}</span>
+                          <div className="list-item-main">
+                            <div className="list-item-top">
+                              {c.customerName}
+                              <span className="text-weak text-xs">{c.company}</span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-              </div>
+                            <div className="list-item-sub">
+                              <span className="plate">{c.vehiclePlate}</span>
+                              <span className="text-weak">·</span>
+                              <span className="danger mono">₩{(c.unpaidAmount ?? 0).toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <div className="list-item-right">
+                            <div className="dday danger">D+{daysSince}</div>
+                            <div className="date">{startDate}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
           </div>
         </div>
