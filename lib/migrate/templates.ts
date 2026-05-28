@@ -59,6 +59,7 @@ export type ParsedContractRow = {
   company: string;
   vehicleModel: string;
   vehicleStatus: string;
+  currentUnpaid: number;
   blocks: Array<{
     kind?: string;
     customerName: string;
@@ -90,6 +91,7 @@ export async function parseContractHistory(file: File): Promise<ParsedContractRo
   const companyIdx = headers.findIndex((h) => h === '회사');
   const modelIdx = headers.findIndex((h) => h === '차종');
   const vstatusIdx = headers.findIndex((h) => h === '차량상태');
+  const unpaidIdx = headers.findIndex((h) => h === '현재미수');
   // 첫 블록 컬럼 시작 인덱스 — '구분' 첫 등장
   const blockStartIdx = headers.findIndex((h) => h === '구분');
   if (blockStartIdx < 0) throw new Error("'구분' 컬럼을 찾을 수 없음");
@@ -127,6 +129,7 @@ export async function parseContractHistory(file: File): Promise<ParsedContractRo
       company: companyIdx >= 0 ? cellStr(r[companyIdx]) : '',
       vehicleModel: modelIdx >= 0 ? cellStr(r[modelIdx]) : '',
       vehicleStatus: vstatusIdx >= 0 ? cellStr(r[vstatusIdx]) : '',
+      currentUnpaid: unpaidIdx >= 0 ? cellNum(r[unpaidIdx]) : 0,
       blocks,
     });
   }
@@ -146,14 +149,28 @@ export type ApplyContractResult = {
  * 파싱 결과를 Contract[] 로 변환. 기존 contracts와 차량번호+계약자명 기준으로 dedupe.
  * 반환 — RTDB에 일괄 set 할 newContracts (id 미발급).
  */
+export type IdleVehicle = {
+  plate: string;
+  model: string;
+  company: Contract['company'];
+  status: Contract['vehicleStatus'];
+  notes: string;
+};
+
 export function buildContractsFromParsed(
   rows: ParsedContractRow[],
   existing: Contract[],
+  existingVehiclePlates: Set<string>,
   fallbackCompany: Contract['company'] = '기타',
-): { newOrUpdated: Array<Omit<Contract, 'id'> & { _existingId?: string }>; touched: Set<string> } {
+): {
+  newOrUpdated: Array<Omit<Contract, 'id'> & { _existingId?: string }>;
+  idleVehicles: IdleVehicle[];
+  touched: Set<string>;
+} {
   const today = new Date().toISOString().slice(0, 10);
   const touched = new Set<string>();
   const out: Array<Omit<Contract, 'id'> & { _existingId?: string }> = [];
+  const idleVehicles: IdleVehicle[] = [];
 
   // 기존 인덱스
   const byPlatePerson = new Map<string, Contract>();
@@ -165,9 +182,26 @@ export function buildContractsFromParsed(
 
   for (const row of rows) {
     touched.add(normPlate(row.vehiclePlate));
-    // 첫 블록 = 현재 계약자(반납일 없으면). 비어있으면 휴차 차량.
-    const isFirstActive = row.blocks[0] && !row.blocks[0].returnedDate;
     const rowCompany = (row.company?.trim() || fallbackCompany) as Contract['company'];
+
+    // 휴차 차량 — 블록 0개. vehicles 노드에 등록 (운영현황 orphan으로 표시)
+    if (row.blocks.length === 0) {
+      const plateKey = row.vehiclePlate.trim();
+      if (!existingVehiclePlates.has(plateKey)) {
+        const idleStatus = (row.vehicleStatus?.trim() || '휴차대기') as Contract['vehicleStatus'];
+        idleVehicles.push({
+          plate: row.vehiclePlate,
+          model: row.vehicleModel || '',
+          company: rowCompany,
+          status: idleStatus,
+          notes: '계약이력 업로드 — 휴차',
+        });
+      }
+      continue;
+    }
+
+    // 첫 블록 = 현재 계약자(반납일 없으면).
+    const isFirstActive = row.blocks[0] && !row.blocks[0].returnedDate;
 
     for (let bi = 0; bi < row.blocks.length; bi++) {
       const b = row.blocks[bi];
@@ -226,9 +260,18 @@ export function buildContractsFromParsed(
           paymentDay: base.paymentDay,
         });
         let inlineList: PaymentScheduleInline[] = sch.map((s, i) => ({ ...s, id: `s${i + 1}` }) as PaymentScheduleInline);
-        // 수납이력 업로드 안 한 계약 → lastPaidDate = 오늘 자동 셋팅
-        // 오늘 기준 이전 회차는 정산 entry로 자동 완료 처리 (미수=0)
-        if (!exist?.lastPaidDate && !b.returnedDate) {
+
+        if (isCurrent && row.currentUnpaid > 0) {
+          // 현재 계약자 + 미수 입력 있음 → 직전 회차부터 역순으로 자동 미납/부분납
+          // lastPaidDate 비워두고 오늘 기준으로 미수 분배 (오늘 이전 회차들이 채워짐)
+          inlineList = distributeUnpaid(inlineList, row.currentUnpaid, today);
+          base.unpaidAmount = row.currentUnpaid;
+          base.unpaidSeqCount = inlineList.filter((s) => s.status === '연체' || s.status === '부분납').length;
+          const lastCompleted = inlineList.filter((s) => s.status === '완료').sort((a, b) => b.dueDate.localeCompare(a.dueDate))[0];
+          if (lastCompleted) base.lastPaidDate = lastCompleted.paidAt ?? lastCompleted.dueDate;
+        } else if (!exist?.lastPaidDate && !b.returnedDate) {
+          // 수납이력 업로드 안 한 계약 + 미수 0 → lastPaidDate = 오늘
+          // 오늘 기준 이전 회차는 정산 entry로 자동 완료 처리
           inlineList = distributeUnpaid(inlineList, 0, today, today);
           base.lastPaidDate = today;
         }
@@ -239,7 +282,7 @@ export function buildContractsFromParsed(
     }
   }
 
-  return { newOrUpdated: out, touched };
+  return { newOrUpdated: out, idleVehicles, touched };
 }
 
 /* ─────────────── 수납이력 파서 ─────────────── */

@@ -155,6 +155,7 @@ export const CONTRACT_HISTORY_TEMPLATE: HorizontalTemplateSpec = {
     { label: '회사',       field: 'company',       required: false, example: '스위치플랜', hint: '회사 마스터에 등록된 이름. 미입력 시 기타' },
     { label: '차종',       field: 'vehicleModel',  required: false, example: 'K5',         hint: '차량 모델명' },
     { label: '차량상태',   field: 'vehicleStatus', required: false, example: '운행',       hint: '운행/휴차/휴차대기/상품화중/매각/정비/사고 등. 비우면 반납일 유무로 자동' },
+    { label: '현재미수',   field: 'currentUnpaid', required: false, example: '0',          hint: '현재 미수 합계 (원). 입력 시 직전 회차부터 역순으로 자동 미납/부분납 처리. 비우면 0' },
   ],
   blockColumns: [
     { label: '구분',     field: 'kind',                required: false, example: '개인',       hint: '개인/사업자/법인' },

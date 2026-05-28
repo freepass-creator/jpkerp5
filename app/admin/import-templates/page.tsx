@@ -68,13 +68,19 @@ export default function ImportTemplatesPage() {
       if (!db) throw new Error('Firebase 미설정');
 
       append('현재 DB 조회 중...');
-      const snap = await get(ref(db, icarPath('contracts')));
-      const existing: Record<string, Contract> = snap.val() ?? {};
+      const cSnap = await get(ref(db, icarPath('contracts')));
+      const vSnap = await get(ref(db, icarPath('vehicles')));
+      const existing: Record<string, Contract> = cSnap.val() ?? {};
       const existingArr = Object.values(existing);
-      append(`현재 계약 ${existingArr.length}건`);
+      const existingVehicles = vSnap.val() ?? {};
+      const existingPlates = new Set<string>([
+        ...existingArr.map((c) => c.vehiclePlate?.trim()).filter(Boolean),
+        ...Object.values(existingVehicles).map((v) => (v as { plate?: string }).plate?.trim()).filter(Boolean) as string[],
+      ]);
+      append(`현재 계약 ${existingArr.length}건 / 차량 ${Object.keys(existingVehicles).length}대`);
 
-      const { newOrUpdated, touched } = buildContractsFromParsed(contractParsed, existingArr);
-      append(`처리 대상: ${newOrUpdated.length}건 (차량 ${touched.size}대)`);
+      const { newOrUpdated, idleVehicles, touched } = buildContractsFromParsed(contractParsed, existingArr, existingPlates);
+      append(`처리 대상: 계약 ${newOrUpdated.length}건 / 휴차 차량 ${idleVehicles.length}대 (차량 ${touched.size}대 총)`);
 
       const writeBatch: Record<string, Contract> = {};
       let created = 0;
@@ -92,13 +98,37 @@ export default function ImportTemplatesPage() {
         }
       }
 
-      append(`RTDB 일괄 적용 중... (신규 ${created} / 갱신 ${updated})`);
+      append(`contracts 일괄 적용 중... (신규 ${created} / 갱신 ${updated})`);
       const pruned: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(writeBatch)) pruned[k] = pruneUndefined(v);
-      await rtdbUpdate(ref(db, icarPath('contracts')), pruned);
+      if (Object.keys(pruned).length > 0) {
+        await rtdbUpdate(ref(db, icarPath('contracts')), pruned);
+      }
 
-      append(`✓ 완료 — 신규 ${created} / 갱신 ${updated}`);
-      toast.success(`계약이력 적용 완료 (신규 ${created} / 갱신 ${updated})`);
+      // 휴차 차량 — vehicles 노드에 push
+      let vehiclesAdded = 0;
+      if (idleVehicles.length > 0) {
+        append(`vehicles 노드에 휴차 차량 ${idleVehicles.length}대 등록 중...`);
+        const vBatch: Record<string, unknown> = {};
+        for (const v of idleVehicles) {
+          const newRef = push(ref(db, icarPath('vehicles')));
+          const id = newRef.key!;
+          vBatch[id] = pruneUndefined({
+            id,
+            plate: v.plate,
+            model: v.model,
+            company: v.company,
+            status: v.status,
+            notes: v.notes,
+            createdAt: new Date().toISOString(),
+          });
+          vehiclesAdded += 1;
+        }
+        await rtdbUpdate(ref(db, icarPath('vehicles')), vBatch);
+      }
+
+      append(`✓ 완료 — 계약 신규 ${created} / 갱신 ${updated} / 휴차 차량 신규 ${vehiclesAdded}`);
+      toast.success(`계약이력 적용 완료 (계약 ${created + updated} / 휴차 ${vehiclesAdded})`);
     } catch (err) {
       append(`✗ 실패: ${friendlyError(err)}`);
       toast.error(friendlyError(err));
