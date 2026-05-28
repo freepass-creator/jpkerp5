@@ -2013,90 +2013,176 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
   );
 }
 
+type ExtractedRow = {
+  fileName: string;
+  customerName: string;
+  customerPhone1: string;
+  plate: string;
+  model: string;
+  company: string;          // 회사 마스터 매칭 결과 (또는 raw)
+  matchedVehicleId?: string; // 기존 vehicle 매칭 시
+  licenseNo: string;
+  licenseType: string;
+  monthlyRent: string;
+  contractDate: string;
+  endDate: string;
+  termMonths: number;
+  error?: string;
+};
+
 function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
-  const { add: addContract } = useContracts();
+  const { addMany: addContracts } = useContracts();
+  const { vehicles, addMany: addVehicles } = useVehicles();
+  const { companies } = useCompanies();
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [extracted, setExtracted] = useState<{
-    customerName: string; customerPhone1: string; plate: string; monthlyRent: string;
-    model: string; company: string; licenseNo: string; licenseType: string;
-    contractDate: string; endDate: string; termMonths: number;
-  } | null>(null);
+  const [rows, setRows] = useState<ExtractedRow[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
-  async function handleImage(file: File) {
-    setBusy(true);
-    setError(null);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('type', 'rental_contract');
-      const { getFirebaseAuth } = await import('@/lib/firebase/client');
-      const auth = getFirebaseAuth();
-      const user = auth?.currentUser;
-      const idToken = user ? await user.getIdToken() : '';
-      const res = await fetch('/api/ocr/extract', {
-        method: 'POST',
-        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-        body: fd,
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || 'OCR 실패');
-      const raw = json.extracted as Record<string, unknown>;
-      setExtracted({
-        customerName: String(raw.contractor_name ?? ''),
-        customerPhone1: String(raw.contractor_phone ?? ''),
-        plate: String(raw.car_number ?? ''),
-        model: String(raw.car_name ?? ''),
-        company: String(raw.company_name ?? ''),
-        licenseNo: String(raw.contractor_license_no ?? ''),
-        licenseType: '1종 보통',
-        monthlyRent: String(raw.monthly_amount ?? ''),
-        contractDate: String(raw.start_date ?? raw.contract_date ?? ''),
-        endDate: String(raw.end_date ?? ''),
-        termMonths: Number(raw.rental_period_months ?? 12) || 12,
-      });
-    } catch (e) {
-      setError((e as Error).message ?? String(e));
-    } finally {
-      setBusy(false);
+  // 회사 마스터 fuzzy 매칭
+  const matchCompany = useCallback((raw: string): string => {
+    if (!raw) return '';
+    const norm = raw.replace(/[\s()]/g, '').toLowerCase();
+    for (const co of companies) {
+      const n = co.name.replace(/[\s()주식회사㈜]/g, '').toLowerCase();
+      if (norm.includes(n) || n.includes(norm)) return co.name;
     }
+    return raw;
+  }, [companies]);
+
+  // 차량 마스터 plate 매칭
+  const matchVehicle = useCallback((plate: string): string | undefined => {
+    const p = plate.replace(/\s+/g, '').toLowerCase();
+    if (!p) return undefined;
+    const hit = vehicles.find((v) => v.plate.replace(/\s+/g, '').toLowerCase() === p);
+    return hit?.id;
+  }, [vehicles]);
+
+  async function handleFiles(fileList: File[]) {
+    if (fileList.length === 0) return;
+    setBusy(true);
+    setProgress({ done: 0, total: fileList.length });
+    const out: ExtractedRow[] = [];
+    const { getFirebaseAuth } = await import('@/lib/firebase/client');
+    const auth = getFirebaseAuth();
+    const user = auth?.currentUser;
+    const idToken = user ? await user.getIdToken() : '';
+
+    for (const file of fileList) {
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('type', 'rental_contract');
+        const res = await fetch('/api/ocr/extract', {
+          method: 'POST',
+          headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+          body: fd,
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || 'OCR 실패');
+        const raw = json.extracted as Record<string, unknown>;
+        const plate = String(raw.car_number ?? '').trim();
+        const rawCompany = String(raw.company_name ?? '');
+        out.push({
+          fileName: file.name,
+          customerName: String(raw.contractor_name ?? ''),
+          customerPhone1: String(raw.contractor_phone ?? ''),
+          plate,
+          model: String(raw.car_name ?? ''),
+          company: matchCompany(rawCompany),
+          matchedVehicleId: matchVehicle(plate),
+          licenseNo: String(raw.contractor_license_no ?? ''),
+          licenseType: '1종 보통',
+          monthlyRent: String(raw.monthly_amount ?? ''),
+          contractDate: String(raw.start_date ?? raw.contract_date ?? ''),
+          endDate: String(raw.end_date ?? ''),
+          termMonths: Number(raw.rental_period_months ?? 12) || 12,
+        });
+      } catch (e) {
+        out.push({
+          fileName: file.name,
+          customerName: '', customerPhone1: '', plate: '', model: '', company: '',
+          licenseNo: '', licenseType: '1종 보통', monthlyRent: '',
+          contractDate: '', endDate: '', termMonths: 12,
+          error: (e as Error).message ?? String(e),
+        });
+      }
+      setProgress({ done: out.length, total: fileList.length });
+    }
+    setRows(out);
+    setBusy(false);
+    setProgress(null);
   }
 
-  async function handleSave() {
-    if (!extracted || saving) return;
+  function updateRow(idx: number, patch: Partial<ExtractedRow>) {
+    setRows((prev) => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
+  }
+
+  function removeRow(idx: number) {
+    setRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function handleSaveAll() {
+    const valid = rows.filter((r) => !r.error && r.customerName.trim() && r.plate.trim());
+    if (valid.length === 0) return;
     setSaving(true);
     try {
-      const monthly = parseInt((extracted.monthlyRent || '0').replace(/[^0-9]/g, ''), 10) || 0;
-      const today = new Date().toISOString().slice(0, 10);
-      const start = extracted.contractDate || today;
-      const yy = start.slice(2, 4);
-      const mm = start.slice(5, 7);
       const { genCode } = await import('@/lib/code');
-      await addContract({
-        contractNo: `ICR-${yy}${mm}-${genCode(4)}`,
-        company: (extracted.company || '기타') as import('@/lib/types').CompanyCode,
-        customerName: extracted.customerName.trim() || '미상',
-        customerPhone1: extracted.customerPhone1.trim(),
-        customerLicenseNo: extracted.licenseNo.trim() || undefined,
-        customerLicenseType: extracted.licenseType,
-        vehiclePlate: extracted.plate.trim() || '미정',
-        vehicleModel: extracted.model.trim() || '미정',
-        vehicleStatus: '운행',
-        contractDate: start,
-        returnScheduledDate: extracted.endDate || undefined,
-        termMonths: extracted.termMonths,
-        longTerm: extracted.termMonths >= 12,
-        monthlyRent: monthly,
-        deposit: 0,
-        paymentDay: 1,
-        paymentMethod: '이체',
-        status: '운행',
-        currentSeq: 1,
-        totalSeq: extracted.termMonths,
-        unpaidAmount: 0,
-        unpaidSeqCount: 0,
+      // 1) 신규 차량 — 매칭 안 된 plate만 vehicles 노드에 추가
+      const newVehiclesByPlate = new Map<string, string>();
+      const toCreateVehicles: Array<Omit<import('@/lib/types').Vehicle, 'id'>> = [];
+      for (const r of valid) {
+        if (r.matchedVehicleId) continue;
+        const plateKey = r.plate.trim();
+        if (newVehiclesByPlate.has(plateKey)) continue;
+        newVehiclesByPlate.set(plateKey, '');
+        toCreateVehicles.push({
+          plate: plateKey,
+          model: r.model.trim() || '미정',
+          company: (r.company || '기타') as import('@/lib/types').CompanyCode,
+          status: '운행',
+          notes: `계약서 OCR — ${r.fileName}`,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      if (toCreateVehicles.length > 0) {
+        await addVehicles(toCreateVehicles);
+      }
+
+      // 2) 계약 일괄 등록
+      const today = new Date().toISOString().slice(0, 10);
+      const newContracts = valid.map((r) => {
+        const monthly = parseInt((r.monthlyRent || '0').replace(/[^0-9]/g, ''), 10) || 0;
+        const start = r.contractDate || today;
+        const yy = start.slice(2, 4);
+        const mm = start.slice(5, 7);
+        return {
+          contractNo: `ICR-${yy}${mm}-${genCode(4)}`,
+          company: (r.company || '기타') as import('@/lib/types').CompanyCode,
+          customerName: r.customerName.trim() || '미상',
+          customerPhone1: r.customerPhone1.trim(),
+          customerLicenseNo: r.licenseNo.trim() || undefined,
+          customerLicenseType: r.licenseType,
+          vehiclePlate: r.plate.trim(),
+          vehicleModel: r.model.trim() || '미정',
+          vehicleStatus: '운행' as const,
+          contractDate: start,
+          returnScheduledDate: r.endDate || undefined,
+          termMonths: r.termMonths,
+          longTerm: r.termMonths >= 12,
+          monthlyRent: monthly,
+          deposit: 0,
+          paymentDay: 1,
+          paymentMethod: '이체',
+          status: '운행' as const,
+          currentSeq: 1,
+          totalSeq: r.termMonths,
+          unpaidAmount: 0,
+          unpaidSeqCount: 0,
+        };
       });
+      await addContracts(newContracts);
+      alert(`✓ ${valid.length}건 계약 등록${toCreateVehicles.length > 0 ? ` (신규 차량 ${toCreateVehicles.length}대 자동 생성)` : ''}`);
       onSubmit();
     } catch (e) {
       alert('계약 등록 실패: ' + ((e as Error).message ?? String(e)));
@@ -2105,6 +2191,87 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
     }
   }
 
+  // ─── 결과 리스트 화면 ───
+  if (rows.length > 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minHeight: 0 }}>
+        <div className="detail-section" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <div className="detail-section-header" style={{ color: 'var(--green-text)' }}>
+            <CheckCircle size={12} weight="duotone" />
+            <span className="title">OCR 추출 완료 — {rows.length}건 (확인 후 일괄 저장)</span>
+            <button type="button" className="btn btn-sm" onClick={() => setRows([])} style={{ marginLeft: 'auto' }}>
+              다시 스캔
+            </button>
+          </div>
+          <div className="detail-section-body" style={{ flex: 1, overflow: 'auto' }}>
+            <table className="table" style={{ fontSize: 11 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 30 }}></th>
+                  <th style={{ width: 90 }}>차량번호</th>
+                  <th style={{ width: 100 }}>차종</th>
+                  <th style={{ width: 90 }}>계약자</th>
+                  <th style={{ width: 110 }}>연락처</th>
+                  <th style={{ width: 90 }}>회사</th>
+                  <th style={{ width: 90 }}>계약시작</th>
+                  <th style={{ width: 90 }}>계약종료</th>
+                  <th style={{ width: 90 }} className="num">월대여료</th>
+                  <th style={{ width: 60 }} className="center">차량매칭</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} style={r.error ? { background: 'var(--red-bg)' } : undefined}>
+                    <td className="center">
+                      <button type="button" className="btn btn-sm" onClick={() => removeRow(i)} title="제외">
+                        <X size={11} />
+                      </button>
+                    </td>
+                    <td><input className="input mono" value={r.plate} onChange={(e) => updateRow(i, { plate: e.target.value, matchedVehicleId: matchVehicle(e.target.value) })} style={{ width: '100%' }} /></td>
+                    <td><input className="input" value={r.model} onChange={(e) => updateRow(i, { model: e.target.value })} style={{ width: '100%' }} /></td>
+                    <td><input className="input" value={r.customerName} onChange={(e) => updateRow(i, { customerName: e.target.value })} style={{ width: '100%' }} /></td>
+                    <td><input className="input mono" value={r.customerPhone1} onChange={(e) => updateRow(i, { customerPhone1: e.target.value })} style={{ width: '100%' }} /></td>
+                    <td><input className="input" value={r.company} onChange={(e) => updateRow(i, { company: e.target.value })} style={{ width: '100%' }} /></td>
+                    <td><input className="input mono" value={r.contractDate} onChange={(e) => updateRow(i, { contractDate: e.target.value })} style={{ width: '100%' }} placeholder="YYYY-MM-DD" /></td>
+                    <td><input className="input mono" value={r.endDate} onChange={(e) => updateRow(i, { endDate: e.target.value })} style={{ width: '100%' }} placeholder="YYYY-MM-DD" /></td>
+                    <td><input className="input num" value={r.monthlyRent} onChange={(e) => updateRow(i, { monthlyRent: e.target.value.replace(/[^0-9]/g, '') })} style={{ width: '100%' }} /></td>
+                    <td className="center">
+                      {r.error ? (
+                        <span style={{ color: 'var(--red-text)' }} title={r.error}>✗</span>
+                      ) : r.matchedVehicleId ? (
+                        <span style={{ color: 'var(--green-text)' }} title="기존 차량 매칭">✓</span>
+                      ) : (
+                        <span style={{ color: 'var(--amber-text)' }} title="신규 차량 자동 생성">+</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-weak)' }}>
+            ✓ 기존 차량 매칭 / + 신규 차량 자동 생성 / ✗ OCR 실패
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn" onClick={() => setRows([])}>취소</button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleSaveAll}
+              disabled={saving || rows.filter((r) => !r.error && r.customerName.trim() && r.plate.trim()).length === 0}
+            >
+              {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+              {saving ? '저장 중...' : `${rows.filter((r) => !r.error && r.customerName.trim() && r.plate.trim()).length}건 일괄 등록`}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── 업로드 영역 ───
   if (busy) {
     return (
       <div className="dropzone" style={{ minHeight: 320, cursor: 'default', flex: 1 }}>
@@ -2112,57 +2279,10 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
           <CircleNotch size={28} weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
         </div>
         <div className="dropzone-title">OCR 처리 중...</div>
-        <div className="dropzone-desc">계약서를 분석하고 있습니다</div>
+        <div className="dropzone-desc">
+          계약서 {progress ? `${progress.done} / ${progress.total}` : ''} 분석 중
+        </div>
       </div>
-    );
-  }
-
-  if (extracted) {
-    return (
-      <form
-        onSubmit={(e) => { e.preventDefault(); void handleSave(); }}
-        style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}
-      >
-        <div className="detail-section">
-          <div className="detail-section-header" style={{ color: 'var(--green-text)' }}>
-            <CheckCircle size={12} weight="duotone" />
-            <span className="title">OCR 추출 완료 — 확인 후 저장</span>
-            <button type="button" className="btn btn-sm" onClick={() => setExtracted(null)}>다시 스캔</button>
-          </div>
-          <div className="detail-section-body">
-            <div className="form-grid-2">
-              <label className="form-label">회사</label>
-              <input className="input" value={extracted.company} onChange={(e) => setExtracted({ ...extracted, company: e.target.value })} />
-              <label className="form-label">계약자명</label>
-              <input className="input" value={extracted.customerName} onChange={(e) => setExtracted({ ...extracted, customerName: e.target.value })} />
-              <label className="form-label">연락처</label>
-              <input className="input" value={extracted.customerPhone1} onChange={(e) => setExtracted({ ...extracted, customerPhone1: e.target.value })} />
-              <label className="form-label">면허번호</label>
-              <input className="input mono" value={extracted.licenseNo} onChange={(e) => setExtracted({ ...extracted, licenseNo: e.target.value })} />
-              <label className="form-label">차량번호</label>
-              <input className="input" value={extracted.plate} onChange={(e) => setExtracted({ ...extracted, plate: e.target.value })} />
-              <label className="form-label">차종</label>
-              <input className="input" value={extracted.model} onChange={(e) => setExtracted({ ...extracted, model: e.target.value })} />
-              <label className="form-label">월 대여료</label>
-              <input className="input" value={extracted.monthlyRent} onChange={(e) => setExtracted({ ...extracted, monthlyRent: e.target.value.replace(/[^0-9]/g, '') })} />
-              <label className="form-label">계약시작</label>
-              <DateInput value={extracted.contractDate} onChange={(v) => setExtracted({ ...extracted, contractDate: v })} />
-              <label className="form-label">계약종료</label>
-              <DateInput value={extracted.endDate} onChange={(v) => setExtracted({ ...extracted, endDate: v })} />
-              <label className="form-label">개월수</label>
-              <input className="input mono" value={String(extracted.termMonths)} onChange={(e) => setExtracted({ ...extracted, termMonths: Number(e.target.value.replace(/[^0-9]/g, '')) || 0 })} style={{ width: 120 }} />
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" className="btn" onClick={() => setExtracted(null)}>취소</button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
-            {saving ? '저장 중...' : '계약 등록'}
-          </button>
-        </div>
-      </form>
     );
   }
 
@@ -2172,22 +2292,33 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
       style={{ minHeight: 320, flex: 1 }}
       onClick={() => document.getElementById('jpk-ocr-contract')?.click()}
       onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImage(f); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/') || f.type === 'application/pdf');
+        if (files.length > 0) void handleFiles(files);
+      }}
     >
-      <input id="jpk-ocr-contract" type="file" accept="image/*,.pdf" className="hidden"
-        onChange={(e) => { if (e.target.files?.[0]) handleImage(e.target.files[0]); }} />
+      <input
+        id="jpk-ocr-contract"
+        type="file"
+        multiple
+        accept="image/*,.pdf"
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          if (files.length > 0) void handleFiles(files);
+          e.target.value = '';
+        }}
+      />
       <div className="dropzone-icon"><Camera size={28} weight="duotone" /></div>
-      <div className="dropzone-title">계약서 스캔</div>
-      <div className="dropzone-desc">계약서 사진(.jpg/.png) 또는 스캔본(.pdf) — 계약자명·연락처·차량·금액 자동 추출</div>
+      <div className="dropzone-title">계약서 스캔 (다중 업로드)</div>
+      <div className="dropzone-desc">
+        계약서 PDF/이미지 여러 장 한 번에 — 회사·차량 자동 매칭. 매칭된 차량은 연결, 없으면 차량 자동 생성.
+      </div>
       <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('jpk-ocr-contract')?.click(); }}>
-        <Camera size={14} /> 이미지 선택
+        <Camera size={14} /> 파일 선택
       </button>
-      <div className="dropzone-hint">또는 여기에 끌어다 놓기</div>
-      {error && (
-        <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--red-bg)', color: 'var(--red-text)', fontSize: 12 }}>
-          OCR 실패: {error}
-        </div>
-      )}
+      <div className="dropzone-hint">또는 여기에 끌어다 놓기 · PDF 여러 장 가능</div>
     </div>
   );
 }
