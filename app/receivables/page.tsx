@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Warning, Power, Phone, FileXls, ChatCircleDots, X } from '@phosphor-icons/react';
+import { Warning, Power, FileXls, ChatCircleDots, X, MagnifyingGlass } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
@@ -44,18 +44,29 @@ export default function ReceivablesPage() {
   const { user } = useAuth();
   const admin = isAdmin(user?.email);
   const [filter, setFilter] = useState<Filter>('연체중');
+  const [search, setSearch] = useState('');
   const [contactOpen, setContactOpen] = useState<Contract | null>(null);
 
   const today = todayKr();
 
   const filtered = useMemo<Contract[]>(() => {
     const base = contracts.filter((c) => c.id && !c.id.startsWith('vehicle-orphan-'));
-    if (filter === '연체중') return base.filter(hasOverdue);
-    if (filter === '부분납') return base.filter(hasPartial);
-    if (filter === '시동제어') return base.filter((c) => c.engineDisabled === true);
-    if (filter === '채권화') return base.filter((c) => c.status === '채권');
-    return base;
-  }, [contracts, filter]);
+    let list: Contract[];
+    if (filter === '연체중') list = base.filter(hasOverdue);
+    else if (filter === '부분납') list = base.filter(hasPartial);
+    else if (filter === '시동제어') list = base.filter((c) => c.engineDisabled === true);
+    else if (filter === '채권화') list = base.filter((c) => c.status === '채권');
+    else list = base;
+
+    const q = search.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((c) =>
+      (c.customerName ?? '').toLowerCase().includes(q)
+      || (c.vehiclePlate ?? '').toLowerCase().includes(q)
+      || (c.vehicleModel ?? '').toLowerCase().includes(q)
+      || (c.manager ?? '').toLowerCase().includes(q),
+    );
+  }, [contracts, filter, search]);
 
   const counts = useMemo(() => ({
     연체중: contracts.filter(hasOverdue).length,
@@ -83,54 +94,51 @@ export default function ReceivablesPage() {
     }
   }
 
+  const filterTone = (f: Filter): string => {
+    if (f === '연체중') return 'red';
+    if (f === '부분납') return 'orange';
+    if (f === '시동제어') return 'amber';
+    if (f === '채권화') return 'gray';
+    return 'brand';
+  };
+
   return (
     <div className="layout">
       <Sidebar />
       <div className="app">
         <header className="topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 600, fontSize: 14, color: 'var(--text-main)' }}>
-            <Warning size={16} weight="fill" style={{ color: 'var(--red-text)' }} />
-            미수관리
+          <div className="topbar-search">
+            <MagnifyingGlass size={14} className="icon" />
+            <input
+              className="input"
+              placeholder="고객 / 차량 / 차종 / 담당"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-        </header>
 
-        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* 필터 탭 */}
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div className="filter-bar">
             {FILTERS.map((f) => (
               <button
                 key={f}
-                type="button"
-                className="btn"
+                className={`chip chip-tone-${filterTone(f)} ${filter === f ? 'active' : ''}`}
                 onClick={() => setFilter(f)}
-                style={{
-                  height: 32,
-                  padding: '0 14px',
-                  fontSize: 12,
-                  fontWeight: filter === f ? 600 : 400,
-                  background: filter === f ? 'var(--brand)' : 'transparent',
-                  color: filter === f ? '#fff' : 'var(--text-main)',
-                  border: '1px solid ' + (filter === f ? 'var(--brand)' : 'var(--border)'),
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
               >
                 {f}
-                <span style={{
-                  fontSize: 11,
-                  padding: '1px 6px',
-                  background: filter === f ? 'rgba(255,255,255,0.25)' : 'var(--bg-sub)',
-                  borderRadius: 8,
-                  fontWeight: 500,
-                }}>
-                  {counts[f]}
-                </span>
+                {counts[f] > 0 && <span className="chip-count">{counts[f]}</span>}
               </button>
             ))}
           </div>
 
-          {/* 표 */}
+          <div className="topbar-right">
+            <span className="topbar-sort">
+              <Warning size={12} weight="fill" style={{ color: 'var(--red-text)' }} /> 미수관리
+            </span>
+            <span className="topbar-date">{today}</span>
+          </div>
+        </header>
+
+        <div className="dashboard">
           <div className="panel">
             <div className="panel-body">
               <table className="table">
@@ -206,11 +214,6 @@ export default function ReceivablesPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-
-          <div style={{ fontSize: 11, color: 'var(--text-weak)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Phone size={12} />
-            <span>행 더블클릭으로 계약 상세를 열려면 운영현황 페이지에서 진입하세요. 이 페이지는 미수 전문 관리용.</span>
           </div>
         </div>
       </div>
