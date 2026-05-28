@@ -213,16 +213,16 @@ export default function ReceivablesPage() {
                         aria-label="전체 선택"
                       />
                     </th>
-                    <th style={{ width: 90 }}>차량번호</th>
-                    <th>계약자</th>
-                    <th style={{ width: 110 }}>연락처</th>
+                    <th style={{ width: 92 }}>차량번호</th>
+                    <th style={{ width: 96 }}>계약자</th>
+                    <th style={{ width: 116 }}>연락처</th>
                     <th className="num" style={{ width: 110 }}>미수금</th>
-                    <th className="center" style={{ width: 60 }}>미납회차</th>
+                    <th className="center" style={{ width: 64 }}>미납회차</th>
                     <th className="center" style={{ width: 76 }}>경과일</th>
-                    <th className="center" style={{ width: 100 }}>마지막연락</th>
+                    <th className="center" style={{ width: 88 }}>마지막연락</th>
                     <th className="center" style={{ width: 80 }}>시동제어</th>
-                    <th className="center" style={{ width: 70 }}>채권</th>
-                    <th style={{ width: 170 }}>액션</th>
+                    <th className="center" style={{ width: 64 }}>채권</th>
+                    <th>액션</th>
                   </tr>
                 </thead>
                 <tbody>
