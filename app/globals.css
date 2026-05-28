@@ -1321,13 +1321,19 @@ input[type="radio"]:disabled {
 .table td.muted { color: var(--text-weak); }
 .table td.dim { color: var(--text-sub); }
 
-/* 체크박스 열 — 좌측 고정 */
+/* 체크박스 열 — 좌측 고정 (페이지별 폭 흔들림 방지 위해 min/max로 강제 고정) */
 .table th.checkbox-col,
 .table td.checkbox-col {
   width: 36px;
-  padding-left: 12px;
-  padding-right: 0;
+  min-width: 36px;
+  max-width: 36px;
+  padding: 0 0 0 12px;
   text-align: center;
+  vertical-align: middle;
+}
+.table .checkbox-col input[type="checkbox"] {
+  vertical-align: middle;
+  margin: 0;
 }
 /* 체크박스 — 전역 input[type=checkbox] 규격 사용 */
 .table tbody tr.selected-row { background: var(--brand-bg); }
