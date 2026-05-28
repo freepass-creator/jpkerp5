@@ -26,7 +26,7 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 
-type View = '전체' | '계약중' | '종료임박' | '연장대기' | '종료대기' | '휴차' | '미수';
+type View = '전체' | '계약중' | '종료임박' | '연장대기' | '종료대기' | '휴차' | '미수' | '종료';
 /** 항상 표시되는 기본 필터 */
 const BASE_VIEWS: View[] = ['전체', '계약중', '휴차', '미수'];
 /** 데이터 있을 때만 표시되는 조건부 필터 */
@@ -75,6 +75,10 @@ function matchesView(c: Contract, v: View): boolean {
   if (v === '종료대기') return c.vehicleStatus === '종료대기';
   if (v === '휴차') return !isRunning(c);
   if (v === '미수') return c.unpaidAmount > 0;
+  if (v === '종료') {
+    // 종료된 계약 — 반납/해지/채권 상태이거나 반납완료된 경우
+    return c.status === '반납' || c.status === '해지' || c.status === '채권' || !!c.returnedDate;
+  }
   return true;
 }
 
@@ -150,6 +154,16 @@ function sortComparator(view: View): (a: Contract, b: Contract) => number {
       const aD = a.returnScheduledDate || '9999-12-31';
       const bD = b.returnScheduledDate || '9999-12-31';
       return aD.localeCompare(bD);
+    };
+  }
+  if (view === '종료') {
+    // 종료일 최근순 + 같은 날이면 미수 큰 쪽 위로 (비정상 종료 우선)
+    return (a, b) => {
+      const aD = a.returnedDate || a.returnScheduledDate || '0000-01-01';
+      const bD = b.returnedDate || b.returnScheduledDate || '0000-01-01';
+      const cmp = bD.localeCompare(aD);
+      if (cmp !== 0) return cmp;
+      return (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0);
     };
   }
   // 전체: 최근 계약 등록 순 (desc)
@@ -472,6 +486,7 @@ export default function Page() {
       종료대기: scoped.filter((c) => matchesView(c, '종료대기')).length,
       휴차: scoped.filter((c) => matchesView(c, '휴차')).length,
       미수: scoped.filter((c) => matchesView(c, '미수')).length,
+      종료: scoped.filter((c) => matchesView(c, '종료')).length,
     };
   }, [contracts, companyFilter]);
 
@@ -481,7 +496,7 @@ export default function Page() {
     for (const v of CONDITIONAL_VIEWS) {
       if (viewCounts[v] > 0) out.push(v);
     }
-    out.push('휴차', '미수');
+    out.push('휴차', '미수', '종료');
     return out;
   }, [viewCounts]);
 
@@ -570,6 +585,7 @@ export default function Page() {
               : v === '연장대기' ? 'blue'
               : v === '종료대기' ? 'orange'
               : v === '휴차' ? 'gray'
+              : v === '종료' ? 'gray'
               : 'brand';
             return (
               <button
