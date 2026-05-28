@@ -83,6 +83,11 @@ export type Contract = {
   tempSince?: string;             // 임시배차 시작일
   // 알림 대기 — 어떤 차량이 휴차/반납 되면 통보 (Phase 2)
   notifyOnAvailable?: string[];   // 차량번호 배열 — 이 차량들이 복귀하면 알림
+  // 시동제어 (미수 채권 회수용 — 차량 원격 시동 차단 상태)
+  engineDisabled?: boolean;
+  engineDisabledAt?: string;     // ISO timestamp — 제어 발효 시각
+  engineDisabledBy?: string;     // 등록자 email
+  engineDisabledReason?: string;
   // 컴플라이언스 (계약상태 산출용)
   inspectionDueDate?: string;  // 다음 정기검사 예정일 (지나면 미수검)
   insuranceExpiryDate?: string; // 자동차보험 만기일

@@ -128,24 +128,59 @@ export default function HelpPage() {
 
           {/* 4. 엑셀 업로드 안내 */}
           <Section icon={<FileXls weight="bold" />} title="엑셀 업로드 안내">
-            <SubSection title="운영 현황 (계약·차량 한 번에)">
-              <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
-                <li>운영 현황 → 신규 → <strong>운영 현황 업로드</strong> 탭 → <strong>템플릿</strong> 다운로드해서 채워 올리기</li>
-                <li>필수: 법인등록번호 / 차량번호 또는 계약자 / 차명 / 계약시작일 / 계약종료일</li>
-                <li>날짜는 어떤 형식이든 OK: <span className="mono">2026-05-01 / 26.5.1 / 260501 / 엑셀 날짜 셀</span></li>
-                <li>등록번호는 자릿수로 개인/사업자/법인 자동 구분</li>
-                <li>회사명은 법인등록번호로 자동 매칭 — (주)·주식회사 자동 제거</li>
-                <li>현재미수 입력하면 과거 회차에 자동 분배 (직전 회차부터 역순)</li>
+            <SubSection title="이력 일괄 업로드 (개발도구 → 이력 업로드) — 관리자 전용">
+              <div style={{ padding: 10, background: 'var(--blue-bg)', borderRadius: 4, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
+                <strong>2개 양식</strong>으로 차량·계약·휴차·미수·과거이력·결제이력 전부 입력. horizontal 형식 (우측으로 갈수록 직전 이력).
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>1️⃣ 계약이력.xlsx — 차량/계약 마스터</div>
+              <ul style={{ margin: '0 0 12px 0', paddingLeft: 18, lineHeight: 1.7, fontSize: 12 }}>
+                <li>1행 = 1차량. 한 차량의 모든 정보 (현재 계약 + 직전 계약 + 휴차 여부)</li>
+                <li><strong>좌측 5칸 (고정)</strong>: 차량번호 · 회사 · 차종 · 차량상태 · 현재미수</li>
+                <li><strong>우측 블록 10칸 × 5회 반복</strong>: 구분/고객명/연락처/인도일/종료일/반납일/대여료/보증금/결제일/영업자</li>
+                <li>블록 1번 = 현재 계약자, 2~5번 = 직전 계약자 (시간 역순)</li>
+                <li>모든 블록 비우면 → 휴차 차량으로 자동 등록</li>
+                <li><strong>현재미수 N원</strong> 입력 → 직전 회차부터 역순으로 자동 미납/부분납 분배</li>
+                <li>현재미수 0 + 수납이력 안 올림 → <strong>오늘 날짜로 마지막 입금일 자동 셋팅</strong> (이전 회차 자동 완료)</li>
+              </ul>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>2️⃣ 수납이력.xlsx — 결제 이력</div>
+              <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: 12 }}>
+                <li>1행 = 1계약(차량+등록번호). 같은 차량이라도 계약자별로 따로</li>
+                <li><strong>좌측 2칸</strong>: 차량번호 · 계약자등록번호</li>
+                <li><strong>우측 블록 5칸 × 20회</strong>: 청구금액/결제금액/결제일자/결제수단/미납금액</li>
+                <li>차량+등록번호로 자동 매칭 → 가장 가까운 회차에 입금 push</li>
+                <li>등록번호 없는 계약은 첫 결제 매칭 시 자동 백필</li>
+                <li>결제일자가 비어있는 블록은 무시 (블록 누락 OK)</li>
+              </ul>
+            </SubSection>
+            <SubSection title="개별 등록 (운영현황 → +신규)">
+              <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: 12 }}>
+                <li>일상 운영: 차량 1대·계약 1건 추가는 운영현황 → +신규</li>
+                <li>날짜 형식 자유: <span className="mono">2026-05-01 / 26.5.1 / 260501 / 엑셀 날짜 셀</span></li>
+                <li>등록번호 자릿수로 개인(13)/사업자(10)/법인(12) 자동 구분</li>
               </ul>
             </SubSection>
             <SubSection title="은행 엑셀 (계좌 관리)">
-              <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+              <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: 12 }}>
                 <li>은행에서 다운받은 엑셀 <strong>그대로</strong> 올리면 됨 (별도 가공 불필요)</li>
-                <li>지원 은행: KB · 우리 · 신한 · 하나 · 농협 · IBK · SC제일 · 카카오뱅크 · 토스뱅크 · 케이뱅크 · 새마을금고 · 우체국 · 수협 · 부산 · 대구 · 광주 · 전북 · 경남 · 제주 · 씨티</li>
-                <li>상단 안내문/합계 행 자동 스킵, 체크박스 컬럼 자동 제거</li>
-                <li>파일명에 은행이름 있으면 자동 인식 (예: <span className="mono">KB_거래내역.xlsx</span>)</li>
+                <li>지원: KB · 우리 · 신한 · 하나 · 농협 · IBK · SC제일 · 카카오 · 토스 · 케이뱅크 · 새마을금고 · 우체국 · 수협 · 부산 · 대구 · 광주 · 전북 · 경남 · 제주 · 씨티</li>
+                <li>파일명에 은행이름 있으면 자동 인식</li>
               </ul>
             </SubSection>
+          </Section>
+
+          {/* 5. 미수관리 */}
+          <Section icon={<Warning weight="bold" />} title="미수관리 (전문 화면)">
+            <div style={{ padding: 10, background: 'var(--red-bg)', color: 'var(--text-main)', borderRadius: 4, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
+              사이드바 <strong>미수관리</strong> 메뉴 — 미수 있는 계약만 전문적으로 다루는 화면. 운영현황과는 별도.
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: 12 }}>
+              <li><strong>4개 필터 탭</strong>: 연체중 · 부분납 · 시동제어 · 채권화 — 각 카운트 뱃지로 한눈에</li>
+              <li>표 컬럼: 차량/계약자/연락처/<strong>미수금</strong>/미납회차/<strong>경과일</strong>/마지막연락/시동제어/액션</li>
+              <li>경과일 색상: 30일 이하(검정) · 31~60일(주황) · 60일 초과(빨강)</li>
+              <li><strong>시동제어 ON/OFF</strong> 토글 — ON 시 사유 입력. 차량 원격 시동 차단 표시</li>
+              <li><strong>연락기록</strong> 버튼 → 다이얼로그 (연락일/방법/고객반응/다음 약속일/비고) → 자동 저장</li>
+              <li>마지막 연락일은 표에 자동 표시 — 누가 언제 통화했는지 추적</li>
+            </ul>
           </Section>
 
           {/* 5. OCR */}

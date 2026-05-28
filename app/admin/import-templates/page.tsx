@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ref, get, update as rtdbUpdate, push } from 'firebase/database';
-import { Upload, Warning, Download, FileXls, CheckCircle } from '@phosphor-icons/react';
+import { Upload, Warning, Download, FileXls, CheckCircle, Info, CaretDown, CaretRight } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { getRtdb, icarPath, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
 import { useAuth } from '@/lib/use-auth';
@@ -24,6 +24,7 @@ export default function ImportTemplatesPage() {
   const [log, setLog] = useState<string[]>([]);
   const [contractParsed, setContractParsed] = useState<ParsedContractRow[] | null>(null);
   const [receiptParsed, setReceiptParsed] = useState<ParsedReceiptRow[] | null>(null);
+  const [guideOpen, setGuideOpen] = useState(true);
 
   function append(line: string) {
     setLog((l) => [...l, `[${new Date().toLocaleTimeString('ko-KR')}] ${line}`]);
@@ -210,6 +211,81 @@ export default function ImportTemplatesPage() {
               SUPER_ADMIN 만 실행할 수 있습니다.
             </div>
           )}
+
+          {/* 가이드 패널 — 접힘 */}
+          <section style={{
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            background: 'var(--blue-bg)',
+            overflow: 'hidden',
+          }}>
+            <button
+              type="button"
+              onClick={() => setGuideOpen((v) => !v)}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                background: 'transparent',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--text-main)',
+              }}
+            >
+              {guideOpen ? <CaretDown size={12} /> : <CaretRight size={12} />}
+              <Info size={14} weight="duotone" />
+              사용 가이드 (한 번 읽어두세요)
+            </button>
+            {guideOpen && (
+              <div style={{ padding: '4px 16px 14px 32px', fontSize: 12, lineHeight: 1.7, color: 'var(--text-main)' }}>
+                <div style={{ marginBottom: 12 }}>
+                  <strong style={{ color: 'var(--brand)' }}>전체 흐름:</strong>{' '}
+                  ① 계약이력.xlsx 다운로드 → 채움 → 업로드 → DB 적용 &nbsp;→&nbsp;
+                  ② 수납이력.xlsx 다운로드 → 채움 → 업로드 → DB 적용
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>📋 계약이력.xlsx</div>
+                  <ul style={{ margin: 0, paddingLeft: 16, listStyle: 'disc' }}>
+                    <li>1행 = 1차량. 한 차량의 <strong>현재 계약 + 직전 계약 + 휴차 여부</strong>를 한 줄에</li>
+                    <li>좌측 5칸 고정: <code>차량번호 | 회사 | 차종 | 차량상태 | 현재미수</code></li>
+                    <li>블록 10칸 × 5회 반복: <code>구분|고객명|연락처|인도일|종료일|반납일|대여료|보증금|결제일|영업자</code></li>
+                    <li>블록 1번 = 현재, 2~5번 = 직전 (시간 역순). 빈 블록 무시</li>
+                    <li>모든 블록 비우면 → <strong>휴차 차량</strong>으로 자동 등록</li>
+                    <li><strong>현재미수 N원</strong> 입력 → 직전 회차부터 역순으로 자동 미납/부분납 분배</li>
+                    <li>현재미수 0 → lastPaidDate=오늘로 자동 (이전 회차 정산 완료)</li>
+                  </ul>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>💰 수납이력.xlsx (계약이력 적용 후)</div>
+                  <ul style={{ margin: 0, paddingLeft: 16, listStyle: 'disc' }}>
+                    <li>1행 = 1계약(차량+등록번호). 같은 차량이라도 계약자별로 따로</li>
+                    <li>좌측 2칸: <code>차량번호 | 계약자등록번호</code></li>
+                    <li>블록 5칸 × 20회: <code>청구금액|결제금액|결제일자|결제수단|미납금액</code></li>
+                    <li>매칭 키: 차량번호 + 등록번호 → 자동으로 가장 가까운 회차에 입금 push</li>
+                    <li>등록번호 없는 계약은 첫 결제 매칭 시 자동 백필</li>
+                    <li>결제일자 비어있는 블록은 무시</li>
+                  </ul>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>📅 날짜 형식</div>
+                  <div>아무 형식이나 가능: <code>2025-04-22 / 25.4.22 / 250422 / 엑셀 날짜 셀</code></div>
+                </div>
+
+                <div style={{ padding: 8, background: 'var(--bg-main)', borderRadius: 4, marginTop: 8 }}>
+                  <strong style={{ color: 'var(--red-text)' }}>⚠️ 주의:</strong>{' '}
+                  같은 차량+계약자가 이미 있으면 <strong>덮어쓰기 갱신</strong>, 없으면 신규.
+                  먼저 계약이력 → 수납이력 순서로 진행. 반대로 하면 매칭 안 됨.
+                </div>
+              </div>
+            )}
+          </section>
 
           {/* 1단계: 템플릿 다운로드 */}
           <section className="detail-section">
