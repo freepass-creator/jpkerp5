@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, CurrencyKrw, DownloadSimple, House } from '@phosphor-icons/react';
+import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, DownloadSimple, House } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import {
@@ -15,12 +15,11 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
-import { downloadContractsExcel, downloadOverdueExcel } from '@/lib/contract-export';
+import { downloadContractsExcel } from '@/lib/contract-export';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
 import { SmsDialog } from '@/components/sms-dialog';
-import { PaymentLedgerDialog } from '@/components/payment-ledger-dialog';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
@@ -304,7 +303,6 @@ export default function Page() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
-  const [ledgerOpen, setLedgerOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Contract | null }>({
     open: false, x: 0, y: 0, row: null,
@@ -850,9 +848,6 @@ export default function Page() {
             <button className="btn btn-primary" type="button" onClick={() => setCreateOpen(true)}>
               <Plus size={14} weight="bold" /> 신규 등록
             </button>
-            <button className="btn" type="button" onClick={() => setLedgerOpen(true)} title="수납 이력">
-              <CurrencyKrw size={14} /> 수납 이력
-            </button>
             <button className="btn" type="button" onClick={() => setSmsOpen(true)} title="문자 발송" disabled={selectedIds.size === 0}>
               <PaperPlaneTilt size={14} /> 문자 발송{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
             </button>
@@ -864,15 +859,6 @@ export default function Page() {
               disabled={filteredContracts.length === 0}
             >
               <DownloadSimple size={14} /> 계약 엑셀
-            </button>
-            <button
-              className="btn"
-              type="button"
-              onClick={() => downloadOverdueExcel(contracts, companyMaster)}
-              title="미수금 있는 계약만 엑셀로 내려받기"
-              disabled={summary.totalUnpaid === 0}
-            >
-              <DownloadSimple size={14} /> 미수 엑셀
             </button>
             {superAdmin && (
               <>
@@ -930,7 +916,6 @@ export default function Page() {
       />
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filteredContracts} selectedIds={selectedIds} />
-      <PaymentLedgerDialog open={ledgerOpen} onOpenChange={setLedgerOpen} contracts={contracts} />
 
       <ContextMenu
         open={ctxMenu.open}

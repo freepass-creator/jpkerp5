@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import {
-  CurrencyKrw, Bank, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar, DownloadSimple,
+  CurrencyKrw, Bank, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar, DownloadSimple, Receipt,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { CreateDialog } from '@/components/create-dialog';
+import { PaymentLedgerDialog } from '@/components/payment-ledger-dialog';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -38,6 +39,7 @@ export default function PaymentsPage() {
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
 
@@ -398,9 +400,14 @@ export default function PaymentsPage() {
 
         <BottomBar
           left={
-            <button className="btn btn-primary" type="button" onClick={() => setUploadOpen(true)}>
-              <Plus weight="bold" /> 계좌내역 올리기
-            </button>
+            <>
+              <button className="btn btn-primary" type="button" onClick={() => setUploadOpen(true)}>
+                <Plus weight="bold" /> 계좌내역 올리기
+              </button>
+              <button className="btn" type="button" onClick={() => setLedgerOpen(true)} title="회사 전체 수납이력 원장">
+                <Receipt size={14} /> 수납 이력
+              </button>
+            </>
           }
           right={
             tab === 'ledger' ? (
@@ -443,6 +450,7 @@ export default function PaymentsPage() {
         />
 
         <CreateDialog open={uploadOpen} onOpenChange={setUploadOpen} initialMode="수납" />
+        <PaymentLedgerDialog open={ledgerOpen} onOpenChange={setLedgerOpen} contracts={contracts} />
         <ReceiptMatchDialog
           open={!!matchTarget}
           onOpenChange={(v) => !v && setMatchTarget(null)}

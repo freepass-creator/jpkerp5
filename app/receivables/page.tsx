@@ -1,13 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning } from '@phosphor-icons/react';
+import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import dynamic from 'next/dynamic';
 const CreateDialog = dynamic(() => import('@/components/create-dialog').then((m) => m.CreateDialog), { ssr: false });
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
+import { downloadOverdueExcel } from '@/lib/contract-export';
 import { useAuth } from '@/lib/use-auth';
 import { isAdmin } from '@/lib/admin-emails';
 import { toast } from '@/lib/toast';
@@ -48,6 +50,7 @@ function lastContactDate(contractId: string, history: ReturnType<typeof useHisto
 
 export default function ReceivablesPage() {
   const { contracts, update: updateContract } = useContracts();
+  const { companies: companyMaster } = useCompanies();
   const { entries: history, add: addHistory } = useHistoryEntries();
   const { user } = useAuth();
   const admin = isAdmin(user?.email);
@@ -350,6 +353,15 @@ export default function ReceivablesPage() {
               </button>
               <button className="btn" type="button" onClick={() => setContactOpen(filtered[0] ?? null)} disabled={filtered.length === 0} title="첫 행 연락기록 — 행 선택 후 우측 연락 버튼 권장">
                 <ChatCircleDots size={14} /> 연락기록
+              </button>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => downloadOverdueExcel(contracts, companyMaster)}
+                title="미수 있는 계약만 엑셀로 내려받기"
+                disabled={contracts.every((c) => (c.unpaidAmount ?? 0) === 0)}
+              >
+                <DownloadSimple size={14} /> 미수 엑셀
               </button>
             </>
           }
