@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Buildings, Gear, CaretLeft, CaretRight, ChartBar, Bank, BookOpen, Wrench, ShieldWarning,
+  Car, Warning, Buildings, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, BookOpen, Wrench, Receipt,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { isAdmin } from '@/lib/admin-emails';
@@ -57,11 +57,11 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
           <span>운영 현황</span>
         </Link>
         <Link href="/receivables" className={`sb-item ${isActive('/receivables') ? 'active' : ''}`} title="리스크 관리 — 미수/시동제어/검사지연 등 임차인 책임 위반 관리">
-          <ShieldWarning size={14} weight={isActive('/receivables') ? 'fill' : 'regular'} />
+          <Warning size={14} weight={isActive('/receivables') ? 'fill' : 'regular'} />
           <span>리스크 관리</span>
         </Link>
         <Link href="/payments" className={`sb-item ${isActive('/payments') ? 'active' : ''}`} title="계좌 관리 (계좌·카드)">
-          <Bank size={14} weight={isActive('/payments') ? 'fill' : 'regular'} />
+          <CurrencyKrw size={14} weight={isActive('/payments') ? 'fill' : 'regular'} />
           <span>계좌 관리</span>
         </Link>
       </div>
@@ -71,7 +71,7 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
       {/* 관리 영역 — 일일 운영과 분리. 과태료·법인·설정 */}
       <div className="sb-foot">
         <Link href="/penalty" className={`sb-item ${isActive('/penalty') ? 'active' : ''}`} title="과태료 업무">
-          <Warning size={14} weight={isActive('/penalty') ? 'fill' : 'regular'} />
+          <Receipt size={14} weight={isActive('/penalty') ? 'fill' : 'regular'} />
           <span>과태료 업무</span>
         </Link>
         <Link href="/companies" className={`sb-item ${isActive('/companies') ? 'active' : ''}`} title="법인 관리">

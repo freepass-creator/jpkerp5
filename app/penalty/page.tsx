@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Trash, X, PencilSimple, CheckCircle, Warning, FileXls, Eye, FileZip, CircleNotch, FileText, User } from '@phosphor-icons/react';
+import { Trash, X, PencilSimple, CheckCircle, Warning, FileXls, Eye, FileZip, CircleNotch, FileText, User, Receipt } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { downloadPenaltyZip, previewPenaltyItem, type PenaltyWorkItem } from '@/lib/penalty-pdf';
@@ -406,7 +406,7 @@ export default function PenaltyPage() {
         <div className="app">
         <header className="topbar">
           <div className="topbar-title">
-            <Warning size={16} weight="fill" style={{ color: 'var(--orange-text)' }} />
+            <Receipt size={16} weight="fill" style={{ color: 'var(--orange-text)' }} />
             <span>과태료 업무</span>
           </div>
           <div className="filter-bar" role="tablist" aria-label="단계" style={{ marginLeft: 16 }}>

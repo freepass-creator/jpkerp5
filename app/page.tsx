@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, DownloadSimple, House } from '@phosphor-icons/react';
+import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, DownloadSimple, Car } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import {
@@ -559,7 +559,7 @@ export default function Page() {
       <div className="app">
       <header className="topbar">
         <div className="topbar-title">
-          <House size={16} weight="fill" style={{ color: 'var(--brand)' }} />
+          <Car size={16} weight="fill" style={{ color: 'var(--brand)' }} />
           <span>운영 현황</span>
         </div>
         <div className="topbar-search">
