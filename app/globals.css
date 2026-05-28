@@ -735,6 +735,9 @@ a { color: var(--text-link); text-decoration: none; }
   color: var(--text-main);
   padding: 0 8px 0 4px;
   white-space: nowrap;
+  /* 페이지별 검색창 시작 위치 통일 — 가장 긴 라벨 기준 고정 */
+  min-width: 140px;
+  flex-shrink: 0;
 }
 
 .topbar-search {
