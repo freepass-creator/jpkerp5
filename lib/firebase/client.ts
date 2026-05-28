@@ -17,7 +17,7 @@ const firebaseConfig = {
 };
 
 /** 데이터 노드 prefix — jpkerp ERP 와 분리 */
-export const ICAR_ROOT = 'jpkerp5';
+export const RTDB_ROOT = 'jpkerp5';
 
 let _app: FirebaseApp | null = null;
 let _rtdb: Database | null = null;
@@ -80,8 +80,8 @@ export function ensureAuth(): Promise<void> {
   });
 }
 
-export function icarPath(...parts: string[]): string {
-  return [ICAR_ROOT, ...parts].filter(Boolean).join('/');
+export function dbPath(...parts: string[]): string {
+  return [RTDB_ROOT, ...parts].filter(Boolean).join('/');
 }
 
 /**

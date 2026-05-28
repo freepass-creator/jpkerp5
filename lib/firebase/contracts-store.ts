@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import { recalcContract } from '@/lib/payment-schedule';
 import { todayKr } from '@/lib/mock-data';
 import type { Contract } from '@/lib/types';
 
-const CONTRACTS_PATH = icarPath('contracts');
+const CONTRACTS_PATH = dbPath('contracts');
 
 /**
  * 계약 리스트 훅 — Firebase RTDB 실시간 구독.

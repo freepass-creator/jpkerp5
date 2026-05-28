@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { Penalty } from '@/lib/types-penalty';
 
-const PATH = icarPath('penalties');
+const PATH = dbPath('penalties');
 
 export function usePenalties(): {
   penalties: Penalty[];

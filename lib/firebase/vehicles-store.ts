@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { Vehicle } from '@/lib/types';
 
-const VEHICLES_PATH = icarPath('vehicles');
+const VEHICLES_PATH = dbPath('vehicles');
 
 export function useVehicles(): {
   vehicles: Vehicle[];

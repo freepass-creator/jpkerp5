@@ -211,16 +211,16 @@ function OcrPane({ onSubmit }: { onSubmit: (p: Omit<Penalty, 'id'>) => Promise<v
     <div
       className="dropzone"
       style={{ minHeight: 360 }}
-      onClick={() => document.getElementById('icar-penalty-ocr')?.click()}
+      onClick={() => document.getElementById('jpk-penalty-ocr')?.click()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImage(f); }}
     >
-      <input id="icar-penalty-ocr" type="file" accept="image/*,.pdf" className="hidden"
+      <input id="jpk-penalty-ocr" type="file" accept="image/*,.pdf" className="hidden"
         onChange={(e) => { if (e.target.files?.[0]) handleImage(e.target.files[0]); }} />
       <div className="dropzone-icon"><FileArrowUp size={28} weight="duotone" /></div>
       <div className="dropzone-title">과태료 고지서 스캔</div>
       <div className="dropzone-desc">고지서 사진(.jpg/.png) 또는 PDF — 통지번호·차량번호·위반정보·금액 자동 추출</div>
-      <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('icar-penalty-ocr')?.click(); }}>
+      <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('jpk-penalty-ocr')?.click(); }}>
         <Camera size={14} /> 파일 선택
       </button>
       <div className="dropzone-hint">또는 여기에 끌어다 놓기 · 여러 페이지 PDF 가능</div>

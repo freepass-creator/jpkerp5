@@ -23,7 +23,7 @@
 ### 옵션 A — Template repo로 복사 (권장)
 1. https://github.com/freepass-creator/jpkerp5 진입
 2. 우측 상단 **`Use this template`** → `Create a new repository`
-3. Owner / 새 repo 이름: `carting-{회사명}` (예: `carting-아이카`)
+3. Owner / 새 repo 이름: `carting-{회사명}` (예: `carting-스위치플랜`)
 4. Private 권장 → **Create repository**
 
 ### 옵션 B — 로컬에서 clone + 새 repo로 push
@@ -222,7 +222,7 @@ export const SUPER_ADMIN_EMAILS: ReadonlyArray<string> = [
 ### 7-5. Firebase 데이터 prefix (선택)
 **`lib/firebase/client.ts`**
 ```ts
-export const ICAR_ROOT = 'icar001';   // ← 회사별로 다르게 (예: 'carting001')
+export const RTDB_ROOT = 'jpkerp5';   // ← 회사별로 다르게 (예: 'carting001')
 ```
 > 같은 Firebase를 여러 회사가 쓰는 경우에만 필요. **회사별 Firebase 분리 시 그대로 둬도 됨** (데이터는 어차피 격리됨).
 

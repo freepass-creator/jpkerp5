@@ -8,7 +8,6 @@ import {
   todayKr,
   buildDeliveries,
   buildReturns,
-  buildOverdue,
 } from '@/lib/mock-data';
 import { formatCurrency, formatDate, daysSince, shortDate, dateWithDow, formatRemainingHuman } from '@/lib/utils';
 import type { Contract } from '@/lib/types';
@@ -536,7 +535,6 @@ export default function Page() {
 
   const deliveries = useMemo(() => buildDeliveries(scopedContracts, todayKr()), [scopedContracts]);
   const returns = useMemo(() => buildReturns(scopedContracts, todayKr(), 30), [scopedContracts]);
-  const overdue = useMemo(() => buildOverdue(scopedContracts, todayKr()), [scopedContracts]);
 
   function handleRowDoubleClick(c: Contract) {
     setSelectedId(c.id);

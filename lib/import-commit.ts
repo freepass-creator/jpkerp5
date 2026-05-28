@@ -10,12 +10,9 @@ import { toStr, toNum, toDate, get, type Row } from './parse-helpers';
 
 /* ──────────────── 도메인별 picker ──────────────── */
 
-const COMPANIES: CompanyCode[] = ['아이카', '달카', '렌트로', '직카', '기타'];
-
 function pickCompany(v: unknown): CompanyCode {
-  const s = toStr(v);
-  for (const c of COMPANIES) if (s.includes(c)) return c;
-  return '아이카';
+  // 회사 식별은 회사 마스터로 동적 관리 — 입력값 그대로 보존
+  return toStr(v) || '기타';
 }
 
 function pickCustomerKind(v: unknown): CustomerKind | undefined {

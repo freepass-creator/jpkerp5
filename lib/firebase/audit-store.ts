@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, push, query, orderByChild, limitToLast } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, getFirebaseAuth } from './client';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, getFirebaseAuth } from './client';
 import type { AuditLog } from '@/lib/types';
 
-const PATH = icarPath('audit_logs');
+const PATH = dbPath('audit_logs');
 
 /** 감사 로그 — 최근 N건 구독 (기본 500) */
 export function useAuditLogs(limit = 500) {

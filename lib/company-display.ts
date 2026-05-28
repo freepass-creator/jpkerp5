@@ -2,14 +2,14 @@
  * 회사명 표시 헬퍼.
  *
  * 규칙:
- *   1) 회사 마스터에 등록되어 있으면 → 접미사 제거한 회사명 ("주식회사 아이카" → "아이카")
+ *   1) 회사 마스터에 등록되어 있으면 → 접미사 제거한 회사명 ("주식회사 스위치플랜" → "스위치플랜")
  *   2) 등록 안 됨 + 사업자번호 있으면 → 사업자번호 뒷 5자리 (예: "67890")
  *   3) 등록 안 됨 + 법인등록번호만 → 법인등록번호 뒷 7자리
  *   4) 다 없으면 → 원본 그대로
  *
  * 사용 예:
- *   const shown = displayCompanyName(c.company, companies);   // "아이카"
- *   const shown = displayCompanyName('렌트로 주식회사');         // "렌트로"
+ *   const shown = displayCompanyName(c.company, companies);   // "스위치플랜"
+ *   const shown = displayCompanyName('스위치플랜 주식회사');     // "스위치플랜"
  *   const shown = displayCompanyName(undefined, [], '123-45-67890'); // "67890"
  */
 
@@ -23,7 +23,7 @@ const CORP_SUFFIXES = [
   '주식', // 일부 표기
 ];
 
-/** "주식회사 아이카" / "아이카 (주)" / "㈜아이카" → "아이카" */
+/** "주식회사 스위치플랜" / "스위치플랜 (주)" / "㈜스위치플랜" → "스위치플랜" */
 export function stripCorpSuffix(name: string): string {
   if (!name) return '';
   let n = name.trim();

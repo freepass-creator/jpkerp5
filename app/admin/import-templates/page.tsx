@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ref, get, update as rtdbUpdate, push } from 'firebase/database';
 import { Upload, Warning, Download, FileXls, CheckCircle, Info, CaretDown, CaretRight } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
-import { getRtdb, icarPath, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
+import { getRtdb, dbPath, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { toast } from '@/lib/toast';
@@ -69,8 +69,8 @@ export default function ImportTemplatesPage() {
       if (!db) throw new Error('Firebase 미설정');
 
       append('현재 DB 조회 중...');
-      const cSnap = await get(ref(db, icarPath('contracts')));
-      const vSnap = await get(ref(db, icarPath('vehicles')));
+      const cSnap = await get(ref(db, dbPath('contracts')));
+      const vSnap = await get(ref(db, dbPath('vehicles')));
       const existing: Record<string, Contract> = cSnap.val() ?? {};
       const existingArr = Object.values(existing);
       const existingVehicles = vSnap.val() ?? {};
@@ -92,7 +92,7 @@ export default function ImportTemplatesPage() {
           writeBatch[_existingId] = { ...c, id: _existingId };
           updated += 1;
         } else {
-          const newRef = push(ref(db, icarPath('contracts')));
+          const newRef = push(ref(db, dbPath('contracts')));
           const id = newRef.key!;
           writeBatch[id] = { ...c, id };
           created += 1;
@@ -103,7 +103,7 @@ export default function ImportTemplatesPage() {
       const pruned: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(writeBatch)) pruned[k] = pruneUndefined(v);
       if (Object.keys(pruned).length > 0) {
-        await rtdbUpdate(ref(db, icarPath('contracts')), pruned);
+        await rtdbUpdate(ref(db, dbPath('contracts')), pruned);
       }
 
       // 휴차 차량 — vehicles 노드에 push
@@ -112,7 +112,7 @@ export default function ImportTemplatesPage() {
         append(`vehicles 노드에 휴차 차량 ${idleVehicles.length}대 등록 중...`);
         const vBatch: Record<string, unknown> = {};
         for (const v of idleVehicles) {
-          const newRef = push(ref(db, icarPath('vehicles')));
+          const newRef = push(ref(db, dbPath('vehicles')));
           const id = newRef.key!;
           vBatch[id] = pruneUndefined({
             id,
@@ -125,7 +125,7 @@ export default function ImportTemplatesPage() {
           });
           vehiclesAdded += 1;
         }
-        await rtdbUpdate(ref(db, icarPath('vehicles')), vBatch);
+        await rtdbUpdate(ref(db, dbPath('vehicles')), vBatch);
       }
 
       append(`✓ 완료 — 계약 신규 ${created} / 갱신 ${updated} / 휴차 차량 신규 ${vehiclesAdded}`);
@@ -150,7 +150,7 @@ export default function ImportTemplatesPage() {
       if (!db) throw new Error('Firebase 미설정');
 
       append('현재 DB 조회 중...');
-      const snap = await get(ref(db, icarPath('contracts')));
+      const snap = await get(ref(db, dbPath('contracts')));
       const existing: Record<string, Contract> = snap.val() ?? {};
       const existingArr = Object.values(existing);
       append(`현재 계약 ${existingArr.length}건`);
@@ -168,7 +168,7 @@ export default function ImportTemplatesPage() {
       for (const [k, v] of Object.entries(writeBatch)) updateOnly[k] = pruneUndefined(v);
       if (Object.keys(updateOnly).length > 0) {
         append(`RTDB 일괄 적용 중... (${Object.keys(updateOnly).length}건)`);
-        await rtdbUpdate(ref(db, icarPath('contracts')), updateOnly);
+        await rtdbUpdate(ref(db, dbPath('contracts')), updateOnly);
       }
 
       append(`✓ 수납이력 적용 완료`);

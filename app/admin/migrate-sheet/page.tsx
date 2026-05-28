@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ref, push, get, update as rtdbUpdate, remove as rtdbRemove } from 'firebase/database';
 import { Database, Upload, Warning, CheckCircle } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
-import { getRtdb, icarPath, ICAR_ROOT, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
+import { getRtdb, dbPath, RTDB_ROOT, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { generateSchedules } from '@/lib/payment-schedule';
@@ -27,12 +27,8 @@ type SeedReceivable = {
   paymentDate: string; amount: number; charged: number; method: string;
 };
 
-const COMPANY_CODES: CompanyCode[] = ['아이카', '달카', '렌트로', '직카', '기타'];
 function mapCompany(s: string): CompanyCode {
-  const t = (s ?? '').trim();
-  if (!t) return '기타';
-  for (const c of COMPANY_CODES) if (t.includes(c)) return c;
-  return t as CompanyCode;  // 알 수 없는 회사명 원본 보존
+  return (s ?? '').trim() || '기타';
 }
 function mapMethod(m: string): PaymentEntry['source'] {
   const t = (m || '').toLowerCase();
@@ -98,8 +94,8 @@ export default function MigrateSheetPage() {
       append(`super admin: ${superAdmin ? 'YES' : 'NO'}`);
 
       // 2) root 노드 자식 카운트
-      append(`═══ ${ICAR_ROOT} root 자식 노드 ═══`);
-      const rootSnap = await get(ref(db, ICAR_ROOT));
+      append(`═══ ${RTDB_ROOT} root 자식 노드 ═══`);
+      const rootSnap = await get(ref(db, RTDB_ROOT));
       const root = rootSnap.val() ?? {};
       if (Object.keys(root).length === 0) {
         append('  (root 비어있음)');
@@ -112,7 +108,7 @@ export default function MigrateSheetPage() {
 
       // 3) vehicles 노드 상세
       append('═══ vehicles 상세 (앞 40대) ═══');
-      const vSnap = await get(ref(db, icarPath('vehicles')));
+      const vSnap = await get(ref(db, dbPath('vehicles')));
       const vehicles = vSnap.val() ?? {};
       const vList = Object.entries(vehicles) as Array<[string, { plate?: string; company?: string; status?: string; notes?: string }]>;
       append(`총 ${vList.length}대`);
@@ -123,7 +119,7 @@ export default function MigrateSheetPage() {
 
       // 4) contracts 노드 상세 (회사='스위치플랜' 같은 의심 케이스)
       append('═══ contracts 상세 (앞 40건) ═══');
-      const cSnap = await get(ref(db, icarPath('contracts')));
+      const cSnap = await get(ref(db, dbPath('contracts')));
       const contracts = cSnap.val() ?? {};
       const cList = Object.entries(contracts) as Array<[string, { vehiclePlate?: string; customerName?: string; company?: string; notes?: string }]>;
       append(`총 ${cList.length}건`);
@@ -147,18 +143,18 @@ export default function MigrateSheetPage() {
   /** 강제 wipe — root 통째로 삭제 (companies/audit_logs 포함 모든 것) */
   async function nukeEverything() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
-    if (!window.confirm(`☢☢☢ 핵 wipe — ${ICAR_ROOT} root 노드 전체 삭제\n\ncompanies/audit_logs 포함 모든 데이터 사라집니다.\n진행할까요?`)) return;
-    if (!window.confirm(`정말로? ${ICAR_ROOT} 노드 전체 삭제`)) return;
+    if (!window.confirm(`☢☢☢ 핵 wipe — ${RTDB_ROOT} root 노드 전체 삭제\n\ncompanies/audit_logs 포함 모든 데이터 사라집니다.\n진행할까요?`)) return;
+    if (!window.confirm(`정말로? ${RTDB_ROOT} 노드 전체 삭제`)) return;
     setRunning(true);
     setLog([]);
     try {
       await ensureAuth();
       const db = getRtdb();
       if (!db) throw new Error('Firebase 미설정');
-      append(`${ICAR_ROOT} root 삭제 중...`);
-      await rtdbRemove(ref(db, ICAR_ROOT));
-      append(`✓ ${ICAR_ROOT} root 통째로 삭제 완료`);
-      toast.success(`${ICAR_ROOT} 전체 삭제 완료`);
+      append(`${RTDB_ROOT} root 삭제 중...`);
+      await rtdbRemove(ref(db, RTDB_ROOT));
+      append(`✓ ${RTDB_ROOT} root 통째로 삭제 완료`);
+      toast.success(`${RTDB_ROOT} 전체 삭제 완료`);
     } catch (e) {
       append(`✗ 실패: ${friendlyError(e)}`);
       toast.error(friendlyError(e));
@@ -179,16 +175,16 @@ export default function MigrateSheetPage() {
 
       // ── 1) 삭제 전 진단: root 전체 상태 ──
       append('═══ 삭제 전 진단 ═══');
-      const rootSnap = await get(ref(db, ICAR_ROOT));
+      const rootSnap = await get(ref(db, RTDB_ROOT));
       const root = rootSnap.val() ?? {};
-      append(`${ICAR_ROOT} root 자식 노드:`);
+      append(`${RTDB_ROOT} root 자식 노드:`);
       for (const [key, val] of Object.entries(root)) {
         const count = val && typeof val === 'object' ? Object.keys(val).length : 0;
         append(`  · ${key}: ${count}건`);
       }
 
-      const cSnap = await get(ref(db, icarPath('contracts')));
-      const vSnap = await get(ref(db, icarPath('vehicles')));
+      const cSnap = await get(ref(db, dbPath('contracts')));
+      const vSnap = await get(ref(db, dbPath('vehicles')));
       const cAll = Object.values(cSnap.val() ?? {}) as Array<{ vehiclePlate?: string; customerName?: string; company?: string }>;
       const vAll = Object.values(vSnap.val() ?? {}) as Array<{ plate?: string; company?: string; status?: string; notes?: string }>;
       append(`contracts: ${cAll.length}건 / vehicles: ${vAll.length}대`);
@@ -214,7 +210,7 @@ export default function MigrateSheetPage() {
       append('═══ 삭제 실행 ═══');
       append('contracts 노드 삭제 중...');
       try {
-        await rtdbRemove(ref(db, icarPath('contracts')));
+        await rtdbRemove(ref(db, dbPath('contracts')));
         append(`✓ contracts 삭제 성공`);
       } catch (e) {
         append(`✗ contracts 삭제 실패: ${friendlyError(e)}`);
@@ -222,7 +218,7 @@ export default function MigrateSheetPage() {
 
       append('vehicles 노드 삭제 중...');
       try {
-        await rtdbRemove(ref(db, icarPath('vehicles')));
+        await rtdbRemove(ref(db, dbPath('vehicles')));
         append(`✓ vehicles 삭제 성공`);
       } catch (e) {
         append(`✗ vehicles 삭제 실패: ${friendlyError(e)}`);
@@ -231,8 +227,8 @@ export default function MigrateSheetPage() {
 
       // ── 3) 삭제 후 검증 ──
       append('═══ 삭제 후 재조회 (실제 지워졌는지 검증) ═══');
-      const cSnap2 = await get(ref(db, icarPath('contracts')));
-      const vSnap2 = await get(ref(db, icarPath('vehicles')));
+      const cSnap2 = await get(ref(db, dbPath('contracts')));
+      const vSnap2 = await get(ref(db, dbPath('vehicles')));
       const cAfter = Object.keys(cSnap2.val() ?? {}).length;
       const vAfter = Object.keys(vSnap2.val() ?? {}).length;
       append(`삭제 후 — contracts: ${cAfter}건 / vehicles: ${vAfter}대`);
@@ -242,51 +238,11 @@ export default function MigrateSheetPage() {
         toast.success(`DB wipe 성공 — 화면 새로고침 필요`);
       } else {
         append(`⚠️ DB에 아직 데이터 남음 — Rules 또는 권한 문제 의심`);
-        append(`해결: Firebase Console → Realtime Database → ${ICAR_ROOT} 노드 직접 삭제`);
+        append(`해결: Firebase Console → Realtime Database → ${RTDB_ROOT} 노드 직접 삭제`);
         toast.error(`삭제 완료 메시지 떴지만 실제 ${cAfter + vAfter}건 남음 — Rules 문제`);
       }
     } catch (e) {
       append(`✗ 전체 실패: ${friendlyError(e)}`);
-      toast.error(friendlyError(e));
-    } finally {
-      setRunning(false);
-    }
-  }
-
-  /** 위험: company === '아이카' 인 contract 일괄 삭제 */
-  async function deleteAllIcar() {
-    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
-    setRunning(true);
-    setLog([]);
-    try {
-      await ensureAuth();
-      const db = getRtdb();
-      if (!db) throw new Error('Firebase 미설정');
-
-      append('현재 DB 조회 중...');
-      const snap = await get(ref(db, icarPath('contracts')));
-      const existing: Record<string, Contract> = snap.val() ?? {};
-      const allContracts = Object.values(existing);
-      const targets = allContracts.filter((c) => c.company === '아이카');
-      append(`전체 ${allContracts.length}건 중 '아이카' 회사: ${targets.length}건`);
-
-      if (targets.length === 0) {
-        toast.warning('아이카 계약 없음');
-        return;
-      }
-      if (!window.confirm(`'아이카' 계약 ${targets.length}건을 영구 삭제합니다. 진행하시겠습니까?`)) return;
-      if (!window.confirm(`한 번 더 확인 — 진짜 삭제할까요? (${targets.length}건)`)) return;
-
-      let deleted = 0;
-      for (const c of targets) {
-        await rtdbRemove(ref(db, `${icarPath('contracts')}/${c.id}`));
-        deleted += 1;
-        if (deleted % 20 === 0) append(`삭제 진행: ${deleted}/${targets.length}`);
-      }
-      append(`✓ '아이카' 계약 ${deleted}건 삭제 완료`);
-      toast.success(`아이카 ${deleted}건 삭제 완료`);
-    } catch (e) {
-      append(`❌ 오류: ${friendlyError(e)}`);
       toast.error(friendlyError(e));
     } finally {
       setRunning(false);
@@ -298,7 +254,7 @@ export default function MigrateSheetPage() {
     if (!window.confirm(
       `구글 시트 import + 중복 자동 정리\n\n` +
       `· 같은 (차량번호+고객명) 중복 발견 시 실 입금 데이터 많은 쪽 keeper, 나머지 삭제\n` +
-      `· 회사명 잘못된 경우 (예: 아이카로 박힘) 시드값으로 자동 보정\n` +
+      `· 회사명 잘못된 경우 시드값으로 자동 보정\n` +
       `· 'spillover/스냅샷 자동 정리' 는 실 입금과 같은 월(회차)에 있으면 제거\n` +
       `· 결제는 차량+계약일 매칭 → schedules.payments에 추가\n\n진행하시겠습니까?`,
     )) return;
@@ -313,32 +269,10 @@ export default function MigrateSheetPage() {
 
       // ─── 0. 현재 DB 상태 조회 ───
       append('DB 현재 상태 조회 중...');
-      const snap = await get(ref(db, icarPath('contracts')));
+      const snap = await get(ref(db, dbPath('contracts')));
       const existing: Record<string, Contract> = snap.val() ?? {};
       let existingContracts = Object.values(existing);
       append(`현재 DB: 계약 ${existingContracts.length}건`);
-
-      // ─── 0-Z. '아이카' 들어간 계약 일괄 삭제 — lenient 매칭 ───
-      // 시드에 아이카 없음 — 모든 변형(공백/괄호/주식회사 등) 잔재 처리
-      const isIcar = (s: string | undefined): boolean => {
-        if (!s) return false;
-        const t = s.replace(/[\s()\-]/g, '').toLowerCase();
-        return t.includes('아이카') || t.includes('icar');
-      };
-      const icarTargets = existingContracts.filter((c) => isIcar(c.company));
-      if (icarTargets.length > 0) {
-        append(`'아이카' 잘못 박힌 계약 ${icarTargets.length}건 삭제 중...`);
-        for (const c of icarTargets) {
-          append(`  - ${c.vehiclePlate} ${c.customerName} (company: "${c.company}")`);
-          await rtdbRemove(ref(db, `${icarPath('contracts')}/${c.id}`));
-        }
-        existingContracts = existingContracts.filter((c) => !isIcar(c.company));
-        append(`✓ '아이카' ${icarTargets.length}건 삭제 완료`);
-      } else {
-        append(`'아이카' 매칭 0건 — 현재 DB의 company 값 샘플:`);
-        const sample = Array.from(new Set(existingContracts.map((c) => c.company))).slice(0, 10);
-        for (const s of sample) append(`  · "${s}"`);
-      }
 
       // ─── 0-A. DB 자체 중복 정리 (시드 무관) ───
       // 같은 (plate+customer) 가 여러 건 있으면 → 실입금 많은 쪽 keeper, 나머지 입금 이전 후 삭제
@@ -441,7 +375,7 @@ export default function MigrateSheetPage() {
           const yy = s.contractDate.slice(2, 4);
           const mm = s.contractDate.slice(5, 7);
           const seqHash = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-          const newRef = push(ref(db, icarPath('contracts')));
+          const newRef = push(ref(db, dbPath('contracts')));
           const id = newRef.key;
           if (!id) continue;
           const c: Contract = {
@@ -663,10 +597,10 @@ export default function MigrateSheetPage() {
         else updateOnly[id] = v;
       }
       if (Object.keys(updateOnly).length > 0) {
-        await rtdbUpdate(ref(db, icarPath('contracts')), updateOnly);
+        await rtdbUpdate(ref(db, dbPath('contracts')), updateOnly);
       }
       for (const id of removeIds) {
-        await rtdbRemove(ref(db, `${icarPath('contracts')}/${id}`));
+        await rtdbRemove(ref(db, `${dbPath('contracts')}/${id}`));
       }
 
       append(`✓ 정산 entry 제거: ${settlementsRemoved}개`);
@@ -753,15 +687,6 @@ export default function MigrateSheetPage() {
                 className="btn btn-danger"
                 type="button"
                 disabled={running || !superAdmin}
-                onClick={deleteAllIcar}
-                style={{ height: 40, fontSize: 13 }}
-              >
-                <Warning weight="bold" size={14} /> 회사='아이카' 계약 일괄 삭제 (잘못 박힌 것)
-              </button>
-              <button
-                className="btn btn-danger"
-                type="button"
-                disabled={running || !superAdmin}
                 onClick={wipeAllContracts}
                 style={{ height: 40, fontSize: 13, background: '#7F1D1D', color: '#fff' }}
               >
@@ -787,7 +712,7 @@ export default function MigrateSheetPage() {
               </button>
               <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
                 ✓ (차량+고객) 기준 중복 발견 시 실 입금 많은 쪽 keeper → 나머지 삭제 + 입금 이전<br />
-                ✓ 회사명 잘못된 것 (예: '아이카'로 잘못 박힘) → 시드값으로 자동 보정<br />
+                ✓ 회사명 잘못된 것 → 시드값으로 자동 보정<br />
                 ✓ contractDate / 월대여료 / 보증금 / paymentDay → 시드 기준으로 keeper 갱신<br />
                 ✓ '스냅샷 자동 정리' (정산) entry → 실 입금 있는 회차에서 자동 제거<br />
                 ✓ 캐시 (미수금/회차/최근결제) 모두 자동 재계산

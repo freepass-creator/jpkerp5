@@ -1,6 +1,7 @@
 // jpkerp5 — 미수/반납/수납 ERP 핵심 타입
 
-export type CompanyCode = '아이카' | '달카' | '렌트로' | '직카' | '기타';
+/** 회사 식별 — 회사 마스터로 동적 관리. legacy 더미는 모두 제거됨. */
+export type CompanyCode = string;
 
 export type VehicleStatus =
   // ── 메인 라이프사이클 (X대기 → X완료 패턴) ──

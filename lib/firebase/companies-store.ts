@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import type { Company } from '@/lib/types';
 
 import { genCode } from '@/lib/code';
 
-const COMPANIES_PATH = icarPath('companies');
+const COMPANIES_PATH = dbPath('companies');
 
 /** 새 회사 코드 — 6자 영문·숫자 난수 (prefix 없음). 기존과 충돌 시 재시도. */
 export function nextCompanyCode(existing: Company[]): string {

@@ -94,7 +94,7 @@ export const BANK_TX_COLUMNS: ColumnSpec[] = [
   { label: '적요',         field: 'memo',         required: false, example: '5월 대여료 / 수수료 등' },
   { label: '계좌번호',     field: 'account',      required: false, example: '110-123-456789', hint: '회사 마스터의 계좌와 자동 매칭' },
   { label: '은행',         field: 'source',       required: false, example: 'KB',  hint: 'KB/우리/신한/하나/농협 등' },
-  { label: '회사',         field: 'companyCode',  required: false, example: '아이카', hint: '미지정 시 계좌번호로 자동 매핑' },
+  { label: '회사',         field: 'companyCode',  required: false, example: '스위치플랜', hint: '미지정 시 계좌번호로 자동 매핑' },
 ];
 
 /* ─────────────── 자동이체 (CMS) 출금 결과 ─────────────── */
@@ -115,7 +115,7 @@ export const CARD_TX_COLUMNS: ColumnSpec[] = [
   { label: '금액',         field: 'amount',       required: true,  example: '480000' },
   { label: '카드번호',     field: 'cardLast4',    required: false, example: '****-****-****-1234', hint: '뒷 4자리만 추출' },
   { label: '카드사',       field: 'source',       required: false, example: 'BC' },
-  { label: '가맹점',       field: 'merchant',     required: false, example: 'icar 렌트' },
+  { label: '가맹점',       field: 'merchant',     required: false, example: 'jpk 렌트' },
   { label: '고객명',       field: 'customerName', required: false, example: '강지훈', hint: '계약자명과 자동 매칭' },
 ];
 

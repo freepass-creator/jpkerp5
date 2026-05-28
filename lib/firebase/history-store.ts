@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, getFirebaseAuth, pruneUndefined } from './client';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, getFirebaseAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { HistoryEntry } from '@/lib/types';
 
-const PATH = icarPath('history_entries');
+const PATH = dbPath('history_entries');
 
 /**
  * 차량·계약 이력 — 정비·사고·검사·세차·위반·보험·부품교체 (vehicle scope)

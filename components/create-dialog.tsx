@@ -101,7 +101,7 @@ export function CreateDialog({
     [handleFiles]
   );
 
-  const onPick = useCallback(() => document.getElementById('icar-bulk-file-input')?.click(), []);
+  const onPick = useCallback(() => document.getElementById('jpk-bulk-file-input')?.click(), []);
 
   const vehicleFiles = parsed.filter((p) => p.kind === '미분류'); // TODO: 차량 분류 추가
   const contractFiles = parsed.filter((p) => p.kind === '계약');
@@ -415,7 +415,7 @@ export function CreateDialog({
     >
       <DialogContent title="신규 등록">
         <input
-          id="icar-bulk-file-input"
+          id="jpk-bulk-file-input"
           type="file"
           multiple
           accept=".xlsx,.xls,.csv"
@@ -1119,7 +1119,7 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
     <div
       className="dropzone"
       style={{ minHeight: 320, flex: 1 }}
-      onClick={() => document.getElementById('icar-ocr-file')?.click()}
+      onClick={() => document.getElementById('jpk-ocr-file')?.click()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
@@ -1128,7 +1128,7 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
       }}
     >
       <input
-        id="icar-ocr-file"
+        id="jpk-ocr-file"
         type="file"
         accept="image/*,.pdf"
         className="hidden"
@@ -1142,7 +1142,7 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
         등록증 사진(.jpg/.png) 또는 스캔본(.pdf) 업로드 시<br />
         차량번호 · 차종 · 차대번호 · 연식 · 소유자 등 자동 추출 (Gemini Vision)
       </div>
-      <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('icar-ocr-file')?.click(); }}>
+      <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('jpk-ocr-file')?.click(); }}>
         <Camera size={14} /> 이미지 선택
       </button>
       <div className="dropzone-hint">또는 여기에 끌어다 놓기</div>
@@ -1164,7 +1164,7 @@ function VehicleExcelPane({
 }) {
   const [sheets, setSheets] = useState<ParsedSheet[]>([]);
   const [drag, setDrag] = useState(false);
-  const inputId = 'icar-vehicle-bulk-file';
+  const inputId = 'jpk-vehicle-bulk-file';
 
   const handleFiles = useCallback(async (files: File[]) => {
     const out: ParsedSheet[] = [];
@@ -1272,7 +1272,7 @@ function SnapshotPane({
   const [drag, setDrag] = useState(false);
   // 행별 체크 선택 (기본: valid 행만 체크) — Map<rowKey, boolean>
   const [picks, setPicks] = useState<Record<string, boolean>>({});
-  const inputId = 'icar-snapshot-bulk-file';
+  const inputId = 'jpk-snapshot-bulk-file';
 
   const handleFiles = useCallback(async (files: File[]) => {
     const out: ParsedSheet[] = [];
@@ -2149,16 +2149,16 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
     <div
       className="dropzone"
       style={{ minHeight: 320, flex: 1 }}
-      onClick={() => document.getElementById('icar-ocr-contract')?.click()}
+      onClick={() => document.getElementById('jpk-ocr-contract')?.click()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImage(f); }}
     >
-      <input id="icar-ocr-contract" type="file" accept="image/*,.pdf" className="hidden"
+      <input id="jpk-ocr-contract" type="file" accept="image/*,.pdf" className="hidden"
         onChange={(e) => { if (e.target.files?.[0]) handleImage(e.target.files[0]); }} />
       <div className="dropzone-icon"><Camera size={28} weight="duotone" /></div>
       <div className="dropzone-title">계약서 스캔</div>
       <div className="dropzone-desc">계약서 사진(.jpg/.png) 또는 스캔본(.pdf) — 계약자명·연락처·차량·금액 자동 추출</div>
-      <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('icar-ocr-contract')?.click(); }}>
+      <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('jpk-ocr-contract')?.click(); }}>
         <Camera size={14} /> 이미지 선택
       </button>
       <div className="dropzone-hint">또는 여기에 끌어다 놓기</div>
@@ -2376,16 +2376,16 @@ function PaymentOcrPane({ onSubmit }: { onSubmit: () => void }) {
     <div
       className="dropzone"
       style={{ minHeight: 320, flex: 1 }}
-      onClick={() => document.getElementById('icar-ocr-pay')?.click()}
+      onClick={() => document.getElementById('jpk-ocr-pay')?.click()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImage(f); }}
     >
-      <input id="icar-ocr-pay" type="file" accept="image/*,.pdf" className="hidden"
+      <input id="jpk-ocr-pay" type="file" accept="image/*,.pdf" className="hidden"
         onChange={(e) => { if (e.target.files?.[0]) handleImage(e.target.files[0]); }} />
       <div className="dropzone-icon"><Camera size={28} weight="duotone" /></div>
       <div className="dropzone-title">영수증 / 입금 확인 스캔</div>
       <div className="dropzone-desc">영수증·이체확인증 사진 — 일자·입금자·금액 자동 추출</div>
-      <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('icar-ocr-pay')?.click(); }}>
+      <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('jpk-ocr-pay')?.click(); }}>
         <Camera size={14} /> 이미지 선택
       </button>
       <div className="dropzone-hint">또는 여기에 끌어다 놓기</div>

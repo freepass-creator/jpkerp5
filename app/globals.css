@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════
- * icar ERP — Modern UI (Linear / Vercel inspired)
+ * jpkerp5 — Modern UI (Linear / Vercel inspired)
  * ═══════════════════════════════════════════════════════════════ */
 
 :root {
@@ -38,7 +38,7 @@
   --border-strong: #d4d4d8;  /* zinc-300 */
   --border-focus:  #18181b;
 
-  /* Brand — icar navy */
+  /* Brand — JPK navy */
   --brand:    #1B2A4A;
   --brand-h:  #0F1B35;
   --brand-bg: #eef2f7;
@@ -651,7 +651,6 @@ a { color: var(--text-link); text-decoration: none; }
   margin: 8px 0;
 }
 .sb-foot {
-  border-top: 1px solid var(--border-soft);
   padding: 6px 8px;
   display: flex; flex-direction: column; gap: 1px;
 }

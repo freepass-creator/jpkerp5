@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update as rtdbUpdate, push } from 'firebase/database';
-import { getRtdb, icarPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { BankTransaction, CardTransaction, AuditEntityType } from '@/lib/types';
 
-const BANK_PATH = icarPath('bank_tx');
-const CARD_PATH = icarPath('card_tx');
+const BANK_PATH = dbPath('bank_tx');
+const CARD_PATH = dbPath('card_tx');
 
 export function useBankTx() {
   return useTxStore<BankTransaction>(BANK_PATH, 'bank_tx');
