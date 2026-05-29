@@ -8,10 +8,49 @@
  * 양식 확정 후 /contract/[contractId] 에 같은 구조 적용.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Printer, FloppyDisk } from '@phosphor-icons/react';
 import { todayKr } from '@/lib/mock-data';
 import { stripCorpSuffix } from '@/lib/company-display';
+
+/* ─── 자동 연동 헬퍼 ─── */
+function addMonths(yyyymmdd: string, months: number): string {
+  if (!yyyymmdd) return '';
+  const d = new Date(yyyymmdd);
+  if (isNaN(d.getTime())) return '';
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  // 말일 조정 (예: 1/31 + 1개월 = 2/28)
+  if (d.getDate() !== day) d.setDate(0);
+  return d.toISOString().slice(0, 10);
+}
+function diffMonths(start: string, end: string): number {
+  if (!start || !end) return 0;
+  const s = new Date(start);
+  const e = new Date(end);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
+  return Math.max(0, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30.4375)));
+}
+function fmtPhone(s: string): string {
+  const d = s.replace(/\D/g, '');
+  if (d.startsWith('02')) {
+    if (d.length <= 2) return d;
+    if (d.length <= 5) return `${d.slice(0, 2)}-${d.slice(2)}`;
+    if (d.length <= 9) return `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5)}`;
+    return `${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6, 10)}`;
+  }
+  if (d.length <= 3) return d;
+  if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  if (d.length <= 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 11)}`;
+}
+function fmtIdent(s: string): string {
+  const d = s.replace(/\D/g, '');
+  if (d.length === 13) return `${d.slice(0, 6)}-${d.slice(6)}`;
+  if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
+  if (d.length === 12) return `${d.slice(0, 6)}-${d.slice(6)}`;
+  return s;
+}
 
 const STANDARD_TERMS = [
   { title: '제1조 (목적)', body: '본 계약은 임대인이 임차인에게 별지 기재 자동차(이하 "본 차량")를 임대하고, 임차인이 이에 따른 대여료를 지급하는 데 필요한 사항을 정함을 목적으로 한다.' },
@@ -87,10 +126,54 @@ export default function ContractPreviewPage() {
   const [deposit, setDeposit] = useState(1000000);
   const [paymentDay, setPaymentDay] = useState(25);
   const [paymentMethod, setPaymentMethod] = useState('CMS');
+  // 보증금 수동 편집 여부 — 월대여료 변경 시 미편집인 경우만 자동 채움
+  const [depositTouched, setDepositTouched] = useState(false);
+  // 결제일 수동 편집 여부 — 인도일 변경 시 미편집인 경우만 자동 채움
+  const [paymentDayTouched, setPaymentDayTouched] = useState(false);
 
   // 발행
   const [issuedDate, setIssuedDate] = useState('2026-05-29');
   const [specialNote, setSpecialNote] = useState('');
+
+  /* ─── 자동 연동 핸들러 ─── */
+  // 인도일자 변경 → 종료일 자동 + 결제일 자동 (미편집인 경우)
+  const handleStartChange = useCallback((newStart: string) => {
+    setContractDate(newStart);
+    if (newStart && termMonths > 0) {
+      setEndDate(addMonths(newStart, termMonths));
+    }
+    if (!paymentDayTouched && newStart) {
+      const day = parseInt(newStart.slice(8, 10), 10);
+      if (day >= 1 && day <= 31) setPaymentDay(day);
+    }
+  }, [termMonths, paymentDayTouched]);
+
+  // 약정개월 변경 → 종료일 자동
+  const handleTermChange = useCallback((newTerm: number) => {
+    setTermMonths(newTerm);
+    if (contractDate && newTerm > 0) {
+      setEndDate(addMonths(contractDate, newTerm));
+    }
+  }, [contractDate]);
+
+  // 종료일 직접 변경 → 약정개월 역산
+  const handleEndChange = useCallback((newEnd: string) => {
+    setEndDate(newEnd);
+    if (contractDate && newEnd) {
+      const m = diffMonths(contractDate, newEnd);
+      if (m > 0) setTermMonths(m);
+    }
+  }, [contractDate]);
+
+  // 월대여료 변경 → 보증금 디폴트 자동 (미편집 시 월대여료 1배)
+  const handleMonthlyChange = useCallback((newRent: number) => {
+    setMonthlyRent(newRent);
+    if (!depositTouched && newRent > 0) {
+      setDeposit(newRent);
+    }
+  }, [depositTouched]);
+
+  const isLongTerm = termMonths >= 12;
 
   // Paged.js 미리보기
   const sourceRef = useRef<HTMLDivElement>(null);
@@ -423,10 +506,24 @@ export default function ContractPreviewPage() {
 
         <h3>임차인 (손님)</h3>
         <div className="ctr-row"><label>성명</label><input value={cName} onChange={(e) => setCName(e.target.value)} /></div>
-        <div className="ctr-row"><label>등록번호</label><input value={cIdent} onChange={(e) => setCIdent(e.target.value)} /></div>
-        <div className="ctr-row"><label>연락처</label><input value={cPhone} onChange={(e) => setCPhone(e.target.value)} /></div>
+        <div className="ctr-row"><label>등록번호</label>
+          <input
+            value={cIdent}
+            onChange={(e) => setCIdent(fmtIdent(e.target.value))}
+            placeholder="900101-1234567"
+            inputMode="numeric"
+          />
+        </div>
+        <div className="ctr-row"><label>연락처</label>
+          <input
+            value={cPhone}
+            onChange={(e) => setCPhone(fmtPhone(e.target.value))}
+            placeholder="010-1234-5678"
+            inputMode="tel"
+          />
+        </div>
         <div className="ctr-row"><label>주소</label><textarea value={cAddr} onChange={(e) => setCAddr(e.target.value)} /></div>
-        <div className="ctr-row"><label>면허번호</label><input value={cLicense} onChange={(e) => setCLicense(e.target.value)} /></div>
+        <div className="ctr-row"><label>면허번호</label><input value={cLicense} onChange={(e) => setCLicense(e.target.value)} placeholder="11-12-345678-90" /></div>
         <div className="ctr-row"><label>면허종</label>
           <select value={cLicenseType} onChange={(e) => setCLicenseType(e.target.value)}>
             <option>1종 보통</option><option>1종 대형</option><option>1종 소형</option>
@@ -435,17 +532,58 @@ export default function ContractPreviewPage() {
         </div>
 
         <h3>차량 · 인도</h3>
-        <div className="ctr-row"><label>차량번호</label><input value={plate} onChange={(e) => setPlate(e.target.value)} /></div>
-        <div className="ctr-row"><label>차종</label><input value={model} onChange={(e) => setModel(e.target.value)} /></div>
+        <div className="ctr-row"><label>차량번호</label><input value={plate} onChange={(e) => setPlate(e.target.value.replace(/\s+/g, ''))} placeholder="15두2255" /></div>
+        <div className="ctr-row"><label>차종</label><input value={model} onChange={(e) => setModel(e.target.value)} placeholder="스팅어" /></div>
         <div className="ctr-row"><label>인도 장소</label><textarea value={deliveryAddr} onChange={(e) => setDeliveryAddr(e.target.value)} /></div>
 
-        <h3>대여 조건</h3>
-        <div className="ctr-row"><label>계약시작</label><input type="date" value={contractDate} onChange={(e) => setContractDate(e.target.value)} /></div>
-        <div className="ctr-row"><label>계약종료</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
-        <div className="ctr-row"><label>약정개월</label><input type="number" value={termMonths} onChange={(e) => setTermMonths(Number(e.target.value) || 0)} /></div>
-        <div className="ctr-row"><label>월 대여료</label><input type="number" value={monthlyRent} onChange={(e) => setMonthlyRent(Number(e.target.value) || 0)} /></div>
-        <div className="ctr-row"><label>보증금</label><input type="number" value={deposit} onChange={(e) => setDeposit(Number(e.target.value) || 0)} /></div>
-        <div className="ctr-row"><label>결제일</label><input type="number" min={1} max={31} value={paymentDay} onChange={(e) => setPaymentDay(Number(e.target.value) || 1)} /></div>
+        <h3>
+          대여 조건
+          {termMonths > 0 && (
+            <span style={{ marginLeft: 8, padding: '1px 6px', background: isLongTerm ? '#dbeafe' : '#fef9c3', color: isLongTerm ? '#1e40af' : '#854d0e', borderRadius: 3, fontSize: 9, fontWeight: 600, letterSpacing: 0 }}>
+              {isLongTerm ? '장기' : '단기'}
+            </span>
+          )}
+        </h3>
+        <div className="ctr-row"><label>인도일자</label><input type="date" value={contractDate} onChange={(e) => handleStartChange(e.target.value)} /></div>
+        <div className="ctr-row"><label>약정개월</label>
+          <input type="number" value={termMonths} onChange={(e) => handleTermChange(Number(e.target.value) || 0)} />
+        </div>
+        <div className="ctr-row"><label>계약종료</label>
+          <input type="date" value={endDate} onChange={(e) => handleEndChange(e.target.value)} />
+        </div>
+        <div className="ctr-row"><label>월 대여료</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={monthlyRent ? monthlyRent.toLocaleString() : ''}
+            onChange={(e) => handleMonthlyChange(parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0)}
+            placeholder="원 단위"
+          />
+        </div>
+        <div className="ctr-row"><label>보증금
+          {!depositTouched && monthlyRent > 0 && (
+            <div style={{ fontSize: 9, color: '#a1a1aa', marginTop: 1 }}>자동: 월대여료 × 1</div>
+          )}
+        </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={deposit ? deposit.toLocaleString() : ''}
+            onChange={(e) => { setDeposit(parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0); setDepositTouched(true); }}
+            placeholder="원 단위"
+          />
+        </div>
+        <div className="ctr-row"><label>결제일
+          {!paymentDayTouched && contractDate && (
+            <div style={{ fontSize: 9, color: '#a1a1aa', marginTop: 1 }}>자동: 인도일</div>
+          )}
+        </label>
+          <input
+            type="number" min={1} max={31}
+            value={paymentDay}
+            onChange={(e) => { setPaymentDay(Number(e.target.value) || 1); setPaymentDayTouched(true); }}
+          />
+        </div>
         <div className="ctr-row"><label>결제방법</label>
           <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
             <option>CMS</option><option>이체</option><option>카드</option><option>현금</option><option>후불</option>
