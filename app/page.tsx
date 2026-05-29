@@ -938,6 +938,11 @@ export default function Page() {
             icon: <PaperPlaneTilt size={12} weight="bold" />,
             onClick: () => { if (ctxMenu.row) ctxAction_sendSms(ctxMenu.row); },
           },
+          {
+            label: '계약서 발행 (새 탭)',
+            icon: <DownloadSimple size={12} weight="bold" />,
+            onClick: () => { if (ctxMenu.row) window.open(`/contract/${ctxMenu.row.id}`, '_blank'); },
+          },
           { type: 'separator' },
           {
             label: '계약 삭제',

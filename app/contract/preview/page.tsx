@@ -302,174 +302,183 @@ export default function ContractPreviewPage() {
           }
         }
 
-        /* ─── 모던 문서 디자인 ─── */
-        .doc {
-          font-family: 'Pretendard Variable', Pretendard, sans-serif;
-          color: #18181b;
-          font-size: 10.5pt;
-          line-height: 1.65;
-          letter-spacing: -0.005em;
-        }
+        /* ─── 한국 자동차 임대차 계약서 디자인 ─── */
+        .doc { font-family: 'Pretendard Variable', sans-serif; color: #18181b; font-size: 10.5pt; line-height: 1.65; letter-spacing: -0.005em; }
+
+        /* 상단 헤더 — 큰 정식 제목 + 회사 정보 */
         .doc-head {
-          margin-bottom: 30px;
-          padding-bottom: 18px;
-          border-bottom: 2px solid #18181b;
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
+          margin-bottom: 24px;
+          text-align: center;
+          padding: 10px 0 20px;
+          border-bottom: 3px double #18181b;
         }
-        .doc-head .title-block h1 {
+        .doc-head .corp {
+          font-size: 9pt;
+          color: #71717a;
+          margin-bottom: 6px;
+          letter-spacing: 0.1em;
+        }
+        .doc-head h1 {
           margin: 0;
-          font-size: 22pt;
-          font-weight: 700;
-          letter-spacing: 0.02em;
+          font-size: 26pt;
+          font-weight: 800;
+          letter-spacing: 0.5em;
+          padding-left: 0.5em;
         }
-        .doc-head .title-block .sub {
-          margin-top: 4px;
-          font-size: 9pt;
-          color: #71717a;
-          font-weight: 500;
-          letter-spacing: 0.05em;
-        }
-        .doc-head .meta {
-          text-align: right;
-          font-size: 9pt;
-          color: #71717a;
-        }
-        .doc-head .meta .doc-no {
-          font-weight: 600;
-          color: #18181b;
+        .doc-head .sub {
+          margin-top: 8px;
           font-size: 10pt;
+          color: #52525b;
+          font-weight: 500;
         }
-
-        .doc-section {
-          margin-top: 22px;
-        }
-        .doc-section-label {
+        .doc-head .doc-no {
+          margin-top: 10px;
           font-size: 9pt;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #1B2A4A;
-          margin-bottom: 8px;
+          color: #71717a;
+          font-variant-numeric: tabular-nums;
         }
 
+        /* 섹션 헤더 — 좌측 컬러 바 + 텍스트 */
+        .doc-section { margin-top: 20px; break-inside: avoid; }
+        .doc-section-label {
+          font-size: 11pt;
+          font-weight: 700;
+          color: #18181b;
+          margin-bottom: 6px;
+          padding-left: 10px;
+          border-left: 4px solid #1B2A4A;
+          line-height: 1.2;
+        }
+
+        /* 정보 grid — 명확한 borders */
         .doc-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 0;
-          border-top: 1px solid #18181b;
-          border-bottom: 1px solid #18181b;
+          border: 1px solid #18181b;
         }
         .doc-grid.single-col { grid-template-columns: 1fr; }
         .doc-field {
           display: grid;
-          grid-template-columns: 92px 1fr;
-          padding: 9px 12px;
-          border-bottom: 1px solid #e7e5e4;
+          grid-template-columns: 100px 1fr;
+          padding: 8px 12px;
+          border-bottom: 1px solid #d4d4d8;
           font-size: 10pt;
+          background: #fff;
         }
-        .doc-field:nth-last-of-type(1),
-        .doc-field:nth-last-of-type(2) { border-bottom: none; }
-        .doc-grid.single-col .doc-field:nth-last-of-type(1) { border-bottom: none; }
         .doc-field.full { grid-column: 1 / -1; }
         .doc-field .k {
-          color: #71717a;
-          font-size: 9pt;
-          font-weight: 500;
-          letter-spacing: 0.03em;
+          color: #52525b;
+          font-size: 9.5pt;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          background: #f4f4f5;
+          margin: -8px -12px -8px -12px;
+          padding: 8px 12px;
+          display: flex;
+          align-items: center;
         }
-        .doc-field .v { color: #18181b; font-weight: 500; }
+        .doc-field .v { color: #18181b; font-weight: 500; padding-left: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
         .doc-field .v.strong { font-weight: 700; }
         .doc-field .v.mono { font-variant-numeric: tabular-nums; }
-        .doc-field .v.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .doc-field .v.num { font-variant-numeric: tabular-nums; font-weight: 700; }
+        .doc-field .v .muted { color: #71717a; font-weight: 400; font-size: 9.5pt; }
 
+        /* 마지막 행 border 제거 */
+        .doc-grid > .doc-field:nth-last-of-type(1),
+        .doc-grid > .doc-field:nth-last-of-type(2) { border-bottom: none; }
+        .doc-grid.single-col > .doc-field:nth-last-of-type(1) { border-bottom: none; }
+
+        /* 특약 박스 */
         .doc-special {
-          margin-top: 10px;
+          margin-top: 8px;
           padding: 14px 16px;
-          background: #fafaf9;
-          border-left: 3px solid #1B2A4A;
+          background: #fff7ed;
+          border: 1px solid #fb923c;
+          border-radius: 4px;
           font-size: 10pt;
           line-height: 1.7;
           white-space: pre-line;
         }
 
-        .doc-terms { margin-top: 22px; font-size: 9.5pt; line-height: 1.7; }
+        /* 약관 */
+        .doc-terms { margin-top: 18px; font-size: 9.5pt; line-height: 1.65; columns: 1; }
         .doc-terms article { break-inside: avoid; margin-bottom: 10px; }
-        .doc-terms .term-title { font-weight: 700; color: #1B2A4A; margin-bottom: 2px; font-size: 10pt; }
-        .doc-terms .term-body { color: #27272a; padding-left: 2px; }
+        .doc-terms .term-title { font-weight: 700; color: #18181b; margin-bottom: 2px; font-size: 10pt; }
+        .doc-terms .term-body { color: #27272a; }
 
-        .doc-notice {
-          margin-top: 26px;
-          padding: 16px 20px;
-          background: #fafaf9;
-          border-radius: 4px;
-          font-size: 10pt;
-          line-height: 1.7;
-          color: #44403c;
-        }
-        .doc-notice .notice-label {
-          font-size: 9pt;
-          font-weight: 700;
-          color: #1B2A4A;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          margin-bottom: 6px;
+        /* 전용 안내 */
+        .doc-notice { margin-top: 26px; padding: 16px 20px; background: #fafaf9; border-radius: 4px; font-size: 10pt; line-height: 1.7; color: #44403c; border: 1px dashed #d4d4d8; }
+        .doc-notice .notice-label { font-size: 10pt; font-weight: 700; color: #1B2A4A; margin-bottom: 6px; }
+
+        /* 첨부 확인 */
+        .doc-attach { margin-top: 16px; padding: 12px 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 9.5pt; color: #52525b; }
+        .doc-attach .label { font-weight: 700; color: #18181b; margin-bottom: 4px; }
+        .doc-attach .checks { display: flex; flex-wrap: wrap; gap: 12px; }
+        .doc-attach .check { display: inline-flex; align-items: center; gap: 4px; }
+        .doc-attach .check::before {
+          content: '☐';
+          font-size: 12pt;
+          color: #71717a;
         }
 
-        .doc-signing {
-          margin-top: 36px;
-          break-inside: avoid;
-        }
+        /* 서명·날인 영역 */
+        .doc-signing { margin-top: 40px; break-inside: avoid; padding-top: 24px; border-top: 2px solid #18181b; }
         .doc-signing-date {
           text-align: center;
-          font-size: 12pt;
-          font-weight: 600;
-          margin-bottom: 28px;
-          letter-spacing: 0.03em;
+          font-size: 14pt;
+          font-weight: 700;
+          margin-bottom: 32px;
+          letter-spacing: 0.05em;
         }
-        .doc-signing-parties {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 32px;
-        }
+        .doc-signing-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
         .doc-signing-parties .party {
-          border-top: 2px solid #18181b;
-          padding-top: 12px;
+          border: 1px solid #18181b;
+          padding: 16px 18px;
+          background: #fff;
+          position: relative;
         }
         .doc-signing-parties .party .role {
+          position: absolute;
+          top: -10px;
+          left: 12px;
+          background: #fff;
+          padding: 0 8px;
           font-size: 9pt;
           font-weight: 700;
           color: #1B2A4A;
           letter-spacing: 0.06em;
-          margin-bottom: 8px;
         }
         .doc-signing-parties .party .name {
-          font-size: 14pt;
-          font-weight: 700;
-          margin-bottom: 4px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
+          font-size: 15pt;
+          font-weight: 800;
+          margin: 6px 0 10px;
+          padding-right: 60px;
+          position: relative;
+          min-height: 56px;
         }
         .doc-signing-parties .party .name .seal {
-          font-size: 8pt;
-          color: #a1a1aa;
-          width: 32px;
-          height: 32px;
-          border: 1px solid #d4d4d8;
+          position: absolute;
+          right: 0;
+          top: -6px;
+          width: 56px;
+          height: 56px;
+          border: 2px dashed #d4d4d8;
           border-radius: 50%;
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          font-size: 8pt;
+          color: #a1a1aa;
           font-weight: 500;
         }
-        .doc-signing-parties .party .meta {
-          font-size: 9pt;
-          color: #52525b;
-          line-height: 1.7;
-        }
+        .doc-signing-parties .party .meta { font-size: 9.5pt; color: #52525b; line-height: 1.85; }
+        .doc-signing-parties .party .meta .row { display: flex; gap: 4px; }
+        .doc-signing-parties .party .meta .row .k { color: #a1a1aa; min-width: 52px; }
         .doc-signing-parties .party .meta .mono { font-variant-numeric: tabular-nums; }
+
+        /* 페이지 푸터 회사 정보 */
+        .doc-foot { margin-top: 40px; text-align: center; font-size: 8.5pt; color: #a1a1aa; padding-top: 8px; border-top: 1px solid #f4f4f5; }
 
         /* 인쇄 시 좌측/배경 숨김, paper만 노출 */
         @media print {
@@ -617,47 +626,85 @@ export default function ContractPreviewPage() {
       <div ref={sourceRef} className="ctr-source">
         <div className="doc">
           <div className="doc-head">
-            <div className="title-block">
-              <h1>자동차 대여 계약서</h1>
-              <div className="sub">{formType === 'full' ? 'STANDARD CONTRACT' : 'INTERNAL AGREEMENT'}</div>
-            </div>
-            <div className="meta">
-              <div className="doc-no">No. {plate || '___'}-{contractDate.replace(/-/g, '')}</div>
-              <div>{fmtKDate(issuedDate)}</div>
+            <div className="corp">{stripCorpSuffix(coName)}</div>
+            <h1>{formType === 'full' ? '자동차 대여 계약서' : '자동차 대여 계약서'}</h1>
+            <div className="sub">{formType === 'full' ? '표준약관에 따른 정식 계약' : '약식 계약 · 표준약관 준용'}</div>
+            <div className="doc-no">계약번호 No. {plate || '___'}-{contractDate.replace(/-/g, '')}</div>
+          </div>
+
+          <div className="doc-section">
+            <div className="doc-section-label">제1관 · 계약 당사자</div>
+            <div className="doc-grid single-col">
+              <div className="doc-field">
+                <span className="k">임대인</span>
+                <span className="v strong">{stripCorpSuffix(coName)} <span className="muted">· 대표 {coCeo}</span></span>
+              </div>
+              <div className="doc-field">
+                <span className="k">사업자등록번호</span>
+                <span className="v mono">{coBizNo}</span>
+              </div>
+              <div className="doc-field">
+                <span className="k">소재지</span>
+                <span className="v">{coAddr}</span>
+              </div>
+              <div className="doc-field">
+                <span className="k">임차인</span>
+                <span className="v strong">{cName} <span className="muted">· {maskIdent(cIdent)}</span></span>
+              </div>
+              <div className="doc-field">
+                <span className="k">연락처</span>
+                <span className="v mono">{cPhone}</span>
+              </div>
+              <div className="doc-field">
+                <span className="k">주소</span>
+                <span className="v">{cAddr}</span>
+              </div>
+              <div className="doc-field">
+                <span className="k">면허</span>
+                <span className="v mono">{cLicense} <span className="muted">({cLicenseType})</span></span>
+              </div>
             </div>
           </div>
 
           <div className="doc-section">
-            <div className="doc-section-label">계약 당사자</div>
+            <div className="doc-section-label">제2관 · 임대 차량</div>
             <div className="doc-grid">
-              <div className="doc-field full"><span className="k">임대인</span><span className="v strong">{stripCorpSuffix(coName)} &nbsp;<span style={{ color: '#71717a', fontWeight: 400, fontSize: '9pt' }}>대표 {coCeo}</span></span></div>
-              <div className="doc-field"><span className="k">사업자등록번호</span><span className="v mono">{coBizNo}</span></div>
-              <div className="doc-field"><span className="k">소재지</span><span className="v">{coAddr}</span></div>
-              <div className="doc-field full" style={{ borderTop: '1px solid #e7e5e4', marginTop: 0 }}><span className="k">임차인</span><span className="v strong">{cName} &nbsp;<span style={{ color: '#71717a', fontWeight: 400, fontSize: '9pt' }}>{maskIdent(cIdent)}</span></span></div>
-              <div className="doc-field"><span className="k">연락처</span><span className="v mono">{cPhone}</span></div>
-              <div className="doc-field"><span className="k">면허</span><span className="v mono">{cLicense} <span style={{ color: '#71717a' }}>({cLicenseType})</span></span></div>
-              <div className="doc-field full"><span className="k">주소</span><span className="v">{cAddr}</span></div>
-            </div>
-          </div>
-
-          <div className="doc-section">
-            <div className="doc-section-label">임대 차량</div>
-            <div className="doc-grid">
-              <div className="doc-field"><span className="k">차량번호</span><span className="v strong mono">{plate}</span></div>
+              <div className="doc-field"><span className="k">차량번호</span><span className="v strong mono">{plate || '미정'}</span></div>
               <div className="doc-field"><span className="k">차종</span><span className="v">{model}</span></div>
               <div className="doc-field"><span className="k">인도일자</span><span className="v mono">{contractDate}</span></div>
-              <div className="doc-field"><span className="k">인도 장소</span><span className="v">{deliveryAddr}</span></div>
+              <div className="doc-field"><span className="k">인도 장소</span><span className="v">{deliveryAddr || '_______________'}</span></div>
             </div>
           </div>
 
           <div className="doc-section">
-            <div className="doc-section-label">대여 조건</div>
-            <div className="doc-grid">
-              <div className="doc-field full"><span className="k">계약기간</span><span className="v">{fmtKDate(contractDate)} ~ {fmtKDate(endDate)} <span style={{ color: '#71717a' }}>· 총 {termMonths}개월</span></span></div>
-              <div className="doc-field"><span className="k">월 대여료</span><span className="v num strong">₩ {fmtCurrency(monthlyRent)}</span></div>
+            <div className="doc-section-label">제3관 · 대여 조건</div>
+            <div className="doc-grid single-col">
+              <div className="doc-field">
+                <span className="k">계약기간</span>
+                <span className="v">{fmtKDate(contractDate)} ~ {fmtKDate(endDate)} <span className="muted">· 총 {termMonths}개월 {termMonths >= 12 ? '(장기)' : '(단기)'}</span></span>
+              </div>
+            </div>
+            <div className="doc-grid" style={{ marginTop: 0, borderTop: 0 }}>
+              <div className="doc-field"><span className="k">월 대여료</span><span className="v num">₩ {fmtCurrency(monthlyRent)}</span></div>
               <div className="doc-field"><span className="k">보증금</span><span className="v num">₩ {fmtCurrency(deposit)}</span></div>
-              <div className="doc-field"><span className="k">결제일</span><span className="v">매월 {paymentDay}일 · {paymentMethod}</span></div>
-              <div className="doc-field"><span className="k">납부 계좌</span><span className="v mono">{coBank} {coAcct}</span></div>
+              <div className="doc-field"><span className="k">결제일</span><span className="v">매월 {paymentDay}일</span></div>
+              <div className="doc-field"><span className="k">결제방법</span><span className="v">{paymentMethod}</span></div>
+            </div>
+            <div className="doc-grid single-col" style={{ marginTop: 0, borderTop: 0 }}>
+              <div className="doc-field">
+                <span className="k">납부 계좌</span>
+                <span className="v mono">{coBank} {coAcct} <span className="muted">· 예금주 {coHolder}</span></span>
+              </div>
+            </div>
+          </div>
+
+          <div className="doc-attach">
+            <div className="label">첨부 서류 확인 · CHECK BEFORE SIGN</div>
+            <div className="checks">
+              <span className="check">임차인 신분증 사본</span>
+              <span className="check">운전면허증 사본</span>
+              <span className="check">자동차등록증</span>
+              <span className="check">보증금 입금 확인</span>
             </div>
           </div>
 
@@ -693,22 +740,28 @@ export default function ContractPreviewPage() {
             <div className="doc-signing-date">{fmtKDate(issuedDate)}</div>
             <div className="doc-signing-parties">
               <div className="party">
-                <div className="role">임대인 / LESSOR</div>
-                <div className="name">{stripCorpSuffix(coName)} <span className="seal">(인)</span></div>
+                <div className="role">임 대 인 · LESSOR</div>
+                <div className="name">{stripCorpSuffix(coName)} <span className="seal">인</span></div>
                 <div className="meta">
-                  대표 {coCeo}<br />
-                  <span className="mono">{coBizNo}</span>
+                  <div className="row"><span className="k">대표</span><span>{coCeo}</span></div>
+                  <div className="row"><span className="k">사업자</span><span className="mono">{coBizNo}</span></div>
+                  <div className="row"><span className="k">주소</span><span>{coAddr}</span></div>
                 </div>
               </div>
               <div className="party">
-                <div className="role">임차인 / LESSEE</div>
-                <div className="name">{cName} <span className="seal">(인)</span></div>
+                <div className="role">임 차 인 · LESSEE</div>
+                <div className="name">{cName} <span className="seal">인</span></div>
                 <div className="meta">
-                  <span className="mono">{cPhone}</span><br />
-                  <span className="mono">{maskIdent(cIdent)}</span>
+                  <div className="row"><span className="k">등록번호</span><span className="mono">{maskIdent(cIdent)}</span></div>
+                  <div className="row"><span className="k">연락처</span><span className="mono">{cPhone}</span></div>
+                  <div className="row"><span className="k">주소</span><span>{cAddr}</span></div>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="doc-foot">
+            {stripCorpSuffix(coName)} · 사업자등록번호 {coBizNo} · {coAddr}
           </div>
         </div>
       </div>
