@@ -8,7 +8,7 @@
  * 양식 확정 후 /contract/[contractId] 에 같은 구조 적용.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Printer, FloppyDisk } from '@phosphor-icons/react';
 import { todayKr } from '@/lib/mock-data';
 import { stripCorpSuffix } from '@/lib/company-display';
@@ -175,43 +175,7 @@ export default function ContractPreviewPage() {
 
   const isLongTerm = termMonths >= 12;
 
-  // Paged.js 미리보기
-  const sourceRef = useRef<HTMLDivElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const [pagedReady, setPagedReady] = useState(false);
-
   useEffect(() => { setIssuedDate(todayKr()); setContractDate(todayKr()); }, []);
-
-  // Paged.js 동적 import + 페이지 분할 렌더
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        // dynamic import — 클라이언트만
-        const mod = await import('pagedjs');
-        const Previewer = mod.Previewer;
-        if (cancelled || !sourceRef.current || !previewRef.current) return;
-
-        // 기존 미리보기 비우기
-        previewRef.current.innerHTML = '';
-        const previewer = new Previewer();
-        await previewer.preview(
-          sourceRef.current.innerHTML,
-          [],
-          previewRef.current,
-        );
-        if (!cancelled) setPagedReady(true);
-      } catch (e) {
-        console.error('Paged.js 로드 실패:', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [
-    formType, coName, coCeo, coBizNo, coAddr, coBank, coAcct, coHolder,
-    cName, cIdent, cPhone, cAddr, cLicense, cLicenseType,
-    plate, model, deliveryAddr, contractDate, endDate, termMonths,
-    monthlyRent, deposit, paymentDay, paymentMethod, issuedDate, specialNote,
-  ]);
 
   return (
     <div className="ctr-shell">
@@ -280,26 +244,23 @@ export default function ContractPreviewPage() {
           padding: 32px 24px;
           overflow-y: auto;
           height: 100vh;
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
         }
-        .ctr-preview {
-          /* Paged.js가 .pagedjs_page 들을 여기 안에 렌더 */
-        }
-        .ctr-preview .pagedjs_page {
+        .ctr-paper {
+          width: 794px;
+          min-height: 1123px;
           background: #fff;
+          padding: 60px 56px;
           box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-          margin: 0 auto 24px;
+          box-sizing: border-box;
         }
 
-        /* ─── 종이 자체 — Paged.js가 size 처리 ─── */
+        /* @page CSS — 인쇄 시만 */
         @page {
           size: A4;
           margin: 18mm 16mm 22mm 16mm;
-          @bottom-center {
-            content: counter(page) " / " counter(pages);
-            font-family: 'Pretendard Variable', sans-serif;
-            font-size: 9pt;
-            color: #71717a;
-          }
         }
 
         /* ─── 한국 자동차 임대차 계약서 디자인 ─── */
@@ -484,12 +445,9 @@ export default function ContractPreviewPage() {
         @media print {
           .ctr-shell { display: block; background: #fff; }
           .ctr-side { display: none; }
-          .ctr-preview-wrap { padding: 0; background: #fff; height: auto; overflow: visible; }
-          .ctr-preview .pagedjs_page { box-shadow: none; margin: 0; }
+          .ctr-preview-wrap { padding: 0; background: #fff; height: auto; overflow: visible; display: block; }
+          .ctr-paper { width: auto; min-height: auto; padding: 0; box-shadow: none; }
         }
-
-        /* source 영역은 화면 숨김 (Paged.js가 읽기만 함) */
-        .ctr-source { display: none; }
       `}</style>
 
       {/* 좌측 입력 패널 */}
@@ -612,18 +570,9 @@ export default function ContractPreviewPage() {
         </div>
       </aside>
 
-      {/* 우측 미리보기 */}
+      {/* 우측 미리보기 (A4 직접 렌더) */}
       <div className="ctr-preview-wrap">
-        {!pagedReady && (
-          <div style={{ padding: 60, textAlign: 'center', color: '#71717a', fontSize: 12 }}>
-            Paged.js 로딩 중...
-          </div>
-        )}
-        <div ref={previewRef} className="ctr-preview" />
-      </div>
-
-      {/* Paged.js source — 화면 비공개. innerHTML만 읽힘 */}
-      <div ref={sourceRef} className="ctr-source">
+        <div className="ctr-paper">
         <div className="doc">
           <div className="doc-head">
             <div className="corp">{stripCorpSuffix(coName)}</div>
@@ -763,6 +712,7 @@ export default function ContractPreviewPage() {
           <div className="doc-foot">
             {stripCorpSuffix(coName)} · 사업자등록번호 {coBizNo} · {coAddr}
           </div>
+        </div>
         </div>
       </div>
     </div>
