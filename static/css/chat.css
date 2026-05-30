@@ -1,0 +1,255 @@
+/* ===== 대화목록 패널 ===== */
+
+.room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.room-item {
+  width: 100%;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 74px 96px 1fr 108px minmax(120px, 1.4fr) 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none;
+}
+
+.room-item:hover {
+  background: #f9fafb;
+}
+
+.room-item.active {
+  background: #f3f4f6;
+  box-shadow: inset 2px 0 0 #111827;
+}
+
+.chat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  white-space: nowrap;
+}
+
+.chat-badge.is-unread {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.chat-badge.is-pending {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.chat-badge.is-done {
+  background: #ecfdf5;
+  border-color: #10b981;
+}
+
+.room-vehicle {
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.room-model,
+.room-codes,
+.room-time {
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.room-last {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ===== 채팅 패널 ===== */
+
+.chat-panel-body {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+.panel-head-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* 가운데 박스 제거 */
+.message-list {
+  border: 0;
+  background: transparent;
+  padding: 4px 0 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.message-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 4px;
+}
+
+.message-wrap.out {
+  align-items: flex-end;
+}
+
+.message-wrap.in {
+  align-items: flex-start;
+}
+
+/* 아이디/시간은 말풍선 위 */
+.message-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.sender-code {
+  font-weight: 600;
+  color: #374151;
+}
+
+.sender-time {
+  color: #6b7280;
+}
+
+/* 말풍선에는 대화 내용만 */
+.message-item {
+  max-width: 78%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  font-size: 12px;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.message-item.role-agent {
+  background: #f9fafb;
+}
+
+.message-item.role-provider {
+  background: #eef6ff;
+}
+
+.message-item.role-admin {
+  background: #fff7ed;
+}
+
+.message-wrap.out .message-item.role-agent {
+  background: #e5e7eb;
+}
+
+.message-wrap.out .message-item.role-provider {
+  background: #dbeafe;
+}
+
+.message-wrap.out .message-item.role-admin {
+  background: #fed7aa;
+}
+
+.message-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.message-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding-top: 6px;
+  margin-top: auto;
+}
+
+.message-form input {
+  min-height: 38px;
+  border: 1px solid #e5e7eb;
+  padding: 0 10px;
+  background: #fff;
+  font-size: 12px;
+}
+
+.chat-grid-room {
+  min-height: 0;
+  height: 100%;
+}
+
+.message-form .btn-primary{
+  min-width:64px;
+}
+#chat-message{
+  margin:0;
+  font-size:11px;
+  color:#6b7280;
+}
+
+
+/* ===== 100 chat input unify ===== */
+.chat-grid-room{
+  height: 100% !important;
+}
+.chat-panel-body{
+  display: grid !important;
+  grid-template-rows: minmax(0,1fr) auto auto !important;
+  gap: 0 !important;
+  padding: 8px 8px 0 8px !important;
+}
+.message-list{
+  padding: 4px 0 8px !important;
+}
+.message-form{
+  margin-top: 0 !important;
+  padding: 8px 0 0 0 !important;
+  gap: 0 !important;
+  border-top: 1px solid #e5e7eb;
+}
+.message-form input{
+  min-height: 36px !important;
+  height: 36px !important;
+  border-radius: 2px 0 0 2px !important;
+  border-right: 0 !important;
+}
+.message-form .btn-primary{
+  min-width: 56px !important;
+  height: 36px !important;
+  border-radius: 0 2px 2px 0 !important;
+}
+#chat-message{
+  padding: 6px 0 8px 0 !important;
+  margin: 0 !important;
+}

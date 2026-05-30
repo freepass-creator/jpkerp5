@@ -1,0 +1,4 @@
+.management-skeleton .field.full textarea { min-height: 180px; }
+
+.filter-overlay{display:none;}
+.filter-overlay.is-open{display:block;}

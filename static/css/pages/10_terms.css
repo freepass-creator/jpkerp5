@@ -1,0 +1,15 @@
+#term-form {
+  align-items: start;
+}
+
+#term-form .field {
+  min-width: 0;
+}
+
+#term-form .field input,
+#term-form .field select {
+  width: 100%;
+}
+
+.filter-overlay{display:none;}
+.filter-overlay.is-open{display:block;}

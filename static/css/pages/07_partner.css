@@ -1,0 +1,4 @@
+.partner-layout { grid-template-columns: 420px minmax(0, 1fr); }
+
+.filter-overlay{display:none;}
+.filter-overlay.is-open{display:block;}

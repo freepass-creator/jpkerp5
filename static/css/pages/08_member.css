@@ -1,0 +1,6 @@
+.table-wrap { max-height: calc(100vh - 220px); }
+#member-list .summary-row { gap: 8px; }
+#member-list .summary-inline-strong { font-weight: 600; }
+
+.filter-overlay{display:none;}
+.filter-overlay.is-open{display:block;}

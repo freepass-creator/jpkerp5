@@ -1,0 +1,105 @@
+.auth-shell {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dashboard-shell {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+}
+
+.sidebar {
+  border-right: 1px solid #d1d5db;
+  background: #ffffff;
+}
+
+.sidebar-head {
+  padding: 18px 14px;
+  border-bottom: 1px solid #d1d5db;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 8px;
+  gap: 8px;
+}
+
+.sidebar-link {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 12px;
+}
+
+.sidebar-link.active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.main-shell {
+  padding: 18px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.page-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.btn-filter {
+  min-width: 60px;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 12px;
+}
+
+.work-page {
+  display: grid;
+  gap: 12px;
+}
+
+.work-page.one-col {
+  grid-template-columns: 1fr;
+}
+
+.work-page.grid-12 {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.col-3 { grid-column: span 3; }
+.col-4 { grid-column: span 4; }
+.col-5 { grid-column: span 5; }
+.col-6 { grid-column: span 6; }
+.col-7 { grid-column: span 7; }
+.col-8 { grid-column: span 8; }
+.col-9 { grid-column: span 9; }
+.col-12 { grid-column: span 12; }
+
+.min-h-work {
+  min-height: 0;
+  height: calc(100vh - 84px);
+}
+
+@media (max-width: 900px) {
+  .dashboard-shell { grid-template-columns: 1fr; height: auto; overflow: visible; }
+  .sidebar { height: auto; overflow: visible; border-right: none; border-bottom: 1px solid #d1d5db; }
+  .main-shell { height: auto; overflow: visible; }
+  .work-page.grid-12 { grid-template-columns: 1fr; }
+  .col-3, .col-4, .col-5, .col-6, .col-7, .col-8, .col-9, .col-12 { grid-column: span 1; }
+}

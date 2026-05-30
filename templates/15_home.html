@@ -1,0 +1,59 @@
+{% extends '00_base.html' %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/15_home.css') }}">{% endblock %}
+{% block body %}
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="sidebar-head"></div>
+    <nav id="sidebar-menu" class="sidebar-menu"></nav>
+  </aside>
+  <main class="main-shell">
+    <div class="page-header">
+      <div class="page-title">홈</div>
+    </div>
+    <div class="work-page grid-12 min-h-work layout-66 home-page-shell">
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">공지사항</div>
+          </div>
+          <div class="panel-head-actions"></div>
+        </div>
+        <div class="panel-body no-pad">
+          <div class="home-list">
+            <button type="button" class="home-row">
+              <span class="home-row-title">시스템 점검 안내</span>
+              <span class="home-row-date">2026-03-21</span>
+            </button>
+            <button type="button" class="home-row">
+              <span class="home-row-title">상품등록 패널 개선 공지</span>
+              <span class="home-row-date">2026-03-20</span>
+            </button>
+            <button type="button" class="home-row">
+              <span class="home-row-title">구글시트 반영 기능 적용</span>
+              <span class="home-row-date">2026-03-19</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">공급사 홍보페이지</div>
+          </div>
+          <div class="panel-head-actions"></div>
+        </div>
+        <div class="panel-body no-pad">
+          <div class="promo-shell">
+            <div class="promo-box">
+              <div class="promo-title">배너 / 홍보영역</div>
+              <div class="promo-text">공급사 프로모션, 신규 정책, 특가 차량 노출 영역</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block page_js %}<script type="module" src="{{ url_for('static', filename='js/pages/15_home.js') }}"></script>{% endblock %}

@@ -1,0 +1,58 @@
+{% extends '00_base.html' %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/06_settings.css') }}">{% endblock %}
+{% block body %}
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="sidebar-head"></div>
+    <nav id="sidebar-menu" class="sidebar-menu"></nav>
+  </aside>
+  <main class="main-shell">
+    <div class="page-header">
+      <div class="page-title">06 설정</div>
+    </div>
+    <div class="work-page grid-12 min-h-work layout-66 settings-page-shell">
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">계정정보</div>
+          </div>
+          <div class="panel-head-actions"></div>
+        </div>
+        <div class="panel-body">
+          <div class="settings-grid">
+            <div class="setting-row"><span>이름</span><strong id="settings-name">-</strong></div>
+            <div class="setting-row"><span>이메일</span><strong id="settings-email">-</strong></div>
+            <div class="setting-row"><span>역할</span><strong id="settings-role">-</strong></div>
+            <div class="setting-row"><span>상태</span><strong id="settings-status">-</strong></div>
+            <div class="setting-row"><span>사용자코드</span><strong id="settings-user-code">-</strong></div>
+            <div class="setting-row"><span>회사코드</span><strong id="settings-company-code">-</strong></div>
+            <div class="setting-row"><span>회사명</span><strong id="settings-company-name">-</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">사용설정</div>
+          </div>
+          <div class="panel-head-actions"></div>
+        </div>
+        <div class="panel-body">
+          <div class="settings-grid">
+            <div class="setting-row"><span>알림설정</span><strong>기본</strong></div>
+            <div class="setting-row"><span>화면모드</span><strong>기본</strong></div>
+            <div class="setting-row"><span>권한범위</span><strong id="settings-role-copy">-</strong></div>
+            <div class="setting-row"><span>최근동기화</span><strong>실시간</strong></div>
+          </div>
+          <div class="action-row top-gap">
+            <button id="logout-button" class="btn-primary" type="button">로그아웃</button>
+          </div>
+          <p id="settings-message" class="message"></p>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block page_js %}<script type="module" src="{{ url_for('static', filename='js/pages/06_settings.js') }}"></script>{% endblock %}

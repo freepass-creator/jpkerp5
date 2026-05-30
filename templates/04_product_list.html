@@ -1,0 +1,60 @@
+{% extends '00_base.html' %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/04_product_list.css') }}" data-page-style="true">{% endblock %}
+{% block body %}
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="sidebar-head">FREEPASS ERP</div>
+    <nav id="sidebar-menu" class="sidebar-menu"></nav>
+  </aside>
+  <main class="main-shell">
+    <div class="page-header">
+      <div class="page-title">04 상품목록</div>
+      <div class="page-header-actions"><button type="button" class="btn-filter" id="openFilterBtn">필터</button></div>
+    </div>
+    <div class="work-page grid-12 min-h-work layout-93 product-list-page-shell">
+      <section class="panel col-9 panel-list-main">
+        <div class="panel-head panel-head-default product-list-panel-head">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">상품정보</div>
+          </div>
+          <div class="period-head" id="selectedPeriodsHead"></div>
+        </div>
+        <div class="panel-body no-pad">
+          <div class="product-list" id="productList"></div>
+        </div>
+      </section>
+
+      <section class="panel col-3 panel-detail-main">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title" id="detailPanelTitle">상품상세</div>
+          </div>
+          <div class="panel-head-actions" id="productDetailActions">
+            <button type="button" class="inline-button" id="inquiryProductBtn" class="inline-button btn-tone-inquiry">문의</button>
+            <button type="button" class="inline-button" id="shareProductBtn" class="inline-button btn-tone-share">공유</button>
+            <button type="button" class="inline-button" id="contractProductBtn" class="inline-button btn-tone-contract">계약</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="productDetail" class="detail-card">
+            <div class="empty-block">좌측 목록에서 차량을 선택하세요.</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="filter-overlay panel" id="filterOverlay" aria-hidden="true">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap"><div class="panel-head-title">필터</div></div>
+          <div class="panel-head-actions">
+            <button type="button" class="inline-button" id="resetFilterBtn" class="inline-button btn-tone-neutral">초기화</button>
+          </div>
+        </div>
+        <div class="panel-body panel-body-filter">
+          <div class="filter-accordion" id="filterAccordion"></div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block page_js %}<script type="module" src="{{ url_for('static', filename='js/pages/04_product_list.js') }}" data-page-script="true"></script>{% endblock %}

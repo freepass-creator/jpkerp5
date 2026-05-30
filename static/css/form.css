@@ -1,0 +1,351 @@
+:root {
+  --form-grid-columns: repeat(2, minmax(0, 1fr));
+  --form-grid-gap: 12px;
+  --form-section-gap: 12px;
+  --form-section-padding-top: 8px;
+  --form-section-split-margin-top: 8px;
+  --form-section-split-padding-top: 16px;
+  --field-gap: 6px;
+  --field-label-size: 12px;
+  --field-control-height: 40px;
+  --field-control-padding-x: 12px;
+  --field-textarea-min-height: 96px;
+  --field-empty-visibility: hidden;
+}
+
+.form-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.form-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--form-grid-columns);
+  gap: var(--form-grid-gap);
+}
+
+.detail-form {
+  display: grid;
+  gap: 0;
+}
+
+.detail-form-compact {
+  --form-section-gap: 8px;
+  --form-section-padding-top: 4px;
+  --form-section-split-margin-top: 4px;
+  --form-section-split-padding-top: 10px;
+  --form-grid-gap: 8px;
+  --field-gap: 4px;
+  --field-label-size: 11px;
+  --field-control-height: 36px;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: var(--form-grid-columns);
+  gap: var(--form-grid-gap);
+}
+
+.field {
+  display: grid;
+  gap: var(--field-gap);
+  min-width: 0;
+}
+
+.field.full {
+  grid-column: 1 / -1;
+}
+
+.field-empty {
+  visibility: var(--field-empty-visibility);
+}
+
+.field label {
+  font-size: var(--field-label-size);
+  color: #374151;
+  line-height: 1.2;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-height: var(--field-control-height);
+  padding: 0 var(--field-control-padding-x);
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.field textarea {
+  width: 100%;
+  min-height: var(--field-textarea-min-height);
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.form-section {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--form-section-gap);
+  padding-top: var(--form-section-padding-top);
+}
+
+.form-section + .form-section {
+  border-top: 1px solid #e5e7eb;
+  margin-top: var(--form-section-split-margin-top);
+  padding-top: var(--form-section-split-padding-top);
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.section-helper {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.action-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.helper-row {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.message {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #111827;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.top-gap {
+  margin-top: 12px;
+}
+
+.form-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.form-mode {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.rent-plan-field {
+  display: grid;
+  gap: 8px;
+}
+
+.rent-plan-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.rent-plan-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.rent-plan-period {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  font-size: 12px;
+  color: #111827;
+}
+
+.rent-plan-row input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 12px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font: inherit;
+  resize: vertical;
+}
+
+.action-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.action-group-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-danger {
+  border-color: #b91c1c;
+  color: #b91c1c;
+}
+
+.btn-danger:hover {
+  background: #fef2f2;
+}
+
+.form-grid.is-view-mode::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: transparent;
+}
+
+.form-grid.is-view-mode .field input,
+.form-grid.is-view-mode .field textarea,
+.form-grid.is-view-mode .field select,
+.detail-form.is-view-mode .field input,
+.detail-form.is-view-mode .field textarea,
+.detail-form.is-view-mode .field select {
+  cursor: default;
+}
+
+.form-grid.is-view-mode .field input,
+.form-grid.is-view-mode .field textarea,
+.detail-form.is-view-mode .field input,
+.detail-form.is-view-mode .field textarea {
+  caret-color: transparent;
+}
+
+.form-grid.is-view-mode .field input:focus,
+.form-grid.is-view-mode .field select:focus,
+.form-grid.is-view-mode .field textarea:focus,
+.detail-form.is-view-mode .field input:focus,
+.detail-form.is-view-mode .field select:focus,
+.detail-form.is-view-mode .field textarea:focus {
+  outline: none;
+}
+
+.upload-dropzone {
+  position: relative;
+  border: 1px dashed #d1d5db;
+  background: #fafafa;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.upload-dropzone.is-dragover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.upload-dropzone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-dropzone-text {
+  font-size: 12px;
+  color: #111827;
+}
+
+.upload-dropzone-sub {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.doc-preview-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.doc-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  font-size: 11px;
+}
+
+.doc-preview-thumb {
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.doc-preview-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 900px) {
+  .form-grid,
+  .section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rent-plan-row {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-preview-list {
+    grid-template-columns: 1fr;
+  }
+
+  .field.full {
+    grid-column: auto;
+  }
+
+  .field-empty {
+    display: none;
+  }
+}

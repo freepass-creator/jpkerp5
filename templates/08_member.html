@@ -1,0 +1,82 @@
+{% extends '00_base.html' %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/08_member.css') }}">{% endblock %}
+{% block body %}
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="sidebar-head">FREEPASS ERP</div>
+    <nav id="sidebar-menu" class="sidebar-menu"></nav>
+  </aside>
+  <main class="main-shell">
+    <div class="page-header">
+      <div class="page-title">08 회원관리</div>
+      <div class="page-header-actions"><button type="button" class="btn-filter" id="openMemberFilterBtn">필터</button></div>
+    </div>
+    <div class="work-page grid-12 min-h-work">
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">회원목록</div>
+          </div>
+          <div class="panel-head-actions"><button type="button" class="inline-button" id="member-refresh">새로고침</button></div>
+        </div>
+        <div class="panel-body no-pad"><div id="member-list" class="summary-list admin-summary-list"></div></div>
+      </section>
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">회원 정보</div>
+          </div>
+          <div class="panel-head-actions">
+            <button type="button" id="member-submit-head" class="inline-button" disabled>수정</button>
+            <button type="button" id="member-delete-head" class="inline-button btn-danger" disabled>삭제</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <form id="member-form" class="form-grid">
+            <input id="editing_member_uid" type="hidden">
+            <div class="field"><label for="member_user_code">사용자코드</label><input id="member_user_code" readonly></div>
+            <div class="field"><label for="member_email">이메일*</label><input id="member_email" readonly></div>
+            <div class="field"><label for="member_name">이름*</label><input id="member_name"></div>
+            <div class="field"><label for="member_business_number">소속 사업자등록번호*</label><input id="member_business_number" readonly></div>
+            <div class="field full"><label for="member_match_result">매칭 결과</label><input id="member_match_result" readonly placeholder="매칭되는 코드 없음"></div>
+            <div class="field"><label for="member_role_select">회원유형*</label>
+              <select id="member_role_select">
+                <option value="">선택</option>
+                <option value="admin">관리자</option>
+                <option value="provider">공급사</option>
+                <option value="agent">영업자</option>
+              </select>
+            </div>
+            <div class="field"><label for="member_company_code_select">소속코드*</label>
+              <select id="member_company_code_select"><option value="">선택</option></select>
+            </div>
+            <div class="field"><label for="member_company_name">소속명</label><input id="member_company_name" readonly></div>
+            <div class="field"><label for="member_status">상태*</label>
+              <select id="member_status">
+                <option value="pending">대기</option>
+                <option value="active">승인</option>
+                <option value="rejected">반려</option>
+              </select>
+            </div>
+            <div class="field"><label for="member_position">직급</label><input id="member_position"></div>
+            <div class="field"><label for="member_phone">연락처</label><input id="member_phone"></div>
+            <div class="field full"><label for="member_note">비고</label><textarea id="member_note" rows="4"></textarea></div>
+          </form>
+          <p id="member-message" class="message"></p>
+        </div>
+      </section>
+
+      <aside class="filter-overlay panel" id="memberFilterOverlay" aria-hidden="true">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap"><div class="panel-head-title">필터</div></div>
+          <div class="panel-head-actions"><button type="button" class="inline-button" data-filter-reset>초기화</button></div>
+        </div>
+        <div class="panel-body">
+          <div class="empty-block">필터 영역</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block page_js %}<script type="module" src="{{ url_for('static', filename='js/pages/08_member.js') }}"></script>{% endblock %}

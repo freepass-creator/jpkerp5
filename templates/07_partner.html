@@ -1,0 +1,79 @@
+{% extends '00_base.html' %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/07_partner.css') }}">{% endblock %}
+{% block body %}
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="sidebar-head">FREEPASS ERP</div>
+    <nav id="sidebar-menu" class="sidebar-menu"></nav>
+  </aside>
+  <main class="main-shell">
+    <div class="page-header">
+      <div class="page-title">07 파트너사관리</div>
+      <div class="page-header-actions"><button type="button" class="btn-filter" id="openPartnerFilterBtn">필터</button></div>
+    </div>
+    <div class="work-page grid-12 min-h-work">
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">파트너목록</div>
+          </div>
+          <div class="panel-head-actions"><button type="button" class="inline-button" id="partner-form-reset">신규</button></div>
+        </div>
+        <div class="panel-body no-pad"><div id="partner-list" class="summary-list admin-summary-list"></div></div>
+      </section>
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">파트너 정보</div>
+          </div>
+          <div class="panel-head-actions">
+            <button type="button" id="partner-submit-head" class="inline-button">저장</button>
+            <button type="button" id="partner-delete-head" class="inline-button btn-danger">삭제</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <form id="partner-form" class="form-grid">
+            <input id="editing_partner_code" type="hidden">
+            <div class="field"><label for="partner_type">파트너유형*</label>
+              <select id="partner_type" required>
+                <option value="provider">공급사</option>
+                <option value="sales_channel">영업채널</option>
+              </select>
+            </div>
+            <div class="field"><label for="partner_code_preview">파트너코드*</label><input id="partner_code_preview" readonly></div>
+            <div class="field"><label for="partner_business_number">사업자등록번호*</label><input id="partner_business_number" required></div>
+            <div class="field"><label for="partner_name">회사명*</label><input id="partner_name" required></div>
+            <div class="field"><label for="partner_ceo_name">대표자명*</label><input id="partner_ceo_name" required></div>
+            <div class="field"><label for="partner_company_phone">회사대표번호</label><input id="partner_company_phone"></div>
+            <div class="field full"><label for="partner_address">회사소재지</label><input id="partner_address"></div>
+            <div class="field"><label for="partner_manager_name">실무담당자명</label><input id="partner_manager_name"></div>
+            <div class="field"><label for="partner_manager_position">실무담당자직급</label><input id="partner_manager_position"></div>
+            <div class="field"><label for="partner_manager_phone">실무담당자연락처</label><input id="partner_manager_phone"></div>
+            <div class="field"><label for="partner_email">이메일</label><input id="partner_email" type="email"></div>
+            <div class="field"><label for="partner_fax">팩스번호</label><input id="partner_fax"></div>
+            <div class="field"><label for="partner_status">상태</label>
+              <select id="partner_status">
+                <option value="active">active</option>
+                <option value="inactive">inactive</option>
+              </select>
+            </div>
+            <div class="field full"><label for="partner_note">비고</label><textarea id="partner_note" rows="5"></textarea></div>
+          </form>
+          <p id="partner-message" class="message"></p>
+        </div>
+      </section>
+
+      <aside class="filter-overlay panel" id="partnerFilterOverlay" aria-hidden="true">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap"><div class="panel-head-title">필터</div></div>
+          <div class="panel-head-actions"><button type="button" class="inline-button" data-filter-reset>초기화</button></div>
+        </div>
+        <div class="panel-body">
+          <div class="empty-block">필터 영역</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block page_js %}<script type="module" src="{{ url_for('static', filename='js/pages/07_partner.js') }}"></script>{% endblock %}

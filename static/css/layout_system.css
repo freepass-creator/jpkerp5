@@ -1,0 +1,72 @@
+
+/* ===== GLOBAL PANEL POSITION SYSTEM ===== */
+
+:root{
+  --sidebar-width: 132px;
+  --header-height: 52px;
+  --panel-gap: 12px;
+  --right-panel-width: 360px;
+}
+
+/* main working area (after sidebar) */
+.main-shell{
+  padding: 16px 16px 16px 16px;
+}
+
+/* page header (title + filter) */
+.page-header{
+  height: var(--header-height);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+/* WORK AREA = 기준 좌표 */
+.work-page{
+  position:relative;
+  margin-top: 8px;
+}
+
+/* ===== LAYOUT TYPES ===== */
+
+/* 6:6 */
+.layout-66{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--panel-gap);
+}
+
+/* 9:3 */
+.layout-93{
+  display:grid;
+  grid-template-columns: minmax(0,1fr) var(--right-panel-width);
+  gap: var(--panel-gap);
+}
+
+/* 6:3:3 */
+.layout-633{
+  display:grid;
+  grid-template-columns: minmax(0,1fr) var(--right-panel-width) var(--right-panel-width);
+  gap: var(--panel-gap);
+}
+
+/* ===== PANEL NORMALIZE ===== */
+
+.panel{
+  min-height:0;
+}
+
+.panel-head{
+  height:44px;
+  display:flex;
+  align-items:center;
+}
+
+/* ===== FILTER ===== */
+.filter-overlay{
+  position:absolute;
+  right:0;
+  top:0;
+  width: var(--right-panel-width);
+  height:100%;
+}

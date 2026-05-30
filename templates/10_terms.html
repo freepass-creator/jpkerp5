@@ -1,0 +1,159 @@
+{% extends '00_base.html' %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/10_terms.css') }}">{% endblock %}
+{% block body %}
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="sidebar-head">FREEPASS ERP</div>
+    <nav id="sidebar-menu" class="sidebar-menu"></nav>
+  </aside>
+  <main class="main-shell">
+    <div class="page-header">
+      <div class="page-title">10 정책관리</div>
+      <div class="page-header-actions"><button type="button" class="btn-filter" id="openTermFilterBtn">필터</button></div>
+    </div>
+    <div class="work-page grid-12 min-h-work">
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">정책목록</div>
+          </div>
+          <div class="panel-head-actions"><button type="button" class="inline-button" id="term-form-reset">신규</button></div>
+        </div>
+        <div class="panel-body no-pad"><div id="term-list" class="summary-list admin-summary-list"></div></div>
+      </section>
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">정책 정보</div>
+          </div>
+          <div class="panel-head-actions">
+            <button type="button" id="term-submit-head" class="inline-button">저장</button>
+            <button type="button" id="term-delete-head" class="inline-button btn-danger">삭제</button>
+          </div>
+        </div>
+        <div class="panel-body term-form-wrap">
+          <form id="term-form" class="form-grid">
+            <input id="editing_term_code" type="hidden">
+
+            <div class="field">
+              <label for="term_provider_code">공급사코드*</label>
+              <select id="term_provider_code" required></select>
+            </div>
+            <div class="field">
+              <label for="term_code_preview">정책코드</label>
+              <input id="term_code_preview" readonly>
+            </div>
+
+            <div class="field">
+              <label for="term_name_input">정책명*</label>
+              <input id="term_name_input" required placeholder="예: 국산차 기본 정책">
+            </div>
+            <div class="field">
+              <label for="term_note">정책설명</label>
+              <input id="term_note" placeholder="예: 국산차 기본 조건 / 선불형 정책">
+            </div>
+
+            <div class="field">
+              <label for="injury_limit_deductible">대인한도 및 면책금</label>
+              <input id="injury_limit_deductible" placeholder="예: 1억원 / 30만원">
+            </div>
+            <div class="field">
+              <label for="property_limit_deductible">대물한도 및 면책금</label>
+              <input id="property_limit_deductible" placeholder="예: 1억원 / 50만원">
+            </div>
+
+            <div class="field">
+              <label for="personal_injury_limit_deductible">자손한도 및 면책금</label>
+              <input id="personal_injury_limit_deductible" placeholder="예: 1억원 / 30만원">
+            </div>
+            <div class="field">
+              <label for="uninsured_limit_deductible">무보험차상해한도 및 면책금</label>
+              <input id="uninsured_limit_deductible" placeholder="예: 2억원 / 없음">
+            </div>
+
+            <div class="field">
+              <label for="own_damage_limit_deductible">자기차량손해한도 및 면책금</label>
+              <input id="own_damage_limit_deductible" placeholder="예: 수리비의 20%, 최대 50~100만원">
+            </div>
+            <div class="field">
+              <label for="roadside_assistance">긴급출동</label>
+              <input id="roadside_assistance" placeholder="예: 연 5회">
+            </div>
+
+            <div class="field">
+              <label for="basic_driver_age">기본운전연령</label>
+              <input id="basic_driver_age" placeholder="예: 만 26세 이상">
+            </div>
+            <div class="field">
+              <label for="rental_region">대여지역</label>
+              <input id="rental_region" placeholder="예: 전국">
+            </div>
+
+            <div class="field">
+              <label for="payment_method">결제방식</label>
+              <input id="payment_method" placeholder="예: 선불결제">
+            </div>
+            <div class="field">
+              <label for="driver_scope">운전자범위</label>
+              <input id="driver_scope" placeholder="예: 개인: 계약자 본인, 법인: 임직원 등">
+            </div>
+
+            <div class="field">
+              <label for="driver_age_lowering">운전연령하향</label>
+              <select id="driver_age_lowering">
+                <option value="">선택</option>
+                <option value="불가">불가</option>
+                <option value="만25세">만25세</option>
+                <option value="만24세">만24세</option>
+                <option value="만23세">만23세</option>
+                <option value="만22세">만22세</option>
+                <option value="만21세">만21세</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="age_lowering_cost">연령하향비용</label>
+              <input id="age_lowering_cost" placeholder="예: 대여료의 10%">
+            </div>
+
+            <div class="field">
+              <label for="annual_mileage">연간약정주행거리</label>
+              <select id="annual_mileage">
+                <option value="">선택</option>
+                <option value="1만Km">1만Km</option>
+                <option value="2만Km">2만Km</option>
+                <option value="3만Km">3만Km</option>
+                <option value="4만Km">4만Km</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="extra_10k_mileage_cost">1만Km추가시</label>
+              <input id="extra_10k_mileage_cost" placeholder="예: 대여료의 10% 또는 10만원">
+            </div>
+
+            <div class="field">
+              <label for="early_termination_fee">중도해지위약금</label>
+              <input id="early_termination_fee" placeholder="예: 1년 이내 30%, 1년 초과 20%">
+            </div>
+            <div class="field">
+              <label for="delivery_fee">탁송비용</label>
+              <input id="delivery_fee" placeholder="예: 5만원까지 지원">
+            </div>
+          </form>
+          <p id="term-message" class="message"></p>
+        </div>
+      </section>
+
+      <aside class="filter-overlay panel" id="termFilterOverlay" aria-hidden="true">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap"><div class="panel-head-title">필터</div></div>
+          <div class="panel-head-actions"><button type="button" class="inline-button" data-filter-reset>초기화</button></div>
+        </div>
+        <div class="panel-body">
+          <div class="empty-block">필터 영역</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block page_js %}<script type="module" src="{{ url_for('static', filename='js/pages/10_terms.js') }}"></script>{% endblock %}

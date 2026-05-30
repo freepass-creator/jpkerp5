@@ -1,0 +1,116 @@
+{% extends '00_base.html' %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/11_contract.css') }}">{% endblock %}
+{% block body %}
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="sidebar-head"></div>
+    <nav id="sidebar-menu" class="sidebar-menu"></nav>
+  </aside>
+  <main class="main-shell">
+    <div class="page-header">
+      <div class="page-title">11 계약관리</div>
+      <div class="page-header-actions"><button type="button" class="btn-filter" id="openContractFilterBtn">필터</button></div>
+    </div>
+    <div class="work-page grid-12 min-h-work layout-66 contract-page-shell">
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap"><div class="panel-head-title">계약목록</div></div>
+          <div class="panel-head-actions"><button type="button" class="inline-button" id="contract-form-reset" class="inline-button btn-tone-neutral">신규</button></div>
+        </div>
+        <div class="panel-body no-pad">
+          <div id="contract-list" class="summary-list admin-summary-list"></div>
+        </div>
+      </section>
+
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap"><div class="panel-head-title" id="contract-detail-title">계약정보</div></div>
+          <div class="panel-head-actions">
+            <button type="button" id="contract-edit-head" data-mode="edit" class="inline-button btn-tone-edit">수정</button>
+            <button type="button" id="contract-submit-head" data-mode="save" class="inline-button btn-tone-save">저장</button>
+            <button type="button" id="contract-delete-head" class="inline-button btn-tone-delete">삭제</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <form id="contract-form" class="detail-form contract-form">
+            <input id="contract-form_mode" type="hidden" value="create">
+            <input id="contract_code_hidden" type="hidden">
+
+            <section class="form-section">
+              <div class="section-title">계약기본정보</div>
+              <div class="section-grid">
+                <div class="field"><label for="contract_code">계약코드</label><input id="contract_code" readonly></div>
+                <div class="field"><label for="contract_status">계약진행</label>
+                  <select id="contract_status">
+                    <option value="계약대기">계약대기</option>
+                    <option value="계약중">계약중</option>
+                    <option value="계약완료">계약완료</option>
+                  </select>
+                </div>
+                <div class="field"><label for="partner_code">파트너코드</label><input id="partner_code" readonly></div>
+                <div class="field"><label for="policy_code">정책코드</label><input id="policy_code" readonly></div>
+                <div class="field"><label for="product_code">상품코드</label><input id="product_code" readonly></div>
+                <div class="field"><label for="car_number">차량번호</label><input id="car_number" readonly></div>
+                <div class="field"><label for="vehicle_name">차량명</label><input id="vehicle_name" readonly></div>
+                <div class="field"><label for="rent_month">대여기간</label><input id="rent_month" readonly></div>
+                <div class="field"><label for="rent_amount">대여료</label><input id="rent_amount" readonly></div>
+                <div class="field"><label for="deposit_amount">보증금</label><input id="deposit_amount" readonly></div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="section-title">손님정보</div>
+              <div class="section-grid">
+                <div class="field"><label for="customer_name">고객명</label><input id="customer_name"></div>
+                <div class="field"><label for="customer_birth">생년월일</label><input id="customer_birth" placeholder="예: 900101"></div>
+                <div class="field"><label for="customer_phone">연락처</label><input id="customer_phone" placeholder="예: 010-0000-0000"></div>
+                <div class="field field-empty"></div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="section-title">요청서류</div>
+              <div class="field full">
+                <label for="contract_docs">면허증 / 요청서류 업로드</label>
+                <div class="upload-dropzone" id="contract-doc-dropzone">
+                  <input id="contract_docs" type="file" multiple accept="image/*,.pdf,.jpg,.jpeg,.png,.webp,.heic">
+                  <div class="upload-dropzone-text">파일을 드래그하거나 클릭해서 업로드</div>
+                  <div class="upload-dropzone-sub">면허증, 신분증, 기타 요청서류를 등록합니다.</div>
+                </div>
+              </div>
+              <div class="field full">
+                <div id="contract-doc-list" class="doc-preview-list"></div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="section-title">공급사 진행상황</div>
+              <div class="checks-grid">
+                <label class="check-item"><input type="checkbox" id="deposit_confirmed"> 계약금입금확인</label>
+                <label class="check-item"><input type="checkbox" id="docs_confirmed"> 서류확인</label>
+                <label class="check-item"><input type="checkbox" id="contract_signed"> 계약서완료</label>
+                <label class="check-item"><input type="checkbox" id="final_payment"> 잔금완료</label>
+                <label class="check-item"><input type="checkbox" id="vehicle_delivered"> 차량인도</label>
+              </div>
+            </section>
+          </form>
+          <p id="contract-message" class="message"></p>
+        </div>
+      </section>
+
+      <aside class="filter-overlay panel col-6" id="contractFilterOverlay" aria-hidden="true">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap"><div class="panel-head-title">필터</div></div>
+          <div class="panel-head-actions">
+            <button type="button" class="inline-button" id="contractFilterResetBtn">초기화</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="empty-block">계약목록 필터 영역</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block page_js %}<script type="module" src="{{ url_for('static', filename='js/pages/11_contract.js') }}"></script>{% endblock %}

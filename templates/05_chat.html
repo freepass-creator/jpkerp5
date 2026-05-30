@@ -1,0 +1,70 @@
+{% extends '00_base.html' %}
+{% block page_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/05_chat.css') }}">{% endblock %}
+{% block body %}
+<div class="dashboard-shell">
+  <aside class="sidebar">
+    <div class="sidebar-head">FREEPASS ERP</div>
+    <nav id="sidebar-menu" class="sidebar-menu"></nav>
+  </aside>
+  <main class="main-shell">
+    <div class="page-header">
+      <div class="page-title">05 대화</div>
+      <div class="page-header-actions"><button type="button" class="btn-filter" id="openChatFilterBtn">필터</button></div>
+    </div>
+    <div class="work-page grid-12 min-h-work layout-633">
+      <section class="panel col-6">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">대화목록</div>
+          </div>
+          <div class="panel-head-actions"><button type="button" class="inline-button" id="hideRoomBtn" class="inline-button btn-tone-hide">숨김</button><button type="button" class="inline-button btn-danger" id="deleteRoomBtn" class="inline-button btn-tone-delete">삭제</button></div>
+        </div>
+        <div class="panel-body no-pad"><div id="room-list" class="room-list"></div></div>
+      </section>
+      <section class="panel col-3">
+        <div class="panel-head panel-head-default chat-head">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">채팅</div>
+            <div id="chat-code" class="panel-head-subtitle">대화코드 없음</div>
+          </div>
+          <div class="panel-head-actions"></div>
+        </div>
+        <div class="panel-body chat-panel-body chat-grid-room">
+          <div id="message-list" class="message-list"></div>
+          <form id="message-form" class="message-form">
+            <input id="message-input" type="text" placeholder="메시지를 입력하세요." autocomplete="off">
+            <button type="submit" class="btn-primary">전송</button>
+          </form>
+          <p id="chat-message" class="message"></p>
+        </div>
+      </section>
+      <section class="panel col-3">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap">
+            <div class="panel-head-title">상품상세</div>
+          </div>
+          <div class="panel-head-actions"></div>
+        </div>
+        <div class="panel-body">
+          <div id="chat-product-detail-card" class="detail-card">
+            <div class="empty-block">상품을 선택하세요.</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="filter-overlay panel col-3" id="chatFilterOverlay" aria-hidden="true">
+        <div class="panel-head panel-head-default">
+          <div class="panel-head-title-wrap"><div class="panel-head-title">필터</div></div>
+          <div class="panel-head-actions">
+            <button type="button" class="inline-button" id="chatFilterResetBtn">초기화</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="empty-block">대화목록 필터 영역</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block page_js %}<script type="module" src="{{ url_for('static', filename='js/pages/05_chat.js') }}"></script>{% endblock %}

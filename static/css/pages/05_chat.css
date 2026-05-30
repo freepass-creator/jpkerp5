@@ -1,0 +1,34 @@
+.auth-panel { width: 100%; max-width: 420px; }
+.auth-panel.wide { max-width: 520px; }
+.settings-grid { display: grid; gap: 12px; }
+.setting-row { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; font-size: 12px; }
+
+.chat-panel-body{min-height:0}
+.chat-head .panel-head-actions{display:flex;gap:6px;align-items:center}
+.room-list .empty-block{padding:16px 12px}
+.room-item{position:relative}
+
+.filter-overlay{
+  display:none;
+}
+.filter-overlay.is-open{
+  display:block;
+}
+
+/* ===== 104 list top gap fix (hard normalize) ===== */
+.panel-body.no-pad{
+  padding-top:0 !important;
+}
+.summary-list{
+  padding-top:0 !important;
+  margin-top:0 !important;
+}
+.summary-row{
+  margin-top:0 !important;
+}
+.summary-row:first-child{
+  margin-top:0 !important;
+}
+.panel-body{
+  padding-top:0 !important;
+}
