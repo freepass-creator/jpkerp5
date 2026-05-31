@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   Gear, User, Sun, Moon, Desktop, ArrowCounterClockwise, SignOut, BookOpen, Snowflake, Leaf, Coffee,
-  Shield, Play, CircleNotch,
+  Shield, Play, CircleNotch, Users, Buildings, ArrowSquareOut,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useAuth, logout } from '@/lib/use-auth';
+import { useRole } from '@/lib/use-role';
 import { useSettings, type Theme, type FontFamily, type FontSize, type Density, type Radius, type Accent } from '@/lib/use-settings';
 
 type Tab = 'display' | 'account' | 'admin';
@@ -15,6 +17,7 @@ type Tab = 'display' | 'account' | 'admin';
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('display');
   const { user } = useAuth();
+  const { isAdmin: admin } = useRole();
 
   return (
     <div className="layout">
@@ -29,6 +32,7 @@ export default function SettingsPage() {
 
         <div className="page-shell">
           <nav className="page-shell-nav">
+            <div className="page-shell-nav-group-label">개인</div>
             <button type="button" className={`page-shell-nav-item ${tab === 'display' ? 'active' : ''}`} onClick={() => setTab('display')}>
               <Sun size={14} weight={tab === 'display' ? 'fill' : 'regular'} />
               <span>화면</span>
@@ -37,10 +41,37 @@ export default function SettingsPage() {
               <User size={14} weight={tab === 'account' ? 'fill' : 'regular'} />
               <span>계정</span>
             </button>
-            <button type="button" className={`page-shell-nav-item ${tab === 'admin' ? 'active' : ''}`} onClick={() => setTab('admin')}>
-              <Shield size={14} weight={tab === 'admin' ? 'fill' : 'regular'} />
-              <span>관리</span>
-            </button>
+
+            <div className="page-shell-nav-group-label" style={{ marginTop: 14 }}>조직</div>
+            {admin && (
+              <Link href="/admin/users" className="page-shell-nav-item">
+                <Users size={14} />
+                <span>직원관리</span>
+                <ArrowSquareOut size={11} weight="bold" style={{ marginLeft: 'auto', opacity: 0.5 }} />
+              </Link>
+            )}
+            <Link href="/companies" className="page-shell-nav-item">
+              <Buildings size={14} />
+              <span>법인관리</span>
+              <ArrowSquareOut size={11} weight="bold" style={{ marginLeft: 'auto', opacity: 0.5 }} />
+            </Link>
+
+            <div className="page-shell-nav-group-label" style={{ marginTop: 14 }}>도움</div>
+            <Link href="/help" className="page-shell-nav-item">
+              <BookOpen size={14} />
+              <span>사용 안내</span>
+              <ArrowSquareOut size={11} weight="bold" style={{ marginLeft: 'auto', opacity: 0.5 }} />
+            </Link>
+
+            {admin && (
+              <>
+                <div className="page-shell-nav-group-label" style={{ marginTop: 14 }}>운영</div>
+                <button type="button" className={`page-shell-nav-item ${tab === 'admin' ? 'active' : ''}`} onClick={() => setTab('admin')}>
+                  <Shield size={14} weight={tab === 'admin' ? 'fill' : 'regular'} />
+                  <span>일일 작업</span>
+                </button>
+              </>
+            )}
           </nav>
 
           <main className="page-shell-main">

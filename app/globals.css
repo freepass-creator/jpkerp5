@@ -403,6 +403,17 @@ a { color: var(--text-link); text-decoration: none; }
 .page-shell-nav-item:disabled:hover { background: transparent; color: var(--text-muted); }
 .sb-item-muted { color: var(--text-weak); }
 .sb-item-muted:hover { color: var(--text-sub); }
+
+/* 설정 페이지 nav 그룹 라벨 */
+.page-shell-nav-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-weak);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 4px 8px 2px;
+  margin-bottom: 2px;
+}
 .sb-item .sb-count {
   margin-left: auto;
   font-size: 11px;

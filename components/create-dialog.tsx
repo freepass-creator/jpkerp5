@@ -1463,17 +1463,14 @@ function SnapshotPane({
   //  · 시트 내 중복 → OFF
   //  · 오류 → OFF
   useEffect(() => {
-    if (validated.length === 0) return;
-    setPicks((prev) => {
-      const next = { ...prev };
-      for (const v of validated) {
-        if (next[v.key] !== undefined) continue;
-        if (v.kind === 'invalid' || v.inSheetDup) { next[v.key] = false; continue; }
-        if (v.kind === 'vehicle-only' && v.dbHit) { next[v.key] = false; continue; }
-        next[v.key] = true;
-      }
-      return next;
-    });
+    // validated 변경 시 picks 통째 재계산 — 옛 false 상태가 잠겨서 0건 commit 되는 문제 해결
+    const next: Record<string, boolean> = {};
+    for (const v of validated) {
+      if (v.kind === 'invalid' || v.inSheetDup) { next[v.key] = false; continue; }
+      if (v.kind === 'vehicle-only' && v.dbHit) { next[v.key] = false; continue; }
+      next[v.key] = true;
+    }
+    setPicks(next);
   }, [validated]);
 
   // 행별 최종 상태 (UI 라벨 + commit 동작)

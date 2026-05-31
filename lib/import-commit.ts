@@ -297,13 +297,23 @@ export function validateSnapshotRow(row: Row, companies?: Company[]): SnapshotVa
     const company = resolveCompanyByRegNo(regNoOrName, companies) || '기타';
     const model = toStr(get(row, '차명', '차종', 'vehicleModel')) || '미정';
     const vehicleStatusRaw = toStr(get(row, '차량상태', '상태', 'vehicleStatus'));
-    // 사용자가 명시한 값이 있으면 우선, 없으면 휴차대기 (계약자 없는 차량의 기본값)
+    // alias 매핑 — 사용자 단순화 라벨 ('계약중'/'휴차중') 우선 처리
+    const STATUS_ALIAS: Record<string, VehicleStatus> = {
+      '계약중': '운행',
+      '운행중': '운행',
+      '휴차중': '휴차',
+    };
     const ALL: VehicleStatus[] = [
       '구매대기', '등록대기', '상품화대기', '상품화중', '상품대기', '운행',
       '휴차대기', '매각대기', '매각', '인도대기', '출고대기', '재고', '반납', '휴차', '임시배차', '정비', '사고',
     ];
-    let vehicleStatus: VehicleStatus = '휴차대기';
-    for (const x of ALL) if (vehicleStatusRaw === x) { vehicleStatus = x; break; }
+    // 1순위: alias / 2순위: 정확한 시스템명 / 기본값: 휴차 (계약자 없는 차량)
+    let vehicleStatus: VehicleStatus = '휴차';
+    if (vehicleStatusRaw && STATUS_ALIAS[vehicleStatusRaw]) {
+      vehicleStatus = STATUS_ALIAS[vehicleStatusRaw];
+    } else {
+      for (const x of ALL) if (vehicleStatusRaw === x) { vehicleStatus = x; break; }
+    }
     if (!customerName) errors.push(`계약자 없음 → ${vehicleStatus} 등록`);
     if (monthlyRent <= 0 && customerName) errors.push(`월대여료 0 → ${vehicleStatus} 등록`);
     return {

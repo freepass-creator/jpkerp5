@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Upload, Database, ClipboardText, Wrench, Warning } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { isAdmin } from '@/lib/admin-emails';
@@ -16,10 +16,24 @@ type ToolCard = {
 
 const TOOLS: ToolCard[] = [
   {
+    href: '/admin/users',
+    title: '계정 관리',
+    desc: 'Firebase Auth 가입된 전체 직원 계정 — 가입일·마지막 로그인·권한 표시.',
+    icon: <Users size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
     href: '/admin/import-templates',
     title: '이력 업로드',
     desc: '계약이력 / 수납이력 xlsx 일괄 등록. 차량+계약자별 horizontal 양식.',
     icon: <Upload size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/admin/audit',
+    title: '감사 로그',
+    desc: '누가 언제 무엇을 변경했는지 추적. 모든 entity 변경 기록.',
+    icon: <ClipboardText size={18} weight="duotone" />,
     variant: 'op',
   },
   {
@@ -28,13 +42,6 @@ const TOOLS: ToolCard[] = [
     desc: 'DB 노드 상태 진단 / 전체 wipe / 잘못 박힌 회사 계약 정리 등 위험 도구.',
     icon: <Database size={18} weight="duotone" />,
     variant: 'danger',
-  },
-  {
-    href: '/admin/audit',
-    title: '감사 로그',
-    desc: '누가 언제 무엇을 변경했는지 추적. 모든 entity 변경 기록.',
-    icon: <ClipboardText size={18} weight="duotone" />,
-    variant: 'op',
   },
 ];
 

@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Buildings, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, BookOpen, Wrench, Receipt,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
-import { isAdmin } from '@/lib/admin-emails';
+import { useRole } from '@/lib/use-role';
 
 type SidebarProps = Record<string, never>;
 
@@ -15,8 +15,8 @@ const COLLAPSE_KEY = 'jpkerp5_sidebar_collapsed';
 
 export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
   const pathname = usePathname();
-  const { user } = useAuth();
-  const admin = isAdmin(user?.email);
+  useAuth();
+  const { isAdmin: admin } = useRole();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -74,21 +74,13 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
           <Receipt size={14} weight={isActive('/penalty') ? 'fill' : 'regular'} />
           <span>과태료 업무</span>
         </Link>
-        <Link href="/companies" className={`sb-item ${isActive('/companies') ? 'active' : ''}`} title="법인 관리">
-          <Buildings size={14} weight={isActive('/companies') ? 'fill' : 'regular'} />
-          <span>법인 관리</span>
-        </Link>
         {admin && (
           <Link href="/admin/dev-tools" className={`sb-item ${isActive('/admin/dev-tools') ? 'active' : ''}`} title="개발도구 — 이력 업로드 / 진단 / wipe / 감사 로그 (관리자 전용)">
             <Wrench size={14} weight={isActive('/admin/dev-tools') ? 'fill' : 'regular'} />
             <span>개발도구</span>
           </Link>
         )}
-        <Link href="/help" className={`sb-item ${isActive('/help') ? 'active' : ''}`} title="사용 안내 — 처음 쓰는 직원 가이드">
-          <BookOpen size={14} weight={isActive('/help') ? 'fill' : 'regular'} />
-          <span>사용 안내</span>
-        </Link>
-        <Link href="/settings" className={`sb-item ${isActive('/settings') ? 'active' : ''}`} title="설정 (화면·계정)">
+        <Link href="/settings" className={`sb-item ${isActive('/settings') ? 'active' : ''}`} title="설정 — 직원·법인·사용안내·화면·계정">
           <Gear size={14} weight={isActive('/settings') ? 'fill' : 'regular'} />
           <span>설정</span>
         </Link>
