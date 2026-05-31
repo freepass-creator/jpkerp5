@@ -74,6 +74,24 @@ export default function CompaniesPage() {
 
   async function save() {
     if (!draft) return;
+    // 중복 등록 차단 — 같은 법인번호/사업자번호로는 한 회사만
+    const normDup = (s: string) => s.replace(/[-\s]/g, '');
+    const dCorp = normDup(draft.corpRegNo ?? '');
+    const dBiz = normDup(draft.bizRegNo ?? '');
+    if (dCorp) {
+      const dup = sortedCompanies.find((c) => c.id !== draft.id && normDup(c.corpRegNo ?? '') === dCorp);
+      if (dup) {
+        alert(`같은 법인등록번호로 이미 "${dup.name || dup.corpRegNo}" 법인이 등록되어 있습니다.`);
+        return;
+      }
+    }
+    if (dBiz) {
+      const dup = sortedCompanies.find((c) => c.id !== draft.id && normDup(c.bizRegNo ?? '') === dBiz);
+      if (dup) {
+        alert(`같은 사업자등록번호로 이미 "${dup.name || dup.bizRegNo}" 법인이 등록되어 있습니다.`);
+        return;
+      }
+    }
     if (creating) {
       const { id, ...payload } = draft;
       const newId = await add(payload);
@@ -98,10 +116,22 @@ export default function CompaniesPage() {
     setCreating(false);
   }
 
-  // 미등록 법인 검출 — 계약 데이터에 있지만 마스터에 없는 회사명
-  const registered = new Set(sortedCompanies.map((c) => c.name.trim()));
+  // 미등록 법인 검출 — 계약 데이터에 있지만 마스터에 없는 회사명/법인번호/사업자번호
+  const normReg = (s: string) => s.replace(/[-\s]/g, '');
+  const registeredNames = new Set(sortedCompanies.map((c) => c.name.trim()).filter(Boolean));
+  const registeredCorpNos = new Set(
+    sortedCompanies.map((c) => normReg(c.corpRegNo ?? '')).filter(Boolean)
+  );
+  const registeredBizNos = new Set(
+    sortedCompanies.map((c) => normReg(c.bizRegNo ?? '')).filter(Boolean)
+  );
   const unregistered = Array.from(usageByName.entries())
-    .filter(([name]) => !registered.has(name))
+    .filter(([name]) => {
+      if (registeredNames.has(name)) return false;
+      const digits = normReg(name);
+      if (digits && (registeredCorpNos.has(digits) || registeredBizNos.has(digits))) return false;
+      return true;
+    })
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
 
@@ -173,8 +203,17 @@ export default function CompaniesPage() {
                         type="button"
                         className="page-shell-nav-card unregistered"
                         onClick={() => {
+                          // 패턴 판별 — 숫자 자릿수 기준 (하이픈 유무 무관)
+                          //   13자리 = 법인등록번호 / 10자리 = 사업자등록번호 / 그 외 = 회사명
+                          const raw = u.name.trim();
+                          const digits = raw.replace(/[-\s]/g, '');
+                          const isCorp = /^\d{13}$/.test(digits);
+                          const isBiz = /^\d{10}$/.test(digits);
                           setDraft({
-                            id: '', code: '', name: u.name, bizRegNo: '', corpRegNo: '',
+                            id: '', code: '',
+                            name: isCorp || isBiz ? '' : raw,
+                            bizRegNo: isBiz ? raw : '',
+                            corpRegNo: isCorp ? raw : '',
                             ceo: '', address: '', bizType: '', bizItem: '',
                             accounts: [], cards: [], locations: [], documents: [],
                             notes: '', createdAt: new Date().toISOString(),

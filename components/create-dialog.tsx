@@ -327,12 +327,12 @@ export function CreateDialog({
       const vehicleOnly = validations.filter((v) => v.kind === 'vehicle-only' && v.vehiclePatch);
 
       // 1) 계약 행 — contract UPSERT (단, plate='미정'은 항상 신규)
-      const byPlate = new Map(contracts.map((c) => [c.vehiclePlate.trim(), c]));
+      const byPlate = new Map(contracts.map((c) => [(c.vehiclePlate ?? '').trim(), c]));
       const updates: Contract[] = [];
       const creates: Array<Omit<Contract, 'id'>> = [];
       for (const v of contractValidations) {
         const p = v.patch!;
-        const plateKey = p.vehiclePlate.trim();
+        const plateKey = (p.vehiclePlate ?? '').trim();
         const existing = plateKey === '미정' ? undefined : byPlate.get(plateKey);
         const out = applySnapshotToContract(existing, p);
         if (existing && 'id' in out) updates.push(out as Contract);
@@ -343,13 +343,13 @@ export function CreateDialog({
 
       // 2) 휴차 차량 — vehicle 만 등록 (이미 같은 plate 의 vehicle 있으면 skip)
       const existingPlates = new Set([
-        ...contracts.map((c) => c.vehiclePlate.trim()),
-        ...vehicles.map((v) => v.plate.trim()),
+        ...contracts.map((c) => (c.vehiclePlate ?? '').trim()),
+        ...vehicles.map((v) => (v.plate ?? '').trim()),
       ]);
       const newVehicles: Array<Omit<import('@/lib/types').Vehicle, 'id'>> = [];
       for (const v of vehicleOnly) {
         const vp = v.vehiclePatch!;
-        if (existingPlates.has(vp.plate.trim())) continue;  // 이미 있으면 skip
+        if (existingPlates.has((vp.plate ?? '').trim())) continue;  // 이미 있으면 skip
         newVehicles.push({
           plate: vp.plate,
           model: vp.model,
@@ -358,7 +358,7 @@ export function CreateDialog({
           notes: `스냅샷 업로드 — ${vp.vehicleStatus}`,
           createdAt: new Date().toISOString(),
         });
-        existingPlates.add(vp.plate.trim());
+        existingPlates.add((vp.plate ?? '').trim());
       }
       const vehiclesAdded = newVehicles.length > 0 ? await addVehicles(newVehicles) : 0;
 
@@ -1837,7 +1837,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
   const matchedVehicle = useMemo(() => {
     const key = plate.trim();
     if (!key || key === '미정') return null;
-    return vehicles.find((v) => v.plate.trim() === key) ?? null;
+    return vehicles.find((v) => (v.plate ?? '').trim() === key) ?? null;
   }, [plate, vehicles]);
   // 매칭되면 차량 정보 5단 자동 채움 + 잠금 (편집은 차량 페이지에서)
   useEffect(() => {

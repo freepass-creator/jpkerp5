@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
   Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch,
   Upload, Warning as WarningIcon, X as XIcon, X, CaretRight,
+  Pencil, FloppyDisk,
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DateInput } from '@/components/ui/date-input';
@@ -62,9 +63,9 @@ export function ContractDetailDialog({
             </Tabs.List>
 
             <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-              <Tabs.Content value="vehicleSpec"><VehicleSpecTab c={contract} /></Tabs.Content>
+              <Tabs.Content value="vehicleSpec"><VehicleSpecTab c={contract} onUpdate={onUpdate} /></Tabs.Content>
               <Tabs.Content value="vehicleStatus"><VehicleStatusTab c={contract} onUpdate={onUpdate} /></Tabs.Content>
-              <Tabs.Content value="contract"><ContractInfoTab c={contract} /></Tabs.Content>
+              <Tabs.Content value="contract"><ContractInfoTab c={contract} onUpdate={onUpdate} /></Tabs.Content>
               <Tabs.Content value="payment"><PaymentTab c={contract} onUpdate={onUpdate} /></Tabs.Content>
               <Tabs.Content value="vehiclePayments"><VehiclePaymentsTab c={contract} /></Tabs.Content>
               <Tabs.Content value="documents"><DocumentsTab c={contract} onUpdate={onUpdate} /></Tabs.Content>
@@ -142,20 +143,36 @@ type Stage =
   | '구매대기' | '등록대기'
   | '상품화대기' | '상품화중' | '상품대기'
   | '운행'
-  | '종료임박' | '연장대기' | '종료대기'   // 만기 라이프사이클
+  | '만기임박' | '연장대기' | '종료대기'   // 만기 라이프사이클
   | '휴차대기' | '매각대기' | '매각'
   | '휴차' | '임시배차';  // legacy (이전 데이터 호환)
 
+/**
+ * 만기일 — contractDate + termMonths 기준 (계약 기간이 진실).
+ * termMonths 없을 때만 returnScheduledDate 폴백.
+ */
+function getExpiryDate(c: Contract): string | null {
+  if (c.contractDate && c.termMonths && c.termMonths > 0) {
+    const base = new Date(c.contractDate);
+    if (!Number.isNaN(base.getTime())) {
+      base.setMonth(base.getMonth() + c.termMonths);
+      return base.toISOString().slice(0, 10);
+    }
+  }
+  return c.returnScheduledDate ?? null;
+}
+
 /** 만기까지 남은 일수 — 음수면 경과 */
 function daysToExpiry(c: Contract, today: string): number | null {
-  if (!c.returnScheduledDate) return null;
+  const expiry = getExpiryDate(c);
+  if (!expiry) return null;
   const a = new Date(today).getTime();
-  const b = new Date(c.returnScheduledDate).getTime();
+  const b = new Date(expiry).getTime();
   if (Number.isNaN(a) || Number.isNaN(b)) return null;
   return Math.round((b - a) / 86400000);
 }
 
-/** 만기 D-90 이내 (음수 = 경과 포함) — 운행 계약일 때 종료임박으로 자동 표시 */
+/** 만기 D-90 이내 (음수 = 경과 포함) — 운행 계약일 때 만기임박으로 자동 표시 */
 function isNearExpiry(c: Contract, today: string): boolean {
   const d = daysToExpiry(c, today);
   return d !== null && d <= 90;
@@ -165,8 +182,8 @@ function currentStage(c: Contract): Stage {
   // 명시적 vehicleStatus 우선
   switch (c.vehicleStatus) {
     case '운행':
-      // 운행 + 반납예정일 D-90 이내 → 종료임박 자동 표시
-      return isNearExpiry(c, todayKr()) ? '종료임박' : '운행';
+      // 운행 + 반납예정일 D-90 이내 → 만기임박 자동 표시
+      return isNearExpiry(c, todayKr()) ? '만기임박' : '운행';
     case '연장대기': return '연장대기';
     case '종료대기': return '종료대기';
     case '매각': return '매각';
@@ -185,11 +202,11 @@ function currentStage(c: Contract): Stage {
   // legacy 케이스 파생 — vehicleStatus 없을 때만
   if (c.returnedDate || c.status === '반납') return '휴차대기';
   if (c.deliveredDate && c.status === '운행') {
-    return isNearExpiry(c, todayKr()) ? '종료임박' : '운행';
+    return isNearExpiry(c, todayKr()) ? '만기임박' : '운행';
   }
   // 손님 있는 계약은 인도일 없어도 운행 (스냅샷 업로드 시점)
   if (c.status === '운행') {
-    return isNearExpiry(c, todayKr()) ? '종료임박' : '운행';
+    return isNearExpiry(c, todayKr()) ? '만기임박' : '운행';
   }
   return '구매대기';
 }
@@ -236,7 +253,7 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
     nextLabel: '반납회수 → 휴차대기',
     items: ['차량 외관 공동 검수', '내부 청소 상태 확인', '주행거리 기록', '연료 잔량 확인', '키·매뉴얼 회수', '면책금/위약금 정산'],
   },
-  '종료임박': {
+  '만기임박': {
     label: '만기 협의 — 통화 후 결정',
     nextLabel: '연장 / 종료 결정',
     items: [],  // 결정 분기라 체크 없음
@@ -265,10 +282,17 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
 
 /* ─────────────── 차량정보 (스펙) — 별도 탭 ─────────────── */
 
-function VehicleSpecTab({ c }: { c: Contract }) {
+function VehicleSpecTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const { companies } = useCompanies();
   const { vehicles } = useVehicles();
   const { contracts: allContracts } = useContractsList();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Contract>(c);
+  useEffect(() => { if (!editing) setDraft(c); }, [c, editing]);
+  const startEdit = () => { setDraft(c); setEditing(true); };
+  const cancel = () => { setDraft(c); setEditing(false); };
+  const save = () => { onUpdate(draft); setEditing(false); };
+  const set = <K extends keyof Contract>(k: K, v: Contract[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
   // 같은 plate 차량 마스터 (있으면 매입·등록·상품화 일자 가져옴)
   const vehicle = useMemo(
@@ -293,12 +317,27 @@ function VehicleSpecTab({ c }: { c: Contract }) {
 
   return (
     <div className="detail-stack">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 4 }}>
+        {!editing ? (
+          <button className="btn btn-sm" type="button" onClick={startEdit}>
+            <Pencil size={12} weight="bold" /> 수정
+          </button>
+        ) : (
+          <>
+            <button className="btn btn-sm" type="button" onClick={cancel}>취소</button>
+            <button className="btn btn-sm btn-primary" type="button" onClick={save}>
+              <FloppyDisk size={12} weight="bold" /> 저장
+            </button>
+          </>
+        )}
+      </div>
+
       {/* 기본 식별 */}
       <Section icon={<Car size={12} weight="duotone" />} title="차량 식별">
         <div className="detail-grid-2">
           <div>
             <Field label="차량번호" value={c.vehiclePlate} mono />
-            <Field label="차종" value={c.vehicleModel} />
+            <EditableField label="차종" value={editing ? draft.vehicleModel : c.vehicleModel} editing={editing} onChange={(v) => set('vehicleModel', v)} />
             <Field label="회사" value={displayCompanyName(c.company, companies)} />
             {c.isInventoryPurchase && (
               <Field label="구분" value={<span style={{ color: 'var(--purple-text)', fontWeight: 600 }}>선도구매 (재고)</span>} />
@@ -350,12 +389,27 @@ function VehicleSpecTab({ c }: { c: Contract }) {
       <Section icon={<Car size={12} weight="duotone" />} title="보험·옵션">
         <div className="detail-grid-2">
           <div>
-            <Field label="보험연령" value={c.insuranceAge ? `${c.insuranceAge}세 이상` : <span className="muted">-</span>} />
-            <Field label="자차여부" value={c.selfInsured ? '가입' : (c.selfInsured === false ? '미가입' : <span className="muted">-</span>)} />
+            <EditableField label="보험연령(세)" value={editing ? String(draft.insuranceAge ?? '') : (c.insuranceAge ? `${c.insuranceAge}세 이상` : '-')} editing={editing} mono onChange={(v) => set('insuranceAge', Number(v) || undefined)} />
+            {editing ? (
+              <div className="detail-field" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span className="detail-field-label" style={{ minWidth: 70, fontSize: 11, color: 'var(--text-weak)' }}>자차여부</span>
+                <select
+                  value={draft.selfInsured === undefined ? '' : draft.selfInsured ? 'true' : 'false'}
+                  onChange={(e) => set('selfInsured', e.target.value === '' ? undefined : e.target.value === 'true')}
+                  style={{ flex: 1, fontSize: 12, padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 4 }}
+                >
+                  <option value="">-</option>
+                  <option value="true">가입</option>
+                  <option value="false">미가입</option>
+                </select>
+              </div>
+            ) : (
+              <Field label="자차여부" value={c.selfInsured ? '가입' : (c.selfInsured === false ? '미가입' : <span className="muted">-</span>)} />
+            )}
           </div>
           <div>
-            <Field label="거리한도" value={c.distanceLimitKm ? `${c.distanceLimitKm.toLocaleString()}km` : <span className="muted">-</span>} mono />
-            <Field label="보험만기" value={formatDateFull(c.insuranceExpiryDate) || <span className="muted">-</span>} mono />
+            <EditableField label="거리한도(km)" value={editing ? String(draft.distanceLimitKm ?? '') : (c.distanceLimitKm ? `${c.distanceLimitKm.toLocaleString()}km` : '-')} editing={editing} mono onChange={(v) => set('distanceLimitKm', Number(v.replace(/[,\s]/g, '')) || undefined)} />
+            <EditableField label="보험만기" value={editing ? (draft.insuranceExpiryDate ?? '') : (formatDateFull(c.insuranceExpiryDate) || '-')} editing={editing} mono onChange={(v) => set('insuranceExpiryDate', v || undefined)} placeholder="YYYY-MM-DD" />
           </div>
         </div>
       </Section>
@@ -682,8 +736,8 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           </div>
         )}
 
-        {/* 종료임박 배너 — 운행 + 만기 D-90 이내 자동 표시 */}
-        {stage === '종료임박' && !renewPicker && !endPicker && (() => {
+        {/* 만기임박 배너 — 운행 + 만기 D-90 이내 자동 표시 */}
+        {stage === '만기임박' && !renewPicker && !endPicker && (() => {
           const d = daysToExpiry(c, todayKr()) ?? 0;
           const tone = d < 0 ? 'red' : d <= 7 ? 'red' : d <= 30 ? 'orange' : 'yellow';
           const bg = tone === 'red' ? 'var(--red-bg)' : tone === 'orange' ? 'var(--orange-bg)' : '#fef9c3';
@@ -976,22 +1030,51 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
 /* ─────────────── 계약정보 탭 (고객 + 조건 + 비고) ─────────────── */
 
-function ContractInfoTab({ c }: { c: Contract }) {
+function ContractInfoTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const identMasked = contractIdentMasked(c);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Contract>(c);
+
+  // 다른 계약으로 네비게이션되면 draft 리셋
+  useEffect(() => {
+    if (!editing) setDraft(c);
+  }, [c, editing]);
+
+  const startEdit = () => { setDraft(c); setEditing(true); };
+  const cancel = () => { setDraft(c); setEditing(false); };
+  const save = () => { onUpdate(draft); setEditing(false); };
+
+  const set = <K extends keyof Contract>(k: K, v: Contract[K]) => setDraft((d) => ({ ...d, [k]: v }));
+
   return (
     <div className="detail-stack">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 4 }}>
+        {!editing ? (
+          <button className="btn btn-sm" type="button" onClick={startEdit}>
+            <Pencil size={12} weight="bold" /> 수정
+          </button>
+        ) : (
+          <>
+            <button className="btn btn-sm" type="button" onClick={cancel}>취소</button>
+            <button className="btn btn-sm btn-primary" type="button" onClick={save}>
+              <FloppyDisk size={12} weight="bold" /> 저장
+            </button>
+          </>
+        )}
+      </div>
+
       <Section icon={<User size={12} weight="duotone" />} title="고객">
         <div className="detail-grid-2">
           <div>
-            <Field label="이름" value={c.customerName} />
+            <EditableField label="이름" value={editing ? draft.customerName : c.customerName} editing={editing} onChange={(v) => set('customerName', v)} />
             <Field label="구분" value={c.customerKind || '-'} />
             <Field label="등록번호" value={identMasked || '-'} mono />
-            <Field label="연락처" value={c.customerPhone1} mono />
-            <Field label="연락처2" value={c.customerPhone2 || '-'} mono />
+            <EditableField label="연락처" value={editing ? draft.customerPhone1 : c.customerPhone1} editing={editing} mono onChange={(v) => set('customerPhone1', v)} />
+            <EditableField label="연락처2" value={editing ? (draft.customerPhone2 ?? '') : (c.customerPhone2 ?? '')} editing={editing} mono onChange={(v) => set('customerPhone2', v || undefined)} placeholder="-" />
           </div>
           <div>
-            <Field label="지역" value={c.customerRegion || '-'} />
-            <Field label="행정구" value={c.customerDistrict || '-'} />
+            <EditableField label="지역" value={editing ? (draft.customerRegion ?? '') : (c.customerRegion ?? '')} editing={editing} onChange={(v) => set('customerRegion', v || undefined)} placeholder="-" />
+            <EditableField label="행정구" value={editing ? (draft.customerDistrict ?? '') : (c.customerDistrict ?? '')} editing={editing} onChange={(v) => set('customerDistrict', v || undefined)} placeholder="-" />
           </div>
         </div>
       </Section>
@@ -1003,23 +1086,63 @@ function ContractInfoTab({ c }: { c: Contract }) {
             <Field label="계약일" value={formatDateFull(c.contractDate)} mono />
             <Field label="인도일" value={formatDateFull(c.deliveredDate) || '-'} mono />
             <Field label="반납예정" value={formatDateFull(c.returnScheduledDate) || '-'} mono />
-            <Field label="약정기간" value={`${c.termMonths}개월 ${c.longTerm ? '(장기)' : '(단기)'}`} />
+            <EditableField label="약정기간(개월)" value={editing ? String(draft.termMonths) : `${c.termMonths}개월 ${c.longTerm ? '(장기)' : '(단기)'}`} editing={editing} mono onChange={(v) => set('termMonths', Number(v) || 0)} />
           </div>
           <div>
-            <Field label="월 대여료" value={`₩${formatCurrency(c.monthlyRent)}`} mono />
-            <Field label="보증금" value={`₩${formatCurrency(c.deposit)}`} mono />
+            <EditableField label="월 대여료" value={editing ? String(draft.monthlyRent ?? 0) : `₩${formatCurrency(c.monthlyRent)}`} editing={editing} mono onChange={(v) => set('monthlyRent', Number(v.replace(/[,\s]/g, '')) || 0)} />
+            <EditableField label="보증금" value={editing ? String(draft.deposit ?? 0) : `₩${formatCurrency(c.deposit)}`} editing={editing} mono onChange={(v) => set('deposit', Number(v.replace(/[,\s]/g, '')) || 0)} />
             <Field label="결제방법" value={c.paymentMethod} />
-            <Field label="결제일" value={`매월 ${c.paymentDay}일`} mono />
-            <Field label="담당자" value={c.manager || '-'} />
+            <EditableField label="결제일(1-31)" value={editing ? String(draft.paymentDay ?? '') : `매월 ${c.paymentDay}일`} editing={editing} mono onChange={(v) => set('paymentDay', Number(v) || 0)} />
+            <EditableField label="담당자" value={editing ? (draft.manager ?? '') : (c.manager ?? '-')} editing={editing} onChange={(v) => set('manager', v || undefined)} />
           </div>
         </div>
       </Section>
 
       <Section icon={<FileText size={12} weight="duotone" />} title="비고">
-        <div style={{ fontSize: 12, color: c.notes ? 'var(--text-main)' : 'var(--text-weak)', whiteSpace: 'pre-wrap' }}>
-          {c.notes || '메모 없음'}
-        </div>
+        {editing ? (
+          <textarea
+            value={draft.notes ?? ''}
+            onChange={(e) => set('notes', e.target.value || undefined)}
+            rows={4}
+            style={{ width: '100%', fontSize: 12, padding: 8, border: '1px solid var(--border)', borderRadius: 4, resize: 'vertical' }}
+            placeholder="메모"
+          />
+        ) : (
+          <div style={{ fontSize: 12, color: c.notes ? 'var(--text-main)' : 'var(--text-weak)', whiteSpace: 'pre-wrap' }}>
+            {c.notes || '메모 없음'}
+          </div>
+        )}
       </Section>
+    </div>
+  );
+}
+
+/** 보기/편집 겸용 필드 — editing=true 면 input, 아니면 Field 표시. */
+function EditableField({
+  label, value, editing, onChange, mono, placeholder,
+}: {
+  label: string;
+  value: string;
+  editing: boolean;
+  onChange: (v: string) => void;
+  mono?: boolean;
+  placeholder?: string;
+}) {
+  if (!editing) return <Field label={label} value={value || (placeholder ?? '-')} mono={mono} />;
+  return (
+    <div className="detail-field" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <span className="detail-field-label" style={{ minWidth: 70, fontSize: 11, color: 'var(--text-weak)' }}>{label}</span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          flex: 1, fontSize: 12, padding: '4px 6px',
+          border: '1px solid var(--border)', borderRadius: 4,
+          fontFamily: mono ? 'var(--font-mono, monospace)' : undefined,
+        }}
+      />
     </div>
   );
 }

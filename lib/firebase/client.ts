@@ -16,8 +16,8 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? '',
 };
 
-/** 데이터 노드 prefix — jpkerp ERP 와 분리 */
-export const RTDB_ROOT = 'jpkerp5';
+/** 데이터 노드 prefix — v4는 root 직접 사용, v5는 /v5/... 로 분리. */
+export const RTDB_ROOT = 'v5';
 
 let _app: FirebaseApp | null = null;
 let _rtdb: Database | null = null;

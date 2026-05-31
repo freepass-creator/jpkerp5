@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
   let contracts: Record<string, Contract>;
   try {
-    const snap = await getAdminRtdb().ref('jpkerp5/contracts').once('value');
+    const snap = await getAdminRtdb().ref('v5/contracts').once('value');
     contracts = snap.val() ?? {};
   } catch (e) {
     return NextResponse.json({ ok: false, error: `RTDB 읽기 실패: ${(e as Error).message}` }, { status: 500 });
@@ -147,7 +147,7 @@ export async function GET(req: NextRequest) {
       if (alert) alerts++;
 
       if (changed && !dry) {
-        await getAdminRtdb().ref(`jpkerp5/contracts/${id}`).update({
+        await getAdminRtdb().ref(`v5/contracts/${id}`).update({
           customerLicenseStatus: after,
           customerLicenseCheckedAt: new Date().toISOString(),
         });
