@@ -13,12 +13,15 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
 
 export default function AssetInspectionPage() {
   const { contracts } = useContracts();
   const { entries: history } = useHistoryEntries();
   const { vehicles } = useVehicles();
+  const { companies: companyMaster } = useCompanies();
   const today = todayKr();
 
   const upcoming = useMemo(() => {
@@ -79,7 +82,7 @@ export default function AssetInspectionPage() {
               const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
               return (
                 <tr key={c.id}>
-                  <td className="dim">{c.company || '-'}</td>
+                  <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                   <td className="mono">{c.vehiclePlate}</td>
                   <td className="dim">{c.vehicleModel || vehicles.find((v) => v.plate === c.vehiclePlate)?.model || '-'}</td>
                   <td>{c.customerName}</td>

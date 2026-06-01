@@ -11,6 +11,7 @@ const CreateDialog = dynamic(() => import('@/components/create-dialog').then((m)
 import { buildCompanyOptions } from '@/lib/filter-helpers';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { displayCompanyName } from '@/lib/company-display';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { downloadOverdueExcel } from '@/lib/contract-export';
 import { useAuth } from '@/lib/use-auth';
@@ -381,7 +382,7 @@ export default function ReceivablesPage() {
                               aria-label="행 선택"
                             />
                           </td>
-                          <td className="center dim">{c.company || '-'}</td>
+                          <td className="center dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                           <td className="center"><span className={`status ${c.vehicleStatus}`}>{c.vehicleStatus || '-'}</span></td>
                           <td className="mono">{c.vehiclePlate}</td>
                           <td>{c.customerName}</td>

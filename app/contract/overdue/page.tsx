@@ -13,9 +13,12 @@ import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import { displayCompanyName } from '@/lib/company-display';
 
 export default function ContractOverduePage() {
   const { contracts } = useContracts();
+  const { companies: companyMaster } = useCompanies();
 
   const overdue = useMemo(() => {
     return contracts
@@ -62,7 +65,7 @@ export default function ContractOverduePage() {
             <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>미수금 계약 없음</td></tr>
           ) : overdue.map((c) => (
             <tr key={c.id}>
-              <td className="dim">{c.company || '-'}</td>
+              <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
               <td className="mono">{c.vehiclePlate}</td>
               <td>{c.customerName}</td>
               <td className="mono dim">{c.customerPhone1 || '-'}</td>

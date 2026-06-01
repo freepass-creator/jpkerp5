@@ -145,7 +145,7 @@ export default function ContractPage() {
                       <tr><td colSpan={10} className="muted center" style={{ padding: 32 }}>계약 없음</td></tr>
                     ) : filtered.map((c) => (
                       <tr key={c.id} onClick={() => router.push(`/contract/${c.id}`)} style={{ cursor: 'pointer' }}>
-                        <td className="dim">{c.company || '-'}</td>
+                        <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                         <td className="mono">{c.contractNo}</td>
                         <td className="mono">{c.vehiclePlate}</td>
                         <td>{c.customerName}</td>

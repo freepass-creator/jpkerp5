@@ -9,12 +9,15 @@
 import { useMemo } from 'react';
 import { ShoppingCart } from '@phosphor-icons/react';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import { displayCompanyName } from '@/lib/company-display';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
 
 export default function PurchasePage() {
   const { vehicles } = useVehicles();
+  const { companies: companyMaster } = useCompanies();
 
   const pending = useMemo(
     () => vehicles.filter((v) => v.status === '구매대기').sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '')),
@@ -72,7 +75,7 @@ export default function PurchasePage() {
               <tr><td colSpan={6} className="muted center" style={{ padding: 24 }}>구매대기 차량 없음</td></tr>
             ) : pending.map((v) => (
               <tr key={v.id}>
-                <td className="dim">{v.company || '-'}</td>
+                <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                 <td className="mono">{v.plate || '미정'}</td>
                 <td>{v.model || '-'}</td>
                 <td className="dim">{v.vehicleMaker ?? '-'}</td>
@@ -106,7 +109,7 @@ export default function PurchasePage() {
               <tr><td colSpan={7} className="muted center" style={{ padding: 24 }}>매입 완료 차량 없음</td></tr>
             ) : purchased.map((v) => (
               <tr key={v.id}>
-                <td className="dim">{v.company || '-'}</td>
+                <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                 <td className="mono">{v.plate}</td>
                 <td>{v.model}</td>
                 <td className="mono">{v.purchasedDate}</td>

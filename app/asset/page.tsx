@@ -212,7 +212,7 @@ export default function AssetPage() {
                       className={selectedId === v.id ? 'selected-row' : undefined}
                     >
                       <td className="center"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} /></td>
-                      <td>{v.company || '-'}</td>
+                      <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                       <td className="mono">{v.assetCode || '-'}</td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleType || '-'}</td>

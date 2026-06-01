@@ -11,10 +11,13 @@ import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
 
 export default function ExpirePage() {
   const { contracts } = useContracts();
+  const { companies: companyMaster } = useCompanies();
   const today = todayKr();
 
   const rows = useMemo(() => {
@@ -73,7 +76,7 @@ export default function ExpirePage() {
             const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
             return (
               <tr key={c.id}>
-                <td className="dim">{c.company || '-'}</td>
+                <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                 <td className="mono">{c.vehiclePlate}</td>
                 <td>{c.customerName}</td>
                 <td className="mono dim">{c.customerPhone1 || '-'}</td>

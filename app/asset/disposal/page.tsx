@@ -11,9 +11,12 @@ import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import { displayCompanyName } from '@/lib/company-display';
 
 export default function AssetDisposalPage() {
   const { vehicles } = useVehicles();
+  const { companies: companyMaster } = useCompanies();
 
   const disposed = useMemo(() => vehicles.filter((v) => v.status === '매각'), [vehicles]);
   const pending = useMemo(() => vehicles.filter((v) => v.status === '매각대기'), [vehicles]);
@@ -49,7 +52,7 @@ export default function AssetDisposalPage() {
               <tr><td colSpan={6} className="muted center" style={{ padding: 24 }}>매각 대기 차량 없음</td></tr>
             ) : pending.map((v) => (
               <tr key={v.id}>
-                <td className="dim">{v.company || '-'}</td>
+                <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                 <td className="mono">{v.assetCode || '-'}</td>
                 <td className="mono">{v.plate}</td>
                 <td>{v.vehicleModelLine || v.model}</td>
@@ -80,7 +83,7 @@ export default function AssetDisposalPage() {
               <tr><td colSpan={6} className="muted center" style={{ padding: 24 }}>매각 완료 차량 없음</td></tr>
             ) : disposed.map((v) => (
               <tr key={v.id}>
-                <td className="dim">{v.company || '-'}</td>
+                <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                 <td className="mono">{v.assetCode || '-'}</td>
                 <td className="mono">{v.plate}</td>
                 <td>{v.vehicleModelLine || v.model}</td>
