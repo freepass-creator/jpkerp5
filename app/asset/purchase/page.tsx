@@ -39,18 +39,18 @@ export default function PurchasePage() {
       title="매입 관리"
       icon={<ShoppingCart size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       subNav={ASSET_SUB}
+      stats={
+        <>
+          <span>구매대기<strong>{pending.length}</strong></span>
+          <span>매입완료<strong>{purchased.length}</strong></span>
+          <span className="sep" />
+          <span>매입가 합계<strong className="mono">₩{totalPurchaseAmount.toLocaleString()}</strong></span>
+        </>
+      }
       bottomBar={
         <BottomBar
-          left={null}
-          right={
-            <>
-              <span>구매대기 <strong>{pending.length}</strong>대</span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>매입완료 <strong>{purchased.length}</strong>대</span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>매입가 합계 <strong className="mono">₩{totalPurchaseAmount.toLocaleString()}</strong></span>
-            </>
-          }
+          left={<button className="btn btn-primary" type="button">+ 차량 매입 등록</button>}
+          right={<button className="btn" type="button">엑셀</button>}
         />
       }
     >

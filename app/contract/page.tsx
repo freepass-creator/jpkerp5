@@ -117,6 +117,17 @@ export default function ContractPage() {
             <button type="button" className={`chip ${groupBy === 'list' ? 'active' : ''}`} onClick={() => setGroupBy('list')}>전체 리스트</button>
             <button type="button" className={`chip ${groupBy === 'customer' ? 'active' : ''}`} onClick={() => setGroupBy('customer')}>계약자별 묶음</button>
           </div>
+          <div className="topbar-stats">
+            <span>계약<strong>{filtered.length}</strong></span>
+            {groupBy === 'customer' && (
+              <>
+                <span className="sep" />
+                <span>고객<strong>{byCustomer.length}</strong></span>
+              </>
+            )}
+            <span className="sep" />
+            <span className="dim" style={{ fontSize: 11 }}>오늘 {today}</span>
+          </div>
         </header>
 
         <SubNav items={CONTRACT_SUB} />
@@ -202,20 +213,8 @@ export default function ContractPage() {
         </div>
 
         <BottomBar
-          left={<Link href="/" className="btn"><ArrowLeft size={12} /> 운영 현황</Link>}
-          right={
-            <>
-              <span>계약 <strong>{filtered.length}</strong>건</span>
-              {groupBy === 'customer' && (
-                <>
-                  <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                  <span>고객 <strong>{byCustomer.length}</strong>명</span>
-                </>
-              )}
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span className="dim" style={{ fontSize: 11 }}>오늘 {today}</span>
-            </>
-          }
+          left={<button className="btn btn-primary" type="button">+ 신규 계약</button>}
+          right={<button className="btn" type="button">엑셀</button>}
         />
       </div>
     </div>

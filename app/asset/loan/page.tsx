@@ -16,21 +16,17 @@ export default function AssetLoanPage() {
       title="할부스케줄"
       icon={<Bank size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       subNav={ASSET_SUB}
+      stats={
+        <>
+          <span>전체<strong>0</strong></span>
+          <span>진행중<strong>0</strong></span>
+          <span>완료<strong>0</strong></span>
+        </>
+      }
       bottomBar={
         <BottomBar
-          left={
-            <>
-              <span>전체 <strong>0</strong></span>
-              <span>진행중 <strong>0</strong></span>
-              <span>완료 <strong>0</strong></span>
-            </>
-          }
-          right={
-            <>
-              <button className="btn" type="button">엑셀</button>
-              <button className="btn btn-primary" type="button">+ 할부 등록</button>
-            </>
-          }
+          left={<button className="btn btn-primary" type="button">+ 할부 등록</button>}
+          right={<button className="btn" type="button">엑셀</button>}
         />
       }
     >

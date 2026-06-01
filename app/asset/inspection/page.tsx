@@ -46,18 +46,19 @@ export default function AssetInspectionPage() {
       title="검사내역"
       icon={<ClipboardText size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       subNav={ASSET_SUB}
+      stats={
+        <>
+          <span>만기 추적<strong>{upcoming.length}</strong></span>
+          <span style={{ color: 'var(--red-text)' }}>경과<strong>{overdue.length}</strong></span>
+          <span style={{ color: 'var(--orange-text, #c2410c)' }}>D-30<strong>{within30.length}</strong></span>
+          <span className="sep" />
+          <span>검사 이력<strong>{inspectionEvents.length}</strong></span>
+        </>
+      }
       bottomBar={
         <BottomBar
-          left={
-            <>
-              <span>만기 추적 <strong>{upcoming.length}</strong></span>
-              <span style={{ color: 'var(--red-text)' }}>경과 <strong>{overdue.length}</strong></span>
-              <span style={{ color: 'var(--orange-text, #c2410c)' }}>D-30 <strong>{within30.length}</strong></span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>검사 이력 <strong>{inspectionEvents.length}</strong></span>
-            </>
-          }
-          right={<button className="btn btn-primary" type="button">+ 검사 등록</button>}
+          left={<button className="btn btn-primary" type="button">+ 검사 등록</button>}
+          right={<button className="btn" type="button">엑셀</button>}
         />
       }
     >

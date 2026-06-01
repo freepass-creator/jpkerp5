@@ -122,21 +122,22 @@ export default function FinanceDailyPage() {
       title="자금일보"
       icon={<ChartBar size={16} weight="fill" style={{ color: 'var(--orange-text, #c2410c)' }} />}
       subNav={FINANCE_SUB}
+      stats={
+        <>
+          <span>일자<strong>{daily.length}</strong></span>
+          <span className="sep" />
+          <span style={{ color: 'var(--green-text)' }}>입금<strong className="mono">₩{formatCurrency(totals.inSum)}</strong></span>
+          <span style={{ color: 'var(--red-text)' }}>출금<strong className="mono">₩{formatCurrency(totals.outSum)}</strong></span>
+          <span>순증감<strong className="mono" style={{ color: totals.inSum - totals.outSum < 0 ? 'var(--red-text)' : 'var(--text-main)' }}>₩{formatCurrency(totals.inSum - totals.outSum)}</strong></span>
+        </>
+      }
       bottomBar={
         <BottomBar
           left={null}
           right={
-            <>
-              <span>일자 <strong>{daily.length}</strong></span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span style={{ color: 'var(--green-text)' }}>입금 <strong className="mono">₩{formatCurrency(totals.inSum)}</strong></span>
-              <span style={{ color: 'var(--red-text)' }}>출금 <strong className="mono">₩{formatCurrency(totals.outSum)}</strong></span>
-              <span>순증감 <strong className="mono" style={{ color: totals.inSum - totals.outSum < 0 ? 'var(--red-text)' : 'var(--text-main)' }}>₩{formatCurrency(totals.inSum - totals.outSum)}</strong></span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <button className="btn btn-sm" type="button" onClick={handleExport} title="자금일보 엑셀 (세무사 공유용)">
-                <DownloadSimple size={12} weight="bold" /> 엑셀
-              </button>
-            </>
+            <button className="btn btn-primary" type="button" onClick={handleExport} title="자금일보 엑셀 (세무사 공유용)">
+              <DownloadSimple size={12} weight="bold" /> 엑셀 다운로드
+            </button>
           }
         />
       }

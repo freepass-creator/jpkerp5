@@ -27,17 +27,19 @@ export default function AssetDisposalPage() {
       title="자산처분"
       icon={<Trash size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       subNav={ASSET_SUB}
+      stats={
+        <>
+          <span>전체<strong>{reviewing.length + pending.length + disposed.length}</strong></span>
+          <span className="sep" />
+          <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토<strong>{reviewing.length}</strong></span>
+          <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각대기<strong>{pending.length}</strong></span>
+          <span>매각완료<strong>{disposed.length}</strong></span>
+        </>
+      }
       bottomBar={
         <BottomBar
-          left={
-            <>
-              <span>전체 <strong>{reviewing.length + pending.length + disposed.length}</strong></span>
-              <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토 <strong>{reviewing.length}</strong></span>
-              <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각대기 <strong>{pending.length}</strong></span>
-              <span>매각완료 <strong>{disposed.length}</strong></span>
-            </>
-          }
-          right={<><button className="btn" type="button">엑셀</button><button className="btn btn-primary" type="button">+ 처분 등록</button></>}
+          left={<button className="btn btn-primary" type="button">+ 처분 등록</button>}
+          right={<button className="btn" type="button">엑셀</button>}
         />
       }
     >

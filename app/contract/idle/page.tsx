@@ -78,21 +78,22 @@ export default function ContractIdlePage() {
           />
         </div>
       }
+      stats={
+        <>
+          <span>전체<strong>{rows.length}</strong></span>
+          <span>휴차대기<strong>{counts.휴차대기}</strong></span>
+          <span>휴차중<strong>{counts.휴차}</strong></span>
+          <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토<strong>{counts.매각검토}</strong></span>
+          <span className="sep" />
+          <span style={{ color: counts.위치미입력 > 0 ? 'var(--red-text)' : undefined }}>
+            위치 미입력<strong>{counts.위치미입력}</strong>
+          </span>
+        </>
+      }
       bottomBar={
         <BottomBar
-          left={
-            <>
-              <span>전체 <strong>{rows.length}</strong></span>
-              <span>휴차대기 <strong>{counts.휴차대기}</strong></span>
-              <span>휴차중 <strong>{counts.휴차}</strong></span>
-              <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토 <strong>{counts.매각검토}</strong></span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span style={{ color: counts.위치미입력 > 0 ? 'var(--red-text)' : undefined }}>
-                위치 미입력 <strong>{counts.위치미입력}</strong>
-              </span>
-            </>
-          }
-          right={null}
+          left={null}
+          right={<button className="btn" type="button">엑셀</button>}
         />
       }
     >

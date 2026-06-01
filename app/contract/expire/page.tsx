@@ -40,18 +40,18 @@ export default function ExpirePage() {
       title="만기 임박 계약"
       icon={<Calendar size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       subNav={CONTRACT_SUB}
+      stats={
+        <>
+          <span style={{ color: 'var(--red-text)' }}>만기 경과<strong>{expired.length}</strong></span>
+          <span className="sep" />
+          <span style={{ color: 'var(--orange-text, #c2410c)' }}>D-30 이내<strong>{within30.length}</strong></span>
+          <span>D-31~90<strong>{within90.length}</strong></span>
+        </>
+      }
       bottomBar={
         <BottomBar
           left={null}
-          right={
-            <>
-              <span style={{ color: 'var(--red-text)' }}>만기 경과 <strong>{expired.length}</strong></span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span style={{ color: 'var(--orange-text, #c2410c)' }}>D-30 이내 <strong>{within30.length}</strong></span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>D-31~90 <strong>{within90.length}</strong></span>
-            </>
-          }
+          right={<button className="btn" type="button">엑셀</button>}
         />
       }
     >

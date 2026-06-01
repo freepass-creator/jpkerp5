@@ -33,16 +33,17 @@ export default function ContractOverduePage() {
       title="미수금 (계약 마스터)"
       icon={<Warning size={16} weight="fill" style={{ color: 'var(--red-text)' }} />}
       subNav={CONTRACT_SUB}
+      stats={
+        <>
+          <span>미수 계약<strong>{overdue.length}</strong></span>
+          <span className="sep" />
+          <span>총 미수<strong className="mono" style={{ color: 'var(--red-text)' }}>₩{total.toLocaleString()}</strong></span>
+        </>
+      }
       bottomBar={
         <BottomBar
           left={<Link href="/receivables" className="btn">→ 리스크 관리로 (액션 중심)</Link>}
-          right={
-            <>
-              <span>미수 계약 <strong>{overdue.length}</strong>건</span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>총 미수 <strong className="mono" style={{ color: 'var(--red-text)' }}>₩{total.toLocaleString()}</strong></span>
-            </>
-          }
+          right={<button className="btn" type="button">엑셀</button>}
         />
       }
     >

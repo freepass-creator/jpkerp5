@@ -27,7 +27,8 @@ export default function ContractReturnPage() {
       title="반납 계약"
       icon={<ArrowUUpLeft size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       subNav={CONTRACT_SUB}
-      bottomBar={<BottomBar left={null} right={<><span>반납 <strong>{rows.length}</strong>건</span></>} />}
+      stats={<><span>반납<strong>{rows.length}</strong></span></>}
+      bottomBar={<BottomBar left={null} right={<button className="btn" type="button">엑셀</button>} />}
     >
       <table className="table">
         <thead>

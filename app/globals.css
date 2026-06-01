@@ -755,6 +755,28 @@ a { color: var(--text-link); text-decoration: none; }
   position: relative;
   width: 200px;
 }
+/* 상단바 우측 끝 통계 — 자산/계약/재무 페이지 공통 규격 */
+.topbar-stats {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  padding: 0 8px;
+}
+.topbar-stats strong {
+  font-weight: 700;
+  color: var(--text-main);
+  margin-left: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.topbar-stats .sep {
+  width: 1px; height: 12px;
+  background: var(--border);
+  display: inline-block;
+}
 .topbar-search .icon {
   position: absolute;
   left: 10px;

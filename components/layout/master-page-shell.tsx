@@ -21,13 +21,15 @@ import { SubNav, type SubNavItem } from '@/components/layout/sub-nav';
 import { useRole } from '@/lib/use-role';
 
 export function MasterPageShell({
-  title, icon, subNav, search, children, bottomBar,
+  title, icon, subNav, search, stats, children, bottomBar,
 }: {
   title: string;
   icon?: ReactNode;
   subNav: SubNavItem[];
   /** 우측 검색창/필터 영역 (optional) */
   search?: ReactNode;
+  /** 상단바 우측 끝 — 통계 요약 (전체/표시/카운트 등). 하단바는 버튼 전용. */
+  stats?: ReactNode;
   children: ReactNode;
   bottomBar?: ReactNode;
 }) {
@@ -58,6 +60,7 @@ export function MasterPageShell({
             <span>{title}</span>
           </div>
           {search}
+          {stats && <div className="topbar-stats">{stats}</div>}
         </header>
         <SubNav items={subNav} />
         <div className="dashboard" style={{ gridTemplateColumns: '1fr' }}>

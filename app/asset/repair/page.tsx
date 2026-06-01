@@ -73,16 +73,17 @@ export default function RepairPage() {
           </div>
         </>
       }
+      stats={
+        <>
+          <span>정비<strong>{rows.length}</strong>건</span>
+          <span className="sep" />
+          <span>총 비용<strong className="mono">₩{totalCost.toLocaleString()}</strong></span>
+        </>
+      }
       bottomBar={
         <BottomBar
-          left={null}
-          right={
-            <>
-              <span>정비 <strong>{rows.length}</strong>건</span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>총 비용 <strong className="mono">₩{totalCost.toLocaleString()}</strong></span>
-            </>
-          }
+          left={<button className="btn btn-primary" type="button">+ 정비 등록</button>}
+          right={<button className="btn" type="button">엑셀</button>}
         />
       }
     >

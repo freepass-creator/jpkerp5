@@ -41,16 +41,17 @@ export default function AssetInsurancePage() {
       title="보험 이력"
       icon={<ShieldCheck size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       subNav={ASSET_SUB}
+      stats={
+        <>
+          <span>보험 이력<strong>{insuranceEvents.length}</strong></span>
+          <span className="sep" />
+          <span>만기 추적<strong>{expiringContracts.length}</strong></span>
+        </>
+      }
       bottomBar={
         <BottomBar
-          left={null}
-          right={
-            <>
-              <span>보험 이력 <strong>{insuranceEvents.length}</strong>건</span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>만기 추적 <strong>{expiringContracts.length}</strong>대</span>
-            </>
-          }
+          left={<button className="btn btn-primary" type="button">+ 보험 등록</button>}
+          right={<button className="btn" type="button">엑셀</button>}
         />
       }
     >

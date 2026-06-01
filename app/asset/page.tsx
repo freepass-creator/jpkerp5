@@ -168,6 +168,24 @@ export default function AssetPage() {
               ))}
             </select>
           </div>
+          {/* 통계 — 하단바에서 이전 (자산/계약/재무 공통 규격) */}
+          <div className="topbar-stats">
+            <span>전체<strong>{vehicles.length}</strong></span>
+            <span>표시<strong>{filtered.length}</strong></span>
+            <span className="sep" />
+            <span>등록예정<strong>{counts.등록예정}</strong></span>
+            <span>대기<strong>{counts.대기}</strong></span>
+            <span style={{ color: 'var(--brand)' }}>운행중<strong>{counts.운행중}</strong></span>
+            <span>정비<strong>{counts.정비}</strong></span>
+            <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토<strong>{counts.매각검토}</strong></span>
+            <span>매각<strong>{counts.매각}</strong></span>
+            {selected && (
+              <>
+                <span className="sep" />
+                <span>선택<strong className="mono">{selected.plate || selected.assetCode || '-'}</strong></span>
+              </>
+            )}
+          </div>
         </header>
 
         <SubNav items={ASSET_SUB} />
@@ -238,29 +256,11 @@ export default function AssetPage() {
           </div>
         </div>
 
+        {/* 하단바 — 버튼 전용 (통계는 상단바로 이동) */}
         <BottomBar
           left={
             <>
-              <span>전체 <strong>{vehicles.length}</strong></span>
-              <span>표시 <strong>{filtered.length}</strong></span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>등록예정 <strong>{counts.등록예정}</strong></span>
-              <span>대기 <strong>{counts.대기}</strong></span>
-              <span style={{ color: 'var(--brand)' }}>운행중 <strong>{counts.운행중}</strong></span>
-              <span>정비 <strong>{counts.정비}</strong></span>
-              <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토 <strong>{counts.매각검토}</strong></span>
-              <span>매각 <strong>{counts.매각}</strong></span>
-              {selected && (
-                <>
-                  <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                  <span>선택 <strong className="mono">{selected.plate || selected.assetCode || '-'}</strong></span>
-                </>
-              )}
-            </>
-          }
-          right={
-            <>
-              <Link className="btn" href="/asset/purchase" title="신차 구매부터 인도까지 흐름 진행 — 차량구매 페이지로">
+              <Link className="btn btn-primary" href="/asset/purchase" title="신차 구매부터 인도까지 흐름 — 차량구매 페이지로">
                 <ShoppingCart size={14} weight="bold" /> 차량구매
               </Link>
               <button className="btn" type="button">
@@ -269,6 +269,10 @@ export default function AssetPage() {
               <button className="btn" type="button" disabled={!selected} title={!selected ? '행 클릭으로 선택' : '계약 템플릿 다운로드'}>
                 <Download size={14} weight="bold" /> 계약 템플릿
               </button>
+            </>
+          }
+          right={
+            <>
               <button className="btn" type="button" disabled={!selected} onClick={() => selected && setOpenId(selected.id)}>
                 <PencilSimple size={14} weight="bold" /> 수정
               </button>

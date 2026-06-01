@@ -113,6 +113,13 @@ export default function FinancePage() {
               <option value="withdraw">출금만</option>
             </select>
           </div>
+          <div className="topbar-stats">
+            <span>전체<strong>{bankTx.length}</strong></span>
+            <span>표시<strong>{filtered.length}</strong></span>
+            <span className="sep" />
+            <span style={{ color: 'var(--green-text)' }}>입금<strong className="mono">₩{formatCurrency(totals.inSum)}</strong></span>
+            <span style={{ color: 'var(--red-text)' }}>출금<strong className="mono">₩{formatCurrency(totals.outSum)}</strong></span>
+          </div>
         </header>
 
         <SubNav items={FINANCE_SUB} />
@@ -175,17 +182,8 @@ export default function FinancePage() {
         </div>
 
         <BottomBar
-          left={<Link href="/" className="btn"><ArrowLeft size={12} /> 운영 현황</Link>}
-          right={
-            <>
-              <span>전체 <strong>{bankTx.length}</strong></span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>표시 <strong>{filtered.length}</strong></span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span style={{ color: 'var(--green-text)' }}>입금 <strong className="mono">₩{formatCurrency(totals.inSum)}</strong></span>
-              <span style={{ color: 'var(--red-text)' }}>출금 <strong className="mono">₩{formatCurrency(totals.outSum)}</strong></span>
-            </>
-          }
+          left={<button className="btn btn-primary" type="button">+ 거래 등록</button>}
+          right={<button className="btn" type="button">엑셀</button>}
         />
       </div>
     </div>
