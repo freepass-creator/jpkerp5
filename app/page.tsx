@@ -94,7 +94,7 @@ type SortDir = 'asc' | 'desc';
 
 const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약중', '휴차', '반납'];
 const CS_ORDER: ContractState[] = ['위반', '미수검', '연장대기', '종료대기', '만기경과', '만기임박', '정상'];
-const PS_ORDER: PaymentState[] = ['미납', '정상'];
+const PS_ORDER: PaymentState[] = ['미납', '정상', '휴차', '종결'];
 
 function compareForCol(a: Contract, b: Contract, col: SortCol): number {
   switch (col) {
@@ -274,10 +274,18 @@ function getContractState(c: Contract): { name: ContractState; days: number } {
   return { name: '정상', days: daysSince(c.contractDate, todayKr()) };
 }
 
-/** 수납상태 (2종) — 결제 건전성 */
-type PaymentState = '정상' | '미납';
+/** 수납상태 (3종) — 결제 건전성. 휴차/매각 차량은 결제 멈춤 상태 */
+type PaymentState = '정상' | '미납' | '휴차' | '종결';
 function getPaymentState(c: Contract): { name: PaymentState; days: number } {
   const today = todayKr();
+  // 휴차/매각검토 — 결제 멈춤
+  if (c.vehicleStatus === '휴차' || c.vehicleStatus === '휴차대기' || c.vehicleStatus === '매각검토') {
+    return { name: '휴차', days: c.idleSince ? daysSince(c.idleSince, today) : 0 };
+  }
+  // 매각/반납/해지 — 종결
+  if (c.vehicleStatus === '매각' || c.vehicleStatus === '매각대기' || c.status === '반납' || c.status === '해지') {
+    return { name: '종결', days: 0 };
+  }
   if (c.unpaidAmount <= 0) {
     return { name: '정상', days: daysSince(c.lastPaidDate ?? c.contractDate, today) };
   }
@@ -743,9 +751,15 @@ export default function Page() {
                         <td className="center">
                           <span className={`status ${cs.name}`}>{cs.name}</span>
                         </td>
-                        {/* 계약시작 */}
+                        {/* 계약시작 — 휴차/매각검토 차량은 휴차 시작일을 표시 */}
                         <td className="center mono dim">
-                          {shortDate(c.deliveredDate ?? c.contractDate) || <span className="muted">-</span>}
+                          {(c.vehicleStatus === '휴차' || c.vehicleStatus === '휴차대기' || c.vehicleStatus === '매각검토') && c.idleSince ? (
+                            <span title={`휴차 시작 (원 계약일: ${shortDate(c.contractDate)})`}>
+                              {shortDate(c.idleSince)} <span style={{ fontSize: 10, color: 'var(--orange-text, #c2410c)' }}>휴</span>
+                            </span>
+                          ) : (
+                            shortDate(c.deliveredDate ?? c.contractDate) || <span className="muted">-</span>
+                          )}
                         </td>
                         {/* 계약종료 */}
                         <td className="center mono dim">

@@ -88,6 +88,8 @@ export type Contract = {
   idleSince?: string;       // 휴차 시작일
   idleUntil?: string;       // 휴차 종료 예정일 (정비 완료 예상 등)
   idleReason?: string;      // 사유 (사고/정비/대기 등)
+  idleLocation?: string;    // 현재 위치 — 휴차 차량 보관 장소 (예: 본사 차고지, 분당 주차장 B-12)
+  idleContact?: string;     // 위치 담당자 연락처 (보관소 관리자 등)
   // 임시배차 — vehicleStatus === '임시배차' 일 때
   tempReplacementPlate?: string;  // 실제로 나간 대체 차량번호 (예: K5 계약인데 K8 임시 출고)
   tempReplacementModel?: string;  // 대체 차종
