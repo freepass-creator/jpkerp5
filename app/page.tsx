@@ -89,7 +89,7 @@ function matchesCompany(c: Contract, co: string): boolean {
 }
 
 /** 컬럼 정렬 키 — 수동 정렬 시 클릭한 컬럼명 */
-type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '시작일' | '종료일' | '회차' | '반납까지' | '수납상태' | '미수금' | '담당';
+type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '시작일' | '종료일' | '결제일' | '회차' | '반납까지' | '수납상태' | '미수금' | '담당';
 type SortDir = 'asc' | 'desc';
 
 const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약중', '휴차', '반납'];
@@ -112,6 +112,7 @@ function compareForCol(a: Contract, b: Contract, col: SortCol): number {
       const bD = resolveEndDate(b) ?? '9999-12-31';
       return aD.localeCompare(bD);
     }
+    case '결제일': return (a.paymentDay ?? 0) - (b.paymentDay ?? 0);
     case '회차': return (a.currentSeq ?? 0) - (b.currentSeq ?? 0);
     case '반납까지': {
       const aD = getExpiryDate(a) ?? '9999-12-31';
@@ -134,24 +135,17 @@ function compareForCol(a: Contract, b: Contract, col: SortCol): number {
 
 /** 퀵필터별 기본 정렬 — 가장 시급한/관련성 높은 행이 위로 */
 function sortComparator(view: View): (a: Contract, b: Contract) => number {
+  // 미수: 연체 일수 많은 순 (오래된 미수 먼저)
   if (view === '미수') {
-    // 연체 일수 많은 순 (오래된 미수 먼저)
-    return (a, b) => {
-      const da = getPaymentState(a).days;
-      const db = getPaymentState(b).days;
-      return db - da;
-    };
+    return (a, b) => getPaymentState(b).days - getPaymentState(a).days;
   }
+  // 휴차: 휴차 일수 많은 순 (오래된 휴차 먼저)
   if (view === '휴차') {
-    // 휴차 일수 많은 순
-    return (a, b) => {
-      const da = getVehicleState(a).days;
-      const db = getVehicleState(b).days;
-      return db - da;
-    };
+    return (a, b) => getVehicleState(b).days - getVehicleState(a).days;
   }
-  if (view === '계약중') {
-    // 반납 가까운 순 (D-day 작은 순)
+  // 만기경과: 가장 오래 경과된 순 (returnScheduledDate 오래된 것 먼저, asc)
+  // 만기임박/계약중/연장대기/종료대기: 반납 임박 순 (D-day 작은 순)
+  if (view === '계약중' || view === '만기임박' || view === '만기경과' || view === '연장대기' || view === '종료대기') {
     return (a, b) => {
       const aD = getExpiryDate(a) || '9999-12-31';
       const bD = getExpiryDate(b) || '9999-12-31';
@@ -167,6 +161,10 @@ function sortLabel(view: View): string {
     case '미수': return '연체 오래된 순';
     case '휴차': return '휴차 오래된 순';
     case '계약중': return '반납 임박 순';
+    case '만기임박': return '만기 임박 순';
+    case '만기경과': return '만기 오래된 순';
+    case '연장대기': return '만기 임박 순';
+    case '종료대기': return '종료 임박 순';
     default: return '최근 등록 순';
   }
 }
@@ -716,6 +714,7 @@ export default function Page() {
                   <SortableTh col="계약상태" align="center" width={80} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="시작일" align="center" width={88} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="종료일" align="center" width={88} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="결제일" align="center" width={64} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="회차" align="center" width={64} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="반납까지" align="center" width={76} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="수납상태" align="center" width={86} sort={manualSort} onSort={toggleSort} />
@@ -804,6 +803,10 @@ export default function Page() {
                             }
                             return shortDate(getExpiryDate(c) ?? undefined) || <span className="muted">-</span>;
                           })()}
+                        </td>
+                        {/* 결제일 (매월 N일) */}
+                        <td className="center mono dim">
+                          {c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>}
                         </td>
                         {/* 회차 */}
                         <td className="center mono dim">
