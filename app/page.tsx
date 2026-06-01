@@ -89,7 +89,7 @@ function matchesCompany(c: Contract, co: string): boolean {
 }
 
 /** 컬럼 정렬 키 — 수동 정렬 시 클릭한 컬럼명 */
-type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '시작일' | '종료일' | '결제일' | '회차' | '반납까지' | '수납상태' | '미수금' | '담당';
+type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '시작일' | '종료일' | '결제일' | '회차' | '반납까지' | '수납상태' | '미수금';
 type SortDir = 'asc' | 'desc';
 
 const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약중', '휴차', '반납'];
@@ -128,7 +128,6 @@ function compareForCol(a: Contract, b: Contract, col: SortCol): number {
       return pb.days - pa.days; // 같은 상태면 일수 큰 순
     }
     case '미수금': return a.unpaidAmount - b.unpaidAmount;
-    case '담당': return (a.manager ?? '').localeCompare(b.manager ?? '');
     default: return 0;
   }
 }
@@ -152,8 +151,64 @@ function sortComparator(view: View): (a: Contract, b: Contract) => number {
       return aD.localeCompare(bD);
     };
   }
-  // 전체: 최근 계약 등록 순 (desc)
-  return (a, b) => b.contractDate.localeCompare(a.contractDate);
+  // 전체: 차량 라이프사이클 순서 (새 차 → 운행 → 휴차 → 매각)
+  //   1. 입고 라이프사이클 (구매대기 → 등록대기 → 상품화)
+  //   2. 운행 (만기 임박순 — 경과 → D-30 → 일반)
+  //   3. 정비/사고 (일시 중단, 운영 흐름 안)
+  //   4. 휴차 (반납 후 대기 — 오래된 순)
+  //   5. 매각 라이프사이클 (검토 → 대기 → 완료)
+  //   6. 반납/해지 (계약 종결)
+  return (a, b) => {
+    const priority = (c: Contract): number => {
+      const s = c.vehicleStatus;
+      // 입고 라이프사이클
+      if (s === '구매대기') return 11;
+      if (s === '등록대기') return 12;
+      if (s === '상품화대기' || s === '상품화중') return 13;
+      if (s === '상품대기') return 14;
+      // 운행 — D-day 따라
+      if (s === '운행' || s === '연장대기' || s === '종료대기') {
+        const exp = getExpiryDate(c);
+        if (exp) {
+          const dLeft = Math.round((new Date(exp).getTime() - new Date(todayKr()).getTime()) / 86400000);
+          if (dLeft < 0) return 21;    // 만기 경과 (운행 중)
+          if (dLeft <= 30) return 22;  // D-30 이내
+          if (dLeft <= 90) return 23;  // D-90 이내 (만기임박 카테고리)
+          return 24;                    // 일반 운행
+        }
+        return 24;
+      }
+      // 일시 중단
+      if (s === '정비' || s === '사고') return 31;
+      // 휴차 — 반납 후 대기
+      if (s === '휴차대기') return 41;
+      if (s === '휴차') return 42;
+      // 매각 라이프사이클
+      if (s === '매각검토') return 51;
+      if (s === '매각대기') return 52;
+      if (s === '매각') return 53;
+      // 종결
+      if (c.status === '반납') return 91;
+      if (c.status === '해지') return 92;
+      return 99;
+    };
+    const pa = priority(a);
+    const pb = priority(b);
+    if (pa !== pb) return pa - pb;
+    // 같은 그룹 내 세부 정렬:
+    // 운행 그룹 — 만기일 가까운 순
+    if (pa >= 21 && pa <= 24) {
+      const aD = getExpiryDate(a) || '9999-12-31';
+      const bD = getExpiryDate(b) || '9999-12-31';
+      return aD.localeCompare(bD);
+    }
+    // 휴차 그룹 — idleSince 오래된 순 (asc)
+    if (pa === 41 || pa === 42) return (a.idleSince ?? '').localeCompare(b.idleSince ?? '');
+    // 매각 그룹 — 최근 변경 순 (idleSince/returnedDate 등)
+    if (pa >= 51 && pa <= 53) return (b.returnedDate ?? b.idleSince ?? '').localeCompare(a.returnedDate ?? a.idleSince ?? '');
+    // 그 외 (입고/종결) — 최근 계약 순
+    return b.contractDate.localeCompare(a.contractDate);
+  };
 }
 
 function sortLabel(view: View): string {
@@ -165,7 +220,7 @@ function sortLabel(view: View): string {
     case '만기경과': return '만기 오래된 순';
     case '연장대기': return '만기 임박 순';
     case '종료대기': return '종료 임박 순';
-    default: return '최근 등록 순';
+    default: return '라이프사이클 순';
   }
 }
 
@@ -719,7 +774,6 @@ export default function Page() {
                   <SortableTh col="반납까지" align="center" width={76} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="수납상태" align="center" width={86} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="미수금" align="num" width={110} sort={manualSort} onSort={toggleSort} />
-                  <SortableTh col="담당" width={64} sort={manualSort} onSort={toggleSort} />
                   <th style={{ width: 240 }}>비고</th>
                 </tr>
               </thead>
@@ -804,20 +858,44 @@ export default function Page() {
                             return shortDate(getExpiryDate(c) ?? undefined) || <span className="muted">-</span>;
                           })()}
                         </td>
-                        {/* 결제일 (매월 N일) */}
+                        {/* 결제일 — 운행 중인 계약만 의미 있음. 휴차/상품화/매각/반납/해지는 비표시 */}
                         <td className="center mono dim">
-                          {c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>}
+                          {(() => {
+                            const s = c.vehicleStatus;
+                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
+                              || s === '매각' || s === '매각대기'
+                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
+                              || s === '구매대기' || s === '등록대기'
+                              || c.status === '반납' || c.status === '해지';
+                            if (inactive) return <span className="muted">-</span>;
+                            return c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>;
+                          })()}
                         </td>
-                        {/* 회차 */}
+                        {/* 회차 — 운행 계약만 의미 있음 */}
                         <td className="center mono dim">
-                          {c.currentSeq && c.totalSeq ? `${c.currentSeq}/${c.totalSeq}` : <span className="muted">-</span>}
+                          {(() => {
+                            const s = c.vehicleStatus;
+                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
+                              || s === '매각' || s === '매각대기'
+                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
+                              || s === '구매대기' || s === '등록대기'
+                              || c.status === '반납' || c.status === '해지';
+                            if (inactive) return <span className="muted">-</span>;
+                            return c.currentSeq && c.totalSeq ? `${c.currentSeq}/${c.totalSeq}` : <span className="muted">-</span>;
+                          })()}
                         </td>
+                        {/* 반납까지 — 휴차/매각 차량은 비표시 */}
                         <td className={`center mono ${isReturnOverdue ? 'danger' : 'dim'}`}>
-                          {!expiryDate
-                            ? <span className="muted">-</span>
-                            : (c.contractDate && expiryDate < c.contractDate)
-                            ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }} title={`종료(${expiryDate}) < 시작(${c.contractDate})`}>날짜오류</span>
-                            : formatRemainingHuman(todayKr(), expiryDate)}
+                          {(() => {
+                            const s = c.vehicleStatus;
+                            const skip = s === '휴차' || s === '휴차대기' || s === '매각검토' || s === '매각' || s === '매각대기' || c.status === '반납' || c.status === '해지';
+                            if (skip) return <span className="muted">-</span>;
+                            if (!expiryDate) return <span className="muted">-</span>;
+                            if (c.contractDate && expiryDate < c.contractDate) {
+                              return <span style={{ color: 'var(--red-text)', fontWeight: 600 }} title={`종료(${expiryDate}) < 시작(${c.contractDate})`}>날짜오류</span>;
+                            }
+                            return formatRemainingHuman(todayKr(), expiryDate);
+                          })()}
                         </td>
                         {/* 수납상태 + 미수금 */}
                         <td className="center">
@@ -831,8 +909,6 @@ export default function Page() {
                         <td className={`num mono ${c.unpaidAmount > 0 ? 'danger' : ''}`}>
                           {c.unpaidAmount > 0 ? formatCurrency(c.unpaidAmount) : <span className="muted">없음</span>}
                         </td>
-                        {/* 관리 */}
-                        <td className="dim">{c.manager || '-'}</td>
                         <td className="dim" style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.notes || ''}>
                           {c.notes || <span className="muted">-</span>}
                         </td>
