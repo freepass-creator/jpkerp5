@@ -331,7 +331,7 @@ export default function Page() {
 
   // Firebase RTDB 실시간 구독 — /jpkerp5/contracts
   const { contracts: rawContracts, loading: contractsLoading, update: rtdbUpdate, updateMany: rtdbUpdateMany, remove: rtdbRemove } = useContracts();
-  const { vehicles } = useVehicles();
+  const { vehicles, update: updateVehicleMaster } = useVehicles();
 
   /**
    * 운영현황 통합 view — 계약 + 휴차차량(계약 없는 차량 = 휴차중).
@@ -384,7 +384,15 @@ export default function Page() {
 
   const updateContract = useCallback((updated: Contract) => {
     void rtdbUpdate(updated);
-  }, [rtdbUpdate]);
+    // 차량 마스터의 status 도 동기화 — Contract.vehicleStatus ↔ Vehicle.status 일치
+    // (자산관리/운영현황/리스크 어디서 보든 같은 상태로 표시되게)
+    if (updated.vehiclePlate && updated.vehicleStatus) {
+      const v = vehicles.find((x) => (x.plate ?? '').trim() === updated.vehiclePlate.trim());
+      if (v && v.status !== updated.vehicleStatus) {
+        void updateVehicleMaster({ ...v, status: updated.vehicleStatus });
+      }
+    }
+  }, [rtdbUpdate, vehicles, updateVehicleMaster]);
 
   // 우클릭 컨텍스트 메뉴 액션 — 빠른 인도/반납/연락/SMS/삭제
   function ctxAction_openDetail(c: Contract) {
