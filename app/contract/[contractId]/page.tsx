@@ -408,7 +408,7 @@ export default function ContractDocPage() {
         <h3>
           대여 조건
           {termMonths > 0 && (
-            <span style={{ marginLeft: 8, padding: '1px 6px', background: isLongTerm ? '#dbeafe' : '#fef9c3', color: isLongTerm ? '#1e40af' : '#854d0e', borderRadius: 3, fontSize: 9, fontWeight: 600, letterSpacing: 0 }}>
+            <span style={{ marginLeft: 8, padding: '1px 6px', background: isLongTerm ? '#dbeafe' : '#fef9c3', color: isLongTerm ? '#1e40af' : '#854d0e', border: `1px solid ${isLongTerm ? 'rgba(30,64,175,0.25)' : 'rgba(133,77,14,0.25)'}`, borderRadius: 0, fontSize: 9, fontWeight: 600, letterSpacing: 0 }}>
               {isLongTerm ? '장기' : '단기'}
             </span>
           )}

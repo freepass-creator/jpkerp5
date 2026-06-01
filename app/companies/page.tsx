@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Buildings, Plus, CheckCircle, Camera, Trash, CircleNotch, Bank, Pencil, X, Warning, CreditCard,
   MapPin, FileText, Garage, Car, ArrowLeft, FloppyDisk,
@@ -397,6 +397,8 @@ function InfoView({ company }: { company: Company }) {
           <div>
             <ViewField label="업태" value={company.bizType} />
             <ViewField label="종목" value={company.bizItem} />
+            <ViewField label="대표번호" value={company.mainPhone} mono />
+            <ViewField label="고객센터" value={company.customerServicePhone} mono />
             <ViewField label="주소" value={company.address} />
             <ViewField label="등록일" value={company.createdAt?.slice(0, 10)} mono />
           </div>
@@ -698,9 +700,20 @@ function InfoEditor({ draft, onChange }: { draft: Company; onChange: (c: Company
             <input className="input" value={draft.bizType ?? ''} onChange={(e) => onChange({ ...draft, bizType: e.target.value })} />
             <label className="form-label">종목</label>
             <input className="input" value={draft.bizItem ?? ''} onChange={(e) => onChange({ ...draft, bizItem: e.target.value })} />
+            <label className="form-label">대표번호</label>
+            <input className="input mono" value={draft.mainPhone ?? ''} onChange={(e) => onChange({ ...draft, mainPhone: e.target.value })} placeholder="02-0000-0000 (손님 노출)" />
+            <label className="form-label">고객센터</label>
+            <input className="input mono" value={draft.customerServicePhone ?? ''} onChange={(e) => onChange({ ...draft, customerServicePhone: e.target.value })} placeholder="1588-0000 (손님 노출, 선택)" />
             <label className="form-label">주소</label>
             <input className="input" value={draft.address ?? ''} onChange={(e) => onChange({ ...draft, address: e.target.value })} style={{ gridColumn: 'span 3' }} />
           </div>
+        </div>
+      </section>
+
+      <section className="detail-section" style={{ marginTop: 14 }}>
+        <div className="detail-section-header">법인 도장 (인영)</div>
+        <div className="detail-section-body">
+          <StampUploader draft={draft} onChange={onChange} />
         </div>
       </section>
     </>
@@ -730,9 +743,10 @@ function FinanceEditor({ draft, onChange }: { draft: Company; onChange: (c: Comp
           {accounts.length === 0 ? <Empty msg="등록된 계좌가 없습니다." /> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {accounts.map((a, idx) => (
-                <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 110px 32px', gap: 8, alignItems: 'center' }}>
+                <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '90px 1fr 130px 100px 100px 32px', gap: 8, alignItems: 'center' }}>
                   <input className="input" placeholder="은행" value={a.bankName} onChange={(e) => { const next = [...accounts]; next[idx] = { ...a, bankName: e.target.value }; setAccounts(next); }} />
                   <input className="input mono" placeholder="계좌번호" value={a.accountNo} onChange={(e) => { const next = [...accounts]; next[idx] = { ...a, accountNo: e.target.value }; setAccounts(next); }} />
+                  <input className="input" placeholder="별명 (예: 본계좌)" value={a.nickname ?? ''} onChange={(e) => { const next = [...accounts]; next[idx] = { ...a, nickname: e.target.value }; setAccounts(next); }} />
                   <input className="input" placeholder="예금주" value={a.accountHolder} onChange={(e) => { const next = [...accounts]; next[idx] = { ...a, accountHolder: e.target.value }; setAccounts(next); }} />
                   <input className="input" placeholder="용도" value={a.purpose ?? ''} onChange={(e) => { const next = [...accounts]; next[idx] = { ...a, purpose: e.target.value }; setAccounts(next); }} />
                   <button className="btn btn-sm btn-danger btn-icon" type="button" onClick={() => setAccounts(accounts.filter((_, i) => i !== idx))}>
@@ -897,5 +911,145 @@ function ViewField({ label, value, mono }: { label: string; value?: string; mono
 function Empty({ msg }: { msg: string }) {
   return (
     <div style={{ padding: '20px 12px', fontSize: 12, color: 'var(--text-weak)', textAlign: 'center' }}>{msg}</div>
+  );
+}
+
+/**
+ * 법인 도장 업로드 — A4 스캔 PNG → 흰배경 자동 누끼 → Storage 저장.
+ * 누끼는 client-side canvas 로 즉시 처리, 결과는 Storage 에 PNG 로 업로드.
+ */
+function StampUploader({ draft, onChange }: { draft: Company; onChange: (c: Company) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [threshold, setThreshold] = useState(235);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function handleFile(file: File, useThreshold = threshold) {
+    setBusy(true); setErr(null);
+    try {
+      const { removeWhiteBackground } = await import('@/lib/seal-bg-remove');
+      const { uploadDocument, deleteDocumentByUrl } = await import('@/lib/firebase/storage');
+      const result = await removeWhiteBackground(file, { threshold: useThreshold });
+      // 미리보기
+      setPreviewUrl(result.dataUrl);
+      // Storage 업로드 — 누끼된 blob 으로 새 File 생성
+      const cleanFile = new File([result.blob], `stamp-${Date.now()}.png`, { type: 'image/png' });
+      const up = await uploadDocument({ kind: 'registration', ownerKey: `stamps/${draft.id || 'new'}`, file: cleanFile });
+      // 기존 도장 삭제
+      if (draft.stampUrl) void deleteDocumentByUrl(draft.stampUrl);
+      onChange({
+        ...draft,
+        stampUrl: up.url,
+        stampFileName: file.name,
+        stampUploadedAt: up.uploadedAt,
+      });
+    } catch (e) {
+      setErr((e as Error).message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemove() {
+    if (!draft.stampUrl) return;
+    if (!confirm('도장을 삭제하시겠습니까?')) return;
+    const { deleteDocumentByUrl } = await import('@/lib/firebase/storage');
+    void deleteDocumentByUrl(draft.stampUrl);
+    onChange({ ...draft, stampUrl: undefined, stampFileName: undefined, stampUploadedAt: undefined });
+    setPreviewUrl(null);
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      {/* 미리보기 박스 — 체크무늬 배경(투명 인식용) */}
+      <div style={{
+        width: 140, height: 140,
+        border: '1px solid var(--border)',
+        background: previewUrl || draft.stampUrl
+          ? `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='8' height='8' fill='%23f1f5f9'/><rect x='8' y='8' width='8' height='8' fill='%23f1f5f9'/></svg>")`
+          : 'var(--bg-sunken)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative',
+      }}>
+        {(previewUrl || draft.stampUrl) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewUrl ?? draft.stampUrl}
+            alt="도장"
+            style={{ maxWidth: '85%', maxHeight: '85%', objectFit: 'contain' }}
+          />
+        ) : (
+          <span style={{ fontSize: 11, color: 'var(--text-weak)' }}>도장 미등록</span>
+        )}
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-sub)', lineHeight: 1.6 }}>
+          A4 종이에 도장을 찍어 <strong>흰 배경 PNG/JPG로 스캔</strong>한 파일을 올리면<br />
+          흰 배경이 자동으로 투명 처리되어 내용증명·계약서 발신인란에 합성됩니다.
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleFile(f);
+            e.target.value = '';
+          }}
+        />
+
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={busy}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {busy ? '처리 중...' : (draft.stampUrl ? '교체' : '도장 PNG 선택')}
+          </button>
+          {draft.stampUrl && (
+            <button type="button" className="btn btn-sm btn-danger" onClick={handleRemove}>삭제</button>
+          )}
+        </div>
+
+        {/* threshold 조정 — 도장이 잘 안 떠지면 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-weak)' }}>
+          <label>배경 인식 강도</label>
+          <input
+            type="range"
+            min={180}
+            max={250}
+            step={5}
+            value={threshold}
+            onChange={(e) => setThreshold(parseInt(e.target.value))}
+            style={{ flex: 1, maxWidth: 200 }}
+          />
+          <span className="mono">{threshold}</span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={busy || !fileInputRef.current}
+            onClick={() => fileInputRef.current?.click()}
+            title="threshold 조정 후 같은 파일 다시 선택"
+          >재처리</button>
+        </div>
+
+        {draft.stampFileName && (
+          <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>
+            원본: {draft.stampFileName}
+            {draft.stampUploadedAt && ` · ${draft.stampUploadedAt.slice(0, 10)}`}
+          </div>
+        )}
+
+        {err && (
+          <div className="notice notice--error notice--sm">{err}</div>
+        )}
+      </div>
+    </div>
   );
 }

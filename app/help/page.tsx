@@ -90,7 +90,7 @@ export default function HelpPage() {
                       템플릿 다운로드 → 채워서 다시 업로드 흐름</Hint>
               </Step>
               <Step n={4} icon={<CurrencyKrw size={14} />}>
-                <strong>입금 흐름 시작</strong> — 계좌관리 → +신규 → <strong>수납 등록</strong> → 은행 엑셀 그대로 업로드 → 자동매칭
+                <strong>입금 흐름 시작</strong> — 입출금관리 → +신규 → <strong>수납 등록</strong> → 은행 엑셀 그대로 업로드 → 자동매칭
                 <Hint>은행 거래내역을 매일 업로드하면 회차별 입금이 자동 매칭되고 운영현황에 즉시 반영</Hint>
               </Step>
             </Section>
@@ -112,7 +112,7 @@ export default function HelpPage() {
                 우측 그룹 <Chip color="red">종료</Chip><Chip color="red">매각</Chip>.
                 연락기록·내용증명·채권화 전이 모두 여기서
               </Row>
-              <Row icon={<CurrencyKrw size={14} />} title="계좌 관리 (5탭)">
+              <Row icon={<CurrencyKrw size={14} />} title="입출금 관리">
                 <Chip>계좌내역</Chip><Chip>자금일보</Chip><Chip>수납내역</Chip><Chip>지출내역</Chip><Chip>카드매출</Chip> —
                 같은 거래내역을 5가지 시각으로 본다. 자금일보는 일자별 입출금 집계
               </Row>
@@ -201,7 +201,7 @@ export default function HelpPage() {
               </SubSection>
               <SubSection title="지출 등록">
                 <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: 12 }}>
-                  <li>계좌관리 → +신규 → <strong>지출 등록</strong> 탭</li>
+                  <li>입출금관리 → +신규 → <strong>지출 등록</strong> 탭</li>
                   <li>계정과목 선택 (차량유지비·인건비·통신비·세금·임대료·잡비 등)</li>
                   <li>bank_tx의 <span className="mono">withdraw</span> 필드로 push → 자금일보에 자동 노출</li>
                 </ul>
@@ -252,7 +252,7 @@ export default function HelpPage() {
                   <li>현재미수 N원 입력 시 마지막입금일 이후 회차에 역순 분배</li>
                 </ul>
               </SubSection>
-              <SubSection title="은행 엑셀 (계좌관리 → 수납 → 엑셀 일괄)">
+              <SubSection title="은행 엑셀 (입출금관리 → 수납 → 엑셀 일괄)">
                 <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: 12 }}>
                   <li>은행에서 다운받은 엑셀 <strong>그대로</strong> 업로드 (가공 불필요)</li>
                   <li>지원: KB · 우리 · 신한 · 하나 · 농협 · IBK · SC제일 · 카카오 · 토스 · 케이뱅크 · 새마을금고 · 우체국 · 수협 · 부산 · 대구 · 광주 · 전북 · 경남 · 제주 · 씨티</li>
@@ -301,7 +301,7 @@ export default function HelpPage() {
                 다만 다른 직원 권한 변경은 마스터만
               </Row>
               <Row icon={<Users size={14} />} title="일반 직원 (staff)">
-                기본값. 운영현황·리스크관리·계좌관리·과태료·설정(개인) 접근. 관리 메뉴는 자동 숨김
+                기본값. 운영현황·리스크관리·입출금관리·과태료·설정(개인) 접근. 관리 메뉴는 자동 숨김
               </Row>
               <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-weak)' }}>
                 권한 토글: <strong>설정 → 직원관리 → ↑(승급) / ↓(강등) 버튼</strong> — 마스터에게만 보임
@@ -324,7 +324,7 @@ export default function HelpPage() {
               />
               <Workflow
                 q="은행 엑셀 올렸는데 어느 계약 입금인지 모르겠어요"
-                a={<>계좌관리 → <Chip color="blue">자동매칭</Chip> 버튼이 이름·금액 일치하는 회차에 자동 연결.
+                a={<>입출금관리 → <Chip color="blue">자동매칭</Chip> 버튼이 이름·금액 일치하는 회차에 자동 연결.
                      매칭 안 된 거래는 클릭 → 수동으로 계약 검색해서 연결</>}
               />
               <Workflow

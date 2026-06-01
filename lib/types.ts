@@ -94,6 +94,10 @@ export type Contract = {
   tempSince?: string;             // 임시배차 시작일
   // 알림 대기 — 어떤 차량이 휴차/반납 되면 통보 (Phase 2)
   notifyOnAvailable?: string[];   // 차량번호 배열 — 이 차량들이 복귀하면 알림
+  // 계약서 파일 (Firebase Storage)
+  contractDocUrl?: string;        // 계약서 PDF/이미지 다운로드 URL
+  contractDocFileName?: string;   // 원본 파일명
+  contractDocUploadedAt?: string; // ISO timestamp — 업로드 시각
   // 시동제어 (미수 채권 회수용 — 차량 원격 시동 차단 상태)
   engineDisabled?: boolean;
   engineDisabledAt?: string;     // ISO timestamp — 제어 발효 시각
@@ -125,6 +129,37 @@ export type Contract = {
   unpaidSeqCount: number;      // 미납 회차 수
   // 회차 스케줄 — 운영현황 업로드 시 자동 생성 + 미수 분배 (lib/payment-schedule.ts)
   schedules?: PaymentScheduleInline[];
+  // 활성 리스크 이슈 (lib/risk-issues.ts 가 동적 계산 — 저장 X)
+  // 운영현황 → 떨어진 계약은 receivables 페이지에서 자동 감지
+};
+
+/** 리스크 이슈 — 각 이슈는 "발생일" 기준 D+N으로 추적 */
+export type RiskIssueKind =
+  | '미납'        // schedules에 연체/부분납 있음 — 발생일 = 가장 오래된 미납 회차 dueDate
+  | '검사지연'    // inspectionDueDate < today — 발생일 = inspectionDueDate
+  | '보험만료'    // insuranceExpiryDate < today — 발생일 = insuranceExpiryDate
+  | '등록증만료'  // (Vehicle 측 데이터) — 발생일 = registrationExpiry
+  | '과태료'      // hasViolations + violationSince — 발생일 = violationSince
+  | '면허'        // customerLicenseStatus = 정지/취소/만료
+  | '사고'        // 사고 미해결 — 발생일 = 사고 접수일
+  | '시동제어'    // engineDisabled = true — 발생일 = engineDisabledAt
+  | '내용증명'    // 발송 후 미해결 — 발생일 = 발송일 (history_entries)
+  | '채권화';     // status = '채권' — 발생일 = 채권 전이일
+
+export type RiskResolveKind = '정상화' | '회수' | '매각' | '면제' | '기간연장';
+
+export type RiskIssue = {
+  contractId: string;
+  kind: RiskIssueKind;
+  issueDate: string;             // YYYY-MM-DD — 발생한 날짜 ⭐
+  daysOverdue: number;           // today - issueDate (자동 계산)
+  // 부가 정보 (이슈별)
+  amount?: number;               // 금액 (미납·과태료 등)
+  meta?: Record<string, string | number | boolean>;
+  // 종결 (resolvedAt 있으면 종결, 없으면 진행중)
+  resolvedAt?: string;
+  resolvedKind?: RiskResolveKind;
+  resolvedNote?: string;
 };
 
 /** 회차당 개별 납부 entry — 분납·선납 모두 수용 */
@@ -210,20 +245,39 @@ export type BankTransaction = {
   matchedScheduleSeq?: number; // schedule 의 회차 번호 (인라인 schedules 매칭용)
   matchedAt?: string;          // 매칭 처리 시각 (ISO)
   matchedBy?: string;          // 매칭 처리자 (이메일/uid)
+  /** CMS 집금 정산 ID — 1 deposit ↔ N 개별 CMS 거래 묶음. settlementRole='deposit' 가 집금건, 'item' 이 개별 CMS */
+  settlementId?: string;
+  settlementRole?: 'deposit' | 'item';
+  /** 정산 메타 (집금건에만 저장) — 묶음 총액, 수수료 등 */
+  settlementGrossAmount?: number;   // 개별 CMS 합계
+  settlementFeeAmount?: number;     // 수수료 = gross - 실 입금액
+  settlementItemCount?: number;     // 묶음 건수
   raw?: Record<string, unknown>;
 };
 
 /** 카드 입금 트랜잭션 */
 export type CardTransaction = {
   id: string;
+  /** 거래 종류 — '매출' (손님이 우리에게 카드 결제, 수입) / '법인카드' (직원이 법인카드로 지출) */
+  kind?: '매출' | '법인카드';
   txDate: string;
   amount: number;
   approvalNo: string;
   cardLast4?: string;
-  customerName?: string;
-  source?: string;
+  customerName?: string;       // 매출: 결제 고객명 / 법인카드: 가맹점명 가능
+  source?: string;             // 카드사 (KB / 신한 / 현대 / BC 등)
+  companyCode?: string;        // 어느 회사의 거래·카드인지
+  // ─── 법인카드 전용 ───
+  merchant?: string;           // 가맹점명 (어디서 썼는지)
+  category?: string;           // 용도 분류 (식비 / 주유 / 통행료 / 사무용품 / 정비 / 기타)
+  usedBy?: string;             // 사용 직원 (이메일 또는 이름)
+  approver?: string;           // 승인자 (관리자 검토 후)
+  approved?: boolean;          // 결재 완료 여부
+  // ─── 매칭 ───
   matchedContractId?: string;
   matchedScheduleId?: string;
+  /** 카드사 집금 정산 ID — 1 BankTransaction deposit ↔ N CardTransaction 묶음. role='item' 만 카드 측에 표시 */
+  settlementId?: string;
   raw?: Record<string, unknown>;
 };
 
@@ -254,6 +308,20 @@ export type HistoryEntry = {
   status: '완료' | '진행' | '예정';
   vendor?: string;
   mileage?: number;
+  /**
+   * 카테고리별 상세 데이터 — 자유 형식 (스키마는 카테고리별 컨벤션):
+   *  · 상품화: { workKind, workStatus }
+   *  · 정비:   { maintType, workStatus }
+   *  · 사고:   { accType, accRole, faultPct, accidentStatus, insTypes[],
+   *             rentalCar, ourInsurance, otherInsurance, insuranceNo, insuranceContact,
+   *             otherInsuranceNo, otherInsuranceContact,
+   *             otherPlate, otherName, otherPhone, location,
+   *             insuranceAmount, deductibleAmount, deductiblePaid, deductibleStatus }
+   *  · 보험:   { insKind, insuranceCompany, ageAfter }
+   *  · 세차:   { washType }
+   *  · 위반:   { penaltyType, dueDate, location, payer, paidStatus }
+   */
+  meta?: Record<string, unknown>;
   createdAt: string;
   createdBy?: string;
 };
@@ -268,6 +336,7 @@ export type BankAccount = {
   bankName: string;       // KB / 우리 / 신한 / 하나 / 농협 등
   accountNo: string;      // 계좌번호
   accountHolder: string;  // 예금주 (회사명과 다를 수 있음)
+  nickname?: string;      // 계좌 별명 — 입출금 내역에 표시. 없으면 계좌번호 전체 표시
   purpose?: string;       // 대여료수납/보증금/관리비 등
   isDefault?: boolean;
 };
@@ -312,6 +381,12 @@ export type Company = {
   address?: string;
   bizType?: string;              // 업태
   bizItem?: string;              // 종목
+  mainPhone?: string;            // 대표 전화번호 — 손님 페이지 노출
+  customerServicePhone?: string; // 고객센터 전화 (별도 운영 시) — 손님 페이지 노출
+  /** 법인 도장(인영) — 누끼 처리된 PNG. 내용증명·계약서 발신인란에 합성 */
+  stampUrl?: string;
+  stampFileName?: string;
+  stampUploadedAt?: string;
   accounts: BankAccount[];       // 계좌 N개
   cards?: CorporateCard[];       // 법인카드 N개
   locations?: CompanyLocation[]; // 사무실/차고지/주차장 통합
@@ -353,8 +428,25 @@ export type Vehicle = {
   seatingCapacity?: number;    // 승차정원
   garage?: string;             // 사용본거지 (차고지 주소)
   ownerName?: string;          // 소유자명
-  registrationCertUrl?: string;// 등록증 첨부 URL (Firebase Storage 등)
+  registrationCertUrl?: string;       // 등록증 첨부 URL (Firebase Storage)
+  registrationCertFileName?: string;  // 원본 파일명
+  registrationCertUploadedAt?: string;// ISO timestamp
+  insuranceCertUrl?: string;          // 보험가입증명서 첨부 URL (Firebase Storage)
+  insuranceCertFileName?: string;
+  insuranceCertUploadedAt?: string;
 
+  // ─── 자동차등록증 추가 필드 (v4 자산등록현황 컬럼 대응) ───
+  assetCode?: string;          // 자산코드 — 회사 scope (예: CP02VH0001), 자동 발급
+  vehicleType?: string;        // 차종 (경형 승용 / 중형 승용 / 대형 승용 / SUV / 화물 등)
+  vehicleUsage?: string;       // 용도 (자가용 / 영업용 / 관용)
+  vehicleFormat?: string;      // 형식 (예: JA51BA-T6-P)
+  engineFormat?: string;       // 원동기형식 (예: G3LA / G4KR)
+  ownerRegNo?: string;         // 성명/명칭의 생년월일 또는 법인등록번호 (110111-XXXXXXX)
+  specMgmtNo?: string;         // 제원관리번호 (예: A01-1-00062-0)
+  vehicleLength?: number;      // 길이 (mm)
+  vehicleWidth?: number;       // 너비 (mm)
+  vehicleHeight?: number;      // 높이 (mm)
+  totalWeight?: number;        // 총중량 (kg)
   // ─── 매입 정보 ───
   purchasePrice?: number;
   insuranceAge?: number;

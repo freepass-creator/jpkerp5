@@ -761,13 +761,16 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
   const txDate = toDate(get(row,
     '거래일자', '거래일', '거래일시', '거래시각', '거래시간',
     '입금일', '출금일', '일자', '발생일', '발생일자', '처리일',
+    // CMS/자동이체 명세 alias
+    '결제일', '결제일(납부기간)', '납부일', '청구완납일자', '수납일',
     'txDate', 'date',
   ));
 
   // 입출금 — 양수/음수 모두 처리. 일부 은행은 '금액' 단일 컬럼에 +/-로 표기.
-  const deposit = toNum(get(row, '입금액', '입금', '받은금액', '받은액', '입금금액', '예입액', 'deposit', 'credit'));
+  // CMS/자동이체 명세는 '수납금액' = 실제 입금된 금액
+  const deposit = toNum(get(row, '입금액', '입금', '받은금액', '받은액', '입금금액', '예입액', '수납금액', '납입금액', 'deposit', 'credit'));
   const withdraw = toNum(get(row, '출금액', '출금', '지급액', '인출액', '낸돈', '출금금액', 'withdraw', 'debit'));
-  const amountSingle = toNum(get(row, '거래금액', '금액', '거래액', 'amount'));
+  const amountSingle = toNum(get(row, '거래금액', '금액', '거래액', '청구금액', 'amount'));
   if (!txDate) return null;
   const useSingle = deposit <= 0 && withdraw <= 0 && Math.abs(amountSingle) > 0;
   const finalDeposit = useSingle ? (amountSingle > 0 ? amountSingle : 0) : deposit;
@@ -780,6 +783,8 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
     '예금주', '수취인', '받는분', '받는사람',
     '송금인', '보낸이', '보내는분', '의뢰인', '의뢰자',
     '상대계좌', '상대은행',
+    // CMS/자동이체 명세 alias — 회원명, 납부자, 고객명
+    '회원명', '납부자', '납부자명', '고객명', '계약자명',
     'counterparty', 'name',
   ));
 
@@ -797,6 +802,10 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
   const cpFinal = counterparty || memo || summary || (finalWithdraw > 0 ? '(출금)' : '(미상)');
   const method = deriveBankMethod(summary, memo);
 
+  // 계정과목 — 사용자가 시트에 적었으면 그대로, 아니면 입금은 '대여료수입' 기본 (가장 흔한 케이스), 출금은 미지정.
+  const subjectRaw = toStr(get(row, '계정과목', '과목', 'subject'));
+  const defaultSubject = finalDeposit > 0 && finalWithdraw <= 0 ? '대여료수입' : undefined;
+
   return {
     txDate,
     amount: finalDeposit > 0 ? finalDeposit : 0,
@@ -807,6 +816,7 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
     source: toStr(get(row, '은행', '거래은행', '은행명', 'source')) || bankHint || fileName,
     account: toStr(get(row, '계좌번호', '계좌', '나의계좌', '본인계좌', 'account')) || undefined,
     companyCode: toStr(get(row, '회사', '회사코드', 'companyCode')) || undefined,
+    subject: subjectRaw || defaultSubject,
     method,
     raw: row,
   };

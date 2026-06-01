@@ -1,18 +1,32 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { CircleNotch } from '@phosphor-icons/react';
 import { useAuth, login, resetPassword, signup } from '@/lib/use-auth';
 
 /**
  * 인증 게이트 — 3 모드 (로그인 / 계정 만들기 / 비밀번호 재설정).
- * jpkerp-v4 디자인 그대로 포팅.
+ * 손님 페이지(/customer/*)는 로그인 없이 접근 가능.
  */
 type Mode = 'login' | 'signup' | 'reset';
 
+/** 로그인 없이 접근 가능한 경로 */
+const PUBLIC_PATHS = ['/customer'];
+function isPublicPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const pathname = usePathname();
   const [mode, setMode] = useState<Mode>('login');
+
+  // 손님 페이지는 인증 없이 패스
+  if (isPublicPath(pathname)) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (

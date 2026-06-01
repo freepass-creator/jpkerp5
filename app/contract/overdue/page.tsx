@@ -1,0 +1,82 @@
+'use client';
+
+/**
+ * /contract/overdue — 미수금 (계약 마스터 시각).
+ * 기존 /receivables 페이지와 같은 데이터(Contract.unpaidAmount > 0) 를 본다.
+ * /receivables 는 리스크 액션 중심, 여기는 계약 마스터 관점에서 미수액 정렬.
+ */
+
+import { useMemo } from 'react';
+import { Warning } from '@phosphor-icons/react';
+import Link from 'next/link';
+import { MasterPageShell } from '@/components/layout/master-page-shell';
+import { CONTRACT_SUB } from '@/components/layout/sub-nav';
+import { BottomBar } from '@/components/layout/bottom-bar';
+import { useContracts } from '@/lib/firebase/contracts-store';
+
+export default function ContractOverduePage() {
+  const { contracts } = useContracts();
+
+  const overdue = useMemo(() => {
+    return contracts
+      .filter((c) => (c.unpaidAmount ?? 0) > 0 || (c.unpaidSeqCount ?? 0) > 0)
+      .sort((a, b) => (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0));
+  }, [contracts]);
+
+  const total = overdue.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
+
+  return (
+    <MasterPageShell
+      title="미수금 (계약 마스터)"
+      icon={<Warning size={16} weight="fill" style={{ color: 'var(--red-text)' }} />}
+      subNav={CONTRACT_SUB}
+      bottomBar={
+        <BottomBar
+          left={<Link href="/receivables" className="btn">→ 리스크 관리로 (액션 중심)</Link>}
+          right={
+            <>
+              <span>미수 계약 <strong>{overdue.length}</strong>건</span>
+              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+              <span>총 미수 <strong className="mono" style={{ color: 'var(--red-text)' }}>₩{total.toLocaleString()}</strong></span>
+            </>
+          }
+        />
+      }
+    >
+      <table className="table">
+        <thead>
+          <tr>
+            <th style={{ width: 60 }}>회사</th>
+            <th style={{ width: 90 }}>차량번호</th>
+            <th>계약자</th>
+            <th style={{ width: 110 }}>연락처</th>
+            <th className="num" style={{ width: 110 }}>월 대여료</th>
+            <th className="num" style={{ width: 64 }}>미납회차</th>
+            <th className="num" style={{ width: 130 }}>미수금</th>
+            <th style={{ width: 110 }}>최근 결제일</th>
+            <th style={{ width: 60 }}>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {overdue.length === 0 ? (
+            <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>미수금 계약 없음</td></tr>
+          ) : overdue.map((c) => (
+            <tr key={c.id}>
+              <td className="dim">{c.company || '-'}</td>
+              <td className="mono">{c.vehiclePlate}</td>
+              <td>{c.customerName}</td>
+              <td className="mono dim">{c.customerPhone1 || '-'}</td>
+              <td className="num mono">₩{(c.monthlyRent ?? 0).toLocaleString()}</td>
+              <td className="num">{c.unpaidSeqCount ?? 0}</td>
+              <td className="num mono" style={{ color: 'var(--red-text)', fontWeight: 700 }}>
+                ₩{(c.unpaidAmount ?? 0).toLocaleString()}
+              </td>
+              <td className="mono dim">{c.lastPaidDate || '-'}</td>
+              <td><span className={`status ${c.status}`}>{c.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </MasterPageShell>
+  );
+}

@@ -607,28 +607,29 @@ export default function Page() {
               </button>
             );
           })}
-          {/* 회사 필터 — 회사가 1곳 이상이면 표시 (전체 + 회사 1개도 차량대수 보여줌) */}
+          {/* 회사 필터 — dropdown (전 페이지 통일) */}
           {companies.length > 1 && (
             <>
               <span className="filter-divider" />
-              {companies.map((co) => {
-                const cnt = companyCounts[co] ?? 0;
-                // 전체는 그냥 '전체', 나머지는 회사명 (없으면 법인번호 뒤 7자리)
-                const label = co === '전체'
-                  ? '전체 회사'
-                  : displayCompanyName(co, companyMaster) || co;
-                return (
-                  <button
-                    key={co}
-                    className={`chip ${companyFilter === co ? 'active' : ''}`}
-                    onClick={() => setCompanyFilter(co)}
-                    title={co}
-                  >
-                    {label}
-                    {cnt > 0 && <span className="chip-count">{cnt}</span>}
-                  </button>
-                );
-              })}
+              <select
+                className="input-compact"
+                data-w="md"
+                value={companyFilter}
+                onChange={(e) => setCompanyFilter(e.target.value)}
+                title="회사별 필터"
+              >
+                {companies.map((co) => {
+                  const cnt = companyCounts[co] ?? 0;
+                  const label = co === '전체'
+                    ? '회사: 전체'
+                    : displayCompanyName(co, companyMaster) || co;
+                  return (
+                    <option key={co} value={co}>
+                      {label}{cnt > 0 ? ` (${cnt})` : ''}
+                    </option>
+                  );
+                })}
+              </select>
             </>
           )}
         </div>

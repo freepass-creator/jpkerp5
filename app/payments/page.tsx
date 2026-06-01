@@ -14,13 +14,22 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { displayCompanyName } from '@/lib/company-display';
 import { applicableSubjects, ALL_SUBJECTS } from '@/lib/ledger-subjects';
 import { autoMatchAll, applyMatch, reverseMatch, applyFifoPayment, autoMatchCardAll, applyCardMatch } from '@/lib/receipt-match';
+import { findAllSettlements, buildSettlementPatch } from '@/lib/settlement-match';
+import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
 import { ReceiptMatchDialog } from '@/components/receipt-match-dialog';
 import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { audit } from '@/lib/firebase/audit-store';
 import { todayKr } from '@/lib/mock-data';
 import type { BankTransaction, Contract } from '@/lib/types';
 
-type Tab = 'all' | 'receipt' | 'expense' | 'summary' | 'card';
+type Tab = 'all' | 'autodebit' | 'summary' | 'card' | 'corpcard';
+
+/** 자동이체로 분류되는 source 값들 — CMS / 자동이체 / 자동이체-CMS 등 */
+function isAutoDebit(t: BankTransaction): boolean {
+  const s = (t.source ?? '').toUpperCase();
+  const m = (t.method ?? '').toUpperCase();
+  return s.includes('CMS') || s.includes('자동이체') || m.includes('CMS') || m.includes('자동이체');
+}
 
 /** 자금일보 분개 상태 */
 function ledgerStatus(tx: BankTransaction): 'unposted' | 'posted' | 'closed' {
@@ -31,10 +40,39 @@ function ledgerStatus(tx: BankTransaction): 'unposted' | 'posted' | 'closed' {
 
 const STATUS_LABEL = { unposted: '미분개', posted: '분개', closed: '마감' } as const;
 
+/**
+ * 거래의 계좌 표시 라벨 — 별명 우선, 없으면 계좌번호 전체.
+ * BankTransaction.account(계좌번호) 가 회사 마스터의 BankAccount와 매칭되면 별명 노출.
+ * 일치 안 되면 t.account 그대로 (계좌번호 전체).
+ */
+function formatAccountLabel(
+  t: BankTransaction,
+  companyMaster: Parameters<typeof displayCompanyName>[1],
+  contract: Contract | undefined,
+): string {
+  const accountNo = (t.account ?? '').trim();
+  // 회사 추론 — t.companyCode → contract.company → fallback
+  const companyKey = t.companyCode || contract?.company;
+  if (companyKey && companyMaster) {
+    const company = companyMaster.find((co) => co.code === companyKey || co.name === companyKey);
+    if (company?.accounts) {
+      // 계좌번호 정규화(숫자만) 비교
+      const norm = (s: string) => s.replace(/[^0-9]/g, '');
+      const matched = company.accounts.find((a) => norm(a.accountNo) === norm(accountNo) && norm(accountNo).length > 0);
+      if (matched) {
+        return matched.nickname?.trim() || matched.accountNo || accountNo || '-';
+      }
+    }
+  }
+  return accountNo || '-';
+}
+
 export default function PaymentsPage() {
   const [tab, setTab] = useState<Tab>('all');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'unposted' | 'posted' | 'closed'>('all');
+  /** 계좌내역(all) 탭에서의 입출금 방향 퀵필터 — 다른 탭에서는 무시 */
+  const [direction, setDirection] = useState<'all' | 'deposit' | 'withdraw'>('all');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -61,16 +99,16 @@ export default function PaymentsPage() {
     const q = search.trim().toLowerCase();
     return bankTx
       .filter((t) => {
-        // 탭별 분기: 수납내역=입금만 / 지출내역=출금만 / 계좌내역=전체
-        if (tab === 'receipt' && !((t.amount ?? 0) > 0)) return false;
-        if (tab === 'expense' && !((t.withdraw ?? 0) > 0)) return false;
+        // 자동이체 탭 — CMS/자동이체 source 만 통과
+        if (tab === 'autodebit' && !isAutoDebit(t)) return false;
+        // 계좌내역(all) 에서만 입출금 방향 dropdown 적용. summary/card 는 별도 처리.
+        if (tab === 'all') {
+          if (direction === 'deposit' && !((t.amount ?? 0) > 0)) return false;
+          if (direction === 'withdraw' && !((t.withdraw ?? 0) > 0)) return false;
+        }
         const st = ledgerStatus(t);
         if (filter !== 'all' && st !== filter) return false;
-        if (companyFilter !== 'all') {
-          const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
-          const co = t.companyCode || c?.company;
-          if (co !== companyFilter) return false;
-        }
+        if (!matchesCompanyFilter(resolveCompanyKey(t, contractById), companyFilter)) return false;
         if (subjectFilter !== 'all') {
           if ((t.subject ?? '(미지정)') !== subjectFilter) return false;
         }
@@ -82,18 +120,13 @@ export default function PaymentsPage() {
         return true;
       })
       .sort((a, b) => b.txDate.localeCompare(a.txDate));
-  }, [bankTx, search, filter, companyFilter, subjectFilter, contractById, tab]);
+  }, [bankTx, search, filter, companyFilter, subjectFilter, contractById, tab, direction]);
 
   /** 분개 뷰에 노출할 회사 목록 (실 데이터 기반) */
-  const companyOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of bankTx) {
-      const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
-      const co = t.companyCode || c?.company;
-      if (co) set.add(co);
-    }
-    return Array.from(set).sort();
-  }, [bankTx, contractById]);
+  const companyOptions = useMemo(
+    () => buildCompanyOptions(bankTx, (t) => resolveCompanyKey(t, contractById)),
+    [bankTx, contractById],
+  );
 
   /** 분개 뷰에 노출할 계정과목 목록 (실 데이터 기반) */
   const subjectOptions = useMemo(() => {
@@ -242,39 +275,101 @@ export default function PaymentsPage() {
     alert(`${results.length}건 자동 매칭 완료`);
   }
 
+  /** CMS·카드 집금 정산 자동매칭 — 1 입금 ↔ N 묶음 + 수수료 산출 */
+  async function handleSettlementMatchAll() {
+    const matches = findAllSettlements(bankTx, cardTx);
+    if (matches.length === 0) {
+      alert('정산 매칭 가능한 집금 입금이 없습니다.\n(CMS·카드 집금건 + 같은날 미정산 묶음 후보 필요)');
+      return;
+    }
+    const preview = matches.slice(0, 8).map((m) => {
+      const kindLabel = m.kind === 'cms' ? 'CMS집금' : '카드집금';
+      const count = m.bundleBankTxs.length + m.bundleCardTxs.length;
+      const feePct = (m.feeRate * 100).toFixed(2);
+      return `· ${m.depositTx.txDate.slice(0, 10)} ${kindLabel} ₩${m.netAmount.toLocaleString('ko-KR')}\n   ↳ 묶음 ${count}건 (총액 ₩${m.grossAmount.toLocaleString('ko-KR')}, 수수료 ₩${m.feeAmount.toLocaleString('ko-KR')} / ${feePct}%)`;
+    }).join('\n');
+    const more = matches.length > 8 ? `\n... 외 ${matches.length - 8}건` : '';
+    if (!confirm(`정산 매칭 ${matches.length}건 일괄 적용:\n\n${preview}${more}\n\n진행할까요?`)) return;
+
+    // 일괄 patch
+    const bankPatches: Record<string, Partial<BankTransaction>> = {};
+    const cardPatches: Record<string, Partial<import('@/lib/types').CardTransaction>> = {};
+    for (const m of matches) {
+      const settlementId = `stl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const { bankPatches: bp, cardPatches: cp } = buildSettlementPatch(m, settlementId);
+      Object.assign(bankPatches, bp);
+      Object.assign(cardPatches, cp);
+    }
+    if (Object.keys(bankPatches).length > 0) await updateManyBankTx(bankPatches);
+    if (Object.keys(cardPatches).length > 0) await updateManyCardTx(cardPatches);
+    void audit.match('bank_tx', 'batch', `정산 매칭 일괄 ${matches.length}건`, {
+      count: matches.length,
+      totalFee: matches.reduce((s, m) => s + m.feeAmount, 0),
+    });
+    alert(`${matches.length}건 정산 매칭 완료 — 수수료 총 ₩${matches.reduce((s, m) => s + m.feeAmount, 0).toLocaleString('ko-KR')}`);
+  }
+
   /* ─── 집계 뷰 ─── */
   type DailyRow = {
     key: string; companyCode: string; date: string;
     txCount: number; deposit: number; withdraw: number; netChange: number; endBalance: number;
     depoSubjects: string; drawSubjects: string;
   };
+  /**
+   * 자금일보 = 계좌(BankTx) + 자동이체(BankTx with CMS source) + 카드매출(CardTx) 3개 소스 통합.
+   * 회사·일자 기준으로 입금/출금/순증감/계정과목 소계 집계 → 세무사 전달용.
+   * 자동이체는 이미 BankTransaction 으로 들어와 있어 bankTx 안에 포함됨.
+   */
   const daily = useMemo<DailyRow[]>(() => {
     const m = new Map<string, DailyRow & { _depo: Record<string, number>; _draw: Record<string, number> }>();
+
+    function bucket(companyCode: string, day: string) {
+      const k = `${companyCode}|${day}`;
+      let cur = m.get(k);
+      if (!cur) {
+        cur = {
+          key: k, companyCode, date: day,
+          txCount: 0, deposit: 0, withdraw: 0, netChange: 0, endBalance: 0,
+          depoSubjects: '', drawSubjects: '',
+          _depo: {}, _draw: {},
+        };
+        m.set(k, cur);
+      }
+      return cur;
+    }
+
+    // 1) 계좌 + 자동이체 (BankTransaction)
     for (const t of bankTx) {
       const day = t.txDate.slice(0, 10);
       const companyCode = t.companyCode || (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
-      const k = `${companyCode}|${day}`;
-      const cur = m.get(k) ?? {
-        key: k, companyCode, date: day,
-        txCount: 0, deposit: 0, withdraw: 0, netChange: 0, endBalance: 0,
-        depoSubjects: '', drawSubjects: '',
-        _depo: {}, _draw: {},
-      };
+      const cur = bucket(companyCode, day);
       cur.deposit += t.amount ?? 0;
       cur.withdraw += t.withdraw ?? 0;
       cur.netChange = cur.deposit - cur.withdraw;
       cur.endBalance = t.balance ?? cur.endBalance;
-      if (t.subject && (t.amount ?? 0) > 0) cur._depo[t.subject] = (cur._depo[t.subject] ?? 0) + (t.amount ?? 0);
-      if (t.subject && (t.withdraw ?? 0) > 0) cur._draw[t.subject] = (cur._draw[t.subject] ?? 0) + (t.withdraw ?? 0);
+      const subj = t.subject || ((t.amount ?? 0) > 0 ? '대여료수입' : undefined);
+      if (subj && (t.amount ?? 0) > 0) cur._depo[subj] = (cur._depo[subj] ?? 0) + (t.amount ?? 0);
+      if (subj && (t.withdraw ?? 0) > 0) cur._draw[subj] = (cur._draw[subj] ?? 0) + (t.withdraw ?? 0);
       cur.txCount++;
-      m.set(k, cur);
     }
+
+    // 2) 카드 매출 (CardTransaction) — 무조건 입금/카드매출 계정으로 잡힘
+    for (const t of cardTx) {
+      const day = t.txDate.slice(0, 10);
+      const companyCode = (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
+      const cur = bucket(companyCode, day);
+      cur.deposit += t.amount ?? 0;
+      cur.netChange = cur.deposit - cur.withdraw;
+      cur._depo['카드매출'] = (cur._depo['카드매출'] ?? 0) + (t.amount ?? 0);
+      cur.txCount++;
+    }
+
     return Array.from(m.values()).map(({ _depo, _draw, ...rest }) => ({
       ...rest,
       depoSubjects: Object.entries(_depo).map(([s, v]) => `${s} ₩${v.toLocaleString('ko-KR')}`).join(' / '),
       drawSubjects: Object.entries(_draw).map(([s, v]) => `${s} ₩${v.toLocaleString('ko-KR')}`).join(' / '),
     })).sort((a, b) => b.date.localeCompare(a.date) || a.companyCode.localeCompare(b.companyCode));
-  }, [bankTx, contractById]);
+  }, [bankTx, cardTx, contractById]);
 
   const dailyTotals = useMemo(() => {
     let inSum = 0, outSum = 0;
@@ -282,10 +377,11 @@ export default function PaymentsPage() {
     return { inSum, outSum };
   }, [daily]);
 
-  /* ─── 카드 매출 (기존 — 유지) ─── */
+  /* ─── 카드 매출 (kind='매출' 만) ─── */
   const cardRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return cardTx
+      .filter((t) => (t.kind ?? '매출') === '매출')
       .map((t) => ({ ...t, contract: t.matchedContractId ? contractById.get(t.matchedContractId) : undefined }))
       .filter((r) => {
         if (q) {
@@ -297,6 +393,21 @@ export default function PaymentsPage() {
       .sort((a, b) => b.txDate.localeCompare(a.txDate));
   }, [cardTx, search, contractById]);
 
+  /* ─── 법인카드 (kind='법인카드' — 직원 지출) ─── */
+  const corpCardRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return cardTx
+      .filter((t) => t.kind === '법인카드')
+      .filter((t) => {
+        if (q) {
+          const hay = `${t.merchant ?? ''} ${t.category ?? ''} ${t.usedBy ?? ''} ${t.source ?? ''} ${t.cardLast4 ?? ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => b.txDate.localeCompare(a.txDate));
+  }, [cardTx, search]);
+
   return (
     <div className="layout">
       <Sidebar />
@@ -304,7 +415,7 @@ export default function PaymentsPage() {
         <header className="topbar">
           <div className="topbar-title">
             <CurrencyKrw size={16} weight="fill" style={{ color: 'var(--brand)' }} />
-            <span>계좌 관리</span>
+            <span>입출금 관리</span>
           </div>
 
           <div className="topbar-search">
@@ -318,60 +429,80 @@ export default function PaymentsPage() {
           </div>
 
           <div className="filter-bar">
+            {/* 회사 — 검색창 우측 맨 앞 */}
+            {companyOptions.length > 0 && (
+              <select
+                className="input-compact"
+                data-w="md"
+                value={companyFilter}
+                onChange={(e) => setCompanyFilter(e.target.value)}
+                title="회사별 필터"
+              >
+                <option value="all">회사: 전체</option>
+                {companyOptions.map((co) => (
+                  <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
+                ))}
+              </select>
+            )}
+            <span className="filter-divider" />
+            {/* 뷰 — chip 명은 신규등록 dialog tab 과 동일하게 통일 */}
             <button type="button" className={`chip ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>
-              <ListChecks /> 계좌내역
+              <ListChecks /> 입출금
               {bankTx.length > 0 && <span className="chip-count">{bankTx.length}</span>}
             </button>
-            <button type="button" className={`chip ${tab === 'summary' ? 'active' : ''}`} onClick={() => setTab('summary')}>
-              <ChartBar /> 자금일보
-              {daily.length > 0 && <span className="chip-count">{daily.length}</span>}
-            </button>
-            <button type="button" className={`chip ${tab === 'receipt' ? 'active' : ''}`} onClick={() => setTab('receipt')}>
-              수납내역
-              {bankTx.filter((t) => (t.amount ?? 0) > 0).length > 0 && (
-                <span className="chip-count">{bankTx.filter((t) => (t.amount ?? 0) > 0).length}</span>
-              )}
-            </button>
-            <button type="button" className={`chip ${tab === 'expense' ? 'active' : ''}`} onClick={() => setTab('expense')}>
-              지출내역
-              {bankTx.filter((t) => (t.withdraw ?? 0) > 0).length > 0 && (
-                <span className="chip-count">{bankTx.filter((t) => (t.withdraw ?? 0) > 0).length}</span>
+            <button type="button" className={`chip ${tab === 'autodebit' ? 'active' : ''}`} onClick={() => setTab('autodebit')}>
+              자동이체
+              {bankTx.filter(isAutoDebit).length > 0 && (
+                <span className="chip-count">{bankTx.filter(isAutoDebit).length}</span>
               )}
             </button>
             <button type="button" className={`chip ${tab === 'card' ? 'active' : ''}`} onClick={() => setTab('card')}>
-              <CreditCard /> 카드 매출
-              {cardTx.length > 0 && <span className="chip-count">{cardTx.length}</span>}
+              <CreditCard /> 카드매출
+              {cardTx.filter((t) => (t.kind ?? '매출') === '매출').length > 0 && (
+                <span className="chip-count">{cardTx.filter((t) => (t.kind ?? '매출') === '매출').length}</span>
+              )}
             </button>
-            {(tab === 'all' || tab === 'receipt' || tab === 'expense') && (
+            <button type="button" className={`chip ${tab === 'corpcard' ? 'active' : ''}`} onClick={() => setTab('corpcard')}>
+              <CreditCard /> 법인카드
+              {cardTx.filter((t) => t.kind === '법인카드').length > 0 && (
+                <span className="chip-count">{cardTx.filter((t) => t.kind === '법인카드').length}</span>
+              )}
+            </button>
+            {tab === 'all' && (
               <>
                 <span className="filter-divider" />
-                <button type="button" className={`chip ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>전체</button>
-                <button type="button" className={`chip ${filter === 'unposted' ? 'active' : ''}`} onClick={() => setFilter('unposted')}>미분개 {counts.unposted > 0 && <span className="chip-count">{counts.unposted}</span>}</button>
-                <button type="button" className={`chip ${filter === 'posted' ? 'active' : ''}`} onClick={() => setFilter('posted')}>분개 {counts.posted > 0 && <span className="chip-count">{counts.posted}</span>}</button>
-                <button type="button" className={`chip ${filter === 'closed' ? 'active' : ''}`} onClick={() => setFilter('closed')}>마감 {counts.closed > 0 && <span className="chip-count">{counts.closed}</span>}</button>
-                {companyOptions.length > 1 && (
-                  <>
-                    <span className="filter-divider" />
-                    <select
-                      className="input"
-                      value={companyFilter}
-                      onChange={(e) => setCompanyFilter(e.target.value)}
-                      style={{ height: 26, fontSize: 11, padding: '0 6px', minWidth: 90 }}
-                      title="회사별 필터"
-                    >
-                      <option value="all">회사: 전체</option>
-                      {companyOptions.map((co) => (
-                        <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
-                      ))}
-                    </select>
-                  </>
-                )}
+                {/* 입출금 방향 dropdown */}
+                <select
+                  className="input-compact"
+                  data-w="md"
+                  value={direction}
+                  onChange={(e) => setDirection(e.target.value as 'all' | 'deposit' | 'withdraw')}
+                  title="입출금 방향"
+                >
+                  <option value="all">입출금 전체</option>
+                  <option value="deposit">입금만</option>
+                  <option value="withdraw">출금만</option>
+                </select>
+                {/* 분개 상태 dropdown */}
+                <select
+                  className="input-compact"
+                  data-w="md"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value as 'all' | 'unposted' | 'posted' | 'closed')}
+                  title="분개 상태"
+                >
+                  <option value="all">상태: 전체</option>
+                  <option value="unposted">미분개{counts.unposted > 0 ? ` (${counts.unposted})` : ''}</option>
+                  <option value="posted">분개{counts.posted > 0 ? ` (${counts.posted})` : ''}</option>
+                  <option value="closed">마감{counts.closed > 0 ? ` (${counts.closed})` : ''}</option>
+                </select>
+                {/* 계정과목 dropdown */}
                 {subjectOptions.length > 0 && (
                   <select
-                    className="input"
+                    className="input-compact"
+                    data-w="md"
                     value={subjectFilter}
                     onChange={(e) => setSubjectFilter(e.target.value)}
-                    style={{ height: 26, fontSize: 11, padding: '0 6px', minWidth: 110 }}
                     title="계정과목별 필터"
                   >
                     <option value="all">계정: 전체</option>
@@ -382,13 +513,24 @@ export default function PaymentsPage() {
                 )}
               </>
             )}
+            {/* 자금일보 — 맨 오른쪽으로 push */}
+            <button
+              type="button"
+              className={`chip chip-tone-amber ${tab === 'summary' ? 'active' : ''}`}
+              onClick={() => setTab('summary')}
+              style={{ marginLeft: 'auto' }}
+              title="회사·일자별 입출금 집계 — 세무사 전달용"
+            >
+              <ChartBar /> 자금일보
+              {daily.length > 0 && <span className="chip-count">{daily.length}</span>}
+            </button>
           </div>
         </header>
 
         <div className="dashboard" style={{ gridTemplateColumns: '1fr' }}>
           <div className="panel">
             <div className="panel-body">
-              {(tab === 'all' || tab === 'receipt' || tab === 'expense') && (
+              {(tab === 'all' || tab === 'autodebit') && (
                 <LedgerTable
                   rows={ledgerRows}
                   contractById={contractById}
@@ -407,6 +549,9 @@ export default function PaymentsPage() {
               {tab === 'card' && (
                 <CardTable rows={cardRows} />
               )}
+              {tab === 'corpcard' && (
+                <CorpCardTable rows={corpCardRows} />
+              )}
             </div>
           </div>
         </div>
@@ -418,19 +563,22 @@ export default function PaymentsPage() {
             </button>
           }
           right={
-            (tab === 'all' || tab === 'receipt' || tab === 'expense') ? (
+            tab === 'all' ? (
               <>
                 <span>표시 <strong>{ledgerRows.length}</strong></span>
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                {tab !== 'expense' && (
+                {direction !== 'withdraw' && (
                   <span style={{ color: 'var(--green-text)' }}>입금 <strong className="mono">₩{formatCurrency(ledgerRows.reduce((s, r) => s + (r.amount ?? 0), 0))}</strong></span>
                 )}
-                {tab !== 'receipt' && (
+                {direction !== 'deposit' && (
                   <span style={{ color: 'var(--red-text)' }}>출금 <strong className="mono">₩{formatCurrency(ledgerRows.reduce((s, r) => s + (r.withdraw ?? 0), 0))}</strong></span>
                 )}
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
                 <button className="btn btn-sm btn-primary" type="button" onClick={handleAutoMatchAll}>
                   자동매칭
+                </button>
+                <button className="btn btn-sm" type="button" onClick={handleSettlementMatchAll} title="CMS·카드 집금 ↔ 묶음 매칭 + 수수료 자동 계산">
+                  집금 정산
                 </button>
               </>
             ) : tab === 'summary' ? (
@@ -445,22 +593,41 @@ export default function PaymentsPage() {
                   <DownloadSimple size={12} weight="bold" /> 엑셀
                 </button>
               </>
-            ) : (
+            ) : tab === 'card' ? (
               <>
-                <span>카드 매출 <strong>{cardTx.length}</strong></span>
+                <span>카드 매출 <strong>{cardRows.length}</strong></span>
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <span style={{ color: 'var(--green-text)' }}>매칭 <strong>{cardTx.filter((t) => t.matchedContractId).length}</strong></span>
-                <span style={{ color: 'var(--orange-text)' }}>미매칭 <strong>{cardTx.filter((t) => !t.matchedContractId).length}</strong></span>
+                <span style={{ color: 'var(--green-text)' }}>매칭 <strong>{cardRows.filter((t) => t.matchedContractId).length}</strong></span>
+                <span style={{ color: 'var(--orange-text)' }}>미매칭 <strong>{cardRows.filter((t) => !t.matchedContractId).length}</strong></span>
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
                 <button className="btn btn-sm btn-primary" type="button" onClick={handleAutoMatchCardAll}>
                   자동매칭
                 </button>
               </>
+            ) : (
+              <>
+                <span>법인카드 사용 <strong>{corpCardRows.length}</strong></span>
+                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <span>총액 <strong className="mono">₩{formatCurrency(corpCardRows.reduce((s, t) => s + (t.amount ?? 0), 0))}</strong></span>
+                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <span style={{ color: 'var(--green-text)' }}>결재 완료 <strong>{corpCardRows.filter((t) => t.approved).length}</strong></span>
+                <span style={{ color: 'var(--orange-text)' }}>미결재 <strong>{corpCardRows.filter((t) => !t.approved).length}</strong></span>
+              </>
             )
           }
         />
 
-        <CreateDialog open={uploadOpen} onOpenChange={setUploadOpen} visibleModes={['수납', '지출']} initialMode="수납" />
+        <CreateDialog
+          open={uploadOpen}
+          onOpenChange={setUploadOpen}
+          visibleModes={['입출금', '자동이체', '카드매출', '법인카드']}
+          initialMode={
+            tab === 'autodebit' ? '자동이체'
+            : tab === 'card' ? '카드매출'
+            : tab === 'corpcard' ? '법인카드'
+            : '입출금'
+          }
+        />
         <ReceiptMatchDialog
           open={!!matchTarget}
           onOpenChange={(v) => !v && setMatchTarget(null)}
@@ -513,7 +680,8 @@ function LedgerTable({
             />
           </th>
           <th className="center" style={{ width: 60 }}>구분</th>
-          <th style={{ width: 70 }}>회사</th>
+          <th style={{ width: 80 }}>회사</th>
+          <th style={{ width: 140 }}>계좌</th>
           <th style={{ width: 90 }}>일자</th>
           <th className="num" style={{ width: 110 }}>입금</th>
           <th className="num" style={{ width: 110 }}>출금</th>
@@ -528,8 +696,8 @@ function LedgerTable({
       <tbody>
         {rows.length === 0 ? (
           <tr>
-            <td colSpan={12} className="muted center" style={{ padding: '32px 10px' }}>
-              표시할 거래가 없습니다. 사이드바 → 신규 등록 → 수납 으로 계좌 엑셀 업로드.
+            <td colSpan={13} className="muted center" style={{ padding: '32px 10px' }}>
+              표시할 거래가 없습니다. 사이드바 → 신규 등록 → 입출금 등록 으로 계좌 엑셀 업로드.
             </td>
           </tr>
         ) : rows.map((t) => {
@@ -545,6 +713,7 @@ function LedgerTable({
                 <span className={`status ${status === 'closed' ? '완료' : status === 'posted' ? '예정' : ''}`}>{STATUS_LABEL[status]}</span>
               </td>
               <td className="dim">{t.companyCode || (c ? displayCompanyName(c.company, companyMaster) : '-')}</td>
+              <td className="mono" style={{ fontSize: 11 }}>{formatAccountLabel(t, companyMaster, c)}</td>
               <td className="mono">{formatDate(t.txDate)}</td>
               <td className="num mono">{t.amount > 0 ? `₩${formatCurrency(t.amount)}` : '-'}</td>
               <td className="num mono" style={{ color: 'var(--red-text)' }}>{(t.withdraw ?? 0) > 0 ? `₩${formatCurrency(t.withdraw!)}` : '-'}</td>
@@ -711,6 +880,55 @@ function CardTable({ rows }: { rows: Array<import('@/lib/types').CardTransaction
                 </button>
               )}
             </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/* ─────────────────── 법인카드 (직원 지출) ─────────────────── */
+
+function CorpCardTable({ rows }: { rows: import('@/lib/types').CardTransaction[] }) {
+  return (
+    <table className="table">
+      <thead>
+        <tr>
+          <th className="center" style={{ width: 36 }}>결재</th>
+          <th style={{ width: 110 }}>사용일</th>
+          <th style={{ width: 100 }}>카드사</th>
+          <th className="mono" style={{ width: 80 }}>카드4자리</th>
+          <th>가맹점</th>
+          <th style={{ width: 100 }}>용도</th>
+          <th style={{ width: 100 }}>사용자</th>
+          <th className="num" style={{ width: 130 }}>금액</th>
+          <th style={{ width: 100 }}>승인자</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 ? (
+          <tr>
+            <td colSpan={9} className="muted center" style={{ padding: '32px 10px' }}>
+              등록된 법인카드 사용 내역이 없습니다. 사이드바 → 신규 등록 → 법인카드 등록.
+            </td>
+          </tr>
+        ) : rows.map((r) => (
+          <tr key={r.id}>
+            <td className="center">
+              {r.approved ? (
+                <CheckCircle size={14} weight="fill" style={{ color: 'var(--green-text)' }} />
+              ) : (
+                <Warning size={14} weight="fill" style={{ color: 'var(--orange-text)' }} />
+              )}
+            </td>
+            <td className="mono">{formatDate(r.txDate)}</td>
+            <td>{r.source || '-'}</td>
+            <td className="mono dim">{r.cardLast4 || '-'}</td>
+            <td>{r.merchant || '-'}</td>
+            <td className="dim">{r.category || '-'}</td>
+            <td>{r.usedBy || '-'}</td>
+            <td className="num mono">₩{formatCurrency(r.amount)}</td>
+            <td className="dim">{r.approver || '-'}</td>
           </tr>
         ))}
       </tbody>

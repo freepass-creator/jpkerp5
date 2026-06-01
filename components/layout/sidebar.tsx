@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Bank,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -16,7 +16,7 @@ const COLLAPSE_KEY = 'jpkerp5_sidebar_collapsed';
 export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
   const pathname = usePathname();
   useAuth();
-  const { isAdmin: admin } = useRole();
+  const { isMaster: master } = useRole();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -47,35 +47,65 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
         </button>
       </div>
 
+      {/* 운영 (일상) */}
       <div className="sb-section">
         <Link href="/dashboard" className={`sb-item ${isActive('/dashboard') ? 'active' : ''}`} title="대시보드 (지표 관리)">
           <ChartBar size={14} weight={isActive('/dashboard') ? 'fill' : 'regular'} />
           <span>대시보드</span>
         </Link>
-        <Link href="/" className={`sb-item ${pathname === '/' ? 'active' : ''}`} title="운영 현황 (자산·계약)">
+        <Link href="/" className={`sb-item ${pathname === '/' ? 'active' : ''}`} title="운영 현황 (계약 상태 일별 슬라이스)">
           <Car size={14} weight={pathname === '/' ? 'fill' : 'regular'} />
           <span>운영 현황</span>
         </Link>
-        <Link href="/receivables" className={`sb-item ${isActive('/receivables') ? 'active' : ''}`} title="리스크 관리 — 미수/시동제어/검사지연 등 임차인 책임 위반 관리">
+        <Link href="/receivables" className={`sb-item ${isActive('/receivables') ? 'active' : ''}`} title="리스크 관리 — 미수/시동제어/검사지연 등">
           <Warning size={14} weight={isActive('/receivables') ? 'fill' : 'regular'} />
           <span>리스크 관리</span>
         </Link>
-        <Link href="/payments" className={`sb-item ${isActive('/payments') ? 'active' : ''}`} title="계좌 관리 (계좌·카드)">
-          <CurrencyKrw size={14} weight={isActive('/payments') ? 'fill' : 'regular'} />
-          <span>계좌 관리</span>
-        </Link>
       </div>
+
+      <div className="sb-divider" />
+
+      {/* 데이터 (마스터 영역) — master 만 노출 */}
+      {master && (
+        <>
+          <div className="sb-section">
+            <Link href="/asset" className={`sb-item ${isActive('/asset') ? 'active' : ''}`} title="자산 관리 — 차량 마스터, 매입·정비·보험·할부·검사·GPS·매각">
+              <Car size={14} weight={isActive('/asset') ? 'fill' : 'regular'} />
+              <span>자산 관리</span>
+            </Link>
+            <Link href="/contract" className={`sb-item ${isActive('/contract') && pathname !== '/contract/preview' ? 'active' : ''}`} title="계약 관리 — 임차인·계약·만기·반납·스케줄">
+              <FileText size={14} weight={isActive('/contract') ? 'fill' : 'regular'} />
+              <span>계약 관리</span>
+            </Link>
+            <Link href="/finance" className={`sb-item ${isActive('/finance') ? 'active' : ''}`} title="재무 관리 — 자금일보·자동이체·카드·수납·지출·세금계산서">
+              <Bank size={14} weight={isActive('/finance') ? 'fill' : 'regular'} />
+              <span>재무 관리</span>
+            </Link>
+          </div>
+          <div className="sb-divider" />
+        </>
+      )}
+
+      {/* 기존 입출금 — master 에게는 재무관리 안으로 들어가지만 일반 직원은 그대로 입출금만 */}
+      {!master && (
+        <div className="sb-section">
+          <Link href="/payments" className={`sb-item ${isActive('/payments') ? 'active' : ''}`} title="입출금 관리 — 계좌 입금/출금 거래">
+            <CurrencyKrw size={14} weight={isActive('/payments') ? 'fill' : 'regular'} />
+            <span>입출금 관리</span>
+          </Link>
+        </div>
+      )}
 
       <div className="sb-spacer" />
 
-      {/* 관리 영역 — 일일 운영과 분리. 과태료·법인·설정 */}
+      {/* 관리 영역 — 일일 운영과 분리 */}
       <div className="sb-foot">
         <Link href="/penalty" className={`sb-item ${isActive('/penalty') ? 'active' : ''}`} title="과태료 업무">
           <Receipt size={14} weight={isActive('/penalty') ? 'fill' : 'regular'} />
           <span>과태료 업무</span>
         </Link>
-        {admin && (
-          <Link href="/admin/dev-tools" className={`sb-item ${isActive('/admin/dev-tools') ? 'active' : ''}`} title="개발도구 — 이력 업로드 / 진단 / wipe / 감사 로그 (관리자 전용)">
+        {master && (
+          <Link href="/admin/dev-tools" className={`sb-item ${isActive('/admin/dev-tools') ? 'active' : ''}`} title="개발도구 — 마스터 전용">
             <Wrench size={14} weight={isActive('/admin/dev-tools') ? 'fill' : 'regular'} />
             <span>개발도구</span>
           </Link>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as XLSX from 'xlsx';
 import {
@@ -23,6 +23,8 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { parsePastedText } from '@/lib/text-paste';
+import { parseBankTxRow as parseBankRow, parseCardTxRow as parseCardRow } from '@/lib/import-commit';
 import {
   parseVehicleRow, parseContractRow, parseBankTxRow, parseCardTxRow,
   matchTransactions, applyPaymentsToContracts,
@@ -37,9 +39,28 @@ import { toast } from '@/lib/toast';
 import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 
-type Mode = '현황' | '차량' | '계약' | '수납' | '지출' | '이력';
+type Mode = '현황' | '차량' | '계약' | '입출금' | '자동이체' | '카드매출' | '법인카드' | '이력';
 
-const ALL_MODES: Mode[] = ['현황', '차량', '계약', '수납', '지출', '이력'];
+const ALL_MODES: Mode[] = ['현황', '차량', '계약', '입출금', '자동이체', '카드매출', '법인카드', '이력'];
+
+/**
+ * 다이얼로그 풋터 슬롯 — 자식 Pane에서 "닫기" 옆에 액션 버튼을 등록할 수 있게 함.
+ * 탭 전환 시 자동으로 비워짐 (useEffect cleanup).
+ */
+type FooterCtxValue = {
+  setFooterActions: (actions: ReactNode | null) => void;
+};
+const FooterCtx = createContext<FooterCtxValue>({ setFooterActions: () => {} });
+
+/** Pane에서 호출 — deps가 바뀌면 자동 갱신, 언마운트 시 null */
+function useDialogFooterActions(actions: ReactNode | null, deps: React.DependencyList) {
+  const { setFooterActions } = useContext(FooterCtx);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setFooterActions(actions);
+    return () => setFooterActions(null);
+  }, deps);
+}
 
 export function CreateDialog({
   open, onOpenChange, initialMode, visibleModes = ALL_MODES,
@@ -57,6 +78,12 @@ export function CreateDialog({
   React.useEffect(() => {
     if (open) setMode(defaultMode);
   }, [open, defaultMode]);
+
+  // 자식 Pane 이 풋터에 등록한 액션 버튼
+  const [footerActions, setFooterActions] = useState<ReactNode | null>(null);
+  const footerCtxValue = useMemo(() => ({ setFooterActions }), []);
+  // 탭 전환 시 자동 비움 (자식의 useEffect cleanup 보강용)
+  useEffect(() => { setFooterActions(null); }, [mode]);
   const [parsed, setParsed] = useState<ParsedSheet[]>([]);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -434,6 +461,7 @@ export function CreateDialog({
           }}
         />
 
+        <FooterCtx.Provider value={footerCtxValue}>
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
           <Tabs.Root value={mode} onValueChange={(v) => setMode(v as Mode)} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <Tabs.List className="tabs-list">
@@ -449,14 +477,20 @@ export function CreateDialog({
                   {contractsCount > 0 && <span className="count">{contractsCount}</span>}
                 </Tabs.Trigger>
               )}
-              {visibleModes.includes('수납') && (
-                <Tabs.Trigger value="수납" className="tabs-trigger">
-                  수납 등록
+              {visibleModes.includes('입출금') && (
+                <Tabs.Trigger value="입출금" className="tabs-trigger">
+                  입출금 등록
                   {paymentsCount > 0 && <span className="count">{paymentsCount}</span>}
                 </Tabs.Trigger>
               )}
-              {visibleModes.includes('지출') && (
-                <Tabs.Trigger value="지출" className="tabs-trigger">지출 등록</Tabs.Trigger>
+              {visibleModes.includes('자동이체') && (
+                <Tabs.Trigger value="자동이체" className="tabs-trigger">자동이체 등록</Tabs.Trigger>
+              )}
+              {visibleModes.includes('카드매출') && (
+                <Tabs.Trigger value="카드매출" className="tabs-trigger">카드매출 등록</Tabs.Trigger>
+              )}
+              {visibleModes.includes('법인카드') && (
+                <Tabs.Trigger value="법인카드" className="tabs-trigger">법인카드 등록</Tabs.Trigger>
               )}
               {visibleModes.includes('이력') && (
                 <Tabs.Trigger value="이력" className="tabs-trigger">이력 등록</Tabs.Trigger>
@@ -492,7 +526,7 @@ export function CreateDialog({
                   result={result}
                 />
               </Tabs.Content>
-              <Tabs.Content value="수납">
+              <Tabs.Content value="입출금">
                 <PaymentRegisterPane
                   files={paymentFiles}
                   drag={drag}
@@ -502,10 +536,47 @@ export function CreateDialog({
                   onCommit={commitPaymentFiles}
                   busy={busy}
                   result={result}
+                  variant="입출금"
                 />
               </Tabs.Content>
-              <Tabs.Content value="지출">
-                <ExpenseRegisterPane onClose={() => onOpenChange(false)} />
+              <Tabs.Content value="자동이체">
+                <PaymentRegisterPane
+                  files={paymentFiles}
+                  drag={drag}
+                  onPick={onPick}
+                  onChangeKind={(idx, k) => updateKind(idx, k, 'payment')}
+                  onClose={() => onOpenChange(false)}
+                  onCommit={commitPaymentFiles}
+                  busy={busy}
+                  result={result}
+                  variant="자동이체"
+                />
+              </Tabs.Content>
+              <Tabs.Content value="카드매출">
+                <PaymentRegisterPane
+                  files={paymentFiles}
+                  drag={drag}
+                  onPick={onPick}
+                  onChangeKind={(idx, k) => updateKind(idx, k, 'payment')}
+                  onClose={() => onOpenChange(false)}
+                  onCommit={commitPaymentFiles}
+                  busy={busy}
+                  result={result}
+                  variant="카드매출"
+                />
+              </Tabs.Content>
+              <Tabs.Content value="법인카드">
+                <PaymentRegisterPane
+                  files={paymentFiles}
+                  drag={drag}
+                  onPick={onPick}
+                  onChangeKind={(idx, k) => updateKind(idx, k, 'payment')}
+                  onClose={() => onOpenChange(false)}
+                  onCommit={commitPaymentFiles}
+                  busy={busy}
+                  result={result}
+                  variant="법인카드"
+                />
               </Tabs.Content>
               <Tabs.Content value="이력">
                 <HistoryAddPane onClose={() => onOpenChange(false)} />
@@ -516,10 +587,12 @@ export function CreateDialog({
 
         <DialogFooter>
           <div className="flex-1" />
+          {footerActions}
           <DialogClose asChild>
             <button className="btn" type="button">닫기</button>
           </DialogClose>
         </DialogFooter>
+        </FooterCtx.Provider>
       </DialogContent>
     </DialogRoot>
   );
@@ -607,6 +680,7 @@ function UploadPane({
 function UploadPaneMulti({
   files, drag, onPick, onChangeKind, groups,
   onCommit, busy, result,
+  dropTitle, dropDesc,
 }: {
   files: ParsedSheet[];
   drag: boolean;
@@ -616,6 +690,8 @@ function UploadPaneMulti({
   onCommit?: () => void | Promise<void>;
   busy?: boolean;
   result?: string | null;
+  dropTitle?: string;
+  dropDesc?: string;
 }) {
   const totalRows = files.reduce((s, f) => s + f.rows.length, 0);
   if (files.length === 0) {
@@ -625,8 +701,8 @@ function UploadPaneMulti({
           <div className="dropzone-icon">
             <FileArrowUp size={28} weight="duotone" />
           </div>
-          <div className="dropzone-title">수납 엑셀 업로드</div>
-          <div className="dropzone-desc">계좌 입금 / 카드 결제 — 헤더로 자동 분류, 계약자명·금액 기준 매칭</div>
+          <div className="dropzone-title">{dropTitle ?? '엑셀 업로드'}</div>
+          <div className="dropzone-desc">{dropDesc ?? '헤더 자동 인식 · 행 단위 미리보기'}</div>
           <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); onPick(); }}>
             <Plus size={14} weight="bold" /> 엑셀 파일 선택
           </button>
@@ -834,7 +910,7 @@ function SheetPreview({ sheet, onChangeKind }: { sheet: ParsedSheet; onChangeKin
 
 /* ─────────────── 차량 등록 Pane (개별 / OCR / 엑셀) ─────────────── */
 
-type VehicleMode = 'manual' | 'ocr' | 'excel';
+type VehicleMode = 'manual' | 'ocr' | 'excel' | 'paste';
 
 function VehicleRegisterPane({
   onClose, onCommit, busy, result,
@@ -2530,9 +2606,11 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
 
 /* ─────────────── 수납 등록 Pane (개별 / OCR / 엑셀) ─────────────── */
 
+type PaymentVariant = '입출금' | '자동이체' | '카드매출' | '법인카드';
+
 function PaymentRegisterPane({
   files, drag, onPick, onChangeKind, onClose,
-  onCommit, busy, result,
+  onCommit, busy, result, variant,
 }: {
   files: ParsedSheet[];
   drag: boolean;
@@ -2542,78 +2620,369 @@ function PaymentRegisterPane({
   onCommit: () => Promise<void>;
   busy: boolean;
   result: string | null;
+  variant: PaymentVariant;
 }) {
-  const [mode, setMode] = useState<VehicleMode>('manual');
+  // variant 별 기본 모드 — 입출금/자동이체/카드수납/법인카드 모두 엑셀 일괄이 기본 (직원 워크플로)
+  const [mode, setMode] = useState<VehicleMode>(variant === '카드매출' || variant === '법인카드' ? 'manual' : 'excel');
+
+  /** variant 별 엑셀 일괄 그룹 정의 */
+  const excelGroups =
+    variant === '입출금'
+      ? [
+          { title: '계좌 입출금', desc: '은행 거래내역 — 입금자/금액 자동 매칭, 출금도 같이 등록', columns: BANK_TX_COLUMNS, templateName: '계좌입출금_템플릿.xlsx' },
+        ]
+      : variant === '자동이체'
+      ? [
+          { title: '자동이체 명세', desc: 'CMS/자동이체 명세 — 출금일·고객명·금액 매칭', columns: BANK_TX_COLUMNS, templateName: '자동이체_템플릿.xlsx' },
+        ]
+      : variant === '카드매출'
+      ? [
+          { title: '카드 매출', desc: '카드사 매출 — 승인번호 + 금액 자동 매칭', columns: CARD_TX_COLUMNS, templateName: '카드수납_템플릿.xlsx' },
+        ]
+      : [
+          { title: '법인카드 사용', desc: '직원 법인카드 지출 — 가맹점/사용자/용도 분류', columns: CARD_TX_COLUMNS, templateName: '법인카드_템플릿.xlsx' },
+        ];
+
+  /** variant 별 드롭존 카피 */
+  const dropCopy =
+    variant === '입출금'
+      ? { title: '계좌 입출금 엑셀 업로드', desc: '은행 거래내역 (입금·출금 모두) — 입금자·금액으로 계약 자동 매칭' }
+      : variant === '자동이체'
+      ? { title: '자동이체 명세 업로드', desc: 'CMS/자동이체 명세 — 출금일·고객명·금액으로 회차 매칭' }
+      : variant === '카드매출'
+      ? { title: '카드 매출 엑셀 업로드', desc: '카드사 매출전표 — 승인번호·금액으로 계약 자동 매칭' }
+      : { title: '법인카드 명세 업로드', desc: '카드사 사용 명세 — 가맹점·사용일·금액 일괄 등록' };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
       <div className="filter-bar">
-        <button type="button" className={`chip ${mode === 'manual' ? 'active' : ''}`} onClick={() => setMode('manual')}>
-          <Keyboard size={11} /> 개별 입력
-        </button>
-        <button type="button" className={`chip ${mode === 'ocr' ? 'active' : ''}`} onClick={() => setMode('ocr')}>
-          <Camera size={11} /> OCR (영수증)
-        </button>
         <button type="button" className={`chip ${mode === 'excel' ? 'active' : ''}`} onClick={() => setMode('excel')}>
           <FileXls size={11} /> 엑셀 일괄
         </button>
+        <button type="button" className={`chip ${mode === 'paste' ? 'active' : ''}`} onClick={() => setMode('paste')}>
+          <ClipboardText size={11} /> 텍스트 붙여넣기
+        </button>
+        <button type="button" className={`chip ${mode === 'manual' ? 'active' : ''}`} onClick={() => setMode('manual')}>
+          <Keyboard size={11} /> 개별 입력
+        </button>
+        {variant !== '자동이체' && (
+          <button type="button" className={`chip ${mode === 'ocr' ? 'active' : ''}`} onClick={() => setMode('ocr')}>
+            <Camera size={11} /> OCR (영수증)
+          </button>
+        )}
       </div>
 
-      {mode === 'manual' && <PaymentManualForm onSubmit={onClose} />}
-      {mode === 'ocr' && <PaymentOcrPane onSubmit={onClose} />}
+      {mode === 'manual' && <PaymentManualForm onSubmit={onClose} variant={variant} />}
+      {mode === 'ocr' && variant !== '자동이체' && <PaymentOcrPane onSubmit={onClose} />}
+      {mode === 'paste' && <PaymentPastePane variant={variant} onClose={onClose} />}
       {mode === 'excel' && (
         <UploadPaneMulti
           files={files} drag={drag} onPick={onPick} onChangeKind={onChangeKind}
-          groups={[
-            { title: '계좌 입금', desc: '은행 거래내역 — 입금자 + 금액 자동 매칭', columns: BANK_TX_COLUMNS, templateName: '계좌입금_템플릿.xlsx' },
-            { title: '카드 결제', desc: '카드사 매출 — 승인번호 + 금액 자동 매칭', columns: CARD_TX_COLUMNS, templateName: '카드결제_템플릿.xlsx' },
-          ]}
+          groups={excelGroups}
           onCommit={onCommit} busy={busy} result={result}
+          dropTitle={dropCopy.title}
+          dropDesc={dropCopy.desc}
         />
       )}
     </div>
   );
 }
 
-function PaymentManualForm({ onSubmit }: { onSubmit: () => void }) {
+/**
+ * 텍스트 붙여넣기 모드 — Excel/표를 죽 긁어 textarea 에 붙여넣으면 자동 파싱.
+ * 헤더 → row[] 만들어서 parseBankTxRow / parseCardTxRow 로 그대로 import.
+ */
+function PaymentPastePane({ variant, onClose }: { variant: PaymentVariant; onClose: () => void }) {
+  const { addMany: addBankMany } = useBankTx();
+  const { addMany: addCardMany } = useCardTx();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const isBank = variant !== '카드매출';
+
+  const parsed = useMemo(() => {
+    if (!text.trim()) return null;
+    try {
+      return parsePastedText(text);
+    } catch (e) {
+      console.error('[paste] parse error', e);
+      return null;
+    }
+  }, [text]);
+
+  const handleClear = useCallback(() => {
+    setText(''); setResult(null); setErr(null);
+  }, []);
+
+  const handleCommit = useCallback(async () => {
+    if (!parsed || busy) return;
+    setBusy(true);
+    setErr(null);
+    setResult(null);
+    try {
+      let saved = 0;
+      if (isBank) {
+        const items = parsed.rows
+          .map((r) => parseBankRow(r, '텍스트 붙여넣기', variant === '자동이체' ? 'CMS' : undefined))
+          .filter((x): x is NonNullable<typeof x> => !!x);
+        // 자동이체는 source 강제 'CMS'
+        const final = variant === '자동이체'
+          ? items.map((it) => ({ ...it, source: 'CMS' as const, method: it.method || 'CMS' }))
+          : items;
+        await addBankMany(final);
+        saved = final.length;
+      } else {
+        const items = parsed.rows
+          .map((r) => parseCardRow(r, '텍스트 붙여넣기'))
+          .filter((x): x is NonNullable<typeof x> => !!x);
+        await addCardMany(items);
+        saved = items.length;
+      }
+      const skipped = parsed.rows.length - saved;
+      setResult(`${saved}건 등록 완료${skipped > 0 ? ` · ${skipped}행은 필수 필드 부족으로 건너뜀` : ''}`);
+      if (saved > 0) {
+        setTimeout(() => onClose(), 1200);
+      }
+    } catch (e) {
+      console.error('[paste] commit error', e);
+      setErr((e as Error).message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [parsed, busy, isBank, variant, addBankMany, addCardMany, onClose]);
+
+  const placeholder = `엑셀에서 헤더 + 데이터 행을 Ctrl+C → 여기에 붙여넣기.
+
+예시 (CMS 자동이체):
+회원명\t결제일\t수납금액\t결제수단
+정유림 145가1796\t2026-05-26\t1070000\tCMS
+김근하 16부2718\t2026-05-11\t390000\tCMS
+...`;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflow: 'auto' }}>
+      <div style={{
+        padding: '10px 12px',
+        background: 'var(--bg-sunken)',
+        border: '1px solid var(--border-soft)',
+        borderRadius: 'var(--radius)',
+        fontSize: 11, color: 'var(--text-sub)', lineHeight: 1.7,
+      }}>
+        <strong>붙여넣기 가능한 형식</strong>
+        <br/>· Excel에서 셀 영역 Ctrl+C → 여기에 Ctrl+V (탭으로 자동 분리)
+        <br/>· 표 텍스트(2칸 이상 공백 구분)도 인식
+        <br/>· 첫 줄 = 헤더. 인식 컬럼: <span className="mono" style={{ fontSize: 10 }}>회원명·납부자·입금자·결제일·수납금액·청구금액·금액·적요 등</span>
+      </div>
+
+      <textarea
+        className="input"
+        placeholder={placeholder}
+        value={text}
+        onChange={(e) => { setText(e.target.value); setResult(null); setErr(null); }}
+        style={{ minHeight: 220, fontFamily: 'var(--font-mono)', fontSize: 11, height: 'auto', padding: '10px 12px', resize: 'vertical', whiteSpace: 'pre' }}
+      />
+
+      {parsed && (
+        <div style={{ fontSize: 11, color: 'var(--text-sub)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>구분자: <strong>{parsed.delimiter === 'tab' ? '탭(Excel)' : parsed.delimiter === 'pipe' ? '파이프' : '다중 공백'}</strong></span>
+          <span>·</span>
+          <span>헤더 {parsed.headers.length}개</span>
+          <span>·</span>
+          <span><strong>{parsed.rows.length}행</strong> 데이터 인식</span>
+        </div>
+      )}
+
+      {parsed && parsed.rows.length > 0 && (
+        <div style={{ border: '1px solid var(--border)', overflowX: 'auto' }}>
+          <table className="table" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+            <thead>
+              <tr>
+                <th style={{ width: 36, textAlign: 'right', color: 'var(--text-weak)' }}>#</th>
+                {parsed.headers.map((h) => <th key={h}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {parsed.rows.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ textAlign: 'right', color: 'var(--text-weak)', fontVariantNumeric: 'tabular-nums' }}>{i + 1}</td>
+                  {parsed.headers.map((h) => <td key={h}>{r[h]}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {result && (
+        <div style={{ padding: '8px 12px', background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 'var(--radius)', fontSize: 12 }}>
+          ✓ {result}
+        </div>
+      )}
+      {err && (
+        <div style={{ padding: '8px 12px', background: 'var(--red-bg)', color: 'var(--red-text)', borderRadius: 'var(--radius)', fontSize: 12 }}>
+          {err}
+        </div>
+      )}
+
+      <PastePaneFooter
+        hasText={text.length > 0}
+        rowCount={parsed?.rows.length ?? 0}
+        busy={busy}
+        onClear={handleClear}
+        onCommit={handleCommit}
+      />
+    </div>
+  );
+}
+
+/** 풋터 컨텍스트에 액션 등록 — 다이얼로그 하단바에만 표시 (Pane 내부 중복 X) */
+function PastePaneFooter({
+  hasText, rowCount, busy, onClear, onCommit,
+}: { hasText: boolean; rowCount: number; busy: boolean; onClear: () => void; onCommit: () => void }) {
+  // useMemo로 JSX 안정화 — primitive deps만 변하면 ref 갱신, 그 외 동일
+  const node = useMemo(() => (
+    <>
+      <button type="button" className="btn" onClick={onClear} disabled={busy || !hasText}>지우기</button>
+      <button type="button" className="btn btn-primary" onClick={onCommit} disabled={rowCount === 0 || busy}>
+        {busy
+          ? <><CircleNotch size={12} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> 저장 중...</>
+          : <>{rowCount}건 등록</>}
+      </button>
+    </>
+  ), [hasText, rowCount, busy, onClear, onCommit]);
+  useDialogFooterActions(node, [node]);
+  return null;
+}
+
+/** localStorage 기반 — 변종별 최근 선택 (회사/계좌/카드) 기억 */
+function lastKey(variant: PaymentVariant, field: 'company' | 'account' | 'card'): string {
+  return `jpkerp5_last_${variant}_${field}`;
+}
+function readLast(variant: PaymentVariant, field: 'company' | 'account' | 'card'): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(lastKey(variant, field)) ?? '';
+}
+function saveLast(variant: PaymentVariant, field: 'company' | 'account' | 'card', value: string) {
+  if (typeof window === 'undefined') return;
+  if (value) localStorage.setItem(lastKey(variant, field), value);
+}
+
+function PaymentManualForm({ onSubmit, variant }: { onSubmit: () => void; variant: PaymentVariant }) {
   const { add: addBankTx } = useBankTx();
   const { add: addCardTx } = useCardTx();
-  const [kind, setKind] = useState<'계좌' | '카드'>('계좌');
+  const { companies } = useCompanies();
+
+  // 회사 — variant 별 마지막 선택 복원 / 없으면 첫 회사
+  const [companyId, setCompanyId] = useState<string>(() => {
+    const last = readLast(variant, 'company');
+    return last || '';
+  });
+  // 회사 로드된 후 빈 값이면 첫 회사로 default
+  useEffect(() => {
+    if (!companyId && companies.length > 0) setCompanyId(companies[0].id);
+  }, [companies, companyId]);
+
+  const selectedCompany = useMemo(() => companies.find((c) => c.id === companyId), [companies, companyId]);
+  const accountOptions = selectedCompany?.accounts ?? [];
+  const cardOptions = selectedCompany?.cards ?? [];
+
+  // 입출금/자동이체 — 계좌 선택
+  const [accountId, setAccountId] = useState<string>(() => readLast(variant, 'account'));
+  useEffect(() => {
+    if (!accountOptions.find((a) => a.id === accountId) && accountOptions.length > 0) {
+      setAccountId(accountOptions[0].id);
+    }
+  }, [accountOptions, accountId]);
+
+  // 법인카드 — 카드 선택
+  const [cardId, setCardId] = useState<string>(() => readLast(variant, 'card'));
+  useEffect(() => {
+    if (!cardOptions.find((c) => c.id === cardId) && cardOptions.length > 0) {
+      setCardId(cardOptions[0].id);
+    }
+  }, [cardOptions, cardId]);
+
+  // 입출금: 계좌 in/out 토글, 자동이체: 입금 고정, 카드매출: 카드 매출, 법인카드: 카드 지출
+  const [direction, setDirection] = useState<'입금' | '출금'>('입금');
   const [txDate, setTxDate] = useState(new Date().toISOString().slice(0, 10));
   const [counterparty, setCounterparty] = useState('');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
   const [approvalNo, setApprovalNo] = useState('');
-  const [cardLast4, setCardLast4] = useState('');
+  // 법인카드 전용
+  const [merchant, setMerchant] = useState('');         // 가맹점
+  const [category, setCategory] = useState('');         // 용도
+  const [usedBy, setUsedBy] = useState('');             // 사용자
   const [saving, setSaving] = useState(false);
 
-  const valid = txDate && counterparty && amount;
+  const isBank = variant === '입출금' || variant === '자동이체';
+  const isCorpCard = variant === '법인카드';
+  // 자동이체는 항상 입금 (고객 → 회사)
+  const effectiveDirection = variant === '자동이체' ? '입금' : direction;
+
+  const selectedAccount = accountOptions.find((a) => a.id === accountId);
+  const selectedCard = cardOptions.find((c) => c.id === cardId);
+
+  const valid = isCorpCard
+    ? (txDate && amount && merchant.trim() && companyId)
+    : (txDate && counterparty.trim() && amount && companyId);
 
   async function handleSave() {
     if (!valid || saving) return;
     setSaving(true);
     try {
       const amountN = parseInt(amount.replace(/[^0-9]/g, ''), 10) || 0;
-      if (kind === '계좌') {
+      // 선택값 기억
+      saveLast(variant, 'company', companyId);
+      if (isBank) saveLast(variant, 'account', accountId);
+      if (isCorpCard) saveLast(variant, 'card', cardId);
+
+      if (isBank) {
+        const isWithdraw = effectiveDirection === '출금';
         await addBankTx({
           txDate,
-          amount: amountN,
+          amount: isWithdraw ? 0 : amountN,
+          withdraw: isWithdraw ? amountN : undefined,
           counterparty: counterparty.trim(),
           memo: memo.trim() || undefined,
-          source: '수동',
+          source: variant === '자동이체' ? '자동이체' : '수동',
+          companyCode: selectedCompany?.code || selectedCompany?.name,
+          account: selectedAccount?.accountNo,
+          subject: isWithdraw ? undefined : '대여료수입',
+        });
+      } else if (isCorpCard) {
+        // 법인카드 — 직원 지출 (CardTransaction with kind='법인카드')
+        await addCardTx({
+          kind: '법인카드',
+          txDate,
+          amount: amountN,
+          approvalNo: approvalNo.trim() || `manual-${Date.now()}`,
+          cardLast4: selectedCard?.cardLast4,
+          source: selectedCard?.cardCompany,
+          companyCode: selectedCompany?.code || selectedCompany?.name,
+          merchant: merchant.trim(),
+          category: category.trim() || undefined,
+          usedBy: usedBy.trim() || undefined,
+          approved: false,
         });
       } else {
+        // 카드매출
         await addCardTx({
+          kind: '매출',
           txDate,
           amount: amountN,
           approvalNo: approvalNo.trim(),
-          cardLast4: cardLast4 || undefined,
+          cardLast4: selectedCard?.cardLast4,
           customerName: counterparty.trim(),
+          companyCode: selectedCompany?.code || selectedCompany?.name,
           source: '수동',
         });
       }
       onSubmit();
     } catch (e) {
-      alert('수납 등록 실패: ' + ((e as Error).message ?? String(e)));
+      alert('등록 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setSaving(false);
     }
@@ -2628,35 +2997,131 @@ function PaymentManualForm({ onSubmit }: { onSubmit: () => void }) {
         <div className="detail-section-header">필수 정보</div>
         <div className="detail-section-body">
           <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '10px 14px', alignItems: 'center' }}>
-            <label className="form-label">종류 *</label>
-            <div className="filter-bar">
-              <button type="button" className={`chip ${kind === '계좌' ? 'active' : ''}`} onClick={() => setKind('계좌')}>계좌 입금</button>
-              <button type="button" className={`chip ${kind === '카드' ? 'active' : ''}`} onClick={() => setKind('카드')}>카드 결제</button>
-            </div>
+            {/* 회사 선택 — 모든 variant 공통 */}
+            <label className="form-label">회사 *</label>
+            <select
+              className="input"
+              required
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+              style={{ maxWidth: 280 }}
+            >
+              {companies.length === 0 && <option value="">법인 마스터에 회사 등록 필요</option>}
+              {companies.map((co) => (
+                <option key={co.id} value={co.id}>{co.name}{co.code ? ` (${co.code})` : ''}</option>
+              ))}
+            </select>
 
-            <label className="form-label">{kind === '계좌' ? '거래일자' : '승인일'} *</label>
+            {/* 계좌 선택 — 입출금/자동이체 */}
+            {isBank && (
+              <>
+                <label className="form-label">계좌 *</label>
+                {accountOptions.length === 0 ? (
+                  <span style={{ fontSize: 11, color: 'var(--orange-text)' }}>
+                    이 회사에 등록된 계좌가 없습니다. 법인 관리 → 재무 정보에서 계좌 추가
+                  </span>
+                ) : (
+                  <select
+                    className="input"
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    style={{ maxWidth: 320 }}
+                  >
+                    {accountOptions.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.bankName} {a.nickname?.trim() || a.accountNo}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </>
+            )}
+
+            {/* 카드 선택 — 카드매출/법인카드 */}
+            {!isBank && (
+              <>
+                <label className="form-label">{isCorpCard ? '법인카드' : '결제 카드'}{isCorpCard ? ' *' : ''}</label>
+                {cardOptions.length === 0 ? (
+                  <span style={{ fontSize: 11, color: 'var(--orange-text)' }}>
+                    이 회사에 등록된 법인카드가 없습니다. 법인 관리 → 재무 정보에서 카드 추가
+                  </span>
+                ) : (
+                  <select
+                    className="input"
+                    value={cardId}
+                    onChange={(e) => setCardId(e.target.value)}
+                    style={{ maxWidth: 320 }}
+                  >
+                    {cardOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.cardCompany} {c.cardName ? `· ${c.cardName}` : ''} ({c.cardLast4})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </>
+            )}
+
+            {/* 입출금 만 입금/출금 토글 노출. 자동이체는 입금 고정 */}
+            {variant === '입출금' && (
+              <>
+                <label className="form-label">구분 *</label>
+                <div className="filter-bar">
+                  <button type="button" className={`chip ${direction === '입금' ? 'active' : ''}`} onClick={() => setDirection('입금')}>입금</button>
+                  <button type="button" className={`chip ${direction === '출금' ? 'active' : ''}`} onClick={() => setDirection('출금')}>출금</button>
+                </div>
+              </>
+            )}
+
+            <label className="form-label">{isBank ? '거래일자' : isCorpCard ? '사용일' : '승인일'} *</label>
             <DateInput required value={txDate} onChange={setTxDate} style={{ width: 200 }} />
 
-            <label className="form-label">{kind === '계좌' ? '입금자' : '고객명'} *</label>
-            <input className="input" required placeholder="계약자명과 자동 매칭" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} />
+            {isCorpCard ? (
+              <>
+                <label className="form-label">가맹점 *</label>
+                <input className="input" required placeholder="어디서 썼는지 (예: GS25 강남점)" value={merchant} onChange={(e) => setMerchant(e.target.value)} />
+              </>
+            ) : (
+              <>
+                <label className="form-label">
+                  {!isBank ? '고객명' : effectiveDirection === '출금' ? '수취인' : '입금자'} *
+                </label>
+                <input
+                  className="input" required
+                  placeholder={!isBank ? '카드 결제자명' : effectiveDirection === '출금' ? '받는 사람/업체' : '계약자명과 자동 매칭'}
+                  value={counterparty} onChange={(e) => setCounterparty(e.target.value)}
+                />
+              </>
+            )}
 
             <label className="form-label">금액 *</label>
             <input className="input" required placeholder="원 단위" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))} style={{ width: 240 }} />
 
-            {kind === '계좌' && (
+            {isBank && (
               <>
                 <label className="form-label">적요</label>
-                <input className="input" value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="5월 대여료 등" />
+                <input
+                  className="input"
+                  value={memo}
+                  onChange={(e) => setMemo(e.target.value)}
+                  placeholder={variant === '자동이체' ? 'CMS 자동이체 출금' : '5월 대여료 등'}
+                />
               </>
             )}
 
-            {kind === '카드' && (
+            {isCorpCard && (
+              <>
+                <label className="form-label">용도</label>
+                <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="식비 / 주유 / 통행료 / 사무용품 / 정비 등" />
+                <label className="form-label">사용자</label>
+                <input className="input" value={usedBy} onChange={(e) => setUsedBy(e.target.value)} placeholder="사용한 직원 이름" />
+              </>
+            )}
+
+            {!isBank && !isCorpCard && (
               <>
                 <label className="form-label">승인번호</label>
                 <input className="input" value={approvalNo} onChange={(e) => setApprovalNo(e.target.value)} placeholder="예: 20260514001" />
-
-                <label className="form-label">카드 4자리</label>
-                <input className="input" value={cardLast4} onChange={(e) => setCardLast4(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))} style={{ width: 120 }} />
               </>
             )}
           </div>
@@ -2666,7 +3131,12 @@ function PaymentManualForm({ onSubmit }: { onSubmit: () => void }) {
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8, position: 'sticky', bottom: 0, background: 'var(--bg-card)', paddingTop: 8 }}>
         <button type="submit" className="btn btn-primary" disabled={!valid || saving}>
           {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
-          {saving ? '저장 중...' : '수납 등록'}
+          {saving
+            ? '저장 중...'
+            : variant === '입출금' ? '입출금 등록'
+            : variant === '자동이체' ? '자동이체 등록'
+            : variant === '카드매출' ? '카드매출 등록'
+            : '법인카드 등록'}
         </button>
       </div>
     </form>

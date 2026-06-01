@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Users, ArrowLeft, ArrowClockwise, Warning, ShieldStar, Envelope, Clock, UserCircle, Pause, Play, Key, Trash, ArrowUp, ArrowDown, Crown } from '@phosphor-icons/react';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { Sidebar } from '@/components/layout/sidebar';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import { getFirebaseAuth } from '@/lib/firebase/client';
@@ -174,7 +175,7 @@ export default function AdminUsersPage() {
             </div>
           </header>
           <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
-            <div style={{ padding: 14, background: 'var(--red-bg)', color: 'var(--red-text)', borderRadius: 6, fontSize: 13 }}>
+            <div className="notice notice--error">
               <Warning size={14} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle' }} />
               관리자만 접근 가능합니다.
             </div>
@@ -224,7 +225,7 @@ export default function AdminUsersPage() {
           </header>
 
           {err && (
-            <div style={{ padding: 14, background: 'var(--red-bg)', color: 'var(--red-text)', borderRadius: 6, fontSize: 13 }}>
+            <div className="notice notice--error">
               <Warning size={14} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle' }} />
               {err}
             </div>
@@ -289,22 +290,10 @@ export default function AdminUsersPage() {
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             {u.role === 'master' && (
-                              <span style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 3,
-                                padding: '2px 8px', fontSize: 10, fontWeight: 700,
-                                background: '#dc2626', color: '#fff', borderRadius: 99,
-                              }}>
-                                <Crown size={10} weight="fill" /> 마스터
-                              </span>
+                              <StatusBadge tone="red" icon={<Crown size={10} weight="fill" />}>마스터</StatusBadge>
                             )}
                             {u.role === 'admin' && (
-                              <span style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 3,
-                                padding: '2px 8px', fontSize: 10, fontWeight: 700,
-                                background: 'var(--brand)', color: '#fff', borderRadius: 99,
-                              }}>
-                                <ShieldStar size={10} weight="fill" /> 관리자
-                              </span>
+                              <StatusBadge tone="brand" icon={<ShieldStar size={10} weight="fill" />}>관리자</StatusBadge>
                             )}
                             {u.role === 'staff' && (
                               <span style={{ fontSize: 11, color: 'var(--text-weak)' }}>일반</span>
@@ -343,13 +332,9 @@ export default function AdminUsersPage() {
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           {u.disabled ? (
-                            <span style={{ fontSize: 10, padding: '2px 6px', background: 'var(--red-bg)', color: 'var(--red-text)', borderRadius: 3, fontWeight: 600 }}>
-                              비활성
-                            </span>
+                            <StatusBadge tone="red">비활성</StatusBadge>
                           ) : (
-                            <span style={{ fontSize: 10, padding: '2px 6px', background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 3, fontWeight: 600 }}>
-                              활성
-                            </span>
+                            <StatusBadge tone="green">활성</StatusBadge>
                           )}
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>

@@ -643,7 +643,7 @@ export default function MigrateSheetPage() {
           </header>
 
           {!superAdmin && (
-            <div style={{ padding: 14, background: 'var(--red-bg)', color: 'var(--red-text)', borderRadius: 6, fontSize: 13 }}>
+            <div className="notice notice--error">
               <Warning size={14} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle' }} />
               SUPER_ADMIN 만 실행할 수 있습니다.
             </div>

@@ -2199,6 +2199,11 @@ const DOC_KINDS: { value: DocumentKind; label: string; mockData: (c: Contract) =
 ];
 
 function DocumentsTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+  const { vehicles, update: updateVehicle } = useVehicles();
+  const vehicle = useMemo(
+    () => vehicles.find((v) => v.plate?.trim() === c.vehiclePlate?.trim()),
+    [vehicles, c.vehiclePlate],
+  );
   const [docs, setDocs] = useState<UploadedDoc[]>([]);
   const [selectedKind, setSelectedKind] = useState<DocumentKind>('자동차등록증');
   const [busy, setBusy] = useState(false);
@@ -2304,6 +2309,38 @@ function DocumentsTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =>
       };
       setDocs((prev) => [doc, ...prev]);
 
+      // ── 손님 다운로드용 Storage 영구 보관 ──
+      // 등록증/보험증권 → Vehicle, 계약서 → Contract 에 URL 저장.
+      // OCR 실패해도 이 단계까지 진행 (OCR은 부가 검증, Storage가 본판)
+      try {
+        const { uploadDocument, deleteDocumentByUrl } = await import('@/lib/firebase/storage');
+        if (selectedKind === '자동차등록증' || selectedKind === '보험증권') {
+          if (vehicle) {
+            const kind = selectedKind === '자동차등록증' ? 'registration' : 'insurance';
+            const up = await uploadDocument({ kind, ownerKey: vehicle.plate || vehicle.id, file });
+            // 기존 파일 정리
+            const prevUrl = selectedKind === '자동차등록증' ? vehicle.registrationCertUrl : vehicle.insuranceCertUrl;
+            if (prevUrl) void deleteDocumentByUrl(prevUrl);
+            const patch = selectedKind === '자동차등록증'
+              ? { registrationCertUrl: up.url, registrationCertFileName: up.fileName, registrationCertUploadedAt: up.uploadedAt }
+              : { insuranceCertUrl: up.url, insuranceCertFileName: up.fileName, insuranceCertUploadedAt: up.uploadedAt };
+            await updateVehicle({ ...vehicle, ...patch });
+          }
+        } else if (selectedKind === '계약서') {
+          const up = await uploadDocument({ kind: 'contract', ownerKey: c.contractNo || c.id, file });
+          if (c.contractDocUrl) void deleteDocumentByUrl(c.contractDocUrl);
+          onUpdate({
+            ...c,
+            contractDocUrl: up.url,
+            contractDocFileName: up.fileName,
+            contractDocUploadedAt: up.uploadedAt,
+          });
+        }
+      } catch (storageErr) {
+        console.error('[DocumentsTab] storage upload failed', storageErr);
+        setOcrError(`서류는 등록됐으나 영구 보관 실패: ${(storageErr as Error).message ?? String(storageErr)}`);
+      }
+
       // Contract 자동 반영 — 보험만기 / 검사만기 / 자동차세 등
       const patch: Partial<Contract> = {};
       if (selectedKind === '보험증권' && data.insuranceEnd && !c.insuranceExpiryDate) {
@@ -2326,9 +2363,96 @@ function DocumentsTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =>
     setDocs((prev) => prev.filter((d) => d.id !== id));
   }
 
+  async function removeStoredDoc(kind: '자동차등록증' | '보험증권' | '계약서') {
+    if (!confirm('영구 보관된 서류를 삭제하시겠습니까? 손님 페이지에서 더 이상 다운로드할 수 없게 됩니다.')) return;
+    try {
+      const { deleteDocumentByUrl } = await import('@/lib/firebase/storage');
+      if (kind === '자동차등록증' && vehicle?.registrationCertUrl) {
+        void deleteDocumentByUrl(vehicle.registrationCertUrl);
+        await updateVehicle({ ...vehicle, registrationCertUrl: undefined, registrationCertFileName: undefined, registrationCertUploadedAt: undefined });
+      } else if (kind === '보험증권' && vehicle?.insuranceCertUrl) {
+        void deleteDocumentByUrl(vehicle.insuranceCertUrl);
+        await updateVehicle({ ...vehicle, insuranceCertUrl: undefined, insuranceCertFileName: undefined, insuranceCertUploadedAt: undefined });
+      } else if (kind === '계약서' && c.contractDocUrl) {
+        void deleteDocumentByUrl(c.contractDocUrl);
+        onUpdate({ ...c, contractDocUrl: undefined, contractDocFileName: undefined, contractDocUploadedAt: undefined });
+      }
+    } catch (e) {
+      alert('삭제 실패: ' + ((e as Error).message ?? String(e)));
+    }
+  }
+
+  /** 보관된 서류 슬롯 한 행 — 손님 페이지 노출 대상 */
+  function StoredDocRow({
+    kind, url, fileName, uploadedAt,
+  }: { kind: '자동차등록증' | '보험증권' | '계약서'; url?: string; fileName?: string; uploadedAt?: string }) {
+    const label = kind === '보험증권' ? '보험가입증명서' : kind;
+    return (
+      <div style={{
+        display: 'grid', gridTemplateColumns: '120px 1fr auto', alignItems: 'center',
+        gap: 10, padding: '8px 12px',
+        background: url ? 'var(--bg-card)' : 'var(--bg-sunken)',
+        border: '1px solid var(--border-soft)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600 }}>
+          <FileText size={13} weight="duotone" style={{ color: url ? 'var(--green-text)' : 'var(--text-weak)' }} />
+          {label}
+        </div>
+        <div style={{ fontSize: 11, color: url ? 'var(--text-sub)' : 'var(--text-weak)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {url ? (
+            <>
+              {fileName || '파일'}
+              {uploadedAt && <span style={{ marginLeft: 6, color: 'var(--text-weak)' }}>· {uploadedAt.slice(0, 10)}</span>}
+            </>
+          ) : (
+            <span>미첨부 — 아래 "서류 업로드"에서 {label === '보험가입증명서' ? '보험증권' : label} 선택 후 파일 올리면 자동 보관</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {url ? (
+            <>
+              <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-sm">다운로드</a>
+              <button type="button" className="btn btn-sm btn-danger" onClick={() => removeStoredDoc(kind)}>삭제</button>
+            </>
+          ) : (
+            <span style={{ fontSize: 11, color: 'var(--text-weak)' }}>—</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="detail-stack">
       <LicenseVerifySection c={c} onUpdate={onUpdate} />
+
+      <Section icon={<FileText size={12} weight="duotone" />} title="보관 중인 서류 — 손님 페이지에서 다운로드 가능">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <StoredDocRow
+            kind="자동차등록증"
+            url={vehicle?.registrationCertUrl}
+            fileName={vehicle?.registrationCertFileName}
+            uploadedAt={vehicle?.registrationCertUploadedAt}
+          />
+          <StoredDocRow
+            kind="보험증권"
+            url={vehicle?.insuranceCertUrl}
+            fileName={vehicle?.insuranceCertFileName}
+            uploadedAt={vehicle?.insuranceCertUploadedAt}
+          />
+          <StoredDocRow
+            kind="계약서"
+            url={c.contractDocUrl}
+            fileName={c.contractDocFileName}
+            uploadedAt={c.contractDocUploadedAt}
+          />
+          {!vehicle && (
+            <div style={{ fontSize: 11, color: 'var(--orange-text)', padding: '4px 12px' }}>
+              ⚠ 같은 차량번호의 차량 마스터가 없습니다. 등록증/보험증명서는 차량 마스터에 저장되므로 먼저 차량을 등록해주세요.
+            </div>
+          )}
+        </div>
+      </Section>
 
       <Section icon={<FileText size={12} weight="duotone" />} title="서류 업로드 — 데이터와 자동 비교">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

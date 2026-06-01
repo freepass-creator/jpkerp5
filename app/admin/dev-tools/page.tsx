@@ -74,7 +74,7 @@ export default function DevToolsPage() {
           </header>
 
           {!admin && (
-            <div style={{ padding: 14, background: 'var(--red-bg)', color: 'var(--red-text)', borderRadius: 6, fontSize: 13 }}>
+            <div className="notice notice--error">
               <Warning size={14} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle' }} />
               관리자만 접근 가능합니다.
             </div>

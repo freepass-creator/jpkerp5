@@ -58,7 +58,7 @@ const STEPS: Step[] = [
   {
     icon: <CurrencyKrw size={48} weight="duotone" />,
     title: '3단계 · 은행 엑셀 업로드 + 매칭',
-    desc: '사이드바 → 계좌 관리 → + 계좌내역 올리기',
+    desc: '사이드바 → 입출금 관리 → + 입출금 등록',
     detail: (
       <div style={{ fontSize: 13, color: 'var(--text-sub)', lineHeight: 1.7 }}>
         은행 사이트에서 받은 엑셀 그대로 OK — <strong>KB·우리·신한·하나·농협·IBK·카카오·토스·케이뱅크 등 20곳</strong> 자동 인식. <br />

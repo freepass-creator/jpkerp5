@@ -5,8 +5,10 @@ import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warnin
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { SmsDialog } from '@/components/sms-dialog';
+import { EngineLockDialog } from '@/components/engine-lock-dialog';
 import dynamic from 'next/dynamic';
 const CreateDialog = dynamic(() => import('@/components/create-dialog').then((m) => m.CreateDialog), { ssr: false });
+import { buildCompanyOptions } from '@/lib/filter-helpers';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
@@ -16,14 +18,29 @@ import { isAdmin } from '@/lib/admin-emails';
 import { toast } from '@/lib/toast';
 import { todayKr } from '@/lib/mock-data';
 import { friendlyError } from '@/lib/friendly-error';
-import type { Contract } from '@/lib/types';
+import type { Contract, RiskIssue } from '@/lib/types';
+import { computeActiveIssues, pickPrimaryIssue, computeLatePayStage, ISSUE_COLOR, ISSUE_LABEL, type LatePayStage, needsEngineLockAction, needsNoticeAction } from '@/lib/risk-issues';
 
-type Filter = '미납중' | '시동제어' | '검사지연' | '기타' | '종료' | '매각';
+type Filter =
+  | '전체'           // 진행중 전체 (종결 제외)
+  | '미납중'
+  | '시동제어필요'   // 신규: D+3+ 미납 + 아직 시동제어 안 함
+  | '내용증명필요'   // 신규: D+10+ 미납 + 아직 내용증명 발송 안 함
+  | '시동제어'        // 이미 ON 상태
+  | '검사지연'
+  | '기타'
+  | '종료'
+  | '매각';
 
-/** 좌측 — 진행중 리스크 4개 */
-const ACTIVE_FILTERS: Filter[] = ['미납중', '시동제어', '검사지연', '기타'];
-/** 우측 — 종결 그룹 */
+/** 진행중 리스크 전체 */
+const ACTIVE_FILTERS: Filter[] = ['전체', '미납중', '시동제어필요', '내용증명필요', '시동제어', '검사지연', '기타'];
+/** 자주 쓰는 4개 — chip 노출 */
+const QUICK_FILTERS: Filter[] = ['전체', '미납중', '시동제어필요', '내용증명필요'];
+/** 나머지 진행중 — dropdown 노출 */
+const MORE_ACTIVE: Filter[] = ['시동제어', '검사지연', '기타'];
+/** 종결 — dropdown 노출 */
 const CLOSED_FILTERS: Filter[] = ['종료', '매각'];
+const MORE_FILTERS: Filter[] = [...MORE_ACTIVE, ...CLOSED_FILTERS];
 
 /** 검사지연 — 정기검사 예정일 지남 (임차인이 받아야 하는 책임 사항) */
 function isInspectionOverdue(c: Contract, today: string): boolean {
@@ -46,6 +63,22 @@ function maxOverdueDays(c: Contract, today: string): number {
   return Math.max(0, Math.round((t - o) / (1000 * 60 * 60 * 24)));
 }
 
+/**
+ * 회수 미완료 — 법적 해지 가능 사유 있는데 차량 아직 못 가져온 계약.
+ *   조건: (D+10+ 미납 + 내용증명 송부 완료) 또는 (수동 채권화)
+ *      + 차량 회수 안 됨 (returnedDate 없고 status가 반납/해지/매각 아님)
+ */
+function needsRecovery(c: Contract, today: string, sentIds: Set<string>): boolean {
+  const days = maxOverdueDays(c, today);
+  const legalGrounds = days >= 10 && sentIds.has(c.id);
+  const debtFlagged = c.status === '채권';
+  if (!legalGrounds && !debtFlagged) return false;
+  // 이미 회수/종결된 케이스는 제외
+  if (c.returnedDate) return false;
+  if (c.status === '반납' || c.status === '해지') return false;
+  return true;
+}
+
 function lastContactDate(contractId: string, history: ReturnType<typeof useHistoryEntries>['entries']): string | undefined {
   const logs = history.filter((h) => h.scope === 'contract' && h.contractId === contractId && h.category === '연락기록');
   if (logs.length === 0) return undefined;
@@ -59,10 +92,12 @@ export default function ReceivablesPage() {
   const { user } = useAuth();
   const admin = isAdmin(user?.email);
   const [filter, setFilter] = useState<Filter>('미납중');
+  const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [contactOpen, setContactOpen] = useState<Contract | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
+  const [engineLockTarget, setEngineLockTarget] = useState<Contract | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const today = todayKr();
@@ -73,6 +108,17 @@ export default function ReceivablesPage() {
   // · 검사지연 = inspectionDueDate < today
   // · 종료     = 반납/해지/채권 OR returnedDate 있음 (이미 종결된 계약, 정상+비정상 모두)
   // · 기타     = 위 4개에 안 잡히는 기타 위반 (추후 직원 피드백 반영)
+  // 내용증명 발송된 계약 ID Set (history_entries category='법적조치')
+  const noticeSentIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const h of history) {
+      if (h.category === '법적조치' && h.scope === 'contract' && h.contractId) {
+        s.add(h.contractId);
+      }
+    }
+    return s;
+  }, [history]);
+
   const isLatePay = (c: Contract) => (c.unpaidAmount ?? 0) > 0 || hasPartial(c);
   const isEngineLock = (c: Contract) => c.engineDisabled === true;
   const isInspection = (c: Contract) => isInspectionOverdue(c, today);
@@ -81,17 +127,34 @@ export default function ReceivablesPage() {
     !isSold(c) && (c.status === '반납' || c.status === '해지' || c.status === '채권' || !!c.returnedDate);
   const isOther = (c: Contract) =>
     !isLatePay(c) && !isEngineLock(c) && !isInspection(c) && !isClosed(c) && !isSold(c) && c.status === '채권';
+  const needsLock = (c: Contract) => needsEngineLockAction(c, today);
+  const needsNotice = (c: Contract) => needsNoticeAction(c, today, noticeSentIds);
+  // '전체' = 진행중 모든 리스크 (종결 제외)
+  const isActiveRisk = (c: Contract) =>
+    !isClosed(c) && !isSold(c) &&
+    (isLatePay(c) || isEngineLock(c) || isInspection(c) || isOther(c) || needsLock(c) || needsNotice(c));
+
+  /** 사용 중인 회사 옵션 — 드랍다운 채우기용 */
+  const companyOptions = useMemo(
+    () => buildCompanyOptions(contracts, (c) => c.company),
+    [contracts],
+  );
 
   const filtered = useMemo<Contract[]>(() => {
     const base = contracts.filter((c) => c.id && !c.id.startsWith('vehicle-orphan-'));
     let list: Contract[];
-    if (filter === '미납중') list = base.filter(isLatePay);
+    if (filter === '전체') list = base.filter(isActiveRisk);
+    else if (filter === '미납중') list = base.filter(isLatePay);
+    else if (filter === '시동제어필요') list = base.filter(needsLock);
+    else if (filter === '내용증명필요') list = base.filter(needsNotice);
     else if (filter === '시동제어') list = base.filter(isEngineLock);
     else if (filter === '검사지연') list = base.filter(isInspection);
     else if (filter === '종료') list = base.filter(isClosed);
     else if (filter === '매각') list = base.filter(isSold);
     else if (filter === '기타') list = base.filter(isOther);
     else list = base;
+
+    if (companyFilter !== 'all') list = list.filter((c) => c.company === companyFilter);
 
     const q = search.trim().toLowerCase();
     if (!q) return list;
@@ -102,12 +165,15 @@ export default function ReceivablesPage() {
       || (c.manager ?? '').toLowerCase().includes(q),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, filter, search]);
+  }, [contracts, filter, companyFilter, search, noticeSentIds]);
 
   const counts = useMemo(() => {
     const base = contracts.filter((c) => c.id && !c.id.startsWith('vehicle-orphan-'));
     return {
+      전체: base.filter(isActiveRisk).length,
       미납중: base.filter(isLatePay).length,
+      시동제어필요: base.filter(needsLock).length,
+      내용증명필요: base.filter(needsNotice).length,
       시동제어: base.filter(isEngineLock).length,
       검사지연: base.filter(isInspection).length,
       종료: base.filter(isClosed).length,
@@ -115,7 +181,7 @@ export default function ReceivablesPage() {
       기타: base.filter(isOther).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, today]);
+  }, [contracts, today, noticeSentIds]);
 
   /** 채권화 토글 — 회수 어려운 미수금 분류 (수동) */
   async function toggleDebtFlag(c: Contract) {
@@ -138,23 +204,23 @@ export default function ReceivablesPage() {
     }
   }
 
-  async function toggleEngineLock(c: Contract) {
+  function openEngineLockDialog(c: Contract) {
     if (!admin) { toast.error('관리자만 시동제어 가능'); return; }
-    const next = !c.engineDisabled;
-    const reason = next ? (prompt('시동제어 사유\n(미납 / 검사지연 / 기타 중 입력)') ?? '') : '';
-    if (next && reason === null) return;
-    try {
-      await updateContract({
-        ...c,
-        engineDisabled: next,
-        engineDisabledAt: next ? new Date().toISOString() : undefined,
-        engineDisabledBy: next ? user?.email ?? '' : undefined,
-        engineDisabledReason: next ? reason : undefined,
-      });
-      toast.success(next ? `${c.vehiclePlate} 시동제어 ON` : `${c.vehiclePlate} 시동제어 해제`);
-    } catch (e) {
-      toast.error(friendlyError(e));
-    }
+    setEngineLockTarget(c);
+  }
+
+  /** EngineLockDialog 의 confirm 콜백 — 실제 RTDB update */
+  async function commitEngineLock(next: boolean, reason: string) {
+    const c = engineLockTarget;
+    if (!c) return;
+    await updateContract({
+      ...c,
+      engineDisabled: next,
+      engineDisabledAt: next ? new Date().toISOString() : undefined,
+      engineDisabledBy: next ? user?.email ?? '' : undefined,
+      engineDisabledReason: next ? reason : undefined,
+    });
+    toast.success(next ? `${c.vehiclePlate} 시동제어 ON` : `${c.vehiclePlate} 시동제어 해제`);
   }
 
   const filterTone = (f: Filter): string => {
@@ -187,18 +253,22 @@ export default function ReceivablesPage() {
           </div>
 
           <div className="filter-bar">
-            {ACTIVE_FILTERS.map((f) => (
-              <button
-                key={f}
-                className={`chip chip-tone-${filterTone(f)} ${filter === f ? 'active' : ''}`}
-                onClick={() => setFilter(f)}
-              >
-                {f}
-                {counts[f] > 0 && <span className="chip-count">{counts[f]}</span>}
-              </button>
-            ))}
+            {/* 회사별 — 검색창 우측 맨 앞 dropdown */}
+            <select
+              className="input-compact"
+              data-w="md"
+              value={companyFilter}
+              onChange={(e) => setCompanyFilter(e.target.value)}
+              title="회사별 필터"
+            >
+              <option value="all">회사: 전체</option>
+              {companyOptions.map((co) => (
+                <option key={co} value={co}>{co}</option>
+              ))}
+            </select>
             <span className="filter-divider" />
-            {CLOSED_FILTERS.map((f) => (
+            {/* 자주 보는 4개 — chip */}
+            {QUICK_FILTERS.map((f) => (
               <button
                 key={f}
                 className={`chip chip-tone-${filterTone(f)} ${filter === f ? 'active' : ''}`}
@@ -208,6 +278,26 @@ export default function ReceivablesPage() {
                 {counts[f] > 0 && <span className="chip-count">{counts[f]}</span>}
               </button>
             ))}
+            {/* 나머지 상태 — dropdown */}
+            <select
+              className="input-compact"
+              data-w="md"
+              value={MORE_FILTERS.includes(filter) ? filter : ''}
+              onChange={(e) => { if (e.target.value) setFilter(e.target.value as Filter); }}
+              title="기타 상태"
+            >
+              <option value="">기타 상태…</option>
+              <optgroup label="진행중">
+                {MORE_ACTIVE.map((f) => (
+                  <option key={f} value={f}>{f}{counts[f] > 0 ? ` (${counts[f]})` : ''}</option>
+                ))}
+              </optgroup>
+              <optgroup label="종결">
+                {CLOSED_FILTERS.map((f) => (
+                  <option key={f} value={f}>{f}{counts[f] > 0 ? ` (${counts[f]})` : ''}</option>
+                ))}
+              </optgroup>
+            </select>
           </div>
 
           <div className="topbar-right">
@@ -238,25 +328,27 @@ export default function ReceivablesPage() {
                         aria-label="전체 선택"
                       />
                     </th>
-                    <th className="center" style={{ width: 64 }}>회사</th>
-                    <th className="center" style={{ width: 84 }}>차량상태</th>
-                    <th style={{ width: 92 }}>차량번호</th>
-                    <th style={{ width: 96 }}>계약자</th>
-                    <th style={{ width: 116 }}>연락처</th>
-                    <th className="num" style={{ width: 110 }}>미수금</th>
-                    <th className="center" style={{ width: 64 }}>미납회차</th>
-                    <th className="center" style={{ width: 76 }}>경과일</th>
-                    <th className="center" style={{ width: 88 }}>마지막연락</th>
-                    <th className="center" style={{ width: 80 }}>시동제어</th>
-                    <th className="center" style={{ width: 64 }}>채권</th>
-                    <th style={{ width: 170 }}>액션</th>
+                    <th className="center" style={{ width: 56 }}>회사</th>
+                    <th className="center" style={{ width: 72 }}>차량상태</th>
+                    <th style={{ width: 84 }}>차량번호</th>
+                    <th style={{ width: 84 }}>계약자</th>
+                    <th style={{ width: 100 }}>연락처</th>
+                    <th className="num" style={{ width: 96 }}>미수금</th>
+                    <th className="center" style={{ width: 48 }}>미납</th>
+                    <th className="center" style={{ width: 76 }}>리스크</th>
+                    <th className="center" style={{ width: 78 }}>발생일</th>
+                    <th className="center" style={{ width: 50 }}>경과</th>
+                    <th style={{ width: 116 }}>미처리 액션</th>
+                    <th className="center" style={{ width: 72 }}>시동제어</th>
+                    <th className="center" style={{ width: 56 }}>채권</th>
+                    <th style={{ width: 140 }}>액션</th>
                     <th>비고</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="muted center" style={{ padding: 32 }}>
+                      <td colSpan={16} className="muted center" style={{ padding: 32 }}>
                         {filter} 해당 계약 없음
                       </td>
                     </tr>
@@ -265,6 +357,12 @@ export default function ReceivablesPage() {
                       const days = maxOverdueDays(c, today);
                       const lastC = lastContactDate(c.id, history);
                       const isChecked = selectedIds.has(c.id);
+                      const issues = computeActiveIssues(c, today);
+                      const primary = pickPrimaryIssue(issues);
+                      const others = issues.filter((i) => i !== primary);
+                      const latePayStage: LatePayStage = computeLatePayStage(days);
+                      const showLockNeeded = needsLock(c);
+                      const showNoticeNeeded = needsNotice(c);
                       return (
                         <tr key={c.id}>
                           <td className="checkbox-col">
@@ -290,20 +388,67 @@ export default function ReceivablesPage() {
                           <td className="mono">{c.customerPhone1 || '-'}</td>
                           <td className="num">{(c.unpaidAmount ?? 0).toLocaleString()}</td>
                           <td className="center">{c.unpaidSeqCount ?? 0}</td>
-                          <td className="center" style={{ color: days > 60 ? 'var(--red-text)' : days > 30 ? 'var(--orange-text)' : undefined }}>
-                            {days > 0 ? `${days}일` : '-'}
+                          {/* 리스크 */}
+                          <td className="center">
+                            {primary ? (
+                              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                <IssueBadge issue={primary} />
+                                {others.length > 0 && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
+                                    {others.map((i) => (
+                                      <span
+                                        key={i.kind}
+                                        className="risk-cell__sub-kind"
+                                        title={`${i.issueDate} · D+${i.daysOverdue}`}
+                                      >
+                                        +{ISSUE_LABEL[i.kind]}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--text-weak)' }}>—</span>
+                            )}
                           </td>
-                          <td className="center mono">{lastC ?? '-'}</td>
+                          {/* 발생일 */}
+                          <td className="center mono">
+                            {primary ? primary.issueDate : <span style={{ color: 'var(--text-weak)' }}>—</span>}
+                          </td>
+                          {/* 경과 D+N (+ SLA) */}
+                          <td className="center">
+                            {primary ? (
+                              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                <strong
+                                  className="risk-cell__dn"
+                                  data-level={primary.daysOverdue >= 11 ? 'red' : primary.daysOverdue >= 4 ? 'orange' : 'normal'}
+                                >
+                                  D+{primary.daysOverdue}
+                                </strong>
+                                {primary.kind === '미납' && latePayStage !== '정상' && latePayStage !== '경고' && (
+                                  <SlaTag stage={latePayStage} />
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--text-weak)' }}>—</span>
+                            )}
+                          </td>
+                          {/* 미처리 액션 */}
+                          <td>
+                            {(showLockNeeded || showNoticeNeeded) ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                {showLockNeeded && <ActionNeededTag label="시동제어" />}
+                                {showNoticeNeeded && <ActionNeededTag label="내용증명" />}
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--text-weak)' }}>—</span>
+                            )}
+                          </td>
                           <td className="center">
                             <button
                               type="button"
-                              className="btn btn-sm"
-                              onClick={() => toggleEngineLock(c)}
-                              style={{
-                                background: c.engineDisabled ? 'var(--red-text)' : 'transparent',
-                                color: c.engineDisabled ? '#fff' : 'var(--text-sub)',
-                                borderColor: c.engineDisabled ? 'var(--red-text)' : 'var(--border)',
-                              }}
+                              className={`toggle-pill ${c.engineDisabled ? 'is-on toggle-pill--red' : ''}`}
+                              onClick={() => openEngineLockDialog(c)}
                               title={c.engineDisabled ? `${c.engineDisabledAt?.slice(0, 10) ?? ''} 제어 시작` : '시동제어 ON'}
                             >
                               <Power weight={c.engineDisabled ? 'fill' : 'regular'} />
@@ -313,13 +458,8 @@ export default function ReceivablesPage() {
                           <td className="center">
                             <button
                               type="button"
-                              className="btn btn-sm"
+                              className={`toggle-pill ${c.status === '채권' ? 'is-on toggle-pill--zinc' : ''}`}
                               onClick={() => toggleDebtFlag(c)}
-                              style={{
-                                background: c.status === '채권' ? 'var(--zinc-text)' : 'transparent',
-                                color: c.status === '채권' ? '#fff' : 'var(--text-sub)',
-                                borderColor: c.status === '채권' ? 'var(--zinc-text)' : 'var(--border)',
-                              }}
                               title={c.status === '채권' ? '채권 해제' : '채권화 (회수불가)'}
                             >
                               <Gavel weight={c.status === '채권' ? 'fill' : 'regular'} />
@@ -346,7 +486,7 @@ export default function ReceivablesPage() {
                               </button>
                             </div>
                           </td>
-                          <td className="dim" style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.notes || ''}>
+                          <td className="dim" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.notes || ''}>
                             {c.notes || <span className="muted">-</span>}
                           </td>
                         </tr>
@@ -355,6 +495,68 @@ export default function ReceivablesPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* 우측 컬럼 — 위/아래 반반 (회수 미완료 + 시동제어) */}
+          <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 10, minHeight: 0, overflow: 'hidden' }}>
+          <div className="panel">
+            <div className="panel-header">
+              <div className="panel-title">
+                <span style={{ color: '#7f1d1d' }}>
+                  <Warning size={14} weight="fill" />
+                </span>
+                회수 미완료
+                {(() => {
+                  const list = contracts.filter((c) => needsRecovery(c, today, noticeSentIds));
+                  return (
+                    <span className="badge" style={{ background: '#fef2f2', color: '#7f1d1d', border: '1px solid rgba(127,29,29,0.3)' }}>
+                      {list.length}
+                    </span>
+                  );
+                })()}
+              </div>
+              <div className="panel-meta danger">
+                ₩{contracts.filter((c) => needsRecovery(c, today, noticeSentIds)).reduce((s, c) => s + (c.unpaidAmount ?? 0), 0).toLocaleString()}
+              </div>
+            </div>
+            <div className="panel-body">
+              {(() => {
+                const list = contracts
+                  .filter((c) => needsRecovery(c, today, noticeSentIds))
+                  .sort((a, b) => maxOverdueDays(b, today) - maxOverdueDays(a, today));
+                if (list.length === 0) {
+                  return <div className="empty-state">회수 대기 차량 없음</div>;
+                }
+                return (
+                  <div>
+                    {list.map((c) => {
+                      const days = maxOverdueDays(c, today);
+                      const reason = c.status === '채권' ? '채권화' : '내용증명 D+' + (days - 10);
+                      return (
+                        <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
+                          <span className="tag over" style={{ background: '#fef2f2', color: '#7f1d1d' }}>{reason}</span>
+                          <div className="list-item-main">
+                            <div className="list-item-top">
+                              {c.customerName}
+                              <span className="text-weak text-xs">{c.company}</span>
+                            </div>
+                            <div className="list-item-sub">
+                              <span className="plate">{c.vehiclePlate}</span>
+                              <span className="text-weak">·</span>
+                              <span className="danger mono">₩{(c.unpaidAmount ?? 0).toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <div className="list-item-right">
+                            <div className="dday danger">D+{days}</div>
+                            <div className="date">{c.engineDisabled ? '시동제어 ON' : ''}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -414,6 +616,7 @@ export default function ReceivablesPage() {
               )}
             </div>
           </div>
+          </div> {/* 우측 컬럼 wrapper 닫기 */}
         </div>
 
         <BottomBar
@@ -430,6 +633,19 @@ export default function ReceivablesPage() {
                 title={selectedIds.size === 0 ? '체크박스로 행을 선택하세요' : '선택 계약 문자 발송'}
               >
                 <PaperPlaneTilt size={14} /> 문자 발송{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+              </button>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  if (selectedIds.size === 0) return;
+                  const ids = Array.from(selectedIds).join(',');
+                  window.open(`/notice/cert/bulk?ids=${ids}`, '_blank');
+                }}
+                disabled={selectedIds.size === 0}
+                title={selectedIds.size === 0 ? '체크박스로 선택 후 일괄 출력 (한 PDF에 N장)' : '선택 계약 N건 내용증명 일괄 출력'}
+              >
+                <FileText size={14} /> 내용증명 일괄 출력{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
               </button>
               <button className="btn" type="button" onClick={() => setContactOpen(filtered[0] ?? null)} disabled={filtered.length === 0} title="첫 행 연락기록 — 행 선택 후 우측 연락 버튼 권장">
                 <ChatCircleDots size={14} /> 연락기록
@@ -463,6 +679,12 @@ export default function ReceivablesPage() {
 
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['이력']} initialMode="이력" />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filtered} selectedIds={selectedIds} />
+      <EngineLockDialog
+        contract={engineLockTarget}
+        open={!!engineLockTarget}
+        onOpenChange={(v) => { if (!v) setEngineLockTarget(null); }}
+        onConfirm={commitEngineLock}
+      />
 
       {/* 연락기록 다이얼로그 */}
       {contactOpen && (
@@ -585,5 +807,75 @@ function ContactLogDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+/* ──────── 리스크 이슈 표시 헬퍼 컴포넌트 ──────── */
+
+function IssueBadge({ issue }: { issue: RiskIssue }) {
+  const color = ISSUE_COLOR[issue.kind];
+  const palette = {
+    red:    { bg: 'var(--red-bg)',    fg: 'var(--red-text)',    bd: 'var(--red-border)' },
+    orange: { bg: 'var(--orange-bg, #fff7ed)', fg: 'var(--orange-text, #c2410c)', bd: 'rgba(194,65,12,0.25)' },
+    yellow: { bg: 'var(--warn-bg, #fefce8)', fg: 'var(--warn-text, #854d0e)', bd: 'rgba(133,77,14,0.2)' },
+    gray:   { bg: 'var(--bg-sunken)', fg: 'var(--text-main)',   bd: 'var(--border)' },
+  }[color];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '1px 6px', fontSize: 11, fontWeight: 600,
+      background: palette.bg, color: palette.fg,
+      border: `1px solid ${palette.bd}`,
+      borderRadius: 0,
+      whiteSpace: 'nowrap', lineHeight: 1.5,
+    }}>
+      {ISSUE_LABEL[issue.kind]}
+    </span>
+  );
+}
+
+/** 액션 종류별 색조 — 시동제어=주황(운영), 내용증명=보라(법적조치), 회수=어두운 빨강(종결) */
+const ACTION_PALETTE: Record<string, { bg: string; fg: string; bd: string }> = {
+  '시동제어':  { bg: 'var(--orange-bg, #fff7ed)', fg: 'var(--orange-text, #c2410c)', bd: 'rgba(194,65,12,0.3)' },
+  '내용증명':  { bg: '#f5f3ff', fg: '#6d28d9', bd: 'rgba(109,40,217,0.25)' },
+  '회수':      { bg: '#fef2f2', fg: '#7f1d1d', bd: 'rgba(127,29,29,0.3)' },
+};
+
+function ActionNeededTag({ label }: { label: string }) {
+  const p = ACTION_PALETTE[label] ?? { bg: 'var(--red-bg)', fg: 'var(--red-text)', bd: 'var(--red-border)' };
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      padding: '1px 6px', fontSize: 10, fontWeight: 600,
+      background: p.bg, color: p.fg,
+      border: `1px solid ${p.bd}`,
+      borderRadius: 0,
+      whiteSpace: 'nowrap', lineHeight: 1.5,
+    }}>
+      <Warning weight="fill" style={{ width: 9, height: 9 }} />
+      {label}
+    </span>
+  );
+}
+
+function SlaTag({ stage }: { stage: LatePayStage }) {
+  if (stage === '정상' || stage === '경고') return null;
+  // 단계별 색조 — 운영성(시동제어)=주황, 법적조치(내용증명)=보라, 종결(회수)=어두운 빨강
+  const map: Record<Exclude<LatePayStage, '정상' | '경고'>, { label: string; bg: string; fg: string; bd: string }> = {
+    '시동제어D-1': { label: '시동제어 D-1', bg: 'var(--orange-bg, #fff7ed)', fg: 'var(--orange-text, #c2410c)', bd: 'rgba(194,65,12,0.25)' },
+    '시동제어':    { label: '시동제어 활성', bg: 'var(--orange-bg, #fff7ed)', fg: 'var(--orange-text, #c2410c)', bd: 'rgba(194,65,12,0.3)' },
+    '내용증명':    { label: '내용증명 송부', bg: '#f5f3ff', fg: '#6d28d9', bd: 'rgba(109,40,217,0.25)' },
+    '회수가능':    { label: '회수 가능',     bg: '#fef2f2', fg: '#7f1d1d', bd: 'rgba(127,29,29,0.3)' },
+  };
+  const m = map[stage];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '1px 6px', fontSize: 10, fontWeight: 600,
+      background: m.bg, color: m.fg, border: `1px solid ${m.bd}`, borderRadius: 0,
+      whiteSpace: 'nowrap', lineHeight: 1.5,
+    }}>
+      {m.label}
+    </span>
   );
 }
