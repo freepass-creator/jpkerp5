@@ -23,7 +23,8 @@ import type { VehicleStatus } from '@/lib/types';
  */
 const ASSET_STATUS_VALUES: VehicleStatus[] = [
   '구매대기', '등록대기', '상품화대기', '상품화중', '상품대기',
-  '운행', '매각대기', '매각', '정비', '사고',
+  '운행', '정비', '사고',
+  '매각검토', '매각대기', '매각',
 ];
 const ASSET_STATUS_SET = new Set<string>(ASSET_STATUS_VALUES);
 import { useVehicles } from '@/lib/firebase/vehicles-store';
@@ -82,15 +83,16 @@ export default function AssetPage() {
     return ASSET_STATUS_VALUES.filter((s) => set.has(s));
   }, [vehicles]);
 
-  /** v4 카운트 — 등록예정/대기/운행중/정비/매각 */
+  /** v4 카운트 — 등록예정/대기/운행중/정비/매각검토/매각 */
   const counts = useMemo(() => {
-    const c = { 등록예정: 0, 대기: 0, 운행중: 0, 정비: 0, 매각: 0 };
+    const c = { 등록예정: 0, 대기: 0, 운행중: 0, 정비: 0, 매각검토: 0, 매각: 0 };
     for (const v of vehicles) {
       if (!v.status || !ASSET_STATUS_SET.has(v.status)) continue;
       if (v.status === '구매대기' || v.status === '등록대기') c.등록예정++;
       else if (v.status === '상품화대기' || v.status === '상품화중' || v.status === '상품대기') c.대기++;
       else if (v.status === '운행') c.운행중++;
       else if (v.status === '정비' || v.status === '사고') c.정비++;
+      else if (v.status === '매각검토') c.매각검토++;
       else if (v.status === '매각' || v.status === '매각대기') c.매각++;
     }
     return c;
@@ -246,6 +248,7 @@ export default function AssetPage() {
               <span>대기 <strong>{counts.대기}</strong></span>
               <span style={{ color: 'var(--brand)' }}>운행중 <strong>{counts.운행중}</strong></span>
               <span>정비 <strong>{counts.정비}</strong></span>
+              <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토 <strong>{counts.매각검토}</strong></span>
               <span>매각 <strong>{counts.매각}</strong></span>
               {selected && (
                 <>

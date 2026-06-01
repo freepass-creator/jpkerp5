@@ -20,6 +20,7 @@ export default function AssetDisposalPage() {
 
   const disposed = useMemo(() => vehicles.filter((v) => v.status === '매각'), [vehicles]);
   const pending = useMemo(() => vehicles.filter((v) => v.status === '매각대기'), [vehicles]);
+  const reviewing = useMemo(() => vehicles.filter((v) => v.status === '매각검토'), [vehicles]);
 
   return (
     <MasterPageShell
@@ -28,14 +29,54 @@ export default function AssetDisposalPage() {
       subNav={ASSET_SUB}
       bottomBar={
         <BottomBar
-          left={<><span>전체 <strong>{disposed.length + pending.length}</strong></span><span style={{ color: 'var(--orange-text, #c2410c)' }}>대기 <strong>{pending.length}</strong></span><span>완료 <strong>{disposed.length}</strong></span></>}
+          left={
+            <>
+              <span>전체 <strong>{reviewing.length + pending.length + disposed.length}</strong></span>
+              <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토 <strong>{reviewing.length}</strong></span>
+              <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각대기 <strong>{pending.length}</strong></span>
+              <span>매각완료 <strong>{disposed.length}</strong></span>
+            </>
+          }
           right={<><button className="btn" type="button">엑셀</button><button className="btn btn-primary" type="button">+ 처분 등록</button></>}
         />
       }
     >
+      {/* 매각 검토 — 매각할지 보유할지 알아보는 단계 (시세조사·견적·내부논의) */}
+      <section style={{ marginBottom: 16 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 700, margin: '0 0 8px', color: 'var(--orange-text, #c2410c)' }}>
+          매각 검토 ({reviewing.length}) <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-weak)', marginLeft: 6 }}>시세·견적·내부논의 중</span>
+        </h3>
+        <table className="table">
+          <thead>
+            <tr>
+              <th style={{ width: 56 }}>회사</th>
+              <th style={{ width: 110 }}>자산코드</th>
+              <th style={{ width: 96 }}>차량번호</th>
+              <th>차명</th>
+              <th style={{ width: 84 }}>제작연월</th>
+              <th className="num" style={{ width: 110 }}>매입가</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reviewing.length === 0 ? (
+              <tr><td colSpan={6} className="muted center" style={{ padding: 24 }}>매각 검토 차량 없음</td></tr>
+            ) : reviewing.map((v) => (
+              <tr key={v.id}>
+                <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                <td className="mono">{v.assetCode || '-'}</td>
+                <td className="mono">{v.plate}</td>
+                <td>{v.vehicleModelLine || v.model}</td>
+                <td className="mono">{v.manufacturedDate?.slice(0, 7) || '-'}</td>
+                <td className="num mono">{v.purchasePrice ? `₩${v.purchasePrice.toLocaleString()}` : '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
       {/* 매각 대기 */}
       <section style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: 13, fontWeight: 700, margin: '0 0 8px', color: 'var(--orange-text, #c2410c)' }}>매각 대기 ({pending.length})</h3>
+        <h3 style={{ fontSize: 13, fontWeight: 700, margin: '0 0 8px', color: 'var(--orange-text, #c2410c)' }}>매각 대기 ({pending.length}) <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-weak)', marginLeft: 6 }}>매각 확정, 거래 진행 중</span></h3>
         <table className="table">
           <thead>
             <tr>
