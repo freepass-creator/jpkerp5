@@ -1016,6 +1016,11 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
         </div>
       </Section>
 
+      {/* 현재 위치 — 항상 노출 (휴차 아니라도 메모 가능) */}
+      <Section icon={<Car size={12} weight="duotone" />} title="현재 위치">
+        <VehicleLocationEditor c={c} onUpdate={onUpdate} />
+      </Section>
+
       {c.idleSince && (
         <Section icon={<PauseCircle size={12} weight="duotone" />} title="휴차 기간">
           <Field label="시작일" value={formatDateFull(c.idleSince)} mono />
@@ -1024,6 +1029,105 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           <Field label="휴차 일수" value={`${daysSince(c.idleSince, todayKr())}일`} mono />
         </Section>
       )}
+    </div>
+  );
+}
+
+/**
+ * 차량 현재 위치 인라인 에디터 — 차량상태 탭에 노출.
+ * 휴차 차량은 보관 장소, 운행 차량도 임시 보관/정비 입고 등 위치 메모 가능.
+ * v4 IOC 패턴 — 위치 변경 시 차량 이력에 자동 기록.
+ */
+function VehicleLocationEditor({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+  const { entries, add: addHistory } = useHistoryEntries();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    idleLocation: c.idleLocation ?? '',
+    idleContact: c.idleContact ?? '',
+    note: '',
+  });
+
+  const moveHistory = useMemo(() => {
+    return entries
+      .filter((h) => h.scope === 'vehicle' && h.vehiclePlate === c.vehiclePlate && (h.meta as Record<string, unknown>)?.kind === 'move')
+      .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+      .slice(0, 3);
+  }, [entries, c.vehiclePlate]);
+
+  const oldLocation = (c.idleLocation ?? '').trim();
+  const newLocation = draft.idleLocation.trim();
+  const changed = oldLocation !== newLocation;
+
+  async function handleSave() {
+    onUpdate({
+      ...c,
+      idleLocation: newLocation || undefined,
+      idleContact: draft.idleContact.trim() || undefined,
+    });
+    if (changed && newLocation && c.vehiclePlate) {
+      const from = oldLocation || '(미입력)';
+      await addHistory({
+        scope: 'vehicle',
+        vehiclePlate: c.vehiclePlate,
+        contractId: c.id,
+        date: todayKr(),
+        category: '기타',
+        title: `위치 이동: ${from} → ${newLocation}`,
+        description: draft.note.trim() || undefined,
+        status: '완료',
+        meta: { kind: 'move', from, to: newLocation },
+      });
+    }
+    setEditing(false);
+    setDraft({ ...draft, note: '' });
+  }
+
+  if (!editing) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr auto', gap: '8px 12px', fontSize: 12, alignItems: 'center' }}>
+          <span style={{ color: 'var(--text-weak)' }}>현재 위치</span>
+          <span>
+            {oldLocation ? <strong>{oldLocation}</strong> : <span className="muted">미입력</span>}
+            {c.idleContact && <span className="dim mono" style={{ marginLeft: 8, fontSize: 11 }}>({c.idleContact})</span>}
+          </span>
+          <button type="button" className="btn btn-sm" onClick={() => setEditing(true)}>
+            {oldLocation ? '위치 이동' : '위치 입력'}
+          </button>
+        </div>
+        {moveHistory.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--text-weak)', paddingLeft: 102 }}>
+            최근 이동: {moveHistory.map((h) => `${(h.meta as Record<string, unknown>)?.to ?? ''}`).join(' ← ')}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {oldLocation && (
+        <div style={{ padding: '6px 10px', background: 'var(--bg-sunken)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: 'var(--text-weak)' }}>이전</span> <strong>{oldLocation}</strong>
+          {changed && newLocation && <><span className="dim">→</span> <strong style={{ color: 'var(--brand)' }}>{newLocation}</strong> <span style={{ fontSize: 10, color: 'var(--orange-text, #c2410c)' }}>이력 자동 기록</span></>}
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '6px 10px', fontSize: 12 }}>
+        <label style={{ alignSelf: 'center', color: 'var(--text-weak)' }}>{oldLocation ? '이동 위치' : '현재 위치'}</label>
+        <input className="input" autoFocus placeholder="예: 본사 차고지 B-12 / 분당 주차장 / 정비소" value={draft.idleLocation} onChange={(e) => setDraft({ ...draft, idleLocation: e.target.value })} />
+        <label style={{ alignSelf: 'center', color: 'var(--text-weak)' }}>담당 연락처</label>
+        <input className="input mono" placeholder="010-0000-0000 (선택)" value={draft.idleContact} onChange={(e) => setDraft({ ...draft, idleContact: e.target.value })} />
+        {changed && newLocation && (
+          <>
+            <label style={{ alignSelf: 'center', color: 'var(--text-weak)' }}>이동 사유</label>
+            <input className="input" placeholder="이동 메모 (선택)" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+          </>
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+        <button type="button" className="btn btn-sm" onClick={() => { setEditing(false); setDraft({ idleLocation: c.idleLocation ?? '', idleContact: c.idleContact ?? '', note: '' }); }}>취소</button>
+        <button type="button" className="btn btn-sm btn-primary" onClick={handleSave}>저장</button>
+      </div>
     </div>
   );
 }
