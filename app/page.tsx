@@ -23,6 +23,11 @@ import { SmsDialog } from '@/components/sms-dialog';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
+import {
+  getExpiryDate, daysToExpiry,
+  getVehicleState, getContractState, getPaymentState,
+  type VehicleState, type ContractState, type PaymentState,
+} from '@/lib/contract-stage';
 
 type View = '전체' | '계약중' | '만기경과' | '만기임박' | '연장대기' | '종료대기' | '휴차' | '미수';
 /** 항상 표시되는 기본 필터 */
@@ -89,11 +94,15 @@ function matchesCompany(c: Contract, co: string): boolean {
 }
 
 /** 컬럼 정렬 키 — 수동 정렬 시 클릭한 컬럼명 */
-type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '계약자' | '연락처' | '보험연령' | '계약상태' | '시작일' | '종료일' | '결제일' | '회차' | '반납까지' | '수납상태' | '미수금';
+type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '사용처' | '연락처' | '보험연령' | '계약상태' | '시작일' | '종료일' | '결제일' | '회차' | '반납까지' | '수납상태' | '미수금';
 type SortDir = 'asc' | 'desc';
 
-const VS_ORDER: VehicleState[] = ['구매대기', '등록대기', '상품화중', '인도대기', '계약중', '휴차', '반납'];
-const CS_ORDER: ContractState[] = ['위반', '미수검', '연장대기', '종료대기', '만기경과', '만기임박', '정상'];
+const VS_ORDER: VehicleState[] = [
+  '구매대기', '등록대기', '상품화중', '인도대기',
+  '운행중',
+  '휴차대기', '휴차', '매각검토', '매각대기', '매각완료', '반납',
+];
+const CS_ORDER: ContractState[] = ['위반', '미수검', '연장대기', '종료대기', '만기경과', '만기임박', '계약중'];
 const PS_ORDER: PaymentState[] = ['미납', '정상', '휴차', '종결'];
 
 function compareForCol(a: Contract, b: Contract, col: SortCol): number {
@@ -102,7 +111,7 @@ function compareForCol(a: Contract, b: Contract, col: SortCol): number {
     case '차량상태': return VS_ORDER.indexOf(getVehicleState(a).name) - VS_ORDER.indexOf(getVehicleState(b).name);
     case '차량번호': return a.vehiclePlate.localeCompare(b.vehiclePlate);
     case '차종': return a.vehicleModel.localeCompare(b.vehicleModel);
-    case '계약자': return a.customerName.localeCompare(b.customerName);
+    case '사용처': return resolveUsage(a).localeCompare(resolveUsage(b));
     case '연락처': return a.customerPhone1.localeCompare(b.customerPhone1);
     case '보험연령': return (a.insuranceAge ?? 0) - (b.insuranceAge ?? 0);
     case '계약상태': return CS_ORDER.indexOf(getContractState(a).name) - CS_ORDER.indexOf(getContractState(b).name);
@@ -228,108 +237,10 @@ function sortLabel(view: View): string {
   }
 }
 
-/** 차량상태 (7종) — 차량 자체의 물리적 라이프사이클 */
-type VehicleState = '구매대기' | '등록대기' | '상품화중' | '인도대기' | '계약중' | '휴차' | '반납';
+// VehicleState / ContractState / PaymentState / getVehicleState / getContractState / getPaymentState
+// → lib/contract-stage.ts 로 이관 (운영현황·상세 다이얼로그에서 공용)
 
-/**
- * 만기일 — contractDate + termMonths 기준 (계약 기간이 진실).
- * termMonths 없을 때만 returnScheduledDate 폴백.
- */
-function getExpiryDate(c: Contract): string | null {
-  if (c.contractDate && c.termMonths && c.termMonths > 0) {
-    const base = new Date(c.contractDate);
-    if (!Number.isNaN(base.getTime())) {
-      base.setMonth(base.getMonth() + c.termMonths);
-      return base.toISOString().slice(0, 10);
-    }
-  }
-  return c.returnScheduledDate ?? null;
-}
-
-/** 만기까지 남은 일수 — 음수면 경과. 만기 도출 불가면 null */
-function daysToExpiry(c: Contract): number | null {
-  const expiry = getExpiryDate(c);
-  if (!expiry) return null;
-  const a = new Date(todayKr()).getTime();
-  const b = new Date(expiry).getTime();
-  if (Number.isNaN(a) || Number.isNaN(b)) return null;
-  return Math.round((b - a) / 86400000);
-}
-
-function getVehicleState(c: Contract): { name: VehicleState; days: number } {
-  // 명시적 휴차 / 반납 — 최우선
-  if (c.vehicleStatus === '휴차') {
-    return { name: '휴차', days: c.idleSince ? daysSince(c.idleSince, todayKr()) : 0 };
-  }
-  if (c.returnedDate || c.status === '반납' || c.vehicleStatus === '반납') {
-    return { name: '반납', days: c.returnedDate ? daysSince(c.returnedDate, todayKr()) : 0 };
-  }
-
-  // ── 규칙: 계약자 있으면 계약중 / 없으면 휴차 (또는 차량 준비 단계) ──
-  const hasCustomer = !!c.customerName?.trim();
-
-  if (hasCustomer) {
-    // 손님 있음 → 인도 여부 무관 모두 '계약중'
-    const start = c.deliveredDate ?? c.contractDate;
-    return { name: '계약중', days: daysSince(start, todayKr()) };
-  }
-
-  // 손님 없음 → 차량 라이프사이클 단계만 표시, 그 외는 휴차로 통합
-  if (c.vehicleStatus === '구매대기') {
-    return { name: '구매대기', days: daysSince(c.contractDate, todayKr()) };
-  }
-  if (c.vehicleStatus === '등록대기') {
-    return { name: '등록대기', days: daysSince(c.purchasedDate ?? c.contractDate, todayKr()) };
-  }
-  if (c.vehicleStatus === '상품화중' || c.vehicleStatus === '상품화대기') {
-    return { name: '상품화중', days: daysSince(c.registeredDate ?? c.contractDate, todayKr()) };
-  }
-  // 상품대기 / 인도대기 / 출고대기 / 휴차대기 / 매각대기 등 손님 없는 모든 비운영 → 휴차
-  return { name: '휴차', days: daysSince(c.readiedDate ?? c.contractDate, todayKr()) };
-}
-
-/**
- * 계약상태 (8종) — 계약 라이프사이클 + 컴플라이언스 + 무계약.
- *   무계약 / 정상 / 만기임박 / 만기경과 / 연장대기 / 종료대기 / 위반 / 미수검
- * 우선순위: 위반 > 미수검 > 연장대기 > 종료대기 > 만기경과 > 만기임박 > 정상 > 무계약
- */
-type ContractState = '무계약' | '정상' | '만기임박' | '만기경과' | '연장대기' | '종료대기' | '미수검' | '위반';
-function getContractState(c: Contract): { name: ContractState; days: number } {
-  // 계약자 없으면 (휴차차량 / 구매대기 차량) — 계약 자체가 없음
-  if (!c.customerName?.trim()) {
-    return { name: '무계약', days: 0 };
-  }
-  const inspectionOverdue = !!(c.inspectionDueDate && c.inspectionDueDate < todayKr());
-  const hasViolations = !!c.hasViolations;
-  // 컴플라이언스 위반은 최우선 (계약 진행 막힘)
-  if (hasViolations) {
-    return { name: '위반', days: c.violationSince ? daysSince(c.violationSince, todayKr()) : 0 };
-  }
-  if (inspectionOverdue) {
-    return { name: '미수검', days: daysSince(c.inspectionDueDate!, todayKr()) };
-  }
-  // 사용자가 명시한 만기 결정 상태
-  if (c.vehicleStatus === '연장대기') {
-    return { name: '연장대기', days: 0 };
-  }
-  if (c.vehicleStatus === '종료대기') {
-    const d = daysToExpiry(c);
-    return { name: '종료대기', days: d !== null ? Math.max(0, -d) : 0 };
-  }
-  // 계약중 + 만기 도래 — 경과면 '만기경과', 90일 이내면 '만기임박'
-  const isRunningStatus = c.vehicleStatus === '운행' || (c.deliveredDate && c.status === '운행');
-  if (isRunningStatus) {
-    const d = daysToExpiry(c);
-    if (d !== null && d < 0) {
-      return { name: '만기경과', days: -d };  // 경과 일수 (양수)
-    }
-    if (d !== null && d <= 90) {
-      return { name: '만기임박', days: d };  // 남은 일수
-    }
-  }
-  // 정상 = 컴플라이언스 OK + 만기 여유 (계약 시작일부터 운영 일수)
-  return { name: '정상', days: daysSince(c.contractDate, todayKr()) };
-}
+// getExpiryDate / daysToExpiry / getVehicleState / getContractState → lib/contract-stage.ts
 
 /**
  * 시작일 — vehicleStatus 별로 의미가 달라짐
@@ -353,46 +264,21 @@ function resolveEndDate(c: Contract): string | undefined {
   return c.returnScheduledDate;
 }
 
-/** 수납상태 (3종) — 결제 건전성. 휴차/매각 차량은 결제 멈춤 상태 */
-type PaymentState = '정상' | '미납' | '휴차' | '종결';
-function getPaymentState(c: Contract): { name: PaymentState; days: number } {
-  const today = todayKr();
-  // 휴차/매각검토 — 결제 멈춤
-  if (c.vehicleStatus === '휴차' || c.vehicleStatus === '휴차대기' || c.vehicleStatus === '매각검토') {
-    return { name: '휴차', days: c.idleSince ? daysSince(c.idleSince, today) : 0 };
+/**
+ * 사용처 — 차량이 지금 어디서/누구한테 쓰이고 있나
+ *   · 운행 → 계약자명 (고객)
+ *   · 휴차/매각/매각검토/휴차대기 → idleLocation (보관처/정비소 등)
+ *   · 그 외 (구매대기/등록대기/상품화중/...) → 회사명 (운영 단계)
+ */
+function resolveUsage(c: Contract): string {
+  const s = c.vehicleStatus;
+  if (s === '휴차' || s === '휴차대기' || s === '매각검토' || s === '매각대기' || s === '매각') {
+    return c.idleLocation?.trim() || '';
   }
-  // 매각/반납/해지 — 종결
-  if (c.vehicleStatus === '매각' || c.vehicleStatus === '매각대기' || c.status === '반납' || c.status === '해지') {
-    return { name: '종결', days: 0 };
-  }
-  if (c.unpaidAmount <= 0) {
-    return { name: '정상', days: daysSince(c.lastPaidDate ?? c.contractDate, today) };
-  }
-  // 미납 일수 = 가장 오래된 연체·부분납 회차의 dueDate ~ 오늘
-  //   예: 4/25 + 5/25 둘 다 미수 (총 100만원), 오늘 5/26 → 31일 (한달+1일)
-  //   read 시점에 recalcContract로 status 자동 갱신되므로 이번달 25일도 연체로 잡힘
-  const overdueSchedules = (c.schedules ?? [])
-    .filter((s) => (s.status === '연체' || s.status === '부분납') && s.dueDate <= today)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));  // 과거 → 최신
-  if (overdueSchedules.length > 0) {
-    const oldestDue = overdueSchedules[0].dueDate;
-    const days = Math.max(0, daysSince(oldestDue, today));
-    return { name: '미납', days };
-  }
-  // 스케줄 없는 legacy 계약 — currentSeq 기준 dueDate 역산 (오래된 미납 = currentSeq)
-  if (c.currentSeq && c.contractDate) {
-    const [y, m] = c.contractDate.split('-').map((s) => parseInt(s, 10));
-    const targetM0 = (m - 1) + (c.currentSeq - 1);
-    const year = y + Math.floor(targetM0 / 12);
-    const month = ((targetM0 % 12) + 12) % 12 + 1;
-    const lastDay = new Date(year, month, 0).getDate();
-    const d = Math.min(c.paymentDay || 1, lastDay);
-    const oldestDue = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const days = Math.max(0, daysSince(oldestDue, today));
-    return { name: '미납', days };
-  }
-  return { name: '미납', days: 0 };
+  return c.customerName?.trim() || '';
 }
+
+// PaymentState / getPaymentState → lib/contract-stage.ts
 
 export default function Page() {
   const [search, setSearch] = useState('');
@@ -767,7 +653,7 @@ export default function Page() {
                   <SortableTh col="차량상태" align="center" width={84} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="차량번호" width={92} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="차종" sort={manualSort} onSort={toggleSort} />
-                  <SortableTh col="계약자" width={96} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="사용처" width={96} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="연락처" width={116} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="보험연령" align="center" width={70} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="계약상태" align="center" width={80} sort={manualSort} onSort={toggleSort} />
@@ -827,8 +713,19 @@ export default function Page() {
                         {/* 차량 */}
                         <td className="plate">{c.vehiclePlate}</td>
                         <td className="dim">{c.vehicleModel}</td>
-                        {/* 고객 */}
-                        <td>{c.customerName}</td>
+                        {/* 사용처 — 운행=계약자명, 휴차/매각=현재 위치(idleLocation) */}
+                        <td>
+                          {(() => {
+                            const s = c.vehicleStatus;
+                            const isIdle = s === '휴차' || s === '휴차대기' || s === '매각검토' || s === '매각대기' || s === '매각';
+                            if (isIdle) {
+                              return c.idleLocation?.trim()
+                                ? <span title={`현재 위치 — ${c.idleLocation}`}>{c.idleLocation}</span>
+                                : <span className="muted" style={{ fontSize: 11 }}>위치 미입력</span>;
+                            }
+                            return c.customerName || <span className="muted">-</span>;
+                          })()}
+                        </td>
                         <td className="mono dim">{c.customerPhone1}</td>
                         {/* 보험연령 */}
                         <td className="center mono dim">

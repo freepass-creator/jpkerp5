@@ -34,28 +34,37 @@ export default function ContractIdlePage() {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Contract | null>(null);
 
+  const [statusFilter, setStatusFilter] = useState<'all' | '휴차' | '휴차대기' | '매각검토' | '__noloc'>('all');
+
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return contracts
       .filter((c) => c.vehicleStatus === '휴차' || c.vehicleStatus === '휴차대기' || c.vehicleStatus === '매각검토')
+      .filter((c) => {
+        if (statusFilter === '__noloc') return !c.idleLocation?.trim();
+        if (statusFilter !== 'all' && c.vehicleStatus !== statusFilter) return false;
+        return true;
+      })
       .filter((c) => {
         if (!q) return true;
         const hay = `${c.vehiclePlate ?? ''} ${c.vehicleModel ?? ''} ${c.idleLocation ?? ''} ${c.idleReason ?? ''}`.toLowerCase();
         return hay.includes(q);
       })
       .sort((a, b) => (a.idleSince ?? '').localeCompare(b.idleSince ?? ''));
-  }, [contracts, search]);
+  }, [contracts, search, statusFilter]);
 
   const counts = useMemo(() => {
-    const c = { 휴차대기: 0, 휴차: 0, 매각검토: 0, 위치미입력: 0 };
-    for (const r of rows) {
+    const c = { 전체: 0, 휴차대기: 0, 휴차: 0, 매각검토: 0, 위치미입력: 0 };
+    for (const r of contracts) {
+      if (r.vehicleStatus !== '휴차' && r.vehicleStatus !== '휴차대기' && r.vehicleStatus !== '매각검토') continue;
+      c.전체++;
       if (r.vehicleStatus === '휴차대기') c.휴차대기++;
       else if (r.vehicleStatus === '휴차') c.휴차++;
       else if (r.vehicleStatus === '매각검토') c.매각검토++;
       if (!r.idleLocation?.trim()) c.위치미입력++;
     }
     return c;
-  }, [rows]);
+  }, [contracts]);
 
   function daysIdle(since?: string): number | null {
     if (!since) return null;
@@ -78,22 +87,30 @@ export default function ContractIdlePage() {
           />
         </div>
       }
-      stats={
+      quickFilters={
         <>
-          <span>전체<strong>{rows.length}</strong></span>
-          <span>휴차대기<strong>{counts.휴차대기}</strong></span>
-          <span>휴차중<strong>{counts.휴차}</strong></span>
-          <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토<strong>{counts.매각검토}</strong></span>
-          <span className="sep" />
-          <span style={{ color: counts.위치미입력 > 0 ? 'var(--red-text)' : undefined }}>
-            위치 미입력<strong>{counts.위치미입력}</strong>
-          </span>
+          <button type="button" className={`chip ${statusFilter === 'all' ? 'active' : ''}`} onClick={() => setStatusFilter('all')}>
+            전체<span className="chip-count">{counts.전체}</span>
+          </button>
+          <button type="button" className={`chip ${statusFilter === '휴차대기' ? 'active' : ''}`} onClick={() => setStatusFilter('휴차대기')}>
+            휴차대기<span className="chip-count">{counts.휴차대기}</span>
+          </button>
+          <button type="button" className={`chip chip-tone-brand ${statusFilter === '휴차' ? 'active' : ''}`} onClick={() => setStatusFilter('휴차')}>
+            휴차중<span className="chip-count">{counts.휴차}</span>
+          </button>
+          <button type="button" className={`chip chip-tone-orange ${statusFilter === '매각검토' ? 'active' : ''}`} onClick={() => setStatusFilter('매각검토')}>
+            매각검토<span className="chip-count">{counts.매각검토}</span>
+          </button>
+          <span className="filter-divider" />
+          <button type="button" className={`chip chip-tone-red ${statusFilter === '__noloc' ? 'active' : ''}`} onClick={() => setStatusFilter('__noloc')}>
+            위치 미입력<span className="chip-count">{counts.위치미입력}</span>
+          </button>
         </>
       }
       bottomBar={
         <BottomBar
-          left={null}
-          right={<button className="btn" type="button">엑셀</button>}
+          left={<button className="btn" type="button">엑셀</button>}
+          right={null}
         />
       }
     >

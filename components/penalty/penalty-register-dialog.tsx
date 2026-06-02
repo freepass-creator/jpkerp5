@@ -64,7 +64,8 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
     createPlaceholder: createPenaltyPlaceholder,
     applyResult: (prev, raw) => {
       const carNumber = (raw.car_number as string) ?? '';
-      const matched = findContractByPlate(contracts, carNumber);
+      const violationDate = normalizeKoreanDate(raw.date as string | null | undefined);
+      const matched = findContractByPlate(contracts, carNumber, violationDate);
       return {
         ...prev,
         doc_type: (raw.doc_type as string) ?? '',

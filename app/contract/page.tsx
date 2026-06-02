@@ -100,33 +100,26 @@ export default function ContractPage() {
                 <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
               ))}
             </select>
-            <select
-              className="input-compact" data-w="md"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-              title="상태별 필터"
-            >
-              <option value="all">상태: 전체</option>
-              <option value="운행">운행</option>
-              <option value="대기">대기</option>
-              <option value="반납">반납</option>
-              <option value="해지">해지</option>
-              <option value="채권">채권</option>
-            </select>
             <span className="filter-divider" />
             <button type="button" className={`chip ${groupBy === 'list' ? 'active' : ''}`} onClick={() => setGroupBy('list')}>전체 리스트</button>
             <button type="button" className={`chip ${groupBy === 'customer' ? 'active' : ''}`} onClick={() => setGroupBy('customer')}>계약자별 묶음</button>
           </div>
-          <div className="topbar-stats">
-            <span>계약<strong>{filtered.length}</strong></span>
-            {groupBy === 'customer' && (
-              <>
-                <span className="sep" />
-                <span>고객<strong>{byCustomer.length}</strong></span>
-              </>
-            )}
-            <span className="sep" />
-            <span className="dim" style={{ fontSize: 11 }}>오늘 {today}</span>
+          {/* 퀵필터 — 계약 상태 chip */}
+          <div className="quick-filters">
+            {(['all','운행','대기','반납','해지','채권'] as const).map((s) => {
+              const count = s === 'all' ? contracts.length : contracts.filter((c) => c.status === s).length;
+              const tone = s === '채권' ? 'chip-tone-red' : s === '해지' ? 'chip-tone-gray' : s === '운행' ? 'chip-tone-brand' : '';
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  className={`chip ${tone} ${statusFilter === s ? 'active' : ''}`}
+                  onClick={() => setStatusFilter(s)}
+                >
+                  {s === 'all' ? '전체' : s}<span className="chip-count">{count}</span>
+                </button>
+              );
+            })}
           </div>
         </header>
 
@@ -213,8 +206,14 @@ export default function ContractPage() {
         </div>
 
         <BottomBar
-          left={<button className="btn btn-primary" type="button">+ 신규 계약</button>}
-          right={<button className="btn" type="button">엑셀</button>}
+          left={
+            <>
+              <button className="btn btn-primary" type="button">+ 신규 계약</button>
+              <span className="btn-sep" />
+              <button className="btn" type="button">엑셀</button>
+            </>
+          }
+          right={null}
         />
       </div>
     </div>

@@ -8,6 +8,7 @@ import { SmsDialog } from '@/components/sms-dialog';
 import { EngineLockDialog } from '@/components/engine-lock-dialog';
 import dynamic from 'next/dynamic';
 const CreateDialog = dynamic(() => import('@/components/create-dialog').then((m) => m.CreateDialog), { ssr: false });
+const RiskDetailDialog = dynamic(() => import('@/components/risk-detail-dialog').then((m) => m.RiskDetailDialog), { ssr: false });
 import { buildCompanyOptions } from '@/lib/filter-helpers';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -99,6 +100,7 @@ export default function ReceivablesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [engineLockTarget, setEngineLockTarget] = useState<Contract | null>(null);
+  const [detailContract, setDetailContract] = useState<Contract | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const today = todayKr();
@@ -358,14 +360,16 @@ export default function ReceivablesPage() {
                       const days = maxOverdueDays(c, today);
                       const lastC = lastContactDate(c.id, history);
                       const isChecked = selectedIds.has(c.id);
-                      const issues = computeActiveIssues(c, today);
+                      const allIssues = computeActiveIssues(c, today);
+                      // 리스크 컬럼은 진짜 리스크(상태)만 — 시동제어/채권화/내용증명은 액션 결과라 별도 컬럼에서 표시
+                      const issues = allIssues.filter((i) => i.kind !== '시동제어' && i.kind !== '채권화' && i.kind !== '내용증명');
                       const primary = pickPrimaryIssue(issues);
                       const others = issues.filter((i) => i !== primary);
                       const latePayStage: LatePayStage = computeLatePayStage(days);
                       const showLockNeeded = needsLock(c);
                       const showNoticeNeeded = needsNotice(c);
                       return (
-                        <tr key={c.id}>
+                        <tr key={c.id} onDoubleClick={() => setDetailContract(c)} style={{ cursor: 'pointer' }}>
                           <td className="checkbox-col">
                             <input
                               type="checkbox"
@@ -679,6 +683,15 @@ export default function ReceivablesPage() {
       </div>
 
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['이력']} initialMode="이력" />
+      <RiskDetailDialog
+        contract={detailContract}
+        open={!!detailContract}
+        onOpenChange={(v) => { if (!v) setDetailContract(null); }}
+        onAddContact={(c) => { setDetailContract(null); setContactOpen(c); }}
+        onEngineLock={(c) => { setDetailContract(null); openEngineLockDialog(c); }}
+        onSendSms={(c) => { setDetailContract(null); setSelectedIds(new Set([c.id])); setSmsOpen(true); }}
+        onMarkDebt={(c) => { void updateContract({ ...c, status: '채권' }); }}
+      />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filtered} selectedIds={selectedIds} />
       <EngineLockDialog
         contract={engineLockTarget}

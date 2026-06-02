@@ -46,10 +46,37 @@ export default function AssetPage() {
     if (!roleLoading && !master) router.replace('/');
   }, [master, roleLoading, router]);
 
-  const { vehicles } = useVehicles();
+  const { vehicles: rawVehicles } = useVehicles();
   const { contracts } = useContracts();
   const { entries: history } = useHistoryEntries();
   const { companies: companyMaster } = useCompanies();
+
+  /**
+   * 자산관리 데이터 = vehicles(차량등록 마스터) + contracts에서 derived(등록증 미입력)
+   * 운영현황과 양방향 연동: 운영현황에 있는 차량은 자산관리에도 보임.
+   * 등록증/제조사 정보가 비어 있으면 "등록증 미입력" 상태로 별도 표시.
+   */
+  const vehicles = useMemo<Vehicle[]>(() => {
+    const byPlate = new Map<string, Vehicle>();
+    for (const v of rawVehicles) {
+      const p = v.plate?.trim();
+      if (p) byPlate.set(p, v);
+    }
+    for (const c of contracts) {
+      const p = c.vehiclePlate?.trim();
+      if (!p || byPlate.has(p)) continue;
+      byPlate.set(p, {
+        id: `contract-derived-${c.id}`,
+        plate: p,
+        model: c.vehicleModel ?? '',
+        company: c.company,
+        status: (c.vehicleStatus ?? '운행') as Vehicle['status'],
+        createdAt: c.contractDate ?? '',
+        notes: '계약에서 자동 인식 — 등록증 정보 미입력',
+      } as Vehicle);
+    }
+    return Array.from(byPlate.values());
+  }, [rawVehicles, contracts]);
 
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = useState('all');
@@ -112,11 +139,19 @@ export default function AssetPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const groupMatch = (status?: VehicleStatus) => {
+      if (!status) return false;
+      if (statusFilter === '__group_등록예정') return status === '구매대기' || status === '등록대기';
+      if (statusFilter === '__group_대기') return status === '상품화대기' || status === '상품화중' || status === '상품대기';
+      if (statusFilter === '__group_정비') return status === '정비' || status === '사고';
+      if (statusFilter === '__group_매각') return status === '매각' || status === '매각대기';
+      return status === statusFilter;
+    };
     return vehicles.filter((v) => {
       // 자산 관점에서는 휴차/임시배차/반납 등 계약 측면 status 제외 (/contract/idle 등 별도 메뉴에서)
       if (v.status && !ASSET_STATUS_SET.has(v.status)) return false;
       if (!matchesCompanyFilter(v.company, companyFilter)) return false;
-      if (statusFilter !== 'all' && v.status !== statusFilter) return false;
+      if (statusFilter !== 'all' && !groupMatch(v.status)) return false;
       if (q) {
         const hay = `${v.plate} ${v.model} ${v.vehicleMaker ?? ''} ${v.vehicleModelLine ?? ''} ${v.vehicleSubModel ?? ''} ${v.vehicleVariant ?? ''} ${v.vehicleTrim ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
@@ -156,35 +191,30 @@ export default function AssetPage() {
                 <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
               ))}
             </select>
-            <select
-              className="input-compact" data-w="md"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              title="차량 상태 필터"
-            >
-              <option value="all">상태: 전체</option>
-              {statusOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
           </div>
-          {/* 통계 — 하단바에서 이전 (자산/계약/재무 공통 규격) */}
-          <div className="topbar-stats">
-            <span>전체<strong>{vehicles.length}</strong></span>
-            <span>표시<strong>{filtered.length}</strong></span>
-            <span className="sep" />
-            <span>등록예정<strong>{counts.등록예정}</strong></span>
-            <span>대기<strong>{counts.대기}</strong></span>
-            <span style={{ color: 'var(--brand)' }}>운행중<strong>{counts.운행중}</strong></span>
-            <span>정비<strong>{counts.정비}</strong></span>
-            <span style={{ color: 'var(--orange-text, #c2410c)' }}>매각검토<strong>{counts.매각검토}</strong></span>
-            <span>매각<strong>{counts.매각}</strong></span>
-            {selected && (
-              <>
-                <span className="sep" />
-                <span>선택<strong className="mono">{selected.plate || selected.assetCode || '-'}</strong></span>
-              </>
-            )}
+          {/* 퀵필터 — 상태 그룹별 chip (카운트 + 클릭 시 필터) */}
+          <div className="quick-filters">
+            <button type="button" className={`chip ${statusFilter === 'all' ? 'active' : ''}`} onClick={() => setStatusFilter('all')}>
+              전체<span className="chip-count">{vehicles.length}</span>
+            </button>
+            <button type="button" className={`chip ${statusFilter === '__group_등록예정' ? 'active' : ''}`} onClick={() => setStatusFilter('__group_등록예정')}>
+              등록예정<span className="chip-count">{counts.등록예정}</span>
+            </button>
+            <button type="button" className={`chip ${statusFilter === '__group_대기' ? 'active' : ''}`} onClick={() => setStatusFilter('__group_대기')}>
+              대기<span className="chip-count">{counts.대기}</span>
+            </button>
+            <button type="button" className={`chip chip-tone-brand ${statusFilter === '운행' ? 'active' : ''}`} onClick={() => setStatusFilter('운행')}>
+              운행중<span className="chip-count">{counts.운행중}</span>
+            </button>
+            <button type="button" className={`chip ${statusFilter === '__group_정비' ? 'active' : ''}`} onClick={() => setStatusFilter('__group_정비')}>
+              정비<span className="chip-count">{counts.정비}</span>
+            </button>
+            <button type="button" className={`chip chip-tone-orange ${statusFilter === '매각검토' ? 'active' : ''}`} onClick={() => setStatusFilter('매각검토')}>
+              매각검토<span className="chip-count">{counts.매각검토}</span>
+            </button>
+            <button type="button" className={`chip ${statusFilter === '__group_매각' ? 'active' : ''}`} onClick={() => setStatusFilter('__group_매각')}>
+              매각<span className="chip-count">{counts.매각}</span>
+            </button>
           </div>
         </header>
 
@@ -233,7 +263,13 @@ export default function AssetPage() {
                     >
                       <td className="center"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} /></td>
                       <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
-                      <td className="mono">{v.assetCode || '-'}</td>
+                      <td className="mono">
+                        {v.assetCode || (
+                          v.id.startsWith('contract-derived-')
+                            ? <span className="muted" style={{ fontSize: 10 }} title="계약에서 자동 인식 — 등록증 정보 미입력">등록증 미입력</span>
+                            : '-'
+                        )}
+                      </td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleType || '-'}</td>
                       <td>{v.vehicleUsage || '-'}</td>
@@ -256,23 +292,13 @@ export default function AssetPage() {
           </div>
         </div>
 
-        {/* 하단바 — 버튼 전용 (통계는 상단바로 이동) */}
+        {/* 하단바 — 모든 버튼은 좌측. 우측은 카톡·알림 popup 영역 (빈공간 유지) */}
         <BottomBar
           left={
             <>
               <Link className="btn btn-primary" href="/asset/purchase" title="신차 구매부터 인도까지 흐름 — 차량구매 페이지로">
                 <ShoppingCart size={14} weight="bold" /> 차량구매
               </Link>
-              <button className="btn" type="button">
-                <FileXls size={14} weight="bold" /> 엑셀
-              </button>
-              <button className="btn" type="button" disabled={!selected} title={!selected ? '행 클릭으로 선택' : '계약 템플릿 다운로드'}>
-                <Download size={14} weight="bold" /> 계약 템플릿
-              </button>
-            </>
-          }
-          right={
-            <>
               <button className="btn" type="button" disabled={!selected} onClick={() => selected && setOpenId(selected.id)}>
                 <PencilSimple size={14} weight="bold" /> 수정
               </button>
@@ -291,8 +317,16 @@ export default function AssetPage() {
               >
                 <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
               </button>
+              <span className="btn-sep" />
+              <button className="btn" type="button">
+                <FileXls size={14} weight="bold" /> 엑셀
+              </button>
+              <button className="btn" type="button" disabled={!selected} title={!selected ? '행 클릭으로 선택' : '계약 템플릿 다운로드'}>
+                <Download size={14} weight="bold" /> 계약 템플릿
+              </button>
             </>
           }
+          right={null}
         />
 
         {openId && (

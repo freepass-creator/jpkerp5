@@ -6,7 +6,7 @@
  * /receivables 는 리스크 액션 중심, 여기는 계약 마스터 관점에서 미수액 정렬.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Warning } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
@@ -19,13 +19,19 @@ import { displayCompanyName } from '@/lib/company-display';
 export default function ContractOverduePage() {
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
+  const [bucket, setBucket] = useState<'all' | 'high' | 'mid' | 'low'>('all');
 
-  const overdue = useMemo(() => {
+  const allOverdue = useMemo(() => {
     return contracts
       .filter((c) => (c.unpaidAmount ?? 0) > 0 || (c.unpaidSeqCount ?? 0) > 0)
       .sort((a, b) => (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0));
   }, [contracts]);
 
+  const high = allOverdue.filter((c) => (c.unpaidSeqCount ?? 0) >= 3);
+  const mid = allOverdue.filter((c) => (c.unpaidSeqCount ?? 0) === 2);
+  const low = allOverdue.filter((c) => (c.unpaidSeqCount ?? 0) <= 1);
+
+  const overdue = bucket === 'high' ? high : bucket === 'mid' ? mid : bucket === 'low' ? low : allOverdue;
   const total = overdue.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
 
   return (
@@ -33,17 +39,37 @@ export default function ContractOverduePage() {
       title="미수금 (계약 마스터)"
       icon={<Warning size={16} weight="fill" style={{ color: 'var(--red-text)' }} />}
       subNav={CONTRACT_SUB}
+      quickFilters={
+        <>
+          <button type="button" className={`chip ${bucket === 'all' ? 'active' : ''}`} onClick={() => setBucket('all')}>
+            전체<span className="chip-count">{allOverdue.length}</span>
+          </button>
+          <button type="button" className={`chip chip-tone-red ${bucket === 'high' ? 'active' : ''}`} onClick={() => setBucket('high')}>
+            3회+<span className="chip-count">{high.length}</span>
+          </button>
+          <button type="button" className={`chip chip-tone-orange ${bucket === 'mid' ? 'active' : ''}`} onClick={() => setBucket('mid')}>
+            2회<span className="chip-count">{mid.length}</span>
+          </button>
+          <button type="button" className={`chip chip-tone-amber ${bucket === 'low' ? 'active' : ''}`} onClick={() => setBucket('low')}>
+            1회<span className="chip-count">{low.length}</span>
+          </button>
+        </>
+      }
       stats={
         <>
-          <span>미수 계약<strong>{overdue.length}</strong></span>
-          <span className="sep" />
           <span>총 미수<strong className="mono" style={{ color: 'var(--red-text)' }}>₩{total.toLocaleString()}</strong></span>
         </>
       }
       bottomBar={
         <BottomBar
-          left={<Link href="/receivables" className="btn">→ 리스크 관리로 (액션 중심)</Link>}
-          right={<button className="btn" type="button">엑셀</button>}
+          left={
+            <>
+              <button className="btn" type="button">엑셀</button>
+              <span className="btn-sep" />
+              <Link href="/receivables" className="btn">→ 리스크 관리로 (액션 중심)</Link>
+            </>
+          }
+          right={null}
         />
       }
     >

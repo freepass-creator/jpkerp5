@@ -21,15 +21,17 @@ import { SubNav, type SubNavItem } from '@/components/layout/sub-nav';
 import { useRole } from '@/lib/use-role';
 
 export function MasterPageShell({
-  title, icon, subNav, search, stats, children, bottomBar,
+  title, icon, subNav, search, stats, quickFilters, children, bottomBar,
 }: {
   title: string;
   icon?: ReactNode;
   subNav: SubNavItem[];
   /** 우측 검색창/필터 영역 (optional) */
   search?: ReactNode;
-  /** 상단바 우측 끝 — 통계 요약 (전체/표시/카운트 등). 하단바는 버튼 전용. */
+  /** 상단바 우측 끝 — 통계 텍스트 요약 (전체/표시/카운트 등). 신규는 quickFilters 사용 권장. */
   stats?: ReactNode;
+  /** 상단바 우측 — chip 퀵필터 그룹 (카운트 + 클릭 시 필터). 자산/계약/재무 공통 규격. */
+  quickFilters?: ReactNode;
   children: ReactNode;
   bottomBar?: ReactNode;
 }) {
@@ -60,6 +62,7 @@ export function MasterPageShell({
             <span>{title}</span>
           </div>
           {search}
+          {quickFilters && <div className="quick-filters">{quickFilters}</div>}
           {stats && <div className="topbar-stats">{stats}</div>}
         </header>
         <SubNav items={subNav} />

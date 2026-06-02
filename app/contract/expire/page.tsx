@@ -5,7 +5,7 @@
  * Contract.returnScheduledDate 가 today 기준 D-90 이내인 계약.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Calendar } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
@@ -19,8 +19,9 @@ export default function ExpirePage() {
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const today = todayKr();
+  const [bucket, setBucket] = useState<'all' | 'expired' | 'd30' | 'd90'>('all');
 
-  const rows = useMemo(() => {
+  const all = useMemo(() => {
     return contracts
       .filter((c) => c.returnScheduledDate && c.status === '운행')
       .map((c) => {
@@ -31,27 +32,42 @@ export default function ExpirePage() {
       .sort((a, b) => a.daysLeft - b.daysLeft);
   }, [contracts, today]);
 
-  const expired = rows.filter((r) => r.daysLeft < 0);
-  const within30 = rows.filter((r) => r.daysLeft >= 0 && r.daysLeft <= 30);
-  const within90 = rows.filter((r) => r.daysLeft > 30 && r.daysLeft <= 90);
+  const expired = all.filter((r) => r.daysLeft < 0);
+  const within30 = all.filter((r) => r.daysLeft >= 0 && r.daysLeft <= 30);
+  const within90 = all.filter((r) => r.daysLeft > 30 && r.daysLeft <= 90);
+
+  const rows = useMemo(() => {
+    if (bucket === 'expired') return expired;
+    if (bucket === 'd30') return within30;
+    if (bucket === 'd90') return within90;
+    return all;
+  }, [bucket, all, expired, within30, within90]);
 
   return (
     <MasterPageShell
       title="만기 임박 계약"
       icon={<Calendar size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       subNav={CONTRACT_SUB}
-      stats={
+      quickFilters={
         <>
-          <span style={{ color: 'var(--red-text)' }}>만기 경과<strong>{expired.length}</strong></span>
-          <span className="sep" />
-          <span style={{ color: 'var(--orange-text, #c2410c)' }}>D-30 이내<strong>{within30.length}</strong></span>
-          <span>D-31~90<strong>{within90.length}</strong></span>
+          <button type="button" className={`chip ${bucket === 'all' ? 'active' : ''}`} onClick={() => setBucket('all')}>
+            전체<span className="chip-count">{all.length}</span>
+          </button>
+          <button type="button" className={`chip chip-tone-red ${bucket === 'expired' ? 'active' : ''}`} onClick={() => setBucket('expired')}>
+            만기 경과<span className="chip-count">{expired.length}</span>
+          </button>
+          <button type="button" className={`chip chip-tone-orange ${bucket === 'd30' ? 'active' : ''}`} onClick={() => setBucket('d30')}>
+            D-30<span className="chip-count">{within30.length}</span>
+          </button>
+          <button type="button" className={`chip ${bucket === 'd90' ? 'active' : ''}`} onClick={() => setBucket('d90')}>
+            D-31~90<span className="chip-count">{within90.length}</span>
+          </button>
         </>
       }
       bottomBar={
         <BottomBar
-          left={null}
-          right={<button className="btn" type="button">엑셀</button>}
+          left={<button className="btn" type="button">엑셀</button>}
+          right={null}
         />
       }
     >

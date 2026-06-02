@@ -21,6 +21,11 @@ import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { HistoryAddDialog } from '@/components/history-add-dialog';
 import { todayKr } from '@/lib/mock-data';
 import {
+  currentStage, stageLabel, isNearExpiry, daysToExpiry, getExpiryDate,
+  getVehicleState, getContractState, getPaymentState,
+  type Stage,
+} from '@/lib/contract-stage';
+import {
   validateDocument, summarizeIssues,
   type DocumentKind, type DocumentData, type ValidationIssue,
 } from '@/lib/document-validation';
@@ -89,6 +94,9 @@ export function ContractDetailDialog({
 function DetailHero({ c }: { c: Contract }) {
   const { companies } = useCompanies();
   const companyDisplay = displayCompanyName(c.company, companies);
+  const vs = getVehicleState(c);
+  const cs = getContractState(c);
+  const ps = getPaymentState(c);
   return (
     <div className="detail-hero">
       <div className="detail-hero-main">
@@ -104,6 +112,14 @@ function DetailHero({ c }: { c: Contract }) {
           <span>·</span>
           <span>담당 {c.manager || '-'}</span>
         </div>
+      </div>
+      <div className="detail-hero-badges" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="dim" style={{ fontSize: 10 }}>차량</span>
+        <span className={`status ${vs.name}`}>{vs.name}</span>
+        <span className="dim" style={{ fontSize: 10, marginLeft: 6 }}>계약</span>
+        <span className={`status ${cs.name}`}>{cs.name}</span>
+        <span className="dim" style={{ fontSize: 10, marginLeft: 6 }}>수납</span>
+        <span className={`status ${ps.name}`}>{ps.name}</span>
       </div>
     </div>
   );
@@ -139,84 +155,8 @@ function Field({
 
 /* ─────────────── 차량정보 탭 (차량 + 라이프사이클 액션) ─────────────── */
 
-type Stage =
-  | '구매대기' | '등록대기'
-  | '상품화대기' | '상품화중' | '상품대기'
-  | '운행'
-  | '만기임박' | '연장대기' | '종료대기'   // 만기 라이프사이클
-  | '휴차대기' | '매각대기' | '매각'
-  | '휴차' | '임시배차';  // legacy (이전 데이터 호환)
-
-/**
- * 만기일 — contractDate + termMonths 기준 (계약 기간이 진실).
- * termMonths 없을 때만 returnScheduledDate 폴백.
- */
-function getExpiryDate(c: Contract): string | null {
-  if (c.contractDate && c.termMonths && c.termMonths > 0) {
-    const base = new Date(c.contractDate);
-    if (!Number.isNaN(base.getTime())) {
-      base.setMonth(base.getMonth() + c.termMonths);
-      return base.toISOString().slice(0, 10);
-    }
-  }
-  return c.returnScheduledDate ?? null;
-}
-
-/** 만기까지 남은 일수 — 음수면 경과 */
-function daysToExpiry(c: Contract, today: string): number | null {
-  const expiry = getExpiryDate(c);
-  if (!expiry) return null;
-  const a = new Date(today).getTime();
-  const b = new Date(expiry).getTime();
-  if (Number.isNaN(a) || Number.isNaN(b)) return null;
-  return Math.round((b - a) / 86400000);
-}
-
-/** 만기 D-90 이내 (음수 = 경과 포함) — 운행 계약일 때 만기임박으로 자동 표시 */
-function isNearExpiry(c: Contract, today: string): boolean {
-  const d = daysToExpiry(c, today);
-  return d !== null && d <= 90;
-}
-
-function currentStage(c: Contract): Stage {
-  // 명시적 vehicleStatus 우선
-  switch (c.vehicleStatus) {
-    case '운행':
-      // 운행 + 반납예정일 D-90 이내 → 만기임박 자동 표시
-      return isNearExpiry(c, todayKr()) ? '만기임박' : '운행';
-    case '연장대기': return '연장대기';
-    case '종료대기': return '종료대기';
-    case '매각': return '매각';
-    case '매각대기': return '매각대기';
-    case '휴차대기': return '휴차대기';
-    case '상품대기': return '상품대기';
-    case '상품화중': return '상품화중';
-    case '상품화대기': return '상품화대기';
-    case '등록대기': return '등록대기';
-    case '구매대기': return '구매대기';
-    case '휴차': return '휴차';
-    case '임시배차': return '임시배차';
-    case '인도대기':
-    case '출고대기': return '상품대기';
-  }
-  // legacy 케이스 파생 — vehicleStatus 없을 때만
-  if (c.returnedDate || c.status === '반납') return '휴차대기';
-  if (c.deliveredDate && c.status === '운행') {
-    return isNearExpiry(c, todayKr()) ? '만기임박' : '운행';
-  }
-  // 손님 있는 계약은 인도일 없어도 운행 (스냅샷 업로드 시점)
-  if (c.status === '운행') {
-    return isNearExpiry(c, todayKr()) ? '만기임박' : '운행';
-  }
-  return '구매대기';
-}
-
-/** 표시용 라벨 — 내부값 '운행' → '계약중', '매각' → '매각완료' (리스트뷰와 통일) */
-function stageLabel(s: Stage): string {
-  if (s === '운행') return '계약중';
-  if (s === '매각') return '매각완료';
-  return s;
-}
+// Stage / currentStage / stageLabel / isNearExpiry / getExpiryDate / daysToExpiry
+// → lib/contract-stage.ts 로 이관 (목록·다이얼로그 양쪽에서 동일 stage 값 사용)
 
 const IDLE_REASONS = ['사고', '정비', '검수', '대기'] as const;
 type IdleReason = typeof IDLE_REASONS[number];
@@ -258,6 +198,11 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
     nextLabel: '연장 / 종료 결정',
     items: [],  // 결정 분기라 체크 없음
   },
+  '만기경과': {
+    label: '만기 경과 — 즉시 협의',
+    nextLabel: '연장 / 종료 결정',
+    items: [],
+  },
   '연장대기': {
     label: '연장 협의 — 새 조건 협상',
     nextLabel: '연장 처리 (새 반납예정일) → 운행',
@@ -270,8 +215,13 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
   },
   '휴차대기': {
     label: '재진입 결정',
-    nextLabel: '매각 / 재상품화 선택',
+    nextLabel: '재상품화 / 매각검토 선택',
     items: [],  // 결정 분기라 체크 없음
+  },
+  '매각검토': {
+    label: '매각 여부 검토',
+    nextLabel: '매각 결정 / 보류 (휴차대기 복귀)',
+    items: ['시세 조사', '주행거리·연식 평가', '잔존가치 산정', '매입처 사전 견적'],
   },
   '매각대기': {
     label: '매각 진행 체크',
@@ -647,8 +597,8 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
       {/* 상태 전환 */}
       <Section
         icon={<ArrowsLeftRight size={12} weight="duotone" />}
-        title={`현재 ${stageLabel(stage)}`}
-        action={<span className={`status ${stage}`}>{stageLabel(stage)}{stage === '휴차' && c.idleReason ? ` (${c.idleReason.split(' — ')[0]})` : ''}</span>}
+        title={`현재 ${stageLabel(stage)}${stage === '휴차' && c.idleReason ? ` (${c.idleReason.split(' — ')[0]})` : ''}`}
+        action={null}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <span style={{ fontSize: 11, color: 'var(--text-weak)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -737,7 +687,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
         )}
 
         {/* 만기임박 배너 — 운행 + 만기 D-90 이내 자동 표시 */}
-        {stage === '만기임박' && !renewPicker && !endPicker && (() => {
+        {(stage === '만기임박' || stage === '만기경과') && !renewPicker && !endPicker && (() => {
           const d = daysToExpiry(c, todayKr()) ?? 0;
           const tone = d < 0 ? 'red' : d <= 7 ? 'red' : d <= 30 ? 'orange' : 'yellow';
           const bg = tone === 'red' ? 'var(--red-bg)' : tone === 'orange' ? 'var(--orange-bg)' : '#fef9c3';
@@ -918,11 +868,10 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
               <button
                 className="btn"
                 onClick={() => {
-                  if (!window.confirm('이 차량을 매각 대상으로 전환합니다. 계속하시겠습니까?')) return;
-                  onUpdate({ ...c, vehicleStatus: '매각대기' });
+                  onUpdate({ ...c, vehicleStatus: '매각검토' });
                 }}
               >
-                매각 결정 → 매각대기
+                매각 검토 시작 → 매각검토
               </button>
               <button
                 className="btn btn-primary"
@@ -934,16 +883,48 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
               </button>
             </>
           )}
+          {stage === '매각검토' && (
+            <>
+              <button
+                className="btn btn-primary"
+                disabled={!allChecked}
+                onClick={() => {
+                  if (!window.confirm('매각 진행을 결정합니다. 매각대기 상태로 전환됩니다.')) return;
+                  onUpdate({ ...c, vehicleStatus: '매각대기' });
+                }}
+              >
+                <CheckCircle size={14} /> 매각 결정 → 매각대기
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  onUpdate({ ...c, vehicleStatus: '휴차대기' });
+                }}
+              >
+                <ArrowUUpLeft size={14} /> 검토 보류 → 휴차대기
+              </button>
+            </>
+          )}
           {stage === '매각대기' && (
-            <button
-              className="btn btn-primary"
-              disabled={!allChecked}
-              onClick={() => {
-                onUpdate({ ...c, vehicleStatus: '매각' });
-              }}
-            >
-              <CheckCircle size={14} /> 매각 처리 → 매각완료
-            </button>
+            <>
+              <button
+                className="btn btn-primary"
+                disabled={!allChecked}
+                onClick={() => {
+                  onUpdate({ ...c, vehicleStatus: '매각' });
+                }}
+              >
+                <CheckCircle size={14} /> 매각 처리 → 매각완료
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  onUpdate({ ...c, vehicleStatus: '매각검토' });
+                }}
+              >
+                <ArrowUUpLeft size={14} /> 매각 보류 → 매각검토
+              </button>
+            </>
           )}
           {stage === '매각' && (
             <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>

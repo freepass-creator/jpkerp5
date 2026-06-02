@@ -133,12 +133,12 @@ export default function FinanceDailyPage() {
       }
       bottomBar={
         <BottomBar
-          left={null}
-          right={
+          left={
             <button className="btn btn-primary" type="button" onClick={handleExport} title="자금일보 엑셀 (세무사 공유용)">
               <DownloadSimple size={12} weight="bold" /> 엑셀 다운로드
             </button>
           }
+          right={null}
         />
       }
     >

@@ -102,21 +102,20 @@ export default function FinancePage() {
                 <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
               ))}
             </select>
-            <select
-              className="input-compact" data-w="md"
-              value={directionFilter}
-              onChange={(e) => setDirectionFilter(e.target.value as 'all' | 'deposit' | 'withdraw')}
-              title="입출금 방향"
-            >
-              <option value="all">입출금 전체</option>
-              <option value="deposit">입금만</option>
-              <option value="withdraw">출금만</option>
-            </select>
+          </div>
+          {/* 퀵필터 — 입출금 방향 chip + 금액합계 */}
+          <div className="quick-filters">
+            <button type="button" className={`chip ${directionFilter === 'all' ? 'active' : ''}`} onClick={() => setDirectionFilter('all')}>
+              전체<span className="chip-count">{bankTx.length}</span>
+            </button>
+            <button type="button" className={`chip chip-tone-brand ${directionFilter === 'deposit' ? 'active' : ''}`} onClick={() => setDirectionFilter('deposit')}>
+              입금<span className="chip-count">{bankTx.filter((t) => (t.amount ?? 0) > 0).length}</span>
+            </button>
+            <button type="button" className={`chip chip-tone-red ${directionFilter === 'withdraw' ? 'active' : ''}`} onClick={() => setDirectionFilter('withdraw')}>
+              출금<span className="chip-count">{bankTx.filter((t) => (t.withdraw ?? 0) > 0).length}</span>
+            </button>
           </div>
           <div className="topbar-stats">
-            <span>전체<strong>{bankTx.length}</strong></span>
-            <span>표시<strong>{filtered.length}</strong></span>
-            <span className="sep" />
             <span style={{ color: 'var(--green-text)' }}>입금<strong className="mono">₩{formatCurrency(totals.inSum)}</strong></span>
             <span style={{ color: 'var(--red-text)' }}>출금<strong className="mono">₩{formatCurrency(totals.outSum)}</strong></span>
           </div>
@@ -182,8 +181,14 @@ export default function FinancePage() {
         </div>
 
         <BottomBar
-          left={<button className="btn btn-primary" type="button">+ 거래 등록</button>}
-          right={<button className="btn" type="button">엑셀</button>}
+          left={
+            <>
+              <button className="btn btn-primary" type="button">+ 거래 등록</button>
+              <span className="btn-sep" />
+              <button className="btn" type="button">엑셀</button>
+            </>
+          }
+          right={null}
         />
       </div>
     </div>

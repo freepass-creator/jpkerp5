@@ -1422,16 +1422,18 @@ input[type="radio"]:disabled {
 .status.등록대기  { background: var(--amber-bg);  color: var(--amber-text); }    /* 등록 진행 */
 .status.상품화중  { background: var(--blue-bg);   color: var(--blue-text); }     /* 준비중 */
 .status.인도대기, .status.출고대기, .status.상품대기  { background: var(--indigo-bg); color: var(--indigo-text); } /* 영업 가능 */
-.status.계약완료, .status.계약, .status.계약중, .status.운행 { background: var(--green-bg); color: var(--green-text); } /* 운영 정상 */
+.status.계약완료, .status.계약, .status.계약중, .status.운행, .status.운행중 { background: var(--green-bg); color: var(--green-text); } /* 운영 정상 */
 .status.만기임박 { background: #fef9c3; color: #854d0e; }   /* 만기 D-90 이내 — 결정 필요 */
+.status.만기경과 { background: var(--red-bg); color: var(--red-text); font-weight: 600; }   /* 만기 지났는데 운행 중 — 강조 */
 .status.연장대기 { background: var(--blue-bg); color: var(--blue-text); }   /* 연장 협의 중 */
 .status.종료대기 { background: var(--orange-bg); color: var(--orange-text); }   /* 반납 약속 잡힘 */
 .status.휴차, .status.휴차중, .status.정비, .status.사고 { background: var(--purple-bg); color: var(--purple-text); }   /* 예외 */
 .status.임시배차 { background: var(--amber-bg); color: var(--amber-text); }   /* 임시 대체 출고 */
 .status.휴차대기, .status.대기, .status.반납, .status.반납완료, .status.반납예정 { background: var(--zinc-bg); color: var(--zinc-text); }   /* 반납 회수 후 결정 대기 */
 .status.상품화대기 { background: var(--blue-bg); color: var(--blue-text); }   /* 재상품화 큐 */
+.status.매각검토 { background: var(--amber-bg); color: var(--amber-text); }   /* 매각 여부 평가 */
 .status.매각대기 { background: var(--orange-bg); color: var(--orange-text); }   /* 매각 진행 */
-.status.매각 { background: var(--red-bg); color: var(--red-text); }   /* terminal */
+.status.매각, .status.매각완료 { background: var(--red-bg); color: var(--red-text); }   /* terminal */
 
 /* 계약상태 — 무계약/정상/만기임박/만기경과/연장대기/종료대기/미수검/위반 */
 .status.무계약 { background: var(--bg-sunken); color: var(--text-weak); }
@@ -1470,6 +1472,27 @@ input[type="radio"]:disabled {
   gap: 6px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* 퀵필터 chip 그룹 — 상단바 우측 정렬, 카운트 chip 패턴 */
+.quick-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.quick-filters .filter-divider { margin: 0 4px; }
+
+/* 하단바 버튼 그룹 구분선 — 주 액션 + 보조 액션 묶음 사이 */
+.btn-sep {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .filter-divider {
