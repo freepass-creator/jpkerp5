@@ -78,7 +78,7 @@ export default function FinancePage() {
         <header className="topbar">
           <div className="topbar-title">
             <Bank size={16} weight="fill" style={{ color: 'var(--brand)' }} />
-            <span>재무 관리</span>
+            <span>입출금 관리</span>
           </div>
           <div className="topbar-search">
             <MagnifyingGlass size={14} className="icon" />

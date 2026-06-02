@@ -40,14 +40,13 @@ export const CONTRACT_SUB: SubNavItem[] = [
   { href: '/contract/ended', label: '종료' },
 ];
 
+// 입출금 관리 (구 재무관리) sub-nav — 계좌·자동이체·카드매출·법인카드
 export const FINANCE_SUB: SubNavItem[] = [
-  { href: '/finance', label: '대시보드' },
-  { href: '/finance/daily', label: '자금일보' },
-  { href: '/finance/receipt', label: '수납' },
-  { href: '/finance/expense', label: '지출' },
+  { href: '/finance', label: '계좌' },
   { href: '/finance/autopay', label: '자동이체' },
   { href: '/finance/card', label: '카드매출' },
-  { href: '/finance/taxbill', label: '세금계산서' },
+  { href: '/finance/corpcard', label: '법인카드' },
+  { href: '/finance/daily', label: '자금일보' },
 ];
 
 export function SubNav({ items }: { items: SubNavItem[] }) {

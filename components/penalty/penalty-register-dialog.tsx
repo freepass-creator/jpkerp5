@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import JSZip from 'jszip';
-import { X, CircleNotch, CheckCircle, Warning, Plus, ArrowCounterClockwise, Printer, DownloadSimple, PaperPlaneTilt } from '@phosphor-icons/react';
+import { X, CircleNotch, CheckCircle, Warning, Plus, ArrowCounterClockwise, Printer, DownloadSimple, PaperPlaneTilt, Trash } from '@phosphor-icons/react';
 import { Dialog, DialogTrigger, DialogContent, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { OcrUploadStage } from '@/components/ui/ocr-upload-stage';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -66,6 +66,15 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
       const carNumber = (raw.car_number as string) ?? '';
       const violationDate = normalizeKoreanDate(raw.date as string | null | undefined);
       const matched = findContractByPlate(contracts, carNumber, violationDate);
+      if (!matched) {
+        const normQ = carNumber.replace(/[^0-9가-힣]/g, '');
+        console.warn('[penalty:match-fail]', {
+          carNumber, normalized: normQ, violationDate,
+          contractsCount: contracts.length,
+          samplePlates: contracts.slice(0, 5).map((c) => c.plate),
+          allPlatesNormalized: contracts.map((c) => (c.plate ?? '').replace(/[^0-9가-힣]/g, '')),
+        });
+      }
       return {
         ...prev,
         doc_type: (raw.doc_type as string) ?? '',
@@ -169,7 +178,7 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
         </DialogTrigger>
       )}
       <DialogContent title="고지서 등록 (자동 OCR)" size="xl">
-        <div className="space-y-3">
+        <div className="space-y-3" style={{ padding: '16px 20px' }}>
           <OcrUploadStage
             progress={ocr.progress}
             busy={ocr.busy}
@@ -200,8 +209,23 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
                   <DownloadSimple size={13} weight="bold" /> 다운로드
                   {selectedCount > 0 && <strong style={{ marginLeft: 4 }}>({selectedCount})</strong>}
                 </button>
+                <button
+                  className="btn btn-sm"
+                  disabled={selectedCount === 0}
+                  onClick={() => {
+                    if (selectedCount === 0) return;
+                    if (!window.confirm(`선택한 ${selectedCount}건을 삭제하시겠습니까?`)) return;
+                    selected.forEach((id) => ocr.removeItem(id));
+                    setSelected(new Set());
+                  }}
+                  title={selectedCount === 0 ? '삭제할 항목을 체크박스로 선택' : `선택 ${selectedCount}건 삭제`}
+                  style={{ color: selectedCount > 0 ? 'var(--red-text)' : undefined }}
+                >
+                  <Trash size={13} weight="bold" /> 선택 삭제
+                  {selectedCount > 0 && <strong style={{ marginLeft: 4 }}>({selectedCount})</strong>}
+                </button>
                 <span className="text-weak text-xs" style={{ marginLeft: 'auto' }}>
-                  체크박스로 항목 선택 → 팩스 / 다운로드
+                  체크박스로 항목 선택 → 팩스 / 다운로드 / 삭제
                 </span>
               </div>
 
@@ -222,6 +246,7 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
                       <th>회사</th>
                       <th>차량번호</th>
                       <th>구분</th>
+                      <th style={{ width: 100 }}>위반일자</th>
                       <th>위반장소</th>
                       <th className="num">금액</th>
                       <th>임차인</th>
@@ -246,12 +271,22 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
                           <td className="plate">{p._company?.code || <span className="text-muted">-</span>}</td>
                           <td className="plate">{p.car_number || <span className="text-muted">-</span>}</td>
                           <td className="dim">{p.doc_type || '-'}</td>
+                          <td className="mono">{p.date || <span className="text-muted">-</span>}</td>
                           <td className="dim truncate" style={{ maxWidth: 200 }}>{p.location || '-'}</td>
                           <td className="num">{p.amount ? p.amount.toLocaleString('ko-KR') : '-'}</td>
                           <td className="dim">{p._contract?.contractor_name || <span className="text-muted">미매칭</span>}</td>
                           <td className="center">
-                            <button className="btn-ghost btn btn-sm" onClick={() => ocr.removeItem(p.id)}>
-                              <X size={11} />
+                            <button
+                              className="btn-ghost btn btn-sm"
+                              onClick={() => {
+                                if (!window.confirm('이 항목을 삭제하시겠습니까?')) return;
+                                ocr.removeItem(p.id);
+                                setSelected((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
+                              }}
+                              title="이 행 삭제"
+                              style={{ color: 'var(--red-text)' }}
+                            >
+                              <X size={12} weight="bold" />
                             </button>
                           </td>
                         </tr>

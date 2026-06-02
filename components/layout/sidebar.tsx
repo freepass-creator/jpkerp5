@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Bank,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -61,11 +61,19 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
           <Warning size={14} weight={isActive('/receivables') ? 'fill' : 'regular'} />
           <span>리스크 관리</span>
         </Link>
+        <Link
+          href={master ? '/finance' : '/payments'}
+          className={`sb-item ${(isActive('/finance') || isActive('/payments')) ? 'active' : ''}`}
+          title="입출금 관리 — 계좌·자동이체·카드매출·법인카드"
+        >
+          <CurrencyKrw size={14} weight={(isActive('/finance') || isActive('/payments')) ? 'fill' : 'regular'} />
+          <span>입출금 관리</span>
+        </Link>
       </div>
 
       <div className="sb-divider" />
 
-      {/* 데이터 (마스터 영역) — master 만 노출 */}
+      {/* 자산 (마스터) — 계약관리는 운영현황에서 보는 것으로 통합, 재무관리는 위 입출금으로 리네임 */}
       {master && (
         <>
           <div className="sb-section">
@@ -73,27 +81,9 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
               <Car size={14} weight={isActive('/asset') ? 'fill' : 'regular'} />
               <span>자산 관리</span>
             </Link>
-            <Link href="/contract" className={`sb-item ${isActive('/contract') && pathname !== '/contract/preview' ? 'active' : ''}`} title="계약 관리 — 임차인·계약·만기·반납·스케줄">
-              <FileText size={14} weight={isActive('/contract') ? 'fill' : 'regular'} />
-              <span>계약 관리</span>
-            </Link>
-            <Link href="/finance" className={`sb-item ${isActive('/finance') ? 'active' : ''}`} title="재무 관리 — 자금일보·자동이체·카드·수납·지출·세금계산서">
-              <Bank size={14} weight={isActive('/finance') ? 'fill' : 'regular'} />
-              <span>재무 관리</span>
-            </Link>
           </div>
           <div className="sb-divider" />
         </>
-      )}
-
-      {/* 기존 입출금 — master 에게는 재무관리 안으로 들어가지만 일반 직원은 그대로 입출금만 */}
-      {!master && (
-        <div className="sb-section">
-          <Link href="/payments" className={`sb-item ${isActive('/payments') ? 'active' : ''}`} title="입출금 관리 — 계좌 입금/출금 거래">
-            <CurrencyKrw size={14} weight={isActive('/payments') ? 'fill' : 'regular'} />
-            <span>입출금 관리</span>
-          </Link>
-        </div>
       )}
 
       <div className="sb-spacer" />
