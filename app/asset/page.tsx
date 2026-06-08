@@ -40,6 +40,8 @@ import { ContractDocSection } from '@/components/asset/contract-doc-section';
 import { useRole } from '@/lib/use-role';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { toast } from '@/lib/toast';
+import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
 
 export default function AssetPage() {
   const router = useRouter();
@@ -48,7 +50,7 @@ export default function AssetPage() {
     if (!roleLoading && !master) router.replace('/');
   }, [master, roleLoading, router]);
 
-  const { vehicles: rawVehicles, update: updateVehicle } = useVehicles();
+  const { vehicles: rawVehicles, update: updateVehicle, remove: removeVehicle, add: addVehicle } = useVehicles();
   const { contracts } = useContracts();
   const { entries: history } = useHistoryEntries();
   const { companies: companyMaster } = useCompanies();
@@ -84,6 +86,7 @@ export default function AssetPage() {
   const [companyFilter, setCompanyFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [insuranceOpen, setInsuranceOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -181,6 +184,7 @@ export default function AssetPage() {
             />
           </div>
 
+          {/* 퀵필터 — 검색창 우측. 같은 페이지의 행 필터 (회사 등) */}
           <div className="filter-bar">
             <select
               className="input-compact" data-w="md"
@@ -194,6 +198,14 @@ export default function AssetPage() {
               ))}
             </select>
           </div>
+
+          {/* 우측 끝 — sub-page 이동 버튼 (.chip-nav) */}
+          <div className="topbar-right">
+            <Link href="/asset/insurance" className="chip chip-nav" title="보험증권 관리 — 회사·차량별 보험 현황, 만기 임박 알림">보험</Link>
+            <Link href="/asset/loan" className="chip chip-nav" title="할부 스케줄 — 할부사·잔여원금·월납입 회차">할부</Link>
+            <Link href="/asset/repair" className="chip chip-nav" title="차량 수선 — 정비공장·이력·비용">수선</Link>
+            <Link href="/asset/gps" className="chip chip-nav" title="GPS 단말 — 공급사·단말번호·상태">GPS</Link>
+          </div>
         </header>
 
         <div className="dashboard" style={{ gridTemplateColumns: '1fr' }}>
@@ -203,7 +215,23 @@ export default function AssetPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th className="center" style={{ width: 36 }}><input type="checkbox" /></th>
+                    <th className="checkbox-col">
+                      <input
+                        type="checkbox"
+                        checked={filtered.length > 0 && filtered.every((v) => selectedIds.has(v.id))}
+                        ref={(el) => {
+                          if (!el) return;
+                          const some = filtered.some((v) => selectedIds.has(v.id));
+                          const all = filtered.every((v) => selectedIds.has(v.id));
+                          el.indeterminate = some && !all;
+                        }}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds(new Set(filtered.map((v) => v.id)));
+                          else setSelectedIds(new Set());
+                        }}
+                        aria-label="전체 선택"
+                      />
+                    </th>
                     <th style={{ width: 56 }}>회사</th>
                     <th style={{ width: 96 }}>차량번호</th>
                     <th style={{ width: 130 }}>차종</th>
@@ -233,7 +261,7 @@ export default function AssetPage() {
                       style={{ cursor: 'pointer', verticalAlign: 'middle' }}
                       className={selectedId === v.id ? 'selected-row' : undefined}
                     >
-                      <td className="center" style={{ verticalAlign: 'middle' }}><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} /></td>
+                      <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
                       <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
@@ -269,10 +297,44 @@ export default function AssetPage() {
               <button className="btn" type="button" disabled={!selected} onClick={() => selected && setOpenId(selected.id)}>
                 <PencilSimple size={14} weight="bold" /> 수정
               </button>
-              <button className="btn" type="button" disabled={!selected}>
+              <button
+                className="btn"
+                type="button"
+                title="보험증권 OCR 등록 — 1회차 보험료 자동 산출"
+                onClick={() => setInsuranceOpen(true)}
+              >
+                <FileXls size={14} weight="bold" /> 보험증권 OCR
+              </button>
+              <button
+                className="btn"
+                type="button"
+                disabled={!selected}
+                title="선택 행을 복제 — 새 차량 생성 (번호판 + 차종 등 그대로, ID는 신규)"
+                onClick={async () => {
+                  if (!selected) return;
+                  if (!confirm(`'${selected.plate}' 자산을 복제하시겠습니까?`)) return;
+                  try {
+                    const { id: _drop, ...rest } = selected;
+                    await addVehicle({ ...rest, plate: `${selected.plate}_복사` });
+                    toast.success('복제 완료 — 차량번호 수정 필요');
+                  } catch (e) { toast.error(`복제 실패: ${(e as Error).message}`); }
+                }}
+              >
                 <Copy size={14} weight="bold" /> 복사
               </button>
-              <button className="btn" type="button" disabled={!selected}>
+              <button
+                className="btn"
+                type="button"
+                disabled={!selected}
+                title="선택 행 단일 삭제"
+                style={{ color: selected ? 'var(--red-text)' : undefined }}
+                onClick={async () => {
+                  if (!selected) return;
+                  if (!confirm(`'${selected.plate}' 자산을 삭제하시겠습니까? (감사로그 남음)`)) return;
+                  try { await removeVehicle(selected.id); setSelectedId(null); toast.success('삭제 완료'); }
+                  catch (e) { toast.error(`삭제 실패: ${(e as Error).message}`); }
+                }}
+              >
                 <Trash size={14} weight="bold" /> 삭제
               </button>
               <button
@@ -281,14 +343,58 @@ export default function AssetPage() {
                 disabled={selectedIds.size === 0}
                 title="체크박스로 선택한 자산 일괄 삭제"
                 style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
+                onClick={async () => {
+                  if (selectedIds.size === 0) return;
+                  if (!confirm(`선택한 ${selectedIds.size}건의 자산을 삭제하시겠습니까? (감사로그 남음)`)) return;
+                  for (const id of selectedIds) {
+                    try { await removeVehicle(id); } catch (e) { console.error('vehicle delete failed', id, e); }
+                  }
+                  setSelectedIds(new Set());
+                }}
               >
                 <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
               </button>
               <span className="btn-sep" />
-              <button className="btn" type="button">
+              <button
+                className="btn"
+                type="button"
+                title="현재 필터된 자산 전체 엑셀"
+                onClick={async () => {
+                  if (filtered.length === 0) { toast.info('내보낼 자산 없음'); return; }
+                  const XLSX = await import('xlsx');
+                  const rows = filtered.map((v) => ({
+                    회사: v.company ?? '',
+                    차량번호: v.plate ?? '',
+                    차종: v.model ?? '',
+                    제조사: v.vehicleMaker ?? '',
+                    제작연월일: v.manufacturedDate ?? '',
+                    VIN: v.vin ?? '',
+                    상태: v.status ?? '',
+                    매입일: v.purchasedDate ?? '',
+                  }));
+                  const ws = XLSX.utils.json_to_sheet(rows);
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, '자산');
+                  XLSX.writeFile(wb, `자산_${filtered.length}건_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                }}
+              >
                 <FileXls size={14} weight="bold" /> 엑셀
               </button>
-              <button className="btn" type="button" disabled={!selected} title={!selected ? '행 클릭으로 선택' : '계약 템플릿 다운로드'}>
+              <button
+                className="btn"
+                type="button"
+                disabled={!selected}
+                title={!selected ? '행 클릭으로 선택' : '선택 자산 기반 계약서 양식 다운로드'}
+                onClick={async () => {
+                  if (!selected) return;
+                  const { downloadTemplate } = await import('@/lib/excel-template');
+                  const { CONTRACT_COLUMNS } = await import('@/lib/import-schema');
+                  downloadTemplate(`계약_${selected.plate}.xlsx`, CONTRACT_COLUMNS, {
+                    title: `계약 등록 양식 (${selected.plate} ${selected.model ?? ''})`,
+                    notes: [`· 차량번호 ${selected.plate}, 차종 ${selected.model ?? ''} 기준 양식 — 회사·계약자만 채우면 됨`],
+                  });
+                }}
+              >
                 <Download size={14} weight="bold" /> 계약 템플릿
               </button>
             </>
@@ -305,6 +411,22 @@ export default function AssetPage() {
             onClose={() => setOpenId(null)}
           />
         )}
+
+        <InsuranceRegisterDialog
+          open={insuranceOpen}
+          onOpenChange={setInsuranceOpen}
+          vehicleId={selected?.id}
+          onSaved={(p) => {
+            if (selected) {
+              void updateVehicle({
+                ...selected,
+                insuranceCompany: p.insurer ?? selected.insuranceCompany,
+                insurancePolicyNo: p.policyNo ?? selected.insurancePolicyNo,
+                insuranceExpiryDate: p.endDate ?? selected.insuranceExpiryDate,
+              });
+            }
+          }}
+        />
       </div>
     </div>
   );

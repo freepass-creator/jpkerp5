@@ -277,7 +277,19 @@ function CompanyCardsView() {
       <table className="table">
         <thead>
           <tr>
-            <th style={{ width: 28 }}><input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="전체 선택" /></th>
+            <th className="checkbox-col">
+              <input
+                type="checkbox"
+                checked={allChecked}
+                ref={(el) => {
+                  if (!el) return;
+                  const some = selectedIds.size > 0;
+                  el.indeterminate = some && !allChecked;
+                }}
+                onChange={toggleAll}
+                aria-label="전체 선택"
+              />
+            </th>
             <th style={{ minWidth: 220 }}>회사명</th>
             <th style={{ width: 70 }}>구분</th>
             <th style={{ width: 115 }}>법인등록</th>
@@ -305,7 +317,7 @@ function CompanyCardsView() {
                 onDoubleClick={() => setOpenId(c.id)}
                 title="더블클릭 시 상세 (계좌·차고지·사무실·증차·서류 관리)"
               >
-                <td className="center" onClick={(e) => e.stopPropagation()}>
+                <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                   <input type="checkbox" checked={checked} onChange={() => toggle(c.id)} aria-label={`${c.name} 선택`} />
                 </td>
                 <td>

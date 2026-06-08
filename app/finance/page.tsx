@@ -233,7 +233,7 @@ export default function FinancePage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th className="center" style={{ width: 36 }}>
+                    <th className="checkbox-col">
                       <input
                         type="checkbox"
                         checked={filtered.length > 0 && filtered.every((t) => selectedIds.has(t.id))}
@@ -282,7 +282,7 @@ export default function FinancePage() {
                         }}
                         style={{ cursor: 'pointer' }}
                       >
-                        <td className="center">
+                        <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selectedIds.has(t.id)}

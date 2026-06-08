@@ -33,7 +33,7 @@ const STAFF_DEFAULTS = {
   fax: '',
 };
 
-const CHECK_COL_WIDTH = 36;
+const CHECK_COL_WIDTH = 28;
 const COMPANY_COL_WIDTH = 56;
 const PLATE_COL_WIDTH = 96;
 
@@ -79,7 +79,7 @@ export default function PenaltyPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('in-progress');
   /** 체크박스로 선택된 항목 ID — bulk 처리완료/다운로드용 */
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   /** 처리완료 탭 기간 필터 */
   const [period, setPeriod] = useState<Period>('이번달');
   /** 처리완료 탭 기준 날짜 — 처리일자(_processedAt) 또는 단속일자(date) */
@@ -142,7 +142,7 @@ export default function PenaltyPage() {
 
   /** 체크박스 토글 */
   function toggleSelect(id: string) {
-    setSelected((prev) => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -152,7 +152,7 @@ export default function PenaltyPage() {
 
   /** 현재 visible 행 전체 선택/해제 */
   function toggleSelectAll(visibleIds: string[]) {
-    setSelected((prev) => {
+    setSelectedIds((prev) => {
       const allChecked = visibleIds.every((id) => prev.has(id));
       const next = new Set(prev);
       if (allChecked) visibleIds.forEach((id) => next.delete(id));
@@ -164,7 +164,7 @@ export default function PenaltyPage() {
   /** 선택된 매칭 완료건 일괄 처리완료 */
   function markSelectedCompleted() {
     const targets = items.filter((i) =>
-      selected.has(i.id) &&
+      selectedIds.has(i.id) &&
       (i._phase ?? 'in-progress') === 'in-progress' &&
       isMatched(i),
     );
@@ -179,12 +179,12 @@ export default function PenaltyPage() {
       ? { ...it, _phase: 'completed' as Phase, _processedAt: now }
       : it,
     ));
-    setSelected(new Set());
+    setSelectedIds(new Set());
   }
 
   /** 선택된 항목 PDF 다운로드 (중복 자동 제외) */
   async function handleDownloadSelected() {
-    const targets = items.filter((i) => selected.has(i.id) && !i._duplicate);
+    const targets = items.filter((i) => selectedIds.has(i.id) && !i._duplicate);
     if (targets.length === 0) {
       alert('다운로드 가능한 항목이 없습니다 (중복은 제외됨).');
       return;
@@ -202,7 +202,7 @@ export default function PenaltyPage() {
         ? { ...it, _phase: 'completed' as Phase, _processedAt: now }
         : it,
       ));
-      setSelected(new Set());
+      setSelectedIds(new Set());
     } finally {
       setBusy(false);
       setPdfProgress(null);
@@ -481,7 +481,7 @@ export default function PenaltyPage() {
             </button>
             {phase === 'in-progress' && (
               <>
-                {selected.size > 0 && (
+                {selectedIds.size > 0 && (
                   <>
                     <button
                       className="btn"
@@ -489,7 +489,7 @@ export default function PenaltyPage() {
                       disabled={busy}
                       title="선택된 항목 중 매칭 완료된 것만 처리완료로 이동"
                     >
-                      <CheckCircle size={14} weight="bold" /> 선택 처리완료 ({selected.size})
+                      <CheckCircle size={14} weight="bold" /> 선택 처리완료 ({selectedIds.size})
                     </button>
                     <button
                       className="btn"
@@ -497,7 +497,7 @@ export default function PenaltyPage() {
                       disabled={busy}
                       title="선택된 항목만 PDF 묶음 다운로드"
                     >
-                      <FileZip size={14} weight="bold" /> 선택 다운로드 ({selected.size})
+                      <FileZip size={14} weight="bold" /> 선택 다운로드 ({selectedIds.size})
                     </button>
                   </>
                 )}
@@ -525,12 +525,19 @@ export default function PenaltyPage() {
           <table className="table">
             <thead>
               <tr>
-                <th className="center sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH }}>
+                <th className="checkbox-col sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH }}>
                   <input
                     type="checkbox"
-                    checked={visible.length > 0 && visible.every((it) => selected.has(it.id))}
+                    checked={visible.length > 0 && visible.every((it) => selectedIds.has(it.id))}
+                    ref={(el) => {
+                      if (!el) return;
+                      const some = visible.some((it) => selectedIds.has(it.id));
+                      const all = visible.every((it) => selectedIds.has(it.id));
+                      el.indeterminate = some && !all;
+                    }}
                     onChange={() => toggleSelectAll(visible.map((it) => it.id))}
                     title="현재 보이는 항목 전체 선택"
+                    aria-label="전체 선택"
                   />
                 </th>
                 <th className="sticky-col" style={{ left: CHECK_COL_WIDTH, minWidth: COMPANY_COL_WIDTH }}>회사코드</th>
@@ -625,10 +632,10 @@ export default function PenaltyPage() {
                   const violClass = inRange === false ? 'text-red' : 'mono';
                   return (
                     <tr key={it.id}>
-                      <td className="center sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH, background: 'var(--bg-card)' }}>
+                      <td className="checkbox-col sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH, background: 'var(--bg-card)' }}>
                         <input
                           type="checkbox"
-                          checked={selected.has(it.id)}
+                          checked={selectedIds.has(it.id)}
                           onChange={() => toggleSelect(it.id)}
                         />
                       </td>

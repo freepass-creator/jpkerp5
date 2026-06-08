@@ -18,12 +18,16 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
+import { CreateDialog } from '@/components/create-dialog';
+import { SmsDialog } from '@/components/sms-dialog';
 import { PageShell } from '@/components/ui/page-shell';
 import { CompanyFilter } from '@/components/ui/filter-bar';
 import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
+import { downloadContractsExcel } from '@/lib/contract-export';
+import { toast } from '@/lib/toast';
 
 export default function ContractPage() {
   const router = useRouter();
@@ -40,6 +44,36 @@ export default function ContractPage() {
   const [companyFilter, setCompanyFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | '운행' | '대기' | '반납' | '해지' | '채권'>('all');
   const [groupBy, setGroupBy] = useState<'list' | 'customer'>('list');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [createOpen, setCreateOpen] = useState(false);
+  const [smsOpen, setSmsOpen] = useState(false);
+
+  // 필터/뷰 변경 시 선택 해제
+  useEffect(() => setSelectedIds(new Set()), [search, companyFilter, statusFilter, groupBy]);
+
+  function toggleRow(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function handleExcelAll() {
+    if (filtered.length === 0) { toast.info('내보낼 계약 없음'); return; }
+    downloadContractsExcel(filtered, companyMaster, { title: '계약 리스트', filter: `검색결과 ${filtered.length}건` });
+  }
+  function handleExcelSelected() {
+    const targets = filtered.filter((c) => selectedIds.has(c.id));
+    if (targets.length === 0) { toast.info('선택된 계약 없음'); return; }
+    downloadContractsExcel(targets, companyMaster, { title: '계약 리스트 (선택)', filter: `선택 ${targets.length}건` });
+  }
+  function handleExpireGuide() {
+    const targets = filtered.filter((c) => selectedIds.has(c.id));
+    if (targets.length === 0) { toast.info('선택된 계약 없음'); return; }
+    const lines = targets.map((c) => `${c.contractNo} · ${c.customerName} · ${c.vehiclePlate} · 만기 ${c.returnScheduledDate ?? '미정'}`).join('\n');
+    navigator.clipboard.writeText(lines).then(() => toast.success(`만기 안내 ${targets.length}건 클립보드 복사`)).catch(() => toast.error('복사 실패'));
+  }
 
   const today = todayKr();
 
@@ -85,19 +119,50 @@ export default function ContractPage() {
           <button type="button" className={`chip ${groupBy === 'customer' ? 'active' : ''}`} onClick={() => setGroupBy('customer')}>계약자별 묶음</button>
         </>
       }
-      topbarChips={
+      topbarRight={
         <>
-          <Link href="/contract/expire" className="chip">만기임박</Link>
-          <Link href="/contract/return" className="chip">반납</Link>
-          <Link href="/contract/overdue" className="chip">미수금</Link>
-          <Link href="/contract/idle" className="chip">휴차</Link>
+          <Link href="/contract/expire" className="chip chip-nav">만기임박</Link>
+          <Link href="/contract/return" className="chip chip-nav">반납</Link>
+          <Link href="/contract/overdue" className="chip chip-nav">미수금</Link>
+          <Link href="/contract/idle" className="chip chip-nav">휴차</Link>
         </>
       }
       bottomBarLeft={
         <>
-          <button className="btn btn-primary" type="button">+ 신규 계약</button>
+          <button className="btn btn-primary" type="button" onClick={() => setCreateOpen(true)}>+ 신규 계약</button>
           <span className="btn-sep" />
-          <button className="btn" type="button">엑셀</button>
+          <button className="btn" type="button" onClick={handleExcelAll} title="현재 필터된 계약 전체 엑셀">엑셀</button>
+          <span className="btn-sep" />
+          <span className="dim" style={{ fontSize: 11 }}>
+            {selectedIds.size > 0 ? `선택 ${selectedIds.size}건` : '체크박스로 선택'}
+          </span>
+          <button
+            className="btn"
+            type="button"
+            disabled={selectedIds.size === 0}
+            title="선택한 계약자에게 일괄 SMS 발송"
+            onClick={() => setSmsOpen(true)}
+          >
+            문자 발송 {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+          </button>
+          <button
+            className="btn"
+            type="button"
+            disabled={selectedIds.size === 0}
+            title="선택한 계약 만기 안내 (클립보드 복사)"
+            onClick={handleExpireGuide}
+          >
+            만기 안내 {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+          </button>
+          <button
+            className="btn"
+            type="button"
+            disabled={selectedIds.size === 0}
+            title="선택한 계약만 엑셀 다운로드"
+            onClick={handleExcelSelected}
+          >
+            선택 엑셀 {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+          </button>
         </>
       }
     >
@@ -105,6 +170,23 @@ export default function ContractPage() {
                 <table className="table">
                   <thead>
                     <tr>
+                      <th className="checkbox-col">
+                        <input
+                          type="checkbox"
+                          checked={filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id))}
+                          ref={(el) => {
+                            if (!el) return;
+                            const some = filtered.some((c) => selectedIds.has(c.id));
+                            const all = filtered.every((c) => selectedIds.has(c.id));
+                            el.indeterminate = some && !all;
+                          }}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedIds(new Set(filtered.map((c) => c.id)));
+                            else setSelectedIds(new Set());
+                          }}
+                          aria-label="전체 선택"
+                        />
+                      </th>
                       <th style={{ width: 60 }}>회사</th>
                       <th style={{ width: 110 }}>계약번호</th>
                       <th style={{ width: 90 }}>차량번호</th>
@@ -119,9 +201,12 @@ export default function ContractPage() {
                   </thead>
                   <tbody>
                     {filtered.length === 0 ? (
-                      <tr><td colSpan={10} className="muted center" style={{ padding: 32 }}>계약 없음</td></tr>
+                      <tr><td colSpan={11} className="muted center" style={{ padding: 32 }}>계약 없음</td></tr>
                     ) : filtered.map((c) => (
-                      <tr key={c.id} onDoubleClick={() => setOpenId(c.id)} style={{ cursor: 'pointer' }}>
+                      <tr key={c.id} onDoubleClick={() => setOpenId(c.id)} style={{ cursor: 'pointer' }} className={selectedIds.has(c.id) ? 'selected-row' : undefined}>
+                        <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleRow(c.id)} aria-label="행 선택" />
+                        </td>
                         <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                         <td className="mono">{c.contractNo}</td>
                         <td className="mono">{c.vehiclePlate}</td>
@@ -181,6 +266,8 @@ export default function ContractPage() {
         onOpenChange={(v) => !v && setOpenId(null)}
         onUpdate={(updated) => { void updateContract(updated); }}
       />
+      <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['계약']} initialMode="계약" />
+      <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filtered} selectedIds={selectedIds} />
     </PageShell>
   );
 }

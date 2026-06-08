@@ -1172,6 +1172,10 @@ input[type="radio"]:disabled {
   border-color: var(--brand);
 }
 .chip.active:hover { background: var(--brand-h); border-color: var(--brand-h); color: var(--text-inverse); }
+
+/* chip-nav — sub-page 이동용. 시각적 차이는 없음 (목록형 통일).
+   퀵필터 chip 과 동일한 .chip 규격. 클래스만 의미적으로 구분 (검색/리팩토링용). */
+.chip.chip-nav { /* 별도 스타일 없음 */ }
 .chip:disabled,
 .chip[disabled] {
   color: var(--text-weak);
@@ -1358,21 +1362,22 @@ input[type="radio"]:disabled {
 .table td.muted { color: var(--text-weak); }
 .table td.dim { color: var(--text-sub); }
 
-/* 체크박스 열 — 좌측 고정 (페이지별 폭 흔들림 방지 위해 min/max로 강제 고정).
+/* 체크박스 열 — 좌측 첫 칸, 폭 28px 고정, 좌우 가운데 정렬.
    우측 border 제거 — 체크박스 옆 세로 라인 없애 정렬 또렷이 */
 .table th.checkbox-col,
 .table td.checkbox-col {
-  width: 36px;
-  min-width: 36px;
-  max-width: 36px;
-  padding: 0 0 0 12px;
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  padding: 0;
   text-align: center;
   vertical-align: middle;
   border-right: none;
 }
 .table .checkbox-col input[type="checkbox"] {
+  display: block;
+  margin: 0 auto;
   vertical-align: middle;
-  margin: 0;
 }
 /* 체크박스 — 전역 input[type=checkbox] 규격 사용 */
 .table tbody tr.selected-row { background: var(--brand-bg); }
@@ -1482,7 +1487,6 @@ input[type="radio"]:disabled {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
   flex-wrap: wrap;
 }
 .quick-filters .filter-divider { margin: 0 4px; }
