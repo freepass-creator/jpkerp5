@@ -2,7 +2,7 @@
 
 import * as XLSX from 'xlsx';
 
-export type UploadKind = '계약' | '계좌' | '카드' | '미분류';
+export type UploadKind = '계약' | '계좌' | '카드' | '자동이체' | '미분류';
 
 export type ParsedSheet = {
   fileName: string;
@@ -28,6 +28,13 @@ const KIND_KEYWORDS: Record<Exclude<UploadKind, '미분류'>, string[]> = {
     '계좌번호', '잔액', '이체'
   ],
   카드: ['승인번호', '승인일', '카드번호', '카드', '매입금액', '카드사', '가맹점'],
+  // CMS 자동이체 명세 — 회원명+수납금액+청구완납일자/청구월 조합
+  자동이체: [
+    '회원명', '회원번호', '납부자', '납부자명', '납부자 휴대전화',
+    '수납금액', '청구금액', '청구월', '최초청구월', '청구완납일자', '결제일(납부기간)',
+    '결제수단', '결제방식', '결제상태', '수납상태', '미수처리상태',
+    'CMS', '자동이체', '이체출금', '집금',
+  ],
 };
 
 /** 체크박스 / 일련번호 / 빈 UI 컬럼 — 헤더에서 제거 (신한 인터넷뱅킹 등) */
@@ -71,7 +78,11 @@ function detectBankFromFileName(fileName: string): string | undefined {
 const HEADER_MIN_NON_EMPTY = 3;  // 4 → 3 (간단 신한 export 대응)
 const LOOK_ROWS_MAX = 30;        // 12 → 30 (안내문 다수 은행 대응)
 
-/** 헤더 행 자동 탐지 — 빈 셀이 적고 키워드 매치 많은 행 (상위 30행 스캔) */
+/** 헤더 행 자동 탐지 — 빈 셀이 적고 키워드 매치 많은 행 (상위 30행 스캔)
+ *
+ *  CMS 자동이체 명세는 '계약번호' 컬럼이 있어서 '계약' 으로 잘못 분류될 수 있음.
+ *  → '회원명' + '수납금액' (또는 '청구완납일자') 둘 다 있으면 무조건 '자동이체' 우선.
+ */
 function detectHeaderRow(aoa: unknown[][]): { headerRow: number; kind: UploadKind; confidence: number } {
   let best = { headerRow: 0, kind: '미분류' as UploadKind, confidence: 0 };
   const lookRows = Math.min(aoa.length, LOOK_ROWS_MAX);
@@ -80,6 +91,14 @@ function detectHeaderRow(aoa: unknown[][]): { headerRow: number; kind: UploadKin
     const cells = row.map((v) => String(v ?? '').trim());
     const nonEmpty = cells.filter((c) => c.length > 0).length;
     if (nonEmpty < HEADER_MIN_NON_EMPTY) continue;
+
+    // CMS 자동이체 강제 인식 — 회원명 + (수납금액 OR 청구완납일자 OR 청구월)
+    const hasMember = cells.some((c) => c === '회원명');
+    const hasAutopaySignal = cells.some((c) => c === '수납금액' || c === '청구완납일자' || c === '청구월' || c === '청구금액');
+    if (hasMember && hasAutopaySignal) {
+      return { headerRow: r, kind: '자동이체' as UploadKind, confidence: 1 };
+    }
+
     let bestKind: UploadKind = '미분류';
     let bestScore = 0;
     for (const [kind, kws] of Object.entries(KIND_KEYWORDS) as [Exclude<UploadKind, '미분류'>, string[]][]) {

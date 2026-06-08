@@ -236,6 +236,10 @@ export type BankTransaction = {
   counterparty: string;        // 입금자/상대 (출금이면 수취인)
   memo?: string;               // 적요/내용
   note?: string;               // 사용자 메모 (인라인 편집)
+  /** 차량번호 직접 입력 — 매칭 계약 없을 때 자금일보에서 수기로 연결 */
+  linkedVehiclePlate?: string;
+  /** 거래처(계약자/공급사 등) 직접 입력 — 매칭 계약 외 자유 입력 */
+  linkedCustomerName?: string;
   source?: string;             // KB/우리/신한/하나/농협 등 — 은행
   account?: string;            // 계좌번호 (회사 마스터의 BankAccount.accountNo와 매칭)
   companyCode?: string;        // 회사 코드 (자금일보 회사별 집계용)
@@ -474,6 +478,25 @@ export type Vehicle = {
   contractDocDate?: string;         // 계약 체결일 (YYYY-MM-DD)
   contractDocPrice?: number;        // 매매가 / 임대료 (원)
   contractDocNotes?: string;        // 비고 (특약 등)
+};
+
+/** 거래처 마스터 — 계약자 외 공급사·협력사·외주업체 등 */
+export type Vendor = {
+  id: string;
+  name: string;                       // 거래처명 (필수)
+  kind?: '공급사' | '협력사' | '외주' | '고객' | '기타';
+  bizNo?: string;                     // 사업자등록번호 (10자리)
+  ceo?: string;                       // 대표
+  bizType?: string;                   // 업태
+  bizCategory?: string;               // 종목
+  address?: string;
+  phone?: string;
+  email?: string;
+  /** 어느 회사가 거래하는 거래처인지 — 회사 분리 시 사용. 미지정이면 전체 공유 */
+  companyCode?: CompanyCode;
+  notes?: string;
+  createdAt: string;
+  createdBy?: string;
 };
 
 /** 감사 로그 — 모든 변경 추적 (누가 / 언제 / 무엇을) */

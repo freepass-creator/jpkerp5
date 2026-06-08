@@ -77,11 +77,12 @@
   --alert-green-bg:  var(--green-bg);  --alert-green-text:  var(--green-text);  --alert-green-border:  var(--green-border);
   --alert-blue-bg:   var(--blue-bg);   --alert-blue-text:   var(--blue-text);   --alert-blue-border:   var(--blue-border);
 
-  /* Sizing — 직각 통일 (ERP 기능 중심). 원형/필 등 의도된 곳만 별도 지정 */
-  --radius-sm: 0;
-  --radius:    0;
-  --radius-md: 0;
-  --radius-lg: 0;
+  /* Sizing — 4px 표준 미세 라운드 (B 정책).
+     모든 카드/버튼/입력/배지 통일. 원형(.50%)·필(99px)·icon-only 등은 별도. */
+  --radius-sm: 3px;
+  --radius:    4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
   --radius-pill: 999px;
 
   /* v4 동일 — 컴팩트 ERP 규격 */
@@ -1357,7 +1358,8 @@ input[type="radio"]:disabled {
 .table td.muted { color: var(--text-weak); }
 .table td.dim { color: var(--text-sub); }
 
-/* 체크박스 열 — 좌측 고정 (페이지별 폭 흔들림 방지 위해 min/max로 강제 고정) */
+/* 체크박스 열 — 좌측 고정 (페이지별 폭 흔들림 방지 위해 min/max로 강제 고정).
+   우측 border 제거 — 체크박스 옆 세로 라인 없애 정렬 또렷이 */
 .table th.checkbox-col,
 .table td.checkbox-col {
   width: 36px;
@@ -1366,6 +1368,7 @@ input[type="radio"]:disabled {
   padding: 0 0 0 12px;
   text-align: center;
   vertical-align: middle;
+  border-right: none;
 }
 .table .checkbox-col input[type="checkbox"] {
   vertical-align: middle;
@@ -2025,11 +2028,145 @@ input[type="radio"]:disabled {
    모든 자식 좌측 X 는 부모(Tabs.Content / DialogBody) padding 으로 결정 → 통일.
    [[feedback_no_ambiguous_lines]] 어정쩡한 데코선 금지 정책.
    ───────────────────────────────────────────────────────────── */
-/* dialog 안 섹션 = default 카드 박스 그대로 (border + shadow + radius).
-   섹션 사이 14px gap 만 줘서 호흡. 헤더 아이콘은 dialog 안에서만 숨김(자산상세 패턴 통일). */
+/* ─────────────────────────────────────────────────────────────
+   다이얼로그 내부 톤 다운 — 모든 detail dialog 자동 적용.
+   Linear/Notion 톤 — 명확한 라벨 + 부드러운 border + 압축 정보.
+   ───────────────────────────────────────────────────────────── */
+
+/* (1) Section — 카드 (실선 border + shadow), 헤더에 brand 좌측 바 + 옅은 brand-bg, 섹션 간 14px */
+.dialog-content .detail-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  background: var(--bg-card, #fff);
+  overflow: hidden;
+}
 .dialog-content .detail-section + .detail-section { margin-top: 14px; }
-.dialog-content .detail-section-header .icon { display: none; }
-.dialog-content .dialog-footer { border-top: none; }
+.dialog-content .detail-section-header {
+  background: var(--brand-bg, #f1f5f9);
+  border-bottom: 1px solid var(--border);
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dialog-content .detail-section-header .icon {
+  display: flex;
+  color: var(--brand);
+}
+.dialog-content .detail-section-body { padding: 14px; }
+
+/* (2) dialog 안 표 — 11.5pt, 헤더 진하게 / 행 정보 또렷, hover brand-bg */
+.dialog-content .table {
+  font-size: 11.5px;
+}
+.dialog-content .table thead th {
+  background: var(--bg-soft, #f1f5f9);
+  color: var(--text-main);
+  font-weight: 700;
+  border-bottom: 2px solid var(--brand);
+  padding: 7px 8px;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.dialog-content .table tbody td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--border-soft, #f1f5f9);
+}
+.dialog-content .table tbody tr:hover {
+  background: var(--brand-bg, #f1f5f9);
+}
+/* 금액·강조 수치 — tabular 큰 폰트 */
+.dialog-content .table td.num,
+.dialog-content .num.strong {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* (3) Tabs — 전역 .chip 규격으로 통일 (필터바와 동일 톤). 활성=brand 채움 */
+.dialog-content .tabs-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--button-height);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.dialog-content .tabs-trigger:hover {
+  background: var(--bg-sunken);
+  color: var(--text-main);
+}
+.dialog-content .tabs-trigger[data-state="active"] {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--text-inverse);
+  font-weight: 600;
+}
+.dialog-content .tabs-trigger[data-state="active"]:hover {
+  background: var(--brand-h);
+  border-color: var(--brand-h);
+  color: var(--text-inverse);
+}
+.dialog-content .tabs-trigger:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* (4) HERO — brand gradient + 큰 이름 18, 번호판 강조, meta 11.5pt.
+   margin 16px 좌우 인셋 — 아래 섹션 박스 좌우 라인과 정렬 */
+.dialog-content .detail-hero {
+  padding: 14px 16px;
+  margin: 14px 16px 0 16px;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--brand-bg) 0%, var(--bg-card) 70%);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+.dialog-content .detail-hero-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-main);
+}
+.dialog-content .detail-hero-meta {
+  font-size: 11.5px;
+  color: var(--text-sub);
+  gap: 8px;
+  margin-top: 4px;
+}
+.dialog-content .detail-hero-meta .plate {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  color: var(--brand);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+/* HERO 우측 상태 배지 — 클러스터로 시선 끌기 */
+.dialog-content .detail-hero .status {
+  font-size: 11px;
+  padding: 3px 9px;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+/* (5) footer — 라인 제거 (기존 유지) */
+.dialog-content .dialog-footer { border-top: none; padding-top: 8px; }
 
 /* dialog 안 checklist 회색 박스 제거 */
 .dialog-content .checklist {
@@ -2038,11 +2175,14 @@ input[type="radio"]:disabled {
   padding: 0;
 }
 
-/* dialog 안 탭 헤더 — 회색 배경/border-bottom 모두 제거 (리스크는 탭 없으니 라인도 없음, 통일) */
+/* dialog 안 탭 헤더 — chip bar 톤, 12px 사이드 padding, 8px gap */
 .dialog-content .tabs-list {
   background: transparent;
-  padding: 8px 16px 0 16px;
+  padding: 10px 16px 4px 16px;
   border-bottom: none;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .detail-hero {

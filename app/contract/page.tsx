@@ -18,6 +18,8 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
+import { PageShell } from '@/components/ui/page-shell';
+import { CompanyFilter } from '@/components/ui/filter-bar';
 import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import { displayCompanyName } from '@/lib/company-display';
@@ -71,52 +73,34 @@ export default function ContractPage() {
   }, [filtered]);
 
   return (
-    <div className="layout">
-      <Sidebar />
-      <div className="app">
-        <header className="topbar">
-          <div className="topbar-title">
-            <FileText size={16} weight="fill" style={{ color: 'var(--brand)' }} />
-            <span>계약 관리</span>
-          </div>
-          <div className="topbar-search">
-            <MagnifyingGlass size={14} className="icon" />
-            <input
-              className="input"
-              placeholder="계약자 / 차량 / 계약번호 / 연락처"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="filter-bar">
-            <select
-              className="input-compact" data-w="md"
-              value={companyFilter}
-              onChange={(e) => setCompanyFilter(e.target.value)}
-              title="회사별 필터"
-            >
-              <option value="all">회사: 전체</option>
-              {companyOptions.map((co) => (
-                <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
-              ))}
-            </select>
-            <span className="filter-divider" />
-            <button type="button" className={`chip ${groupBy === 'list' ? 'active' : ''}`} onClick={() => setGroupBy('list')}>전체 리스트</button>
-            <button type="button" className={`chip ${groupBy === 'customer' ? 'active' : ''}`} onClick={() => setGroupBy('customer')}>계약자별 묶음</button>
-          </div>
-          {/* 퀵필터 — 계약 디테일 기능 진입 chip (sub-page 실존하는 것만) */}
-          <div className="quick-filters">
-            <Link href="/contract/expire" className="chip">만기임박</Link>
-            <Link href="/contract/return" className="chip">반납</Link>
-            <Link href="/contract/overdue" className="chip">미수금</Link>
-            <Link href="/contract/idle" className="chip">휴차</Link>
-          </div>
-        </header>
-
-        <div className="dashboard" style={{ gridTemplateColumns: '1fr' }}>
-          <div className="panel">
-            <div className="panel-body">
+    <PageShell
+      title="계약 관리"
+      icon={<FileText size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
+      topbarSearch={{ placeholder: '계약자 / 차량 / 계약번호 / 연락처', value: search, onChange: setSearch }}
+      topbarFilter={
+        <>
+          <CompanyFilter value={companyFilter} onChange={setCompanyFilter} options={companyOptions} master={companyMaster} />
+          <span className="filter-divider" />
+          <button type="button" className={`chip ${groupBy === 'list' ? 'active' : ''}`} onClick={() => setGroupBy('list')}>전체 리스트</button>
+          <button type="button" className={`chip ${groupBy === 'customer' ? 'active' : ''}`} onClick={() => setGroupBy('customer')}>계약자별 묶음</button>
+        </>
+      }
+      topbarChips={
+        <>
+          <Link href="/contract/expire" className="chip">만기임박</Link>
+          <Link href="/contract/return" className="chip">반납</Link>
+          <Link href="/contract/overdue" className="chip">미수금</Link>
+          <Link href="/contract/idle" className="chip">휴차</Link>
+        </>
+      }
+      bottomBarLeft={
+        <>
+          <button className="btn btn-primary" type="button">+ 신규 계약</button>
+          <span className="btn-sep" />
+          <button className="btn" type="button">엑셀</button>
+        </>
+      }
+    >
               {groupBy === 'list' ? (
                 <table className="table">
                   <thead>
@@ -190,28 +174,13 @@ export default function ContractPage() {
                   </tbody>
                 </table>
               )}
-            </div>
-          </div>
-        </div>
 
-        <BottomBar
-          left={
-            <>
-              <button className="btn btn-primary" type="button">+ 신규 계약</button>
-              <span className="btn-sep" />
-              <button className="btn" type="button">엑셀</button>
-            </>
-          }
-          right={null}
-        />
-
-        <ContractDetailDialog
-          contract={openId ? contracts.find((c) => c.id === openId) ?? null : null}
-          open={openId != null}
-          onOpenChange={(v) => !v && setOpenId(null)}
-          onUpdate={(updated) => { void updateContract(updated); }}
-        />
-      </div>
-    </div>
+      <ContractDetailDialog
+        contract={openId ? contracts.find((c) => c.id === openId) ?? null : null}
+        open={openId != null}
+        onOpenChange={(v) => !v && setOpenId(null)}
+        onUpdate={(updated) => { void updateContract(updated); }}
+      />
+    </PageShell>
   );
 }

@@ -35,6 +35,7 @@ import {
 import { todayKr } from '@/lib/mock-data';
 import { dedupAgainst } from '@/lib/dedup';
 import { bankTxKeys, cardTxKeys, vehicleKeys, contractKeys } from '@/lib/dedup-keys';
+import { normalizePlateLoose } from '@/lib/customer-match';
 import { toast } from '@/lib/toast';
 import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
@@ -835,7 +836,7 @@ function downloadTemplate(filename: string, columns: ColumnSpec[]) {
     title = '카드 매출내역 일괄 등록 양식';
     notes = [
       '· 승인번호·금액 기준으로 계약과 자동 매칭',
-      '· 고객명 입력 시 매칭 정확도 향상',
+      '· 계약자명 입력 시 매칭 정확도 향상',
     ];
   }
   excelTemplate(filename, columns, { title, notes });
@@ -1182,9 +1183,7 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
   const [extracted, setExtracted] = useState<{ plate: string; model: string; company: string; vin?: string; year?: string } | null>(null);
   const [matchedVehicle, setMatchedVehicle] = useState<import('@/lib/types').Vehicle | null>(null);
 
-  function normalizePlate(p: string): string {
-    return p.replace(/[\s\-·.]/g, '').toLowerCase();
-  }
+  const normalizePlate = normalizePlateLoose;
 
   async function handleSaveAsNew() {
     if (!extracted || saving) return;
@@ -1813,7 +1812,7 @@ function SnapshotPane({
             <div style={{ fontSize: 11, color: 'var(--text-sub)', display: 'grid', gridTemplateColumns: '90px 1fr', gap: '4px 8px' }}>
               <span style={{ fontWeight: 600 }}>차량번호</span>
               <span className="mono">{diag.vehiclePlateCol ?? <span style={{ color: 'var(--red-text)' }}>❌ 없음</span>}</span>
-              <span style={{ fontWeight: 600 }}>고객명 ({diag.customerCols.length})</span>
+              <span style={{ fontWeight: 600 }}>계약자명 ({diag.customerCols.length})</span>
               <span className="mono" style={{ fontSize: 10 }}>{diag.customerCols.length > 0 ? diag.customerCols.join(' · ') : <span className="dim">없음</span>}</span>
               <span style={{ fontWeight: 600 }}>인도일 ({diag.deliveryCols.length})</span>
               <span className="mono" style={{ fontSize: 10 }}>{diag.deliveryCols.length > 0 ? diag.deliveryCols.join(' · ') : <span className="dim">없음</span>}</span>
@@ -2724,7 +2723,7 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
       <div className="dropzone-icon"><Camera size={28} weight="duotone" /></div>
       <div className="dropzone-title">계약서 스캔 (다중 업로드)</div>
       <div className="dropzone-desc">
-        계약서 PDF/이미지 여러 장 한 번에 — 회사·차량 자동 매칭. 매칭된 차량은 연결, 없으면 차량 자동 생성.
+        계약서 PDF/이미지 여러 장 한 번에 — 회사·차량 자동 매칭. 일치 차량은 매칭, 없으면 차량 자동 생성.
       </div>
       <button className="btn btn-primary" type="button" onClick={(e) => { e.stopPropagation(); document.getElementById('jpk-ocr-contract')?.click(); }}>
         <Camera size={14} /> 파일 선택
@@ -2763,7 +2762,7 @@ function PaymentRegisterPane({
         ]
       : variant === '자동이체'
       ? [
-          { title: '자동이체 명세', desc: 'CMS/자동이체 명세 — 출금일·고객명·금액 매칭', columns: BANK_TX_COLUMNS, templateName: '자동이체_템플릿.xlsx' },
+          { title: '자동이체 명세', desc: 'CMS/자동이체 명세 — 출금일·계약자명·금액 매칭', columns: BANK_TX_COLUMNS, templateName: '자동이체_템플릿.xlsx' },
         ]
       : variant === '카드매출'
       ? [
@@ -2778,7 +2777,7 @@ function PaymentRegisterPane({
     variant === '입출금'
       ? { title: '계좌 입출금 엑셀 업로드', desc: '은행 거래내역 (입금·출금 모두) — 입금자·금액으로 계약 자동 매칭' }
       : variant === '자동이체'
-      ? { title: '자동이체 명세 업로드', desc: 'CMS/자동이체 명세 — 출금일·고객명·금액으로 회차 매칭' }
+      ? { title: '자동이체 명세 업로드', desc: 'CMS/자동이체 명세 — 출금일·계약자명·금액으로 회차 매칭' }
       : variant === '카드매출'
       ? { title: '카드 매출 엑셀 업로드', desc: '카드사 매출전표 — 승인번호·금액으로 계약 자동 매칭' }
       : { title: '법인카드 명세 업로드', desc: '카드사 사용 명세 — 가맹점·사용일·금액 일괄 등록' };
@@ -3214,7 +3213,7 @@ function PaymentManualForm({ onSubmit, variant }: { onSubmit: () => void; varian
             ) : (
               <>
                 <label className="form-label">
-                  {!isBank ? '고객명' : effectiveDirection === '출금' ? '수취인' : '입금자'} *
+                  {!isBank ? '계약자명' : effectiveDirection === '출금' ? '수취인' : '입금자'} *
                 </label>
                 <input
                   className="input" required
@@ -3476,7 +3475,7 @@ function HistoryAddPane({ onClose }: { onClose: () => void }) {
         <input
           className="input"
           autoFocus
-          placeholder="차량번호 / 고객명 / 계약번호로 검색"
+          placeholder="차량번호 / 계약자명 / 계약번호로 검색"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -3504,7 +3503,7 @@ function HistorySearchResults({ q, onPick }: { q: string; onPick: (c: Contract) 
         </div>
         <div className="dropzone-title">차량 검색</div>
         <div className="dropzone-desc">
-          차량번호, 고객명, 계약번호 중 하나로 검색하면<br />
+          차량번호, 계약자명, 계약번호 중 하나로 검색하면<br />
           매칭되는 계약 목록이 표시됩니다.
         </div>
       </div>

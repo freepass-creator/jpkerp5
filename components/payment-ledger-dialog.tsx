@@ -6,6 +6,7 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { formatCurrency, formatDateFull } from '@/lib/utils';
 import type { Contract } from '@/lib/types';
+import { matchesSearch } from '@/lib/filter-helpers';
 
 type Filter = '전체' | '매칭' | '미매칭';
 type ViewMode = '목록' | '기간별';
@@ -74,14 +75,10 @@ export function PaymentLedgerDialog({
   } as Record<Filter, number>), [ledger]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return ledger.filter((l) => {
       if (filter === '매칭' && !l.matchedContractId) return false;
       if (filter === '미매칭' && l.matchedContractId) return false;
-      if (q) {
-        const hay = `${l.counterparty} ${l.memo} ${l.sourceDetail} ${l.amount}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
+      if (!matchesSearch(search, [l.counterparty, l.memo, l.sourceDetail, String(l.amount)])) return false;
       return true;
     });
   }, [ledger, filter, search]);
@@ -363,12 +360,10 @@ function MatchPane({
   const [q, setQ] = useState(tx.counterparty);
 
   const matches = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    if (!query) return contracts.slice(0, 20);
-    return contracts.filter((c) => {
-      const hay = `${c.customerName} ${c.vehiclePlate} ${c.contractNo} ${c.customerPhone1}`.toLowerCase();
-      return hay.includes(query);
-    }).slice(0, 30);
+    if (!q.trim()) return contracts.slice(0, 20);
+    return contracts
+      .filter((c) => matchesSearch(q, [c.customerName, c.vehiclePlate, c.contractNo, c.customerPhone1]))
+      .slice(0, 30);
   }, [q, contracts]);
 
   // 트랜잭션 정보 헤더 (양 단계 공통)

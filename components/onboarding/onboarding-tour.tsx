@@ -62,7 +62,7 @@ const STEPS: Step[] = [
     detail: (
       <div style={{ fontSize: 13, color: 'var(--text-sub)', lineHeight: 1.7 }}>
         은행 사이트에서 받은 엑셀 그대로 OK — <strong>KB·우리·신한·하나·농협·IBK·카카오·토스·케이뱅크 등 20곳</strong> 자동 인식. <br />
-        업로드 후 <strong>자동매칭</strong> 버튼 → 이름+금액 일치하는 회차에 자동 연결됨.
+        업로드 후 <strong>자동매칭</strong> 버튼 → 이름+금액 일치하는 회차에 자동 매칭됨.
       </div>
     ),
   },

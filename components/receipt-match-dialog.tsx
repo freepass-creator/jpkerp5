@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { displayCompanyName } from '@/lib/company-display';
 import { findCandidates, applyMatch, reverseMatch, applyFifoPayment } from '@/lib/receipt-match';
 import { todayKr } from '@/lib/mock-data';
+import { matchesSearch } from '@/lib/filter-helpers';
 
 /**
  * 자금일보 수동 매칭 다이얼로그.
@@ -44,12 +45,10 @@ export function ReceiptMatchDialog({
   const candidates = useMemo(() => (tx ? findCandidates(tx, contracts) : []), [tx, contracts]);
 
   const filteredContracts = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return contracts.slice(0, 50);
-    return contracts.filter((c) => {
-      const hay = `${c.vehiclePlate} ${c.customerName} ${c.contractNo} ${c.driverName ?? ''}`.toLowerCase();
-      return hay.includes(q);
-    }).slice(0, 50);
+    if (!search.trim()) return contracts.slice(0, 50);
+    return contracts
+      .filter((c) => matchesSearch(search, [c.vehiclePlate, c.customerName, c.contractNo, c.driverName]))
+      .slice(0, 50);
   }, [contracts, search]);
 
   const picked = pickedId ? contracts.find((c) => c.id === pickedId) : null;

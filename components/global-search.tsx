@@ -9,6 +9,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { useBankTx } from '@/lib/firebase/transactions-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { formatCurrency } from '@/lib/utils';
+import { matchesSearch } from '@/lib/filter-helpers';
 
 /**
  * 글로벌 검색 — Ctrl/Cmd+K 로 어디서든 열림.
@@ -49,21 +50,17 @@ export function GlobalSearch() {
   }, [open]);
 
   const results = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    if (!query) return { contracts: [], companies: [], txs: [] };
+    if (!q.trim()) return { contracts: [], companies: [], txs: [] };
     return {
-      contracts: contracts.filter((c) => {
-        const hay = `${c.vehiclePlate} ${c.customerName} ${c.contractNo} ${c.driverName ?? ''} ${c.customerLicenseNo ?? ''} ${c.customerPhone1 ?? ''}`.toLowerCase();
-        return hay.includes(query);
-      }).slice(0, 20),
-      companies: companies.filter((co) => {
-        const hay = `${co.name} ${co.code ?? ''} ${co.bizRegNo ?? ''} ${co.corpRegNo ?? ''} ${co.ceo ?? ''}`.toLowerCase();
-        return hay.includes(query);
-      }).slice(0, 10),
-      txs: bankTx.filter((t) => {
-        const hay = `${t.counterparty} ${t.memo ?? ''} ${t.note ?? ''} ${t.account ?? ''}`.toLowerCase();
-        return hay.includes(query);
-      }).slice(0, 10),
+      contracts: contracts.filter((c) =>
+        matchesSearch(q, [c.vehiclePlate, c.customerName, c.contractNo, c.driverName, c.customerLicenseNo, c.customerPhone1])
+      ).slice(0, 20),
+      companies: companies.filter((co) =>
+        matchesSearch(q, [co.name, co.code, co.bizRegNo, co.corpRegNo, co.ceo])
+      ).slice(0, 10),
+      txs: bankTx.filter((t) =>
+        matchesSearch(q, [t.counterparty, t.memo, t.note, t.account])
+      ).slice(0, 10),
     };
   }, [q, contracts, companies, bankTx]);
 
@@ -96,7 +93,7 @@ export function GlobalSearch() {
               </div>
             ) : totalCount === 0 ? (
               <div style={{ padding: 32, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)' }}>
-                결과 없음
+                검색 결과 없음
               </div>
             ) : (
               <>

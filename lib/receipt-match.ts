@@ -32,46 +32,126 @@ export type MatchCandidate = {
   confidence: 'high' | 'medium' | 'low';
 };
 
-/**
- * 한 BankTransaction에 대해 매칭 후보 검색.
- *  - withdraw 행은 매칭 X (출금은 계약과 무관)
- *  - 이미 매칭된 트랜잭션은 빈 배열
- */
-export function findCandidates(tx: BankTransaction, contracts: Contract[]): MatchCandidate[] {
-  if (tx.withdraw && tx.withdraw > 0) return [];
-  if (tx.amount <= 0) return [];
-  if (tx.matchedContractId) return [];
+/* 색인 — autoMatchAll/autoMatchCardAll 에서 1회 사전구축 (O(N+M)) */
+type ScheduleRef = { c: Contract; s: PaymentScheduleInline };
+export type MatchIndex = {
+  byName: Map<string, Contract[]>;
+  byAmount: Map<number, ScheduleRef[]>;
+};
 
-  const out: MatchCandidate[] = [];
-  const cpName = normName(tx.counterparty);
-
+export function buildMatchIndex(contracts: Contract[]): MatchIndex {
+  const byName = new Map<string, Contract[]>();
+  const byAmount = new Map<number, ScheduleRef[]>();
   for (const c of contracts) {
     if (c.status === '해지') continue;
+    const names = new Set<string>();
     const cName = normName(c.customerName);
-    const driverName = c.driverName ? normName(c.driverName) : '';
-    const nameMatch = cpName && (cpName === cName || cpName === driverName || cName.includes(cpName) || cpName.includes(cName));
-
-    const schedules = c.schedules ?? [];
-    for (const s of schedules) {
+    if (cName) names.add(cName);
+    if (c.driverName) {
+      const dn = normName(c.driverName);
+      if (dn) names.add(dn);
+    }
+    for (const n of names) {
+      const arr = byName.get(n);
+      if (arr) arr.push(c);
+      else byName.set(n, [c]);
+    }
+    for (const s of c.schedules ?? []) {
       if (s.status === '완료') continue;
-      const amountMatch = s.amount === tx.amount || (s.status === '부분납' && (s.amount - s.paidAmount) === tx.amount);
-      if (!amountMatch && !nameMatch) continue;
+      const remaining = s.status === '부분납' ? (s.amount - s.paidAmount) : s.amount;
+      const amounts = new Set<number>([s.amount]);
+      if (remaining !== s.amount && remaining > 0) amounts.add(remaining);
+      for (const a of amounts) {
+        const arr = byAmount.get(a);
+        if (arr) arr.push({ c, s });
+        else byAmount.set(a, [{ c, s }]);
+      }
+    }
+  }
+  return { byName, byAmount };
+}
+
+/**
+ * 색인 기반 후보 검색 (autoMatchAll 내부 — N개 tx 반복 시 색인 1회 빌드).
+ * 외부에서 단발 호출은 findCandidates(tx, contracts) 사용 (편의 래퍼).
+ */
+function findCandidatesIndexed(
+  txAmount: number,
+  txCounterparty: string,
+  index: MatchIndex,
+): MatchCandidate[] {
+  const out: MatchCandidate[] = [];
+  const cpName = normName(txCounterparty);
+
+  // 이름 매칭 후보 — exact + substring 양방향
+  const nameMatched = new Set<Contract>();
+  if (cpName) {
+    const exact = index.byName.get(cpName);
+    if (exact) for (const c of exact) nameMatched.add(c);
+    // substring 양방향 (cName.includes(cpName) / cpName.includes(cName))
+    for (const [k, arr] of index.byName) {
+      if (k.includes(cpName) || cpName.includes(k)) {
+        for (const c of arr) nameMatched.add(c);
+      }
+    }
+  }
+
+  // 금액 일치 schedule
+  const amountSchedules = index.byAmount.get(txAmount) ?? [];
+
+  // 이름 매칭 contract × 그 contract의 모든 미납 회차 (이름만 매칭, 금액 무관) → medium
+  // 금액 매칭 schedule × (이름도 매칭됨? high : low)
+  const seen = new Set<string>();
+  for (const ref of amountSchedules) {
+    const key = `${ref.c.id}:${ref.s.seq}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const isNameMatch = nameMatched.has(ref.c);
+    out.push({
+      contract: ref.c,
+      scheduleSeq: ref.s.seq,
+      scheduleAmount: ref.s.amount,
+      scheduleDueDate: ref.s.dueDate,
+      confidence: isNameMatch ? 'high' : 'low',
+    });
+  }
+  // 이름은 일치하지만 금액이 안 맞는 schedule들 → medium
+  for (const c of nameMatched) {
+    for (const s of c.schedules ?? []) {
+      if (s.status === '완료') continue;
+      const key = `${c.id}:${s.seq}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       out.push({
         contract: c,
         scheduleSeq: s.seq,
         scheduleAmount: s.amount,
         scheduleDueDate: s.dueDate,
-        confidence: nameMatch && amountMatch ? 'high' : nameMatch ? 'medium' : 'low',
+        confidence: 'medium',
       });
     }
   }
 
-  // 정렬: high → medium → low, 동일 confidence면 dueDate 오래된 순
   return out.sort((a, b) => {
     const rank = { high: 0, medium: 1, low: 2 } as const;
     if (rank[a.confidence] !== rank[b.confidence]) return rank[a.confidence] - rank[b.confidence];
     return a.scheduleDueDate.localeCompare(b.scheduleDueDate);
   });
+}
+
+/**
+ * 한 BankTransaction에 대해 매칭 후보 검색.
+ *  - withdraw 행은 매칭 X (출금은 계약과 무관)
+ *  - 이미 매칭된 트랜잭션은 빈 배열
+ *
+ * 단발 호출용 — 일괄 매칭은 autoMatchAll 사용.
+ */
+export function findCandidates(tx: BankTransaction, contracts: Contract[]): MatchCandidate[] {
+  if (tx.withdraw && tx.withdraw > 0) return [];
+  if (tx.amount <= 0) return [];
+  if (tx.matchedContractId) return [];
+  const index = buildMatchIndex(contracts);
+  return findCandidatesIndexed(tx.amount, tx.counterparty, index);
 }
 
 /** 매칭 한 건 적용 — BankTransaction patch + Contract patch 반환 */
@@ -180,6 +260,7 @@ export function autoMatchAll(
   contracts: Contract[],
 ): AutoMatchResult[] {
   const results: AutoMatchResult[] = [];
+  const index = buildMatchIndex(contracts);
   // 같은 회차에 중복 매칭 방지 — 이미 매칭한 (contractId, seq) 기록
   const used = new Set<string>();
   for (const c of contracts) {
@@ -188,7 +269,10 @@ export function autoMatchAll(
     }
   }
   for (const t of txs) {
-    const candidates = findCandidates(t, contracts);
+    if (t.withdraw && t.withdraw > 0) continue;
+    if (t.amount <= 0) continue;
+    if (t.matchedContractId) continue;
+    const candidates = findCandidatesIndexed(t.amount, t.counterparty, index);
     const high = candidates.filter((c) => c.confidence === 'high' && !used.has(`${c.contract.id}:${c.scheduleSeq}`));
     if (high.length === 0) continue;
     // 가장 오래된 미납 회차 우선
@@ -216,35 +300,8 @@ export type CardMatchCandidate = {
 export function findCardCandidates(tx: CardTransaction, contracts: Contract[]): CardMatchCandidate[] {
   if (tx.amount <= 0) return [];
   if (tx.matchedContractId) return [];
-
-  const out: CardMatchCandidate[] = [];
-  const cardName = normName(tx.customerName ?? '');
-
-  for (const c of contracts) {
-    if (c.status === '해지') continue;
-    const cName = normName(c.customerName);
-    const driverName = c.driverName ? normName(c.driverName) : '';
-    const nameMatch = cardName && (cardName === cName || cardName === driverName || cName.includes(cardName) || cardName.includes(cName));
-
-    for (const s of c.schedules ?? []) {
-      if (s.status === '완료') continue;
-      const amountMatch = s.amount === tx.amount || (s.status === '부분납' && (s.amount - s.paidAmount) === tx.amount);
-      if (!amountMatch && !nameMatch) continue;
-      out.push({
-        contract: c,
-        scheduleSeq: s.seq,
-        scheduleAmount: s.amount,
-        scheduleDueDate: s.dueDate,
-        confidence: nameMatch && amountMatch ? 'high' : nameMatch ? 'medium' : 'low',
-      });
-    }
-  }
-
-  return out.sort((a, b) => {
-    const rank = { high: 0, medium: 1, low: 2 } as const;
-    if (rank[a.confidence] !== rank[b.confidence]) return rank[a.confidence] - rank[b.confidence];
-    return a.scheduleDueDate.localeCompare(b.scheduleDueDate);
-  });
+  const index = buildMatchIndex(contracts);
+  return findCandidatesIndexed(tx.amount, tx.customerName ?? '', index);
 }
 
 /** 카드 매칭 적용 — Bank와 동일 패턴 */
@@ -298,6 +355,7 @@ export function autoMatchCardAll(
   contracts: Contract[],
 ): CardAutoMatchResult[] {
   const results: CardAutoMatchResult[] = [];
+  const index = buildMatchIndex(contracts);
   const used = new Set<string>();
   for (const c of contracts) {
     for (const s of c.schedules ?? []) {
@@ -305,7 +363,9 @@ export function autoMatchCardAll(
     }
   }
   for (const t of txs) {
-    const candidates = findCardCandidates(t, contracts);
+    if (t.amount <= 0) continue;
+    if (t.matchedContractId) continue;
+    const candidates = findCandidatesIndexed(t.amount, t.customerName ?? '', index);
     const high = candidates.filter((c) => c.confidence === 'high' && !used.has(`${c.contract.id}:${c.scheduleSeq}`));
     if (high.length === 0) continue;
     const pick = high[0];

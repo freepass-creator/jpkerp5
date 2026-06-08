@@ -1,0 +1,1011 @@
+﻿'use client';
+
+
+
+/**
+
+ * 자금일보 ?듯빀 view ??BankTx(계좌·?동?체) + CardTx(留ㅼ텧·법인카드) 거래 ?듯빀 ??
+
+ *
+
+ *  쨌 媛??? ?쇱옄 / 종류(계좌/?먮룞?댁껜/카드留ㅼ텧/법인카드) / 회사 / 입금 / 출금 / 거래상대 / 적요
+
+ *  쨌 계정과목 (subject) ??inline dropdown (RECEIPT/EXPENSE/INTERNAL_SUBJECTS)
+
+ *  쨌 留ㅼ묶 계약 ??inline dropdown (?대떦 계약??ȸ contracts)
+
+ *  쨌 onChange 利됱떆 store update ??audit_log ?먮룞
+
+ *
+
+ * 계좌/?먮룞?댁껜/카드留ㅼ텧/법인카드 view ??raw ?대젰留? 자금일보???듯빀 + 계정과목 吏???먮━.
+
+ */
+
+
+
+import { useMemo, useState, Fragment } from 'react';
+
+import { useVendors } from '@/lib/firebase/vendors-store';
+
+import type { BankTransaction, CardTransaction, Contract, Vendor } from '@/lib/types';
+
+import { displayCompanyName } from '@/lib/company-display';
+
+import { resolveCompanyKey, matchesCompanyFilter } from '@/lib/filter-helpers';
+
+import { RECEIPT_SUBJECTS, EXPENSE_SUBJECTS, INTERNAL_SUBJECTS } from '@/lib/ledger-subjects';
+
+import type { Company as JpkCompany } from '@/lib/types';
+
+
+
+type Kind = '계좌' | '자동이체' | '카드매출' | '법인카드';
+
+
+
+type UnifiedRow = {
+
+  id: string;
+
+  kind: Kind;
+
+  source: 'bank' | 'card';
+
+  txDate: string;
+
+  /** 계좌번호 (BankTx.account / ?먮룞?댁껜=CMS ID) ?먮뒗 카드???━ (CardTx.cardLast4) */
+
+  channelId: string;
+
+  deposit: number;
+
+  withdraw: number;
+
+  counterparty: string;
+
+  memo: string;
+
+  subject: string;
+
+  matchedContractId: string;
+
+  companyCode?: string;
+
+  approvalNo?: string;
+
+  cardLast4?: string;
+
+  note: string;
+
+  /** 留ㅼ묶 계약 ?놁쓣 ???ъ슜?먭? 吏곸젒 ?낅젰??李⑤웾번호/거래泥?*/
+
+  linkedVehiclePlate: string;
+
+  linkedCustomerName: string;
+
+};
+
+
+
+function depositForBank(t: BankTransaction): number { return t.amount ?? 0; }
+
+function withdrawForBank(t: BankTransaction): number { return t.withdraw ?? 0; }
+
+
+
+const fmtNum = (v: number) => v ? v.toLocaleString('ko-KR') : '';
+
+
+
+export function DailyLedgerView({
+
+  bankTx, cardTx, contractById, contracts, companyMaster,
+
+  inPeriod, search, companyFilter, kindFilter,
+
+  onUpdateBank, onUpdateCard,
+
+}: {
+
+  bankTx: BankTransaction[];
+
+  cardTx: CardTransaction[];
+
+  contractById: Map<string, Contract>;
+
+  contracts: Contract[];
+
+  companyMaster: JpkCompany[];
+
+  inPeriod: (date: string) => boolean;
+
+  search: string;
+
+  companyFilter: string;
+
+  /** ?뱀젙 종류留??쒖떆. undefined 硫??꾩껜 (자금일보) */
+
+  kindFilter?: Kind;
+
+  onUpdateBank: (id: string, patch: Partial<BankTransaction>) => void;
+
+  onUpdateCard: (id: string, patch: Partial<CardTransaction>) => void;
+
+}) {
+
+  const { vendors, add: addVendor } = useVendors();
+
+
+
+  /** ???쇱묠 ??CMS 留ㅼ묶 ?댁뿭 보기 (자금일보 ?꾩슜) */
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleExpand(rowKey: string) {
+
+    setExpandedIds((prev) => {
+
+      const next = new Set(prev);
+
+      if (next.has(rowKey)) next.delete(rowKey); else next.add(rowKey);
+
+      return next;
+
+    });
+
+  }
+
+
+
+  /** settlementId 같? ?먮룞?댁껜 묶음 ??CMS 吏묎툑건이 펼쳐서 표시 */
+
+  function findCmsItems(settlementId: string | undefined): BankTransaction[] {
+
+    if (!settlementId) return [];
+
+    return bankTx.filter((t) => t.settlementId === settlementId && t.settlementRole === 'item');
+
+  }
+
+  const unified = useMemo<UnifiedRow[]>(() => {
+
+    const out: UnifiedRow[] = [];
+
+    for (const t of bankTx) {
+
+      const day = (t.txDate ?? '').slice(0, 10);
+
+      if (!inPeriod(day)) continue;
+
+      const co = resolveCompanyKey(t, contractById);
+
+      if (!matchesCompanyFilter(co, companyFilter)) continue;
+
+      out.push({
+
+        id: t.id,
+
+        kind: (t.source === '자동이체' ? '자동이체' : '계좌') as Kind,
+
+        source: 'bank',
+
+        txDate: t.txDate,
+
+        channelId: t.account ?? '',
+
+        deposit: depositForBank(t),
+
+        withdraw: withdrawForBank(t),
+
+        counterparty: t.counterparty ?? '',
+
+        memo: t.memo ?? '',
+
+        subject: t.subject ?? '',
+
+        matchedContractId: t.matchedContractId ?? '',
+
+        companyCode: co,
+
+        note: t.note ?? '',
+
+        linkedVehiclePlate: t.linkedVehiclePlate ?? '',
+
+        linkedCustomerName: t.linkedCustomerName ?? '',
+
+      });
+
+    }
+
+    for (const t of cardTx) {
+
+      const day = (t.txDate ?? '').slice(0, 10);
+
+      if (!inPeriod(day)) continue;
+
+      const co = (t.matchedContractId ? contractById.get(t.matchedContractId)?.company : undefined) ?? t.companyCode;
+
+      if (!matchesCompanyFilter(co, companyFilter)) continue;
+
+      const isSales = (t.kind ?? '留ㅼ텧') === '留ㅼ텧';
+
+      out.push({
+
+        id: t.id,
+
+        kind: (isSales ? '카드留ㅼ텧' : '법인카드') as Kind,
+
+        source: 'card',
+
+        txDate: t.txDate,
+
+        channelId: t.cardLast4 ? `****-${t.cardLast4}` : '',
+
+        deposit: isSales ? (t.amount ?? 0) : 0,
+
+        withdraw: isSales ? 0 : (t.amount ?? 0),
+
+        counterparty: t.customerName ?? t.merchant ?? '',
+
+        memo: isSales ? (t.approvalNo ? `승인 ${t.approvalNo}` : '카드留ㅼ텧') : (t.category ?? '법인카드'),
+
+        subject: isSales ? '카드留ㅼ텧' : (t.category ?? ''),
+
+        matchedContractId: t.matchedContractId ?? '',
+
+        companyCode: co,
+
+        approvalNo: t.approvalNo,
+
+        cardLast4: t.cardLast4,
+
+        note: '',  // CardTx ?먮뒗 note ?꾨뱶 ?놁쓬 ??추후 추?
+
+        linkedVehiclePlate: '',
+
+        linkedCustomerName: '',
+
+      });
+
+    }
+
+    // 종류 ?꾪꽣 (raw view??
+
+    const kindFiltered = kindFilter ? out.filter((r) => r.kind === kindFilter) : out;
+
+    // 寃??
+    const q = search.trim().toLowerCase();
+
+    const filtered = q
+
+      ? kindFiltered.filter((r) => `${r.counterparty} ${r.memo} ${r.subject}`.toLowerCase().includes(q))
+
+      : kindFiltered;
+
+    return filtered.sort((a, b) => (b.txDate ?? '').localeCompare(a.txDate ?? ''));
+
+  }, [bankTx, cardTx, contractById, companyFilter, inPeriod, search, kindFilter]);
+
+
+
+  /** datalist ?꾨낫 ??contracts 留덉뒪?곗뿉??distinct 추출 */
+
+  const vehiclePlates = useMemo(() => {
+
+    const s = new Set<string>();
+
+    for (const c of contracts) if (c.vehiclePlate) s.add(c.vehiclePlate);
+
+    return Array.from(s).sort();
+
+  }, [contracts]);
+
+  const customerNames = useMemo(() => {
+
+    const s = new Set<string>();
+
+    for (const c of contracts) if (c.customerName) s.add(c.customerName);
+
+    return Array.from(s).sort();
+
+  }, [contracts]);
+
+
+
+  /** 李⑤웾번호 ?낅젰 ??plate ?쇱튂 계약 ?먮룞 留ㅼ묶. ?놁쑝硫?linkedVehiclePlate 留????*/
+
+  function handleVehiclePlateInput(row: UnifiedRow, plate: string) {
+
+    if (row.source !== 'bank') return;
+
+    const v = plate.trim();
+
+    if (!v) {
+
+      onUpdateBank(row.id, { linkedVehiclePlate: undefined });
+
+      return;
+
+    }
+
+    const matched = contracts.find((c) => c.vehiclePlate === v && (!row.companyCode || c.company === row.companyCode));
+
+    if (matched) {
+
+      onUpdateBank(row.id, { matchedContractId: matched.id, linkedVehiclePlate: undefined });
+
+    } else {
+
+      onUpdateBank(row.id, { linkedVehiclePlate: v });
+
+    }
+
+  }
+
+  /** 거래泥??낅젰 ??customerName ?쇱튂 계약 ?먮룞 留ㅼ묶. ?놁쑝硫?linkedCustomerName ???*/
+
+  function handleCustomerNameInput(row: UnifiedRow, name: string) {
+
+    if (row.source !== 'bank') return;
+
+    const v = name.trim();
+
+    if (!v) {
+
+      onUpdateBank(row.id, { linkedCustomerName: undefined });
+
+      return;
+
+    }
+
+    const matched = contracts.find((c) => c.customerName === v && (!row.companyCode || c.company === row.companyCode));
+
+    if (matched) {
+
+      onUpdateBank(row.id, { matchedContractId: matched.id, linkedCustomerName: undefined });
+
+    } else {
+
+      onUpdateBank(row.id, { linkedCustomerName: v });
+
+    }
+
+  }
+
+
+
+  /** ??거래泥?利됱떆 ?깅줉 ??자금일보 dropdown ?먯꽌 prompt ??름 받고 vendor 留덉뒪???깅줉 + BankTx 留ㅼ묶 */
+
+  async function handleQuickVendorAdd(row: UnifiedRow) {
+
+    const name = window.prompt('??거래泥??대쫫 (?뺣퉬공장·공급??외???');
+
+    if (!name?.trim() || row.source !== 'bank') return;
+
+    const cleanName = name.trim();
+
+    // ?대? ?덉쑝硫?留ㅼ묶留? ?놁쑝硫?추?
+
+    let vendor = vendors.find((v) => v.name === cleanName);
+
+    if (!vendor) {
+
+      try {
+
+        await addVendor({
+
+          name: cleanName,
+
+          kind: '공급사',
+
+          companyCode: row.companyCode as Vendor['companyCode'] | undefined,
+
+          createdAt: new Date().toISOString(),
+
+        });
+
+        // store ?낅뜲?댄듃??onValue ??동, 留ㅼ묶? linkedCustomerName ?쇰줈 ?꾩떆
+
+      } catch (e) {
+
+        alert(`거래泥??깅줉 ?ㅽ뙣: ${(e as Error).message ?? String(e)}`);
+
+        return;
+
+      }
+
+    }
+
+    onUpdateBank(row.id, { linkedCustomerName: cleanName, matchedContractId: undefined });
+
+  }
+
+
+
+  function handleSubjectChange(row: UnifiedRow, subject: string) {
+
+    if (row.source === 'bank') onUpdateBank(row.id, { subject: subject || undefined });
+
+    else onUpdateCard(row.id, { category: subject || undefined });
+
+  }
+
+  function handleContractMatch(row: UnifiedRow, contractId: string) {
+
+    if (row.source === 'bank') onUpdateBank(row.id, { matchedContractId: contractId || undefined });
+
+    else onUpdateCard(row.id, { matchedContractId: contractId || undefined });
+
+  }
+
+
+
+  if (unified.length === 0) {
+
+    return (
+
+      <div className="muted center" style={{ padding: 56, fontSize: 13 }}>
+
+        {kindFilter
+
+          ? `해당 기간에${kindFilter} 거래 없음 ??신규 등록 또는 엑셀 업로드로 등록`
+
+          : '해당 기간에거래 없음 ??계좌/?먮룞?댁껜/카드留ㅼ텧/법인카드 view ?먯꽌 ?깅줉 ??자금일보???먮룞 ?⑹궛'}
+
+      </div>
+
+    );
+
+  }
+
+
+
+  return (
+
+    <>
+
+    {/* ?먮룞?꾩꽦 ?꾨낫 ??input list="..." 媛 李몄“ */}
+
+    <datalist id="ledger-vehicle-plates">
+
+      {vehiclePlates.map((p) => <option key={p} value={p} />)}
+
+    </datalist>
+
+    <datalist id="ledger-customer-names">
+
+      {customerNames.map((n) => <option key={n} value={n} />)}
+
+    </datalist>
+
+    <table className="table">
+
+      <thead>
+
+        <tr>
+
+          <th style={{ width: 96 }}>거래일자</th>
+
+          <th style={{ width: 64 }}>구분</th>
+
+          <th style={{ width: 56 }}>회사</th>
+
+          <th style={{ width: 120 }}>계좌·카드</th>
+
+          <th className="num" style={{ width: 96 }}>입금</th>
+
+          <th className="num" style={{ width: 96 }}>출금</th>
+
+          <th style={{ width: 120 }}>거래처</th>
+
+          <th>적요</th>
+
+          <th style={{ width: 116 }}>계정과목</th>
+
+          <th style={{ width: 96 }}>거래泥?</th>
+
+          <th style={{ width: 84 }}>李⑤웾번호</th>
+
+          <th style={{ width: 130 }}>留ㅼ묶 계약</th>
+
+          <th style={{ width: 110 }}>비고</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        {unified.map((r) => {
+
+          const matched = r.matchedContractId ? contractById.get(r.matchedContractId) : undefined;
+
+          const rowKey = `${r.source}-${r.id}`;
+
+          // CMS 吏묎툑嫄?= 계좌 입금 + (memo쨌counterparty ??'CMS' ?ы븿 OR settlementRole='deposit')
+
+          const bankRecord = r.source === 'bank' ? bankTx.find((b) => b.id === r.id) : undefined;
+
+          const isCmsDeposit = r.kind === '계좌' && r.deposit > 0 && (
+
+            bankRecord?.settlementRole === 'deposit'
+
+            || /CMS|吏묎툑/i.test(`${r.counterparty} ${r.memo}`)
+
+          );
+
+          const settlementItems = isCmsDeposit ? findCmsItems(bankRecord?.settlementId) : [];
+
+          const expanded = expandedIds.has(rowKey);
+
+          return (
+
+          <Fragment key={rowKey}>
+
+          <tr>
+
+            {/* 1. 거래일자 + CMS ?쇱묠 ??*/}
+
+            <td className="mono" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+
+              {isCmsDeposit && (
+
+                <button
+
+                  type="button"
+
+                  onClick={() => toggleExpand(rowKey)}
+
+                  style={{
+
+                    width: 14, height: 14, border: 'none', background: 'transparent',
+
+                    cursor: 'pointer', padding: 0, color: 'var(--text-sub)',
+
+                    transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+
+                    transition: 'transform 0.12s',
+
+                  }}
+
+                  title="CMS 留ㅼ묶 ?댁뿭 ?쇱튂湲?"
+                >▶</button>
+              )}
+
+              {(r.txDate ?? '').slice(0, 10)}
+
+            </td>
+
+            {/* 2. 구분 */}
+
+            <td>
+
+              <span className="badge" style={{
+
+                fontSize: 10, padding: '1px 6px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+
+                background: r.kind === '계좌' || r.kind === '자동이체' ? 'var(--blue-bg)' : 'var(--purple-bg)',
+
+                color: r.kind === '계좌' || r.kind === '자동이체' ? 'var(--blue-text)' : 'var(--purple-text)',
+
+              }}>{r.kind}</span>
+
+            </td>
+
+            {/* 3. 회사 */}
+
+            <td className="dim">{r.companyCode ? displayCompanyName(r.companyCode, companyMaster) : '-'}</td>
+
+            {/* 4. 계좌/카드 ?앸퀎 (계좌번호 / CMS ID / 카드 ??) */}
+
+            <td className="mono dim" style={{ fontSize: 11 }}>{r.channelId || '-'}</td>
+
+            {/* 5. 입금 */}
+
+            <td className="num mono" style={{ color: r.deposit > 0 ? 'var(--blue-text)' : 'var(--text-weak)' }}>
+
+              {fmtNum(r.deposit) || '-'}
+
+            </td>
+
+            {/* 6. 출금 */}
+
+            <td className="num mono" style={{ color: r.withdraw > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>
+
+              {fmtNum(r.withdraw) || '-'}
+
+            </td>
+
+            {/* 7. 거래처(?듭옣 ?쒓린) */}
+
+            <td>{r.counterparty || <span className="muted">-</span>}</td>
+
+            {/* 8. 적요 */}
+
+            <td className="dim" style={{ fontSize: 11 }}>{r.memo || '-'}</td>
+
+            {/* 9. 계정과목 (분개 dropdown) */}
+
+            <td>
+
+              <select
+
+                className="input"
+
+                style={{ height: 24, fontSize: 11, padding: '0 4px', width: '100%' }}
+
+                value={r.subject}
+
+                onChange={(e) => handleSubjectChange(r, e.target.value)}
+
+              >
+
+                <option value="">미지정</option>
+
+                <optgroup label="입금 계정">
+
+                  {RECEIPT_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+
+                </optgroup>
+
+                <optgroup label="출금 계정">
+
+                  {EXPENSE_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+
+                </optgroup>
+
+                <optgroup label="내부 이체">
+
+                  {INTERNAL_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+
+                </optgroup>
+
+              </select>
+
+            </td>
+
+            {/* 10. 거래泥???dropdown (계약 ?좏깮 + ??거래泥?吏곸젒 ?깅줉) */}
+
+            <td>
+
+              {r.source === 'bank' ? (
+
+                <select
+
+                  className="input"
+
+                  style={{
+
+                    height: 24, fontSize: 11, padding: '0 4px', width: '100%',
+
+                    background: matched ? 'var(--brand-bg, #eef2ff)' : r.linkedCustomerName ? '#fef9c3' : undefined,
+
+                  }}
+
+                  value={r.matchedContractId || (r.linkedCustomerName ? '__linked__' : '')}
+
+                  onChange={(e) => {
+
+                    const v = e.target.value;
+
+                    if (v === '__new__') {
+
+                      void handleQuickVendorAdd(r);
+
+                      e.target.value = r.matchedContractId || (r.linkedCustomerName ? `__vendor__${r.linkedCustomerName}` : '');
+
+                      return;
+
+                    }
+
+                    if (v.startsWith('__vendor__')) {
+
+                      const name = v.slice('__vendor__'.length);
+
+                      onUpdateBank(r.id, { linkedCustomerName: name, matchedContractId: undefined });
+
+                      return;
+
+                    }
+
+                    handleContractMatch(r, v);
+
+                  }}
+
+                  title={matched ? `?꾩옱 留ㅼ묶: ${matched.contractNo} 쨌 ${matched.customerName}` : (r.linkedCustomerName ? `거래泥? ${r.linkedCustomerName}` : '계약?????먮뒗 거래泥??깅줉')}
+
+                >
+
+                  <option value="">미매칭</option>
+
+                  <optgroup label="계약??(寃??">
+
+                    {contracts
+
+                      .filter((c) => !r.companyCode || c.company === r.companyCode)
+
+                      .map((c) => (
+
+                        <option key={c.id} value={c.id}>
+
+                          {c.customerName} 쨌 {c.vehiclePlate}
+
+                        </option>
+
+                      ))}
+
+                  </optgroup>
+
+                  <optgroup label="거래泥?(?뺣퉬공장·공급??외???">
+
+                    {vendors
+
+                      .filter((v) => !r.companyCode || !v.companyCode || v.companyCode === r.companyCode)
+
+                      .map((v) => (
+
+                        <option key={v.id} value={`__vendor__${v.name}`}>
+
+                          {v.name}{v.kind ? ` (${v.kind})` : ''}
+
+                        </option>
+
+                      ))}
+
+                  </optgroup>
+
+                  <option value="__new__">+ ??거래泥??깅줉...</option>
+
+                </select>
+
+              ) : <span>{matched?.customerName || <span className="muted" style={{ fontSize: 11 }}>-</span>}</span>}
+
+            </td>
+
+            {/* 11. 李⑤웾번호 ???숈씪 dropdown (계약 ?좏깮 ??李⑤웾/거래泥??④퍡 set) */}
+
+            <td>
+
+              {r.source === 'bank' ? (
+
+                <select
+
+                  className="input mono"
+
+                  style={{
+
+                    height: 24, fontSize: 11, padding: '0 4px', width: '100%',
+
+                    background: matched ? 'var(--brand-bg, #eef2ff)' : undefined,
+
+                  }}
+
+                  value={r.matchedContractId}
+
+                  onChange={(e) => handleContractMatch(r, e.target.value)}
+
+                  title={matched ? `현재: ${matched.vehiclePlate} ${matched.vehicleModel ?? ''} 시 ?ㅻⅨ 李⑤웾 ?좏깮 ??강제 蹂寃?` : '李⑤웾 ?좏깮'}
+
+                >
+
+                  <option value="">미매칭{r.linkedVehiclePlate ? ` (吏곸젒 ?낅젰: ${r.linkedVehiclePlate})` : ''}</option>
+
+                  {contracts
+
+                    .filter((c) => !r.companyCode || c.company === r.companyCode)
+
+                    .map((c) => (
+
+                      <option key={c.id} value={c.id}>
+
+                        {c.vehiclePlate} 쨌 {c.customerName}
+
+                      </option>
+
+                    ))}
+
+                </select>
+
+              ) : <span className="mono">{matched?.vehiclePlate || <span className="muted" style={{ fontSize: 11 }}>-</span>}</span>}
+
+            </td>
+
+            {/* 12. 留ㅼ묶 계약 (?닿구?거래泥?李⑤웾 ?먮룞 set) */}
+
+            <td>
+
+              <select
+
+                className="input"
+
+                style={{ height: 24, fontSize: 11, padding: '0 4px', width: '100%' }}
+
+                value={r.matchedContractId}
+
+                onChange={(e) => handleContractMatch(r, e.target.value)}
+
+              >
+
+                <option value="">미매칭</option>
+
+                {contracts
+
+                  .filter((c) => !r.companyCode || c.company === r.companyCode)
+
+                  .map((c) => (
+
+                    <option key={c.id} value={c.id}>
+
+                      {c.contractNo} 쨌 {c.customerName} ({c.vehiclePlate})
+
+                    </option>
+
+                  ))}
+
+              </select>
+
+            </td>
+
+            {/* 13. 비고 (?먯쑀 ?낅젰 ??BankTx 留? */}
+
+            <td>
+
+              {r.source === 'bank' ? (
+
+                <input
+
+                  className="input"
+
+                  style={{ height: 24, fontSize: 11, padding: '0 6px', width: '100%' }}
+
+                  defaultValue={r.note}
+
+                  onBlur={(e) => {
+
+                    const v = e.target.value;
+
+                    if (v !== r.note) onUpdateBank(r.id, { note: v || undefined });
+
+                  }}
+
+                  placeholder="硫붾え"
+
+                />
+
+              ) : <span className="muted">-</span>}
+
+            </td>
+
+          </tr>
+
+          {/* CMS 留ㅼ묶 ?쇱묠 ??留ㅼ묶???먮룞?댁껜 list OR 미매칭?덈궡 */}
+
+          {expanded && isCmsDeposit && (
+
+            <tr>
+
+              <td colSpan={13} style={{ background: 'var(--bg-sunken)', padding: '10px 14px' }}>
+
+                {settlementItems.length > 0 ? (
+
+                  <div>
+
+                    <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--text-sub)' }}>
+
+                      留ㅼ묶??CMS ?먮룞?댁껜 ({settlementItems.length}嫄?
+
+                      {bankRecord?.settlementGrossAmount && (
+
+                        <span style={{ marginLeft: 8 }}>
+
+                          쨌 묶음 합계 <strong className="mono">??{fmtNum(bankRecord.settlementGrossAmount)}</strong>
+
+                          {bankRecord.settlementFeeAmount != null && (
+
+                            <span style={{ marginLeft: 8, color: 'var(--red-text)' }}>
+
+                              쨌 CMS 수수료<strong className="mono">-??{fmtNum(bankRecord.settlementFeeAmount)}</strong>
+
+                            </span>
+
+                          )}
+
+                        </span>
+
+                      )}
+
+                    </div>
+
+                    <table className="table" style={{ fontSize: 11 }}>
+
+                      <thead>
+
+                        <tr>
+
+                          <th style={{ width: 96 }}>거래일자</th>
+
+                          <th style={{ width: 130 }}>입금??</th>
+
+                          <th>적요</th>
+
+                          <th style={{ width: 84 }}>李⑤웾번호</th>
+
+                          <th className="num" style={{ width: 100 }}>금액</th>
+
+                        </tr>
+
+                      </thead>
+
+                      <tbody>
+
+                        {settlementItems.map((it) => {
+
+                          const itC = it.matchedContractId ? contractById.get(it.matchedContractId) : undefined;
+
+                          return (
+
+                            <tr key={it.id}>
+
+                              <td className="mono">{(it.txDate ?? '').slice(0, 10)}</td>
+
+                              <td>{it.counterparty}</td>
+
+                              <td className="dim">{it.memo || '-'}</td>
+
+                              <td className="mono">{itC?.vehiclePlate || <span className="muted">-</span>}</td>
+
+                              <td className="num mono">{fmtNum(it.amount ?? 0)}</td>
+
+                            </tr>
+
+                          );
+
+                        })}
+
+                      </tbody>
+
+                    </table>
+
+                  </div>
+
+                ) : (
+
+                  <div style={{ fontSize: 12, color: 'var(--orange-text)', padding: '8px 12px', background: 'var(--orange-bg)', borderRadius: 'var(--radius)' }}>
+
+                    ??留ㅼ묶??CMS ?댁뿭 ?놁쓬 ????기간 CMS(?먮룞?댁껜) ?낅줈?쒕? ????것으?추정?⑸땲??
+
+                    <br />
+
+                    <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>
+
+                      ???먮룞?댁껜 view ?먯꽌 CMS 紐낆꽭 ?묒? ?낅줈?????먮룞 묶음 留ㅼ묶?⑸땲??
+
+                    </span>
+
+                  </div>
+
+                )}
+
+              </td>
+
+            </tr>
+
+          )}
+
+          </Fragment>
+
+          );
+
+        })}
+
+      </tbody>
+
+    </table>
+
+    </>
+
+  );
+
+}
+

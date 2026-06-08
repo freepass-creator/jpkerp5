@@ -17,6 +17,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
+import { PageShell } from '@/components/ui/page-shell';
 import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
 import { SmsDialog } from '@/components/sms-dialog';
@@ -79,7 +80,9 @@ function matchesView(c: Contract, v: View): boolean {
   // 종료된 계약은 운영현황에서 제외 (리스크관리 → 종료 탭에서 확인)
   if (isClosed(c)) return false;
   if (v === '전체') return true;
-  if (v === '계약중') return isRunning(c);
+  // '계약중' = 반납/해지 안 된 모든 계약 (휴차·상품화·매각 포함).
+  // vehicleStatus 변경해도 운영현황에서 사라지지 않음 (직원 피드백 6,7 반영).
+  if (v === '계약중') return isActiveContract(c);
   if (v === '만기경과') return getContractState(c).name === '만기경과';
   if (v === '만기임박') return getContractState(c).name === '만기임박';
   if (v === '연장대기') return c.vehicleStatus === '연장대기';
@@ -505,7 +508,9 @@ export default function Page() {
     const q = search.trim().toLowerCase();
     const arr = contracts.filter((c) => {
       if (!matchesCompany(c, companyFilter)) return false;
-      if (!matchesView(c, view)) return false;
+      // 검색어 있을 때 view 필터 우회 — 직원이 휴차/반납 계약자도 한 번에 찾을 수 있게.
+      // (view 기본 '계약중' 이라 '정도하' 같은 계약자가 휴차/반납이면 안 보이던 버그 수정)
+      if (!q && !matchesView(c, view)) return false;
       if (q) {
         const hay = `${c.customerName} ${c.vehiclePlate} ${c.vehicleModel} ${c.manager} ${c.customerPhone1}`.toLowerCase();
         if (!hay.includes(q)) return false;
@@ -549,28 +554,14 @@ export default function Page() {
   }
 
   return (
-    <div className="layout">
-      <Sidebar />
-      <div className="app">
-      <header className="topbar">
-        <div className="topbar-title">
-          <Car size={16} weight="fill" style={{ color: 'var(--brand)' }} />
-          <span>운영 현황</span>
-        </div>
-        <div className="topbar-search">
-          <MagnifyingGlass size={14} className="icon" />
-          <input
-            className="input"
-            placeholder="고객 / 차량 / 차종 / 담당"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <div className="filter-bar">
+    <PageShell
+      title="운영 현황"
+      icon={<Car size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
+      topbarSearch={{ placeholder: '고객 / 차량 / 차종 / 담당', value: search, onChange: setSearch }}
+      topbarFilter={
+        <>
           {visibleViews.map((v) => {
             const count = viewCounts[v];
-            // view별 고유 색상 — 활성 시 chip-{color} 클래스로 brand 대신 해당 색 사용
             const tone = v === '미수' ? 'red'
               : v === '만기경과' ? 'red'
               : v === '만기임박' ? 'amber'
@@ -589,7 +580,6 @@ export default function Page() {
               </button>
             );
           })}
-          {/* 회사 필터 — dropdown (전 페이지 통일) */}
           {companies.length > 1 && (
             <>
               <span className="filter-divider" />
@@ -602,9 +592,7 @@ export default function Page() {
               >
                 {companies.map((co) => {
                   const cnt = companyCounts[co] ?? 0;
-                  const label = co === '전체'
-                    ? '회사: 전체'
-                    : displayCompanyName(co, companyMaster) || co;
+                  const label = co === '전체' ? '회사: 전체' : displayCompanyName(co, companyMaster) || co;
                   return (
                     <option key={co} value={co}>
                       {label}{cnt > 0 ? ` (${cnt})` : ''}
@@ -614,9 +602,10 @@ export default function Page() {
               </select>
             </>
           )}
-        </div>
-
-        <div className="topbar-right">
+        </>
+      }
+      topbarRight={
+        <>
           <span className="topbar-sort" title={manualSort ? '컬럼 헤더 다시 클릭으로 변경/해제' : '필터별 자동 정렬'}>
             <span className="arrow">{manualSort?.dir === 'asc' ? '▲' : '▼'}</span>
             {manualSort
@@ -624,9 +613,11 @@ export default function Page() {
               : sortLabel(view)}
           </span>
           <span className="topbar-date">{dateWithDow(todayKr())}</span>
-        </div>
-      </header>
-
+        </>
+      }
+      bare
+      noBottomBar
+    >
       <div className="dashboard">
         <div className="panel">
           <div className="panel-body">
@@ -707,9 +698,14 @@ export default function Page() {
                         </td>
                         {/* 회사 */}
                         <td className="center dim">{displayCompanyName(c.company, companyMaster)}</td>
-                        {/* 차량상태 */}
+                        {/* 차량상태 — display 만. 변경은 더블클릭 → dialog → 처리 flow 거쳐서 (휴차 사유/반납 검수 등) */}
                         <td className="center">
-                          <span className={`status ${vs.name}`}>{vs.name}</span>
+                          <span
+                            className={`status ${vs.name}`}
+                            title="더블클릭 → 상세 dialog → 상태 탭에서 처리 (휴차 사유·반납 검수 등 flow 거침)"
+                          >
+                            {vs.name}
+                          </span>
                         </td>
                         {/* 차량 */}
                         <td className="plate">{c.vehiclePlate}</td>
@@ -1015,8 +1011,7 @@ export default function Page() {
           },
         ] satisfies ContextMenuItem[]) : []}
       />
-      </div>
-    </div>
+    </PageShell>
   );
 }
 

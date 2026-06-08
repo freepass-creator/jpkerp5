@@ -6,6 +6,7 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import type { Contract } from '@/lib/types';
 import type { Penalty, PenaltyStatus } from '@/lib/types-penalty';
 import { formatDateFull } from '@/lib/utils';
+import { matchesSearch } from '@/lib/filter-helpers';
 
 const NEXT_STATUSES: PenaltyStatus[] = ['계약매칭', '임차인통보', '납부완료', '회사납부', '이의신청'];
 
@@ -26,13 +27,10 @@ export function PenaltyMatchDialog({
 
   const candidates = useMemo(() => {
     if (!penalty) return [];
-    const query = searchQ.trim().toLowerCase();
     // 차량번호 기본 매칭 + 위반일 당시 운행 중이었는지 시기 가중
-    return contracts.filter((c) => {
-      const hay = `${c.vehiclePlate} ${c.customerName} ${c.contractNo} ${c.customerPhone1}`.toLowerCase();
-      if (query && !hay.includes(query)) return false;
-      return true;
-    }).map((c) => {
+    return contracts.filter((c) =>
+      matchesSearch(searchQ, [c.vehiclePlate, c.customerName, c.contractNo, c.customerPhone1])
+    ).map((c) => {
       // 위반일 당시 운행 중이었는지 점수
       const v = penalty.violationDate;
       const from = c.deliveredDate ?? c.contractDate;

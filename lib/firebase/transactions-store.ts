@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ref, onValue, set, update as rtdbUpdate, push } from 'firebase/database';
+import { ref, onValue, set, update as rtdbUpdate, push, remove as rtdbRemove } from 'firebase/database';
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { BankTransaction, CardTransaction, AuditEntityType } from '@/lib/types';
@@ -112,6 +112,30 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       await rtdbUpdate(ref(db, path), pruneUndefined(batch as unknown as Record<string, unknown>));
       void audit.import(auditType, `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 등록 ${items.length}건`, { count: items.length });
       return stamped;
+    },
+    remove: async (id: string) => {
+      if (!configured) {
+        setRows((prev) => prev.filter((r) => r.id !== id));
+        return;
+      }
+      await ensureAuth();
+      const db = getRtdb(); if (!db) return;
+      await rtdbRemove(ref(db, `${path}/${id}`));
+      void audit.delete(auditType, id, `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 삭제`);
+    },
+    removeMany: async (ids: string[]) => {
+      if (ids.length === 0) return 0;
+      if (!configured) {
+        setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+        return ids.length;
+      }
+      await ensureAuth();
+      const db = getRtdb(); if (!db) return 0;
+      const updates: Record<string, null> = {};
+      for (const id of ids) updates[id] = null;
+      await rtdbUpdate(ref(db, path), updates);
+      void audit.delete(auditType, '', `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 삭제 ${ids.length}건`);
+      return ids.length;
     },
   };
 }

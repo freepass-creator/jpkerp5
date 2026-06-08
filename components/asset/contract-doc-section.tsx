@@ -16,10 +16,7 @@ import { useRef, useState } from 'react';
 import { Paperclip, CircleNotch, CheckCircle, X, Camera, Warning } from '@phosphor-icons/react';
 import { DateInput } from '@/components/ui/date-input';
 import type { Vehicle } from '@/lib/types';
-
-function normalizePlate(p: string): string {
-  return p.replace(/[\s\-·.]/g, '').toLowerCase();
-}
+import { normalizePlateLoose as normalizePlate } from '@/lib/customer-match';
 
 type Extracted = {
   car_number?: string;

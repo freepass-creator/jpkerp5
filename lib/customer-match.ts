@@ -11,9 +11,14 @@
 
 import type { Contract } from './types';
 
-/** 차량번호 정규화 — 공백 제거 */
+/** 차량번호 정규화 — 공백 제거 (strict, 계약 customer 매칭용) */
 export function normalizePlate(plate: string): string {
   return (plate ?? '').replace(/\s/g, '').trim();
+}
+
+/** 차량번호 정규화 — 공백/하이픈/중점/점 제거 + 소문자 (OCR/엑셀 비교용 loose) */
+export function normalizePlateLoose(plate: string): string {
+  return (plate ?? '').replace(/[\s\-·.]/g, '').toLowerCase();
 }
 
 /** 식별번호 정규화 — 하이픈/공백 제거 후 숫자만 */
