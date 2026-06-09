@@ -859,7 +859,8 @@ a { color: var(--text-link); text-decoration: none; }
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .topbar-sort {
   display: inline-flex;
@@ -1363,7 +1364,7 @@ input[type="radio"]:disabled {
 .table td.dim { color: var(--text-sub); }
 
 /* 체크박스 열 — 좌측 첫 칸, 폭 28px 고정, 좌우 가운데 정렬.
-   우측 border 제거 — 체크박스 옆 세로 라인 없애 정렬 또렷이 */
+   sticky 로 좌우 스크롤 시에도 맨 앞 고정. 우측 border 제거. */
 .table th.checkbox-col,
 .table td.checkbox-col {
   width: 28px;
@@ -1373,6 +1374,20 @@ input[type="radio"]:disabled {
   text-align: center;
   vertical-align: middle;
   border-right: none;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: var(--bg-card);
+}
+.table thead th.checkbox-col {
+  z-index: 11; /* sticky thead 보다 위 */
+  background: var(--bg-header);
+}
+.table tbody tr.selected-row td.checkbox-col {
+  background: var(--bg-selected, var(--brand-bg));
+}
+.table tbody tr:nth-child(even) td.checkbox-col {
+  background: var(--bg-stripe);
 }
 .table .checkbox-col input[type="checkbox"] {
   display: block;

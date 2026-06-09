@@ -38,8 +38,8 @@ const TOOLS: ToolCard[] = [
   },
   {
     href: '/admin/migrate-sheet',
-    title: '진단 · wipe',
-    desc: 'DB 노드 상태 진단 / 전체 wipe / 잘못 박힌 회사 계약 정리 등 위험 도구.',
+    title: '데이터 초기화 · 진단',
+    desc: '☢ 전체 데이터 wipe (테스트 후 처음부터 쓰기) / DB 노드 상태 진단 / 회사 코드 정리 — 관리자 전용 위험 도구. 이중 confirm 거침.',
     icon: <Database size={18} weight="duotone" />,
     variant: 'danger',
   },

@@ -9,9 +9,11 @@
  * 현재 (Phase 1): 차량 리스트 + 차량별 디테일 다이얼로그.
  */
 
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Car, MagnifyingGlass, FileXls, Download, PencilSimple, Copy, Trash, ShoppingCart } from '@phosphor-icons/react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Plus, Trash } from '@phosphor-icons/react';
+import { AssetTopbar } from '@/components/asset/asset-topbar';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -36,15 +38,15 @@ import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers'
 import type { Vehicle, Contract, HistoryEntry } from '@/lib/types';
 import { DialogRoot, DialogContent, DialogBody, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
-import { ContractDocSection } from '@/components/asset/contract-doc-section';
 import { useRole } from '@/lib/use-role';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { toast } from '@/lib/toast';
 import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
+import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 
 export default function AssetPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialView = (searchParams.get('view') === 'registered') ? 'registered' : 'status';
   const { isMaster: master, loading: roleLoading } = useRole();
   useEffect(() => {
     if (!roleLoading && !master) router.replace('/');
@@ -87,6 +89,39 @@ export default function AssetPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [openId, setOpenId] = useState<string | null>(null);
   const [insuranceOpen, setInsuranceOpen] = useState(false);
+  const [vehicleRegOpen, setVehicleRegOpen] = useState(false);
+  const [assetView, setAssetView] = useState<'status' | 'registered'>(initialView);
+
+  // URL ?view= 이 바뀌면 state 동기화 (sub-page 에서 [등록자산] 클릭으로 진입한 경우)
+  useEffect(() => {
+    const v = searchParams.get('view');
+    if (v === 'registered' || v === 'status') setAssetView(v);
+  }, [searchParams]);
+
+  // URL ?plate= 또는 ?id= 로 진입 시 해당 차량 상세 dialog 자동 open (sub-page 더블클릭 진입).
+  // 한 번만 처리 후 URL 에서 제거 — 새로고침/닫기 후 재오픈 방지.
+  const dialogOpenedRef = React.useRef(false);
+  useEffect(() => {
+    if (dialogOpenedRef.current) return;
+    const plate = searchParams.get('plate');
+    const id = searchParams.get('id');
+    if (!plate && !id) return;
+    if (rawVehicles.length === 0) return; // 데이터 로드 대기
+
+    let targetId: string | null = null;
+    if (plate) {
+      const target = rawVehicles.find((v) => (v.plate ?? '').replace(/\s/g, '') === plate.replace(/\s/g, ''));
+      if (target) targetId = target.id;
+    } else if (id) {
+      targetId = id;
+    }
+
+    dialogOpenedRef.current = true;
+    if (targetId) setOpenId(targetId);
+    // URL 정리 — plate/id 제거하고 view 만 유지
+    const v = searchParams.get('view');
+    router.replace(v ? `/asset?view=${v}` : '/asset');
+  }, [searchParams, rawVehicles, router]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -142,6 +177,33 @@ export default function AssetPage() {
     return m;
   }, [contracts]);
 
+  type AssetQF = 'all' | 'reg-missing' | 'ins-missing' | 'loan-missing' | 'gps-missing';
+  const [assetQF, setAssetQF] = useState<AssetQF>('all');
+
+  const isMissing = useMemo(() => ({
+    reg: (v: Vehicle) => v.id.startsWith('contract-derived-') || !v.vin,
+    ins: (v: Vehicle) => !v.insuranceCompany,
+    loan: (v: Vehicle) => !v.loanCompany && !v.loanCashOnly,
+    gps: (v: Vehicle) => !v.gpsProvider,
+  }), []);
+
+  /** 회사 필터 + 자산 status 필터 통과한 차량들에서 미입력 카운트 */
+  const assetCounts = useMemo(() => {
+    const base = vehicles.filter((v) => {
+      if (v.status && !ASSET_STATUS_SET.has(v.status)) return false;
+      if (!matchesCompanyFilter(v.company, companyFilter)) return false;
+      return true;
+    });
+    let reg = 0, ins = 0, loan = 0, gps = 0;
+    for (const v of base) {
+      if (isMissing.reg(v)) reg++;
+      if (isMissing.ins(v)) ins++;
+      if (isMissing.loan(v)) loan++;
+      if (isMissing.gps(v)) gps++;
+    }
+    return { all: base.length, reg, ins, loan, gps };
+  }, [vehicles, companyFilter, isMissing]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const groupMatch = (status?: VehicleStatus) => {
@@ -153,65 +215,61 @@ export default function AssetPage() {
       return status === statusFilter;
     };
     return vehicles.filter((v) => {
-      // 자산 관점에서는 휴차/임시배차/반납 등 계약 측면 status 제외 (/contract/idle 등 별도 메뉴에서)
       if (v.status && !ASSET_STATUS_SET.has(v.status)) return false;
       if (!matchesCompanyFilter(v.company, companyFilter)) return false;
       if (statusFilter !== 'all' && !groupMatch(v.status)) return false;
+      // 퀵필터 — 미입력 별
+      if (assetQF === 'reg-missing' && !isMissing.reg(v)) return false;
+      if (assetQF === 'ins-missing' && !isMissing.ins(v)) return false;
+      if (assetQF === 'loan-missing' && !isMissing.loan(v)) return false;
+      if (assetQF === 'gps-missing' && !isMissing.gps(v)) return false;
       if (q) {
         const hay = `${v.plate} ${v.model} ${v.vehicleMaker ?? ''} ${v.vehicleModelLine ?? ''} ${v.vehicleSubModel ?? ''} ${v.vehicleVariant ?? ''} ${v.vehicleTrim ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     }).sort((a, b) => (a.plate ?? '').localeCompare(b.plate ?? ''));
-  }, [vehicles, search, companyFilter, statusFilter]);
+  }, [vehicles, search, companyFilter, statusFilter, assetQF, isMissing]);
 
   return (
     <div className="layout">
       <Sidebar />
       <div className="app">
-        <header className="topbar">
-          <div className="topbar-title">
-            <Car size={16} weight="fill" style={{ color: 'var(--brand)' }} />
-            <span>자산 관리</span>
-          </div>
-          <div className="topbar-search">
-            <MagnifyingGlass size={14} className="icon" />
-            <input
-              className="input"
-              placeholder="차량번호 / 차종 / 제조사"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          {/* 퀵필터 — 검색창 우측. 같은 페이지의 행 필터 (회사 등) */}
-          <div className="filter-bar">
-            <select
-              className="input-compact" data-w="md"
-              value={companyFilter}
-              onChange={(e) => setCompanyFilter(e.target.value)}
-              title="회사별 필터"
-            >
-              <option value="all">회사: 전체</option>
-              {companyOptions.map((co) => (
-                <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* 우측 끝 — sub-page 이동 버튼 (.chip-nav) */}
-          <div className="topbar-right">
-            <Link href="/asset/insurance" className="chip chip-nav" title="보험증권 관리 — 회사·차량별 보험 현황, 만기 임박 알림">보험</Link>
-            <Link href="/asset/loan" className="chip chip-nav" title="할부 스케줄 — 할부사·잔여원금·월납입 회차">할부</Link>
-            <Link href="/asset/repair" className="chip chip-nav" title="차량 수선 — 정비공장·이력·비용">수선</Link>
-            <Link href="/asset/gps" className="chip chip-nav" title="GPS 단말 — 공급사·단말번호·상태">GPS</Link>
-          </div>
-        </header>
+        <AssetTopbar
+          currentPage={assetView}
+          search={search}
+          onSearchChange={setSearch}
+          companyFilter={companyFilter}
+          onCompanyFilterChange={setCompanyFilter}
+          companyOptions={companyOptions}
+          companyMaster={companyMaster}
+          onViewChange={setAssetView}
+          extraFilters={
+            <>
+              <button type="button" className={`chip ${assetQF === 'all' ? 'active' : ''}`} onClick={() => setAssetQF('all')}>
+                전체<span className="chip-count">{assetCounts.all}</span>
+              </button>
+              <button type="button" className={`chip ${assetQF === 'reg-missing' ? 'active' : ''}`} onClick={() => setAssetQF('reg-missing')}>
+                등록증 미입력{assetCounts.reg > 0 && <span className="chip-count">{assetCounts.reg}</span>}
+              </button>
+              <button type="button" className={`chip ${assetQF === 'ins-missing' ? 'active' : ''}`} onClick={() => setAssetQF('ins-missing')}>
+                보험 미입력{assetCounts.ins > 0 && <span className="chip-count">{assetCounts.ins}</span>}
+              </button>
+              <button type="button" className={`chip ${assetQF === 'loan-missing' ? 'active' : ''}`} onClick={() => setAssetQF('loan-missing')}>
+                구매방식 미입력{assetCounts.loan > 0 && <span className="chip-count">{assetCounts.loan}</span>}
+              </button>
+              <button type="button" className={`chip ${assetQF === 'gps-missing' ? 'active' : ''}`} onClick={() => setAssetQF('gps-missing')}>
+                GPS 미설치{assetCounts.gps > 0 && <span className="chip-count">{assetCounts.gps}</span>}
+              </button>
+            </>
+          }
+        />
 
         <div className="dashboard" style={{ gridTemplateColumns: '1fr' }}>
           <div className="panel">
             <div className="panel-body">
-              {/* 자산관리 표 — 자산 관점 핵심 9컬럼 (등록증 디테일은 더블클릭 → 다이얼로그) */}
+              {/* 자산관리 표 — 자산현황(운영 포괄) vs 등록자산(등록증+제조사 스펙) view 분기 */}
+              {assetView === 'status' ? (
               <table className="table">
                 <thead>
                   <tr>
@@ -235,107 +293,148 @@ export default function AssetPage() {
                     <th style={{ width: 56 }}>회사</th>
                     <th style={{ width: 96 }}>차량번호</th>
                     <th style={{ width: 130 }}>차종</th>
-                    <th className="center" style={{ width: 84 }}>등록증</th>
-                    <th style={{ width: 110 }}>보험사</th>
-                    <th style={{ width: 110 }}>할부사</th>
-                    <th className="num" style={{ width: 70 }}>할부개월</th>
-                    <th className="num" style={{ width: 110 }}>잔여원금</th>
-                    <th style={{ width: 90 }}>GPS</th>
+                    <th className="center" style={{ width: 90 }}>등록증</th>
+                    <th className="center" style={{ width: 90 }}>보험증권</th>
+                    <th className="center" style={{ width: 90 }}>구매방식</th>
+                    <th className="center" style={{ width: 90 }}>GPS</th>
+                    <th style={{ minWidth: 240 }}>미입력 알람</th>
                     <th className="center" style={{ width: 76 }}>상태</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="muted center" style={{ padding: 32 }}>
-                        등록된 차량 없음
-                      </td>
+                      <td colSpan={10} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td>
                     </tr>
                   ) : filtered.map((v) => {
                     const regMissing = v.id.startsWith('contract-derived-') || !v.vin;
+                    const insMissing = !v.insuranceCompany;
+                    const loanMissing = !v.loanCompany && !v.loanCashOnly;
+                    const gpsMissing = !v.gpsProvider;
+                    const missing: string[] = [];
+                    if (regMissing) missing.push('자동차등록증');
+                    if (insMissing) missing.push('보험가입증명서');
+                    if (loanMissing) missing.push('구매방식');
+                    if (gpsMissing) missing.push('GPS');
                     return (
-                    <tr
-                      key={v.id}
-                      onClick={() => setSelectedId(v.id)}
-                      onDoubleClick={() => setOpenId(v.id)}
-                      style={{ cursor: 'pointer', verticalAlign: 'middle' }}
-                      className={selectedId === v.id ? 'selected-row' : undefined}
-                    >
+                    <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => setOpenId(v.id)} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
                       <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
                       <td className="center">
-                        {regMissing ? (
-                          <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>
-                        ) : (
-                          <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>입력완료</span>
-                        )}
+                        {regMissing
+                          ? <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>
+                          : <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>완료</span>}
                       </td>
-                      <td>{v.insuranceCompany || <span className="muted">-</span>}</td>
-                      <td>{v.loanCompany || <span className="muted">-</span>}</td>
-                      <td className="num mono">{v.loanMonths ? `${v.loanMonths}개월` : '-'}</td>
-                      <td className="num mono">{v.loanRemainingPrincipal ? `₩${v.loanRemainingPrincipal.toLocaleString()}` : '-'}</td>
-                      <td>{v.gpsProvider || <span className="muted">-</span>}</td>
+                      <td className="center">
+                        {insMissing
+                          ? <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>
+                          : <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>완료</span>}
+                      </td>
+                      <td className="center">
+                        {v.loanCashOnly
+                          ? <span className="status" style={{ background: 'var(--bg-stripe)', color: 'var(--text-weak)' }}>없음</span>
+                          : v.loanCompany
+                            ? <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>완료</span>
+                            : <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>}
+                      </td>
+                      <td className="center">
+                        {gpsMissing
+                          ? <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미설치</span>
+                          : <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>설치</span>}
+                      </td>
+                      <td className="dim" style={{ fontSize: 11 }}>
+                        {missing.length === 0
+                          ? <span style={{ color: 'var(--green-text)' }}>✓ 모두 입력 완료</span>
+                          : <span style={{ color: 'var(--red-text)' }}>● {missing.join(' · ')} 미입력</span>}
+                      </td>
                       <td className="center"><span className={`status ${v.status}`}>{v.status}</span></td>
                     </tr>
                   );
                   })}
                 </tbody>
               </table>
+              ) : (
+              /* 등록자산 view — 자동차등록증 + 제조사 5단 스펙 (정적 차량 정보) */
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th className="checkbox-col">
+                      <input
+                        type="checkbox"
+                        checked={filtered.length > 0 && filtered.every((v) => selectedIds.has(v.id))}
+                        ref={(el) => {
+                          if (!el) return;
+                          const some = filtered.some((v) => selectedIds.has(v.id));
+                          const all = filtered.every((v) => selectedIds.has(v.id));
+                          el.indeterminate = some && !all;
+                        }}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds(new Set(filtered.map((v) => v.id)));
+                          else setSelectedIds(new Set());
+                        }}
+                        aria-label="전체 선택"
+                      />
+                    </th>
+                    <th style={{ width: 88 }}>자산코드</th>
+                    <th style={{ width: 56 }}>회사</th>
+                    <th style={{ width: 96 }}>차량번호</th>
+                    <th style={{ width: 80 }}>제조사</th>
+                    <th style={{ width: 110 }}>모델</th>
+                    <th style={{ width: 130 }}>세부모델</th>
+                    <th style={{ width: 80 }}>트림</th>
+                    <th className="mono" style={{ width: 140 }}>VIN</th>
+                    <th className="mono" style={{ width: 100 }}>제작연월일</th>
+                    <th className="num" style={{ width: 70 }}>배기량</th>
+                    <th className="num" style={{ width: 60 }}>승차</th>
+                    <th style={{ width: 80 }}>연료</th>
+                    <th style={{ width: 90 }}>형식</th>
+                    <th style={{ width: 90 }}>원동기형식</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={15} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td>
+                    </tr>
+                  ) : filtered.map((v) => (
+                    <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => setOpenId(v.id)} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
+                      <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
+                      <td className="mono dim">{v.assetCode || '-'}</td>
+                      <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                      <td className="mono">{v.plate || '-'}</td>
+                      <td>{v.vehicleMaker || '-'}</td>
+                      <td>{v.vehicleModelLine || v.model || '-'}</td>
+                      <td className="dim">{v.vehicleSubModel || '-'}</td>
+                      <td className="dim">{v.vehicleTrim || '-'}</td>
+                      <td className="mono dim">{v.vin || <span className="muted">미입력</span>}</td>
+                      <td className="mono dim">{v.manufacturedDate || '-'}</td>
+                      <td className="num mono">{v.displacementCc ? `${v.displacementCc.toLocaleString()}cc` : '-'}</td>
+                      <td className="num mono dim">{v.seatingCapacity ? `${v.seatingCapacity}인` : '-'}</td>
+                      <td className="dim">{v.fuelType || '-'}</td>
+                      <td className="mono dim">{v.vehicleFormat || '-'}</td>
+                      <td className="mono dim">{v.engineFormat || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              )}
             </div>
           </div>
         </div>
 
-        {/* 하단바 — 모든 버튼은 좌측. 우측은 카톡·알림 popup 영역 (빈공간 유지) */}
+        {/* 하단바 — 단순화: [+ 등록] + [선택 N건 삭제] 만. 수정은 더블클릭 → 상세 dialog */}
         <BottomBar
           left={
             <>
-              <Link className="btn btn-primary" href="/asset/purchase" title="신차 구매부터 인도까지 흐름 — 차량구매 페이지로">
-                <ShoppingCart size={14} weight="bold" /> 차량구매
-              </Link>
-              <button className="btn" type="button" disabled={!selected} onClick={() => selected && setOpenId(selected.id)}>
-                <PencilSimple size={14} weight="bold" /> 수정
-              </button>
               <button
-                className="btn"
+                className="btn btn-primary"
                 type="button"
-                title="보험증권 OCR 등록 — 1회차 보험료 자동 산출"
-                onClick={() => setInsuranceOpen(true)}
+                title="자산 등록 — OCR 일괄 / 개별 입력 / 엑셀 일괄 3가지 방식"
+                onClick={() => setVehicleRegOpen(true)}
               >
-                <FileXls size={14} weight="bold" /> 보험증권 OCR
-              </button>
-              <button
-                className="btn"
-                type="button"
-                disabled={!selected}
-                title="선택 행을 복제 — 새 차량 생성 (번호판 + 차종 등 그대로, ID는 신규)"
-                onClick={async () => {
-                  if (!selected) return;
-                  if (!confirm(`'${selected.plate}' 자산을 복제하시겠습니까?`)) return;
-                  try {
-                    const { id: _drop, ...rest } = selected;
-                    await addVehicle({ ...rest, plate: `${selected.plate}_복사` });
-                    toast.success('복제 완료 — 차량번호 수정 필요');
-                  } catch (e) { toast.error(`복제 실패: ${(e as Error).message}`); }
-                }}
-              >
-                <Copy size={14} weight="bold" /> 복사
-              </button>
-              <button
-                className="btn"
-                type="button"
-                disabled={!selected}
-                title="선택 행 단일 삭제"
-                style={{ color: selected ? 'var(--red-text)' : undefined }}
-                onClick={async () => {
-                  if (!selected) return;
-                  if (!confirm(`'${selected.plate}' 자산을 삭제하시겠습니까? (감사로그 남음)`)) return;
-                  try { await removeVehicle(selected.id); setSelectedId(null); toast.success('삭제 완료'); }
-                  catch (e) { toast.error(`삭제 실패: ${(e as Error).message}`); }
-                }}
-              >
-                <Trash size={14} weight="bold" /> 삭제
+                <Plus size={14} weight="bold" /> 자산 등록
               </button>
               <button
                 className="btn"
@@ -353,49 +452,6 @@ export default function AssetPage() {
                 }}
               >
                 <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
-              </button>
-              <span className="btn-sep" />
-              <button
-                className="btn"
-                type="button"
-                title="현재 필터된 자산 전체 엑셀"
-                onClick={async () => {
-                  if (filtered.length === 0) { toast.info('내보낼 자산 없음'); return; }
-                  const XLSX = await import('xlsx');
-                  const rows = filtered.map((v) => ({
-                    회사: v.company ?? '',
-                    차량번호: v.plate ?? '',
-                    차종: v.model ?? '',
-                    제조사: v.vehicleMaker ?? '',
-                    제작연월일: v.manufacturedDate ?? '',
-                    VIN: v.vin ?? '',
-                    상태: v.status ?? '',
-                    매입일: v.purchasedDate ?? '',
-                  }));
-                  const ws = XLSX.utils.json_to_sheet(rows);
-                  const wb = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(wb, ws, '자산');
-                  XLSX.writeFile(wb, `자산_${filtered.length}건_${new Date().toISOString().slice(0, 10)}.xlsx`);
-                }}
-              >
-                <FileXls size={14} weight="bold" /> 엑셀
-              </button>
-              <button
-                className="btn"
-                type="button"
-                disabled={!selected}
-                title={!selected ? '행 클릭으로 선택' : '선택 자산 기반 계약서 양식 다운로드'}
-                onClick={async () => {
-                  if (!selected) return;
-                  const { downloadTemplate } = await import('@/lib/excel-template');
-                  const { CONTRACT_COLUMNS } = await import('@/lib/import-schema');
-                  downloadTemplate(`계약_${selected.plate}.xlsx`, CONTRACT_COLUMNS, {
-                    title: `계약 등록 양식 (${selected.plate} ${selected.model ?? ''})`,
-                    notes: [`· 차량번호 ${selected.plate}, 차종 ${selected.model ?? ''} 기준 양식 — 회사·계약자만 채우면 됨`],
-                  });
-                }}
-              >
-                <Download size={14} weight="bold" /> 계약 템플릿
               </button>
             </>
           }
@@ -426,6 +482,11 @@ export default function AssetPage() {
               });
             }
           }}
+        />
+
+        <VehicleRegRegisterDialog
+          open={vehicleRegOpen}
+          onOpenChange={setVehicleRegOpen}
         />
       </div>
     </div>
@@ -509,9 +570,10 @@ function Kpi({ label, value, hint, positive }: { label: string; value: string; h
 
 /* ─── 탭1: 요약 — 자산정보 + 등록증정보 ─── */
 function SummaryTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void }) {
+  // 계약사실확인서 첨부는 별도 페이지 (구매대기·구매 예정 차량용) — 자산 상세에서 제거됨
+  void onUpdate;
   return (
     <div className="detail-stack">
-      <ContractDocSection vehicle={vehicle} onUpdate={onUpdate} />
       <section className="detail-section">
         <div className="detail-section-header">기본 정보</div>
         <div className="detail-section-body">

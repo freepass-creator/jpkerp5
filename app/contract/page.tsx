@@ -40,16 +40,17 @@ export default function ContractPage() {
   const { companies: companyMaster } = useCompanies();
   const [openId, setOpenId] = useState<string | null>(null);
 
+  type QuickFilter = 'all' | 'expire' | 'return' | 'overdue' | 'ended';
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | '운행' | '대기' | '반납' | '해지' | '채권'>('all');
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [groupBy, setGroupBy] = useState<'list' | 'customer'>('list');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
 
   // 필터/뷰 변경 시 선택 해제
-  useEffect(() => setSelectedIds(new Set()), [search, companyFilter, statusFilter, groupBy]);
+  useEffect(() => setSelectedIds(new Set()), [search, companyFilter, quickFilter, groupBy]);
 
   function toggleRow(id: string) {
     setSelectedIds((prev) => {
@@ -84,16 +85,46 @@ export default function ContractPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const today_ = today;
     return contracts.filter((c) => {
-      if (statusFilter !== 'all' && c.status !== statusFilter) return false;
       if (!matchesCompanyFilter(c.company, companyFilter)) return false;
+      // 퀵필터 분기
+      if (quickFilter === 'expire') {
+        // 만기임박: status='운행' && returnScheduledDate D-90 이내
+        if (c.status !== '운행') return false;
+        if (!c.returnScheduledDate) return false;
+        const days = Math.round((new Date(c.returnScheduledDate).getTime() - new Date(today_).getTime()) / 86400000);
+        if (days < 0 || days > 90) return false;
+      } else if (quickFilter === 'return') {
+        if (c.status !== '반납') return false;
+      } else if (quickFilter === 'overdue') {
+        if ((c.unpaidAmount ?? 0) <= 0) return false;
+      } else if (quickFilter === 'ended') {
+        if (c.status !== '해지' && c.status !== '반납' && c.status !== '채권') return false;
+      }
       if (q) {
         const hay = `${c.customerName} ${c.vehiclePlate} ${c.vehicleModel} ${c.contractNo} ${c.customerPhone1 ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [contracts, search, statusFilter, companyFilter]);
+  }, [contracts, search, quickFilter, companyFilter, today]);
+
+  // 각 퀵필터 카운트 — chip 라벨에 표시
+  const counts = useMemo(() => {
+    let expire = 0, ret = 0, overdue = 0, ended = 0;
+    for (const c of contracts) {
+      if (!matchesCompanyFilter(c.company, companyFilter)) continue;
+      if (c.status === '운행' && c.returnScheduledDate) {
+        const days = Math.round((new Date(c.returnScheduledDate).getTime() - new Date(today).getTime()) / 86400000);
+        if (days >= 0 && days <= 90) expire++;
+      }
+      if (c.status === '반납') ret++;
+      if ((c.unpaidAmount ?? 0) > 0) overdue++;
+      if (c.status === '해지' || c.status === '반납' || c.status === '채권') ended++;
+    }
+    return { expire, return: ret, overdue, ended };
+  }, [contracts, companyFilter, today]);
 
   // 계약자별 묶음 (customerName 기준)
   const byCustomer = useMemo(() => {
@@ -115,16 +146,23 @@ export default function ContractPage() {
         <>
           <CompanyFilter value={companyFilter} onChange={setCompanyFilter} options={companyOptions} master={companyMaster} />
           <span className="filter-divider" />
+          {/* 퀵필터 — 같은 list 에서 status 별 행 필터 */}
+          <button type="button" className={`chip ${quickFilter === 'all' ? 'active' : ''}`} onClick={() => setQuickFilter('all')}>전체</button>
+          <button type="button" className={`chip ${quickFilter === 'expire' ? 'active' : ''}`} onClick={() => setQuickFilter('expire')}>
+            만기임박{counts.expire > 0 && <span className="chip-count">{counts.expire}</span>}
+          </button>
+          <button type="button" className={`chip ${quickFilter === 'return' ? 'active' : ''}`} onClick={() => setQuickFilter('return')}>
+            반납{counts.return > 0 && <span className="chip-count">{counts.return}</span>}
+          </button>
+          <button type="button" className={`chip ${quickFilter === 'overdue' ? 'active' : ''}`} onClick={() => setQuickFilter('overdue')}>
+            미수금{counts.overdue > 0 && <span className="chip-count">{counts.overdue}</span>}
+          </button>
+          <button type="button" className={`chip ${quickFilter === 'ended' ? 'active' : ''}`} onClick={() => setQuickFilter('ended')}>
+            종료계약{counts.ended > 0 && <span className="chip-count">{counts.ended}</span>}
+          </button>
+          <span className="filter-divider" />
           <button type="button" className={`chip ${groupBy === 'list' ? 'active' : ''}`} onClick={() => setGroupBy('list')}>전체 리스트</button>
           <button type="button" className={`chip ${groupBy === 'customer' ? 'active' : ''}`} onClick={() => setGroupBy('customer')}>계약자별 묶음</button>
-        </>
-      }
-      topbarRight={
-        <>
-          <Link href="/contract/expire" className="chip chip-nav">만기임박</Link>
-          <Link href="/contract/return" className="chip chip-nav">반납</Link>
-          <Link href="/contract/overdue" className="chip chip-nav">미수금</Link>
-          <Link href="/contract/idle" className="chip chip-nav">휴차</Link>
         </>
       }
       bottomBarLeft={

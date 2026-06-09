@@ -175,24 +175,7 @@ export default function FinancePage() {
       }
       topbarChips={
         <>
-          <button type="button" className={`chip ${viewMode === 'account' ? 'active' : ''}`} onClick={() => setViewMode('account')}>계좌</button>
-          <button type="button" className={`chip ${viewMode === 'autopay' ? 'active' : ''}`} onClick={() => setViewMode('autopay')}>자동이체</button>
-          <button type="button" className={`chip ${viewMode === 'card' ? 'active' : ''}`} onClick={() => setViewMode('card')}>카드매출</button>
-          <button type="button" className={`chip ${viewMode === 'corpcard' ? 'active' : ''}`} onClick={() => setViewMode('corpcard')}>법인카드</button>
-          <button
-            type="button"
-            className={`chip ${viewMode === 'daily' ? 'active' : ''}`}
-            onClick={() => setViewMode('daily')}
-            style={
-              viewMode === 'daily'
-                ? { background: '#f3e8ff', color: '#6b21a8', borderColor: '#a855f7' }
-                : { borderColor: '#c4b5fd', color: '#6b21a8' }
-            }
-            title="자금일보 — 4 종류 통합 + 계정과목·매칭 편집"
-          >
-            자금일보
-          </button>
-          <span className="filter-divider" />
+          {/* 기간 필터 — 검색 우측 (필터 영역) */}
           <button type="button" className={`chip ${periodMode === 'month' ? 'active' : ''}`} onClick={() => setPeriodMode('month')}>월</button>
           <button type="button" className={`chip ${periodMode === 'quarter' ? 'active' : ''}`} onClick={() => setPeriodMode('quarter')}>분기</button>
           <button type="button" className={`chip ${periodMode === 'year' ? 'active' : ''}`} onClick={() => setPeriodMode('year')}>연</button>
@@ -201,6 +184,16 @@ export default function FinancePage() {
           <strong className="mono" style={{ minWidth: 80, textAlign: 'center', fontSize: 12 }}>{periodLabel}</strong>
           <button type="button" className="chip" onClick={() => shiftPeriod(1)} title="다음 기간">▶</button>
           <button type="button" className="chip" onClick={gotoCurrent} title="현재 기간으로">당월</button>
+        </>
+      }
+      topbarRight={
+        <>
+          {/* view 토글 버튼 — 우측 끝 (.chip-nav) */}
+          <button type="button" className={`chip chip-nav ${viewMode === 'account' ? 'active' : ''}`} onClick={() => setViewMode('account')}>계좌</button>
+          <button type="button" className={`chip chip-nav ${viewMode === 'autopay' ? 'active' : ''}`} onClick={() => setViewMode('autopay')}>자동이체</button>
+          <button type="button" className={`chip chip-nav ${viewMode === 'card' ? 'active' : ''}`} onClick={() => setViewMode('card')}>카드매출</button>
+          <button type="button" className={`chip chip-nav ${viewMode === 'corpcard' ? 'active' : ''}`} onClick={() => setViewMode('corpcard')}>법인카드</button>
+          <button type="button" className={`chip chip-nav ${viewMode === 'daily' ? 'active' : ''}`} onClick={() => setViewMode('daily')} title="자금일보 — 4 종류 통합 + 계정과목·매칭 편집">자금일보</button>
         </>
       }
       bare

@@ -341,9 +341,9 @@ export default function PenaltyPage() {
   // 처리완료 — 필터 합계
   const compAmount = completedFiltered.reduce((s, i) => s + (i.amount ?? 0), 0);
 
-  async function handleExcel() {
+  function handleExcel() {
     if (visible.length === 0) return;
-    await exportToExcel({
+    exportToExcel({
       title: phase === 'in-progress' ? '과태료 처리중' : '과태료 처리완료',
       subtitle: `${new Date().toLocaleDateString('ko-KR')} 기준 ${visible.length}건`,
       columns: [

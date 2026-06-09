@@ -34,40 +34,57 @@ export function buildInsurancePolicyFromOcr(
   const paidPremium = n('paid_premium');
   const startDate = s('start_date');
 
-  // OCR installments — 2회차부터의 명세
+  // OCR installments 정규화 — 회차 키 우선순위 (cycle, due_date 또는 dueDate)
   const rawInstallments = Array.isArray(raw.installments) ? raw.installments : [];
-  const laterInstallments: InsuranceInstallment[] = rawInstallments
+  const parsed: InsuranceInstallment[] = rawInstallments
     .map((it): InsuranceInstallment | null => {
       if (typeof it !== 'object' || it === null) return null;
       const o = it as Record<string, unknown>;
       const cycle = Number(o.cycle);
-      const dueDate = String(o.dueDate ?? '');
+      const dueDate = String(o.due_date ?? o.dueDate ?? '');
       const amount = Number(String(o.amount ?? '').replace(/[,\s]/g, ''));
-      if (!Number.isFinite(cycle) || !dueDate || !Number.isFinite(amount)) return null;
+      if (!Number.isFinite(cycle) || cycle < 1) return null;
+      if (!Number.isFinite(amount) || amount <= 0) return null;
       return { cycle, dueDate, amount };
     })
-    .filter((x): x is InsuranceInstallment => x !== null)
-    .sort((a, b) => a.cycle - b.cycle);
+    .filter((x): x is InsuranceInstallment => x !== null);
 
-  // 1회차 산출 = 총보험료 - sum(2..N)
+  // 정책 (사용자 확정): 1회차 = 총보험료 − sum(2~N회차) — 항상 산출
+  // OCR 이 cycle=1 을 명시했더라도 무시하고 산출값 사용 (paid_premium 불일치 케이스 회피)
+  const later = parsed.filter((x) => x.cycle > 1).sort((a, b) => a.cycle - b.cycle);
+
   const installments: InsuranceInstallment[] = [];
-  if (totalPremium != null && laterInstallments.length > 0) {
-    const laterSum = laterInstallments.reduce((sum, i) => sum + i.amount, 0);
+  let firstInst: InsuranceInstallment | undefined;
+
+  if (totalPremium != null && later.length > 0) {
+    const laterSum = later.reduce((sum, i) => sum + i.amount, 0);
     const firstAmount = Math.max(0, totalPremium - laterSum);
-    installments.push({
+    firstInst = {
       cycle: 1,
-      dueDate: startDate ?? laterInstallments[0]?.dueDate ?? '',
+      dueDate: startDate ?? later[0]?.dueDate ?? '',
       amount: firstAmount,
       paid: true,
-    });
-    installments.push(...laterInstallments);
-  } else if (laterInstallments.length > 0) {
-    // 총보험료 모름 — 그냥 추출된 회차만
-    installments.push(...laterInstallments);
-  } else if (paidPremium != null && startDate) {
-    // 분납 명세 없음 — 일시납으로 간주
-    installments.push({ cycle: 1, dueDate: startDate, amount: paidPremium, paid: true });
+    };
+  } else if (totalPremium != null && later.length === 0) {
+    // 분납 명세 없음 — 일시납. 1회차 = 총보험료
+    firstInst = {
+      cycle: 1,
+      dueDate: startDate ?? '',
+      amount: totalPremium,
+      paid: true,
+    };
+  } else if (paidPremium != null) {
+    // 총보험료 OCR 실패 fallback — 납입한 금액으로
+    firstInst = {
+      cycle: 1,
+      dueDate: startDate ?? '',
+      amount: paidPremium,
+      paid: true,
+    };
   }
+
+  if (firstInst) installments.push(firstInst);
+  installments.push(...later);
 
   return {
     id: opts?.id ?? `ins-${Date.now()}`,

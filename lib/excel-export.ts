@@ -1,111 +1,106 @@
 'use client';
 
 /**
- * 엑셀 내보내기 — 정형 스타일 (굴림체, 헤더 회색배경, 셀 테두리, freeze).
- * exceljs는 ~1MB라 lazy import (엑셀 버튼 누를 때만 다운로드).
+ * 엑셀 내보내기 — JPK ERP 표준 스타일 (xlsx-js-style + lib/excel-style.ts).
+ * 모든 list 페이지에서 동일 톤. ExcelJS → xlsx-js-style 마이그 (1MB → 200KB + 일관 스타일).
  */
 
-export type ExcelColumn = {
+import * as XLSX from 'xlsx-js-style';
+import {
+  STYLE_TITLE, STYLE_META, STYLE_HEADER, STYLE_CELL, STYLE_MONO,
+  STYLE_CENTER, STYLE_NUM, STYLE_DATE,
+} from './excel-style';
+
+export type ExcelColumn<T = Record<string, unknown>> = {
   key: string;
   header: string;
   width?: number;
-  type?: 'text' | 'number' | 'date' | 'mono';
-  getter?: (row: Record<string, unknown>) => unknown;
+  type?: 'text' | 'number' | 'date' | 'mono' | 'center';
+  getter?: (row: T) => unknown;
 };
 
-type Options = {
+type Options<T = Record<string, unknown>> = {
   title: string;
   subtitle?: string;
-  columns: ExcelColumn[];
-  rows: Record<string, unknown>[];
+  columns: ExcelColumn<T>[];
+  rows: T[];
+  sheetName?: string;
   fileName?: string;
+  /** freeze pane — 좌측 N 열 고정 (헤더는 항상 4행 고정) */
+  freezeLeftCols?: number;
 };
 
-export async function exportToExcel(opts: Options) {
-  const { default: ExcelJS } = await import('exceljs');
+type Cell = { v: string | number; s?: Record<string, unknown> };
 
-  const FONT_BODY = { name: '굴림체', size: 10 };
-  const FONT_MONO = { name: 'Consolas', size: 10 };
-  const FONT_HEADER = { name: '굴림체', size: 10, bold: true, color: { argb: 'FF111827' } };
-  const FONT_TITLE = { name: '굴림체', size: 14, bold: true, color: { argb: 'FF1B2A4A' } };
-
-  const FILL_HEADER = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFAFAFA' } };
-  const FILL_TITLE = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFFFFF' } };
-
-  const BORDER_THIN = { style: 'thin' as const, color: { argb: 'FFE5E7EB' } };
-  const BORDER_STRONG = { style: 'thin' as const, color: { argb: 'FFD1D5DB' } };
-
-  const wb = new ExcelJS.Workbook();
-  wb.creator = 'JPK ERP v4';
-  wb.created = new Date();
-
-  const sheet = wb.addWorksheet(opts.title.slice(0, 31), {
-    views: [{ state: 'frozen', ySplit: opts.subtitle ? 4 : 3 }],
-  });
-
-  sheet.columns = opts.columns.map((c) => ({
-    key: c.key,
-    width: c.width ?? defaultWidth(c.type),
-  }));
-
-  const titleRow = sheet.addRow([opts.title]);
-  sheet.mergeCells(titleRow.number, 1, titleRow.number, opts.columns.length);
-  titleRow.getCell(1).font = FONT_TITLE;
-  titleRow.getCell(1).fill = FILL_TITLE;
-  titleRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
-  titleRow.height = 26;
-
-  if (opts.subtitle) {
-    const subRow = sheet.addRow([opts.subtitle]);
-    sheet.mergeCells(subRow.number, 1, subRow.number, opts.columns.length);
-    subRow.getCell(1).font = { ...FONT_BODY, color: { argb: 'FF6B7280' } };
-    subRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
-    subRow.height = 18;
-  }
-
-  sheet.addRow([]);
-
-  const headerRow = sheet.addRow(opts.columns.map((c) => c.header));
-  headerRow.eachCell((cell) => {
-    cell.font = FONT_HEADER;
-    cell.fill = FILL_HEADER;
-    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-    cell.border = { top: BORDER_STRONG, bottom: BORDER_STRONG, left: BORDER_THIN, right: BORDER_THIN };
-  });
-  headerRow.height = 22;
-
-  for (const r of opts.rows) {
-    const values = opts.columns.map((c) => {
-      const v = c.getter ? c.getter(r) : (r as Record<string, unknown>)[c.key];
-      return v ?? '';
-    });
-    const row = sheet.addRow(values);
-    opts.columns.forEach((c, i) => {
-      const cell = row.getCell(i + 1);
-      cell.font = c.type === 'mono' || c.type === 'number' || c.type === 'date' ? FONT_MONO : FONT_BODY;
-      cell.alignment = {
-        vertical: 'middle',
-        horizontal: c.type === 'number' ? 'right' : 'left',
-        wrapText: false,
-      };
-      if (c.type === 'number') cell.numFmt = '#,##0';
-      cell.border = { top: BORDER_THIN, bottom: BORDER_THIN, left: BORDER_THIN, right: BORDER_THIN };
-    });
-    row.height = 18;
-  }
-
-  const buf = await wb.xlsx.writeBuffer();
-  const fileName = opts.fileName ?? `${opts.title}-${todayStr()}.xlsx`;
-  triggerDownload(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName);
+function styleFor(type?: ExcelColumn['type'], v?: unknown): Record<string, unknown> {
+  if (type === 'number') return STYLE_NUM;
+  if (type === 'mono') return STYLE_MONO;
+  if (type === 'date') return STYLE_DATE;
+  if (type === 'center') return STYLE_CENTER;
+  return typeof v === 'number' ? STYLE_NUM : STYLE_CELL;
 }
 
 function defaultWidth(type?: ExcelColumn['type']): number {
   switch (type) {
     case 'number': return 14;
-    case 'date':   return 18;
+    case 'date':   return 14;
     case 'mono':   return 16;
+    case 'center': return 12;
     default:       return 14;
   }
+}
+
+export function exportToExcel<T = Record<string, unknown>>(opts: Options<T>): { ok: true; count: number } | { ok: false; reason: 'empty' } {
+  if (opts.rows.length === 0) return { ok: false, reason: 'empty' };
+
+  const ncols = opts.columns.length;
+  const aoa: Cell[][] = [];
+
+  // row 0 — title
+  aoa.push(opts.columns.map((_, i) => ({ v: i === 0 ? opts.title : '', s: STYLE_TITLE })));
+
+  // row 1 — subtitle (meta)
+  aoa.push(opts.columns.map((_, i) => ({ v: i === 0 ? (opts.subtitle ?? '') : '', s: STYLE_META })));
+
+  // row 2 — blank spacer
+  aoa.push(opts.columns.map(() => ({ v: '', s: STYLE_CELL })));
+
+  // row 3 — header
+  aoa.push(opts.columns.map((c) => ({ v: c.header, s: STYLE_HEADER })));
+
+  // 데이터
+  for (const r of opts.rows) {
+    const cells: Cell[] = opts.columns.map((c) => {
+      const raw = c.getter ? c.getter(r) : (r as Record<string, unknown>)[c.key];
+      const v = (raw == null ? '' : raw) as string | number;
+      return { v, s: styleFor(c.type, v) };
+    });
+    aoa.push(cells);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // 컬럼 폭
+  ws['!cols'] = opts.columns.map((c) => ({ wch: c.width ?? defaultWidth(c.type) }));
+
+  // merge — title + meta 전체 폭
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: ncols - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: ncols - 1 } },
+  ];
+
+  // 행 높이
+  ws['!rows'] = [{ hpt: 28 }, { hpt: 18 }, { hpt: 8 }, { hpt: 28 }];
+
+  // freeze — 헤더 4행 + 좌측 N열
+  const xSplit = opts.freezeLeftCols ?? 0;
+  ws['!views'] = [{ ySplit: 4, xSplit, topLeftCell: `${colLetter(xSplit)}5`, state: 'frozen' }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, (opts.sheetName ?? opts.title).slice(0, 31));
+  const fileName = opts.fileName ?? `${opts.title}-${todayStr()}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+  return { ok: true, count: opts.rows.length };
 }
 
 function todayStr(): string {
@@ -113,13 +108,7 @@ function todayStr(): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function triggerDownload(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+function colLetter(n: number): string {
+  if (n < 26) return String.fromCharCode(65 + n);
+  return String.fromCharCode(64 + Math.floor(n / 26)) + String.fromCharCode(65 + (n % 26));
 }

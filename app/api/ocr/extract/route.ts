@@ -723,12 +723,16 @@ export async function POST(req: NextRequest) {
         const m = blob.match(PLATE_RE);
         if (m) { extracted = `${m[1]}${m[2]}${m[3]}`; plateDebug.stage = 2; }
       }
-      // 3차 fallback (vehicle_reg 한정): 병렬 plate-only Gemini 호출 (multi-prompt).
+      // 3차 fallback (vehicle_reg / insurance_policy): 병렬 plate-only Gemini 호출 (multi-prompt).
       // Gemini Vision 은 temperature:0 이어도 동일 입력에 대해 non-deterministic 한
-      // 케이스가 있어 (특히 Tesla 같은 외산차 등록증) — 다른 prompt 3개 동시 호출 후
-      // 첫 매칭을 채택. 1개라도 hit 하면 OK 라 신뢰성↑.
-      if (!extracted && docType === 'vehicle_reg') {
-        const PLATE_PROMPTS = [
+      // 케이스가 있어 (특히 Tesla 같은 외산차 등록증, 또는 보험증권 "차량(차대)번호" 칸이 작은 경우)
+      if (!extracted && (docType === 'vehicle_reg' || docType === 'insurance_policy')) {
+        const isInsurance = docType === 'insurance_policy';
+        const PLATE_PROMPTS = isInsurance ? [
+          '이 한국 자동차보험증권에서 "차량(차대)번호" 또는 "차량번호" 칸에 적힌 차량번호판만 답하세요. 포맷: \\d{2,3}[가-힣]\\d{4} (예: 30어1926, 26부0281). 17자 차대번호(VIN)는 제외. 다른 설명 없이 번호판만.',
+          '이 자동차보험증권의 "차량 사항" 섹션 안 차량번호를 옮겨 적으세요. 한국 번호판 포맷 (예: 30어1926). 차대번호(VIN) 절대 X.',
+          'Read the Korean license plate from this Korean car insurance policy. Look for "차량(차대)번호" or "차량번호" cell. Format: digits + 한글 + digits (e.g. 30어1926). NOT the 17-char VIN. Output ONLY the plate string.',
+        ] : [
           '이 한국 자동차등록증의 ① 자동차등록번호 칸에 적힌 차량번호판만 답하세요. 포맷: \\d{2,3}[가-힣]\\d{4} (예: 15가4481, 01도9893). 다른 설명 없이 번호판 문자열만.',
           '이 자동차등록증 첫 페이지의 가장 위쪽 표 ① 칸 (차종 / 용도 같은 행) 에 있는 한국 번호판을 그대로 옮겨 적으세요. 예: 15가4481. 다른 텍스트 금지.',
           'Read the Korean license plate from the ① 자동차등록번호 cell of this 자동차등록증 (top-left of the main table on page 1). Format: digits + 한글 + digits like 15가4481. Output ONLY the plate string.',
