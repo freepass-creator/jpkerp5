@@ -170,7 +170,8 @@ function CompanyCardsView() {
       return;
     }
     if (!window.confirm(`선택한 ${target.length}건 삭제하시겠습니까?`)) return;
-    // TODO: 실제 삭제
+    // 실제 RTDB 삭제는 companies-store 연동 후 활성화 (현재 화면은 정책 검토 단계, MOCK 데이터)
+    alert('실제 삭제는 법인 마스터 RTDB 연동 후 지원됩니다. (정책 검토 단계)');
     setSelectedIds(new Set());
   }
 
@@ -299,7 +300,8 @@ function CompanyDetailDialog({ c, onClose }: { c: MockCompany; onClose: () => vo
       return;
     }
     if (!window.confirm(`${c.name}을(를) 삭제하시겠습니까?`)) return;
-    // TODO: 실제 삭제
+    // 실제 RTDB 삭제는 companies-store 연동 후 활성화 (현재 화면은 정책 검토 단계, MOCK 데이터)
+    alert('실제 삭제는 법인 마스터 RTDB 연동 후 지원됩니다. (정책 검토 단계)');
     onClose();
   }
 

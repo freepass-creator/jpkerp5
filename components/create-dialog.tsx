@@ -137,7 +137,8 @@ export function CreateDialog({
 
   const onPick = useCallback(() => document.getElementById('jpk-bulk-file-input')?.click(), []);
 
-  const vehicleFiles = parsed.filter((p) => p.kind === '미분류'); // TODO: 차량 분류 추가
+  // '미분류' 만 차량 후보로 처리 — 차량 전용 분류('차량') 추가 시 OR 조건으로 확장
+  const vehicleFiles = parsed.filter((p) => p.kind === '미분류');
   const contractFiles = parsed.filter((p) => p.kind === '계약');
   const paymentFiles = parsed.filter((p) => p.kind === '계좌' || p.kind === '카드');
 
