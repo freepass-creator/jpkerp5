@@ -89,12 +89,12 @@ export function AssetTopbar({
         {isMain && onViewChange ? (
           <>
             <button type="button" className={`chip chip-nav ${currentPage === 'status' ? 'active' : ''}`} onClick={() => onViewChange('status')} title="자산 운영 현황 — 상태·계약·만기 중심">자산현황</button>
-            <button type="button" className={`chip chip-nav ${currentPage === 'registered' ? 'active' : ''}`} onClick={() => onViewChange('registered')} title="등록자산 — 자동차등록증 정보 중심">등록자산</button>
+            <button type="button" className={`chip chip-nav ${currentPage === 'registered' ? 'active' : ''}`} onClick={() => onViewChange('registered')} title="등록차량 — 자동차등록증 정보 중심">등록차량</button>
           </>
         ) : (
           <>
             <Link href="/asset?view=status" className="chip chip-nav" title="자산 운영 현황">자산현황</Link>
-            <Link href="/asset?view=registered" className="chip chip-nav" title="등록자산">등록자산</Link>
+            <Link href="/asset?view=registered" className="chip chip-nav" title="등록차량">등록차량</Link>
           </>
         )}
         <Link href="/asset/insurance" className={`chip chip-nav ${currentPage === 'insurance' ? 'active' : ''}`} title="보험증권 — 회사·차량별 보험 현황, 만기 임박 알림">보험증권</Link>

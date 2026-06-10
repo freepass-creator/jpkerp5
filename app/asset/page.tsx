@@ -505,10 +505,14 @@ export default function AssetPage() {
               <button
                 className="btn btn-primary"
                 type="button"
-                title="자산 등록 — OCR 일괄 / 개별 입력 / 엑셀 일괄 3가지 방식"
+                title={
+                  assetView === 'registered'
+                    ? '차량 등록 — 자동차등록증 OCR / 개별 입력 / 엑셀 일괄'
+                    : '자산현황 등록 — 운영중인 자산의 현황 (보험·할부·GPS) 함께 등록'
+                }
                 onClick={() => setVehicleRegOpen(true)}
               >
-                <Plus size={14} weight="bold" /> 자산 등록
+                <Plus size={14} weight="bold" /> {assetView === 'registered' ? '차량 등록' : '자산현황 등록'}
               </button>
               <button
                 className="btn"
@@ -596,7 +600,7 @@ function VehicleDetailDialog({
       tabs={view === 'registered'
         ? [
             // 등록자산 = 제조사 스펙 + 자등증 정보 + 자등증 첨부 (단일 탭)
-            { value: 'summary', label: '등록자산', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} /> },
+            { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} /> },
           ]
         : [
             // 자산현황 = 전체 정보 (모든 탭)
