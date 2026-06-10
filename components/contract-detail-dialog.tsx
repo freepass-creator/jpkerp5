@@ -12,6 +12,9 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
+import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
+import { useInsurances } from '@/lib/firebase/insurance-store';
+import { normPlate } from '@/lib/entity-sync';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
 import { toast } from '@/lib/toast';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -286,6 +289,13 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
   const { contracts: allContracts } = useContractsList();
   const [editing, setEditing] = useState(false);
   const [regOpen, setRegOpen] = useState(false);     // 자동차등록증 OCR 다이얼로그 inline
+  const [insOpen, setInsOpen] = useState(false);     // 보험증권 OCR 다이얼로그 inline
+  const { policies } = useInsurances();
+  const currentPolicy = useMemo(() => {
+    const key = normPlate(c.vehiclePlate);
+    if (!key) return undefined;
+    return policies.find((p) => p.carNumber && normPlate(p.carNumber) === key);
+  }, [policies, c.vehiclePlate]);
   const [draft, setDraft] = useState<Contract>(c);
   useEffect(() => { if (!editing) setDraft(c); }, [c, editing]);
   useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
@@ -471,6 +481,44 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
         onOpenChange={setRegOpen}
         prefillVehicle={vehicle ?? null}
         onSaved={() => setRegOpen(false)}
+      />
+
+      {/* 보험증권 — Vehicle 캐시 또는 InsurancePolicy 마스터에서. 미보유 시 inline [등록] */}
+      <Section
+        icon={<Car size={12} weight="duotone" />}
+        title="보험증권"
+        action={
+          <button className="btn btn-sm" type="button" onClick={() => setInsOpen(true)}>
+            <Pencil size={11} weight="bold" /> {currentPolicy ? '보험증권 수정' : '보험증권 등록'}
+          </button>
+        }
+      >
+        <div className="detail-grid-2">
+          <div>
+            <Field label="보험사" value={currentPolicy?.insurer || vehicle?.insuranceCompany || <span className="muted">-</span>} />
+            <Field label="증권번호" value={currentPolicy?.policyNo || vehicle?.insurancePolicyNo || <span className="muted">-</span>} mono />
+            <Field label="시작일" value={currentPolicy?.startDate || <span className="muted">-</span>} mono />
+            <Field label="만기일" value={currentPolicy?.endDate || vehicle?.insuranceExpiryDate || <span className="muted">-</span>} mono />
+          </div>
+          <div>
+            <Field label="계약자" value={currentPolicy?.contractor || <span className="muted">-</span>} />
+            <Field label="피보험자" value={currentPolicy?.insured || <span className="muted">-</span>} />
+            <Field label="운전자 범위" value={currentPolicy?.driverScope || <span className="muted">-</span>} />
+            <Field label="총보험료" value={currentPolicy?.totalPremium ? `₩${currentPolicy.totalPremium.toLocaleString()}` : <span className="muted">-</span>} mono />
+          </div>
+        </div>
+        {!currentPolicy && (
+          <div style={{ fontSize: 11, color: 'var(--text-weak)', marginTop: 8 }}>
+            ↑ 보험증권 OCR 등록으로 자동 채움
+          </div>
+        )}
+      </Section>
+      <InsuranceRegisterDialog
+        open={insOpen}
+        onOpenChange={setInsOpen}
+        vehicleId={vehicle?.id}
+        prefillPolicy={currentPolicy ?? null}
+        onSaved={() => setInsOpen(false)}
       />
     </div>
   );
