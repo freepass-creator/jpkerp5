@@ -293,8 +293,20 @@ export function InsuranceRegisterDialog({
                   {items.map((it) => {
                     const plateOk = it.carNumber && PLATE_RE.test(it.carNumber.replace(/\s/g, ''));
                     const dup = it.policyNo && existingPolicyNos.has(it.policyNo);
-                    const cyc = (n: number): number | undefined =>
-                      it.installments?.find((x) => x.cycle === n)?.amount;
+                    const cycInst = (n: number) => it.installments?.find((x) => x.cycle === n);
+                    const cyc = (n: number): number | undefined => cycInst(n)?.amount;
+                    /** 일자만 짧게 MM-DD */
+                    const shortDate = (ymd?: string) => (ymd && ymd.length >= 10 ? ymd.slice(5) : '');
+                    const cycCell = (n: number) => {
+                      const inst = cycInst(n);
+                      if (!inst) return <span className="dim">-</span>;
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0, lineHeight: 1.1 }}>
+                          <span style={{ fontSize: 9, color: 'var(--text-weak)' }}>{shortDate(inst.dueDate) || '-'}</span>
+                          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(inst.amount)}</span>
+                        </div>
+                      );
+                    };
                     return (
                       <tr key={it.id} className={selectedIds.has(it.id) ? 'selected-row' : undefined}>
                         <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
@@ -331,12 +343,12 @@ export function InsuranceRegisterDialog({
                         <td className="mono dim">{it.startDate || '-'}</td>
                         <td className="mono dim">{it.endDate || '-'}</td>
                         <td className="dim">{it.driverAge || '-'}</td>
-                        <td className="num mono" style={{ background: 'var(--brand-bg)', fontWeight: 600 }}>{fmt(cyc(1))}</td>
-                        <td className="num mono dim">{fmt(cyc(2))}</td>
-                        <td className="num mono dim">{fmt(cyc(3))}</td>
-                        <td className="num mono dim">{fmt(cyc(4))}</td>
-                        <td className="num mono dim">{fmt(cyc(5))}</td>
-                        <td className="num mono dim">{fmt(cyc(6))}</td>
+                        <td className="num mono" style={{ background: 'var(--brand-bg)', fontWeight: 600 }}>{cycCell(1)}</td>
+                        <td className="num mono dim">{cycCell(2)}</td>
+                        <td className="num mono dim">{cycCell(3)}</td>
+                        <td className="num mono dim">{cycCell(4)}</td>
+                        <td className="num mono dim">{cycCell(5)}</td>
+                        <td className="num mono dim">{cycCell(6)}</td>
                         <td className="num mono">{fmt(it.totalPremium)}</td>
                         {/* 상태·삭제 */}
                         <td className="center" style={{ fontSize: 10 }}>

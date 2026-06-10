@@ -629,6 +629,38 @@ function SummaryTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Veh
           </div>
         </div>
       </section>
+
+      {/* 원본 자동차등록증 — 보험증권 detail dialog 패턴 동일 */}
+      {vehicle.registrationCertUrl && (
+        <section className="detail-section">
+          <div className="detail-section-header">
+            <span>원본 자동차등록증</span>
+            {vehicle.registrationCertFileName && (
+              <span className="dim" style={{ marginLeft: 'auto', fontSize: 10 }}>{vehicle.registrationCertFileName}</span>
+            )}
+          </div>
+          <div className="detail-section-body">
+            {vehicle.registrationCertUrl.startsWith('data:image') || /\.(png|jpe?g|webp|gif)$/i.test(vehicle.registrationCertFileName ?? '') ? (
+              <img
+                src={vehicle.registrationCertUrl}
+                alt={vehicle.registrationCertFileName ?? '자동차등록증'}
+                style={{ maxWidth: '100%', maxHeight: 600, border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-sm)' }}
+              />
+            ) : (
+              <embed
+                src={vehicle.registrationCertUrl}
+                type="application/pdf"
+                style={{ width: '100%', height: 600, border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-sm)' }}
+              />
+            )}
+            {vehicle.registrationCertUploadedAt && (
+              <div className="dim" style={{ fontSize: 10, marginTop: 6 }}>
+                업로드 {vehicle.registrationCertUploadedAt.slice(0, 16).replace('T', ' ')}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
