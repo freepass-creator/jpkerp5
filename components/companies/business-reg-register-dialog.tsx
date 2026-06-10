@@ -58,7 +58,13 @@ export function BusinessRegRegisterDialog({
   const editTarget = editId ? companies.find((c) => c.id === editId) ?? null : null;
   useEffect(() => {
     if (open && editTarget) {
-      setManualDraft({ ...editTarget });
+      // prefill 시 등록번호 정규화 — 옛 데이터에 invisible 공백 있어도 깔끔하게
+      setManualDraft({
+        ...editTarget,
+        bizRegNo: editTarget.bizRegNo?.replace(/[^\d-]/g, ''),
+        corpRegNo: editTarget.corpRegNo?.replace(/[^\d-]/g, ''),
+        contactPhone: editTarget.contactPhone?.replace(/[^\d-]/g, ''),
+      });
       setMode('manual');
     }
   // editTarget?.id 만 watch (재렌더링 방지)
@@ -125,9 +131,9 @@ export function BusinessRegRegisterDialog({
           const raw = json.extracted as Record<string, string | null>;
 
           const name = (raw.partner_name ?? '').trim();
-          // OCR 결과 공백 모두 제거 (등록번호는 하이픈만 허용) — 표시 시 자간처럼 보이는 공백 차단
-          const bizRegNo = (raw.biz_no ?? '').replace(/\s+/g, '').trim();
-          const corpRegNo = (raw.corp_no ?? '').replace(/\s+/g, '').trim();
+          // OCR 결과: 숫자/하이픈만 추출 — 공백·zero-width·invisible 문자 모두 제거
+          const bizRegNo = (raw.biz_no ?? '').replace(/[^\d-]/g, '');
+          const corpRegNo = (raw.corp_no ?? '').replace(/[^\d-]/g, '');
           // 같은 회사 매칭 — 사업자번호/법인번호로
           const existing = companies.find((c) => {
             if (bizRegNo && normReg(c.bizRegNo) === normReg(bizRegNo)) return true;
