@@ -259,7 +259,7 @@ function CompanyListView({
               <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                 <input type="checkbox" checked={checked} onChange={() => toggle(c.id)} aria-label={`${c.name} 선택`} />
               </td>
-              <td style={{ fontWeight: 600 }}>{c.name || <span className="muted">이름 미입력</span>}</td>
+              <td>{c.name || <span className="muted">이름 미입력</span>}</td>
               <td className="mono dim">{c.corpRegNo || '-'}</td>
               <td className="mono dim">{c.bizRegNo || '-'}</td>
               <td>{c.ceo || <span className="muted">-</span>}</td>
