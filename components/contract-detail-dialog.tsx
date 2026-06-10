@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
-import { InlineEditBar, type EditableTabHandle } from '@/components/ui/edit-buttons';
+import { type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { DateInput } from '@/components/ui/date-input';
 import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus } from '@/lib/types';
 import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
@@ -67,23 +67,27 @@ function ContractDetailShell({
   const cs = getContractState(contract);
   const ps = getPaymentState(contract);
 
-  // 활성 탭 + 편집 가능한 탭의 ref dispatch (footer 통일 [수정] 버튼 → 활성 탭의 inline edit)
-  // footer 는 [수정] 만 노출 — [저장]/[취소] 는 자식 탭의 inline 버튼이 담당 (state 동기 회피)
-  // 디폴트 탭 = 'asset' (수정 가장 자주 — footer [수정] 즉시 작동)
+  // 활성 탭 + 편집 가능한 탭의 ref dispatch.
+  // 공용 DetailDialogShell footer 패턴 그대로:
+  //   [수정][닫기] ⟷ [취소][저장][닫기]
+  // 자식 inline 편집 state 를 부모로 lift — 자식 onEditingChange 콜백으로 부모에 알림.
   const [activeTab, setActiveTab] = useState<string>('asset');
+  const [editingTab, setEditingTab] = useState<string | null>(null);
   const assetRef = useRef<EditableTabHandle>(null);
   const contractRef = useRef<EditableTabHandle>(null);
   const editable: Record<string, React.RefObject<EditableTabHandle | null>> = {
     asset: assetRef,
     contract: contractRef,
   };
-  // footer [수정] — 모든 탭에서 노출. editable 아닌 탭에서 누르면 'asset'으로 자동 전환 + 편집
+  const isEditing = editingTab !== null && editingTab === activeTab;
+  // [수정] — 어떤 탭에서든 노출. editable 아닌 탭에서 누르면 'asset' 으로 자동 전환 + 편집
   const handleEdit = () => {
     const target = activeTab in editable ? activeTab : 'asset';
     if (target !== activeTab) setActiveTab(target);
-    // ref 가 다음 렌더 후 mount 되도록 마이크로태스크 지연
     queueMicrotask(() => editable[target].current?.startEdit());
   };
+  const handleSave = () => editable[activeTab]?.current?.save();
+  const handleCancel = () => editable[activeTab]?.current?.cancel();
 
   return (
     <DetailDialogShell
@@ -117,11 +121,13 @@ function ContractDetailShell({
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onEdit={handleEdit}
-      editing={false}
+      editing={isEditing}
+      onSave={handleSave}
+      onCancel={handleCancel}
       tabs={[
         { value: 'status', label: '상태', content: <VehicleStatusTab c={contract} onUpdate={onUpdate} /> },
-        { value: 'asset', label: '자산', content: <VehicleSpecTab ref={assetRef} c={contract} onUpdate={onUpdate} /> },
-        { value: 'contract', label: '계약', content: <ContractInfoTab ref={contractRef} c={contract} onUpdate={onUpdate} /> },
+        { value: 'asset', label: '자산', content: <VehicleSpecTab ref={assetRef} c={contract} onUpdate={onUpdate} onEditingChange={(e) => setEditingTab(e ? 'asset' : null)} /> },
+        { value: 'contract', label: '계약', content: <ContractInfoTab ref={contractRef} c={contract} onUpdate={onUpdate} onEditingChange={(e) => setEditingTab(e ? 'contract' : null)} /> },
         { value: 'payment', label: '수납', content: <PaymentTab c={contract} onUpdate={onUpdate} /> },
       ]}
     />
@@ -271,18 +277,19 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
 
 /* ─────────────── 차량정보 (스펙) — 별도 탭 ─────────────── */
 
-const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u: Contract) => void }>(function VehicleSpecTab({ c, onUpdate }, ref) {
+const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u: Contract) => void; onEditingChange?: (e: boolean) => void }>(function VehicleSpecTab({ c, onUpdate, onEditingChange }, ref) {
   const { companies } = useCompanies();
   const { vehicles } = useVehicles();
   const { contracts: allContracts } = useContractsList();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Contract>(c);
   useEffect(() => { if (!editing) setDraft(c); }, [c, editing]);
+  useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
   const startEdit = () => { setDraft(c); setEditing(true); };
   const cancel = () => { setDraft(c); setEditing(false); };
   const save = () => { onUpdate(draft); setEditing(false); };
   const set = <K extends keyof Contract>(k: K, v: Contract[K]) => setDraft((d) => ({ ...d, [k]: v }));
-  useImperativeHandle(ref, () => ({ startEdit, isEditing: () => editing }), [editing, c]);
+  useImperativeHandle(ref, () => ({ startEdit, save, cancel, isEditing: () => editing }), [editing, c, draft]);
 
   // 같은 plate 차량 마스터 (있으면 매입·등록·상품화 일자 가져옴)
   const vehicle = useMemo(
@@ -307,9 +314,7 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
 
   return (
     <div className="detail-stack">
-      <InlineEditBar editing={editing} onEdit={startEdit} onCancel={cancel} onSave={save} />
-
-      {/* 기본 식별 */}
+{/* 기본 식별 */}
       <Section icon={<Car size={12} weight="duotone" />} title="차량 식별">
         <div className="detail-grid-2">
           <div>
@@ -1142,7 +1147,7 @@ function VehicleLocationEditor({ c, onUpdate }: { c: Contract; onUpdate: (u: Con
 
 /* ─────────────── 계약정보 탭 (고객 + 조건 + 비고) ─────────────── */
 
-const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u: Contract) => void }>(function ContractInfoTab({ c, onUpdate }, ref) {
+const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u: Contract) => void; onEditingChange?: (e: boolean) => void }>(function ContractInfoTab({ c, onUpdate, onEditingChange }, ref) {
   const identMasked = contractIdentMasked(c);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Contract>(c);
@@ -1152,19 +1157,19 @@ const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (
     if (!editing) setDraft(c);
   }, [c, editing]);
 
+  useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
+
   const startEdit = () => { setDraft(c); setEditing(true); };
   const cancel = () => { setDraft(c); setEditing(false); };
   const save = () => { onUpdate(draft); setEditing(false); };
 
   const set = <K extends keyof Contract>(k: K, v: Contract[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
-  useImperativeHandle(ref, () => ({ startEdit, isEditing: () => editing }), [editing, c]);
+  useImperativeHandle(ref, () => ({ startEdit, save, cancel, isEditing: () => editing }), [editing, c, draft]);
 
   return (
     <div className="detail-stack">
-      <InlineEditBar editing={editing} onEdit={startEdit} onCancel={cancel} onSave={save} />
-
-      <Section icon={<User size={12} weight="duotone" />} title="고객">
+<Section icon={<User size={12} weight="duotone" />} title="고객">
         <div className="detail-grid-2">
           <div>
             <EditableField label="이름" value={editing ? draft.customerName : c.customerName} editing={editing} onChange={(v) => set('customerName', v)} />

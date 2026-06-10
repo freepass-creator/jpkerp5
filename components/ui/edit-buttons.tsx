@@ -18,7 +18,11 @@ import { Pencil, FloppyDisk, X as XIcon } from '@phosphor-icons/react';
 export type EditableTabHandle = {
   /** 편집 모드 진입 (footer [수정] 버튼이 호출) */
   startEdit: () => void;
-  /** 현재 편집 중인지 (footer가 [저장]/[취소] 버튼 분기) */
+  /** 저장 (footer [저장] 버튼이 호출) */
+  save: () => void;
+  /** 취소 (footer [취소] 버튼이 호출) */
+  cancel: () => void;
+  /** 현재 편집 중인지 */
   isEditing: () => boolean;
 };
 
