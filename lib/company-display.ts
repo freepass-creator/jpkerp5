@@ -39,15 +39,23 @@ export function stripCorpSuffix(name: string): string {
   return n.replace(/\s+/g, ' ').trim();
 }
 
-/** "스위치플랜 Inc." / "Switch Plan 주식회사" → "스위치플랜" — 한글 회사명만 추출 */
+/** "스위치플랜 (Switch Plan Co.,Ltd)" / "Switch Plan 주식회사" → "스위치플랜" — 한글 회사명만 추출 */
 export function stripCorpAndEnglish(name: string): string {
   if (!name) return '';
-  let n = stripCorpSuffix(name);
-  // 영문 법인 표기 (Inc., Corp., Ltd., Co., LLC, LLP) 제거
+  let n = name.trim();
+  // 1) 괄호와 괄호 안 내용 모두 제거 — (Switch Plan Co.,Ltd) / [영문명] / 【...】
+  n = n.replace(/\([^)]*\)/g, ' ');
+  n = n.replace(/\[[^\]]*\]/g, ' ');
+  n = n.replace(/【[^】]*】/g, ' ');
+  // 2) 법인 표기 (주식회사·㈜ 등) 제거
+  n = stripCorpSuffix(n);
+  // 3) 영문 법인 표기 (Inc., Corp., Ltd., Co., LLC, LLP) 제거
   n = n.replace(/\b(Inc|Corp|Corporation|Ltd|Limited|Co|Company|LLC|LLP|LP|Plc)\.?\b/gi, ' ').trim();
-  // 일반 영문 단어 제거 (한글 회사명만 남기기)
+  // 4) 일반 영문 단어 제거 (한글 회사명만 남기기)
   n = n.replace(/[A-Za-z]+/g, ' ').trim();
-  // 다중 공백 정리
+  // 5) 쉼표·마침표 등 잔여 구두점 정리
+  n = n.replace(/[,.]+/g, ' ').trim();
+  // 6) 다중 공백 → 단일 공백
   return n.replace(/\s+/g, ' ').trim();
 }
 
