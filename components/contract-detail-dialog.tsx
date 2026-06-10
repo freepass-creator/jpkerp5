@@ -2781,6 +2781,20 @@ function LicenseVerifySection({ c, onUpdate }: { c: Contract; onUpdate: (u: Cont
 
       if (ln) setLicenseNo(ln);
       setOcrInfo({ holderName: holder, birth, licenseType: ltype, expiry, nameMatch, birthMatch });
+
+      // 원본 파일 보관 — 보험증권 패턴. 면허증도 검증 후 영구 첨부 (RIMS 미연동 환경에서도 확인 가능)
+      try {
+        const { fileToDataUrl } = await import('@/lib/image-compress');
+        const fileUrl = await fileToDataUrl(file);
+        onUpdate({
+          ...c,
+          customerLicenseCertUrl: fileUrl,
+          customerLicenseCertFileName: file.name,
+          customerLicenseCertUploadedAt: new Date().toISOString(),
+        });
+      } catch (saveErr) {
+        console.warn('[license OCR] 파일 보관 실패', saveErr);
+      }
     } catch (e) {
       setOcrInfo({ holderName: `오류: ${(e as Error).message ?? String(e)}` });
     } finally {

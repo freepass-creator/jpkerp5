@@ -48,6 +48,10 @@ export type Contract = {
   customerLicenseCheckedAt?: string; // 마지막 RIMS 조회 시각 (ISO)
   customerLicenseExpiry?: string;    // RIMS 응답의 만료일
   customerLicenseType?: string;      // 1종/2종 등
+  /** 면허증 OCR 원본 파일 — 검증 + 영구 보관 (보험증권 패턴) */
+  customerLicenseCertUrl?: string;
+  customerLicenseCertFileName?: string;
+  customerLicenseCertUploadedAt?: string;
   // 주운전자 — 법인 계약일 때 또는 계약자 ≠ 운전자일 때만. 비어있으면 customerName이 운전자.
   driverName?: string;
   /** 주운전자 식별번호 — 주민번호(개인). 만연령·보험가능연령 매칭용. 비어있으면 customerIdentNo 사용 */
