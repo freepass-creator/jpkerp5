@@ -19,6 +19,7 @@
  */
 
 import { type ReactNode } from 'react';
+import { Pencil, FloppyDisk, X as XIcon } from '@phosphor-icons/react';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose,
@@ -39,23 +40,56 @@ export type DetailDialogShellProps = {
   heroName: ReactNode;
   /** HERO meta line — plate badge + 텍스트들 (· 구분자 포함) */
   heroMeta: ReactNode;
-  /** HERO 우상단 영역 — 뱃지/KPI/액션 자유 배치 */
+  /** HERO 우상단 영역 — 뱃지/KPI 표시만 (액션 버튼은 footer 로) */
   heroRight?: ReactNode;
   /** 탭 모드 — tabs 가 있으면 children 무시하고 Tabs.Root 렌더 */
   tabs?: ShellTab[];
   /** 단일 모드 — tabs 없을 때 본문 영역 */
   children?: ReactNode;
-  /** Footer 추가 버튼 (닫기 좌측). 미지정 시 [닫기]만 노출 */
+  /** Footer 추가 버튼 (닫기 좌측). 미지정 시 [닫기]만 노출. footer prop 사용 시 자동 [수정] 버튼은 비활성화 */
   footer?: ReactNode;
   /** 초기 활성 탭 (tabs 모드에서만) */
   defaultTab?: string;
+
+  /* ─── 공용 [수정] 버튼 — 모든 detail dialog 동일 규격 ─── */
+  /** [수정] 버튼 클릭 시 호출. 있으면 footer 에 [수정] 자동 노출 */
+  onEdit?: () => void;
+  /** 편집 중인지 — true 시 footer 가 [취소] [저장] 으로 자동 전환 */
+  editing?: boolean;
+  /** 편집 중일 때 [저장] 버튼 핸들러 */
+  onSave?: () => void;
+  /** 편집 중일 때 [취소] 버튼 핸들러 */
+  onCancel?: () => void;
 };
 
 export function DetailDialogShell({
   open, onOpenChange, title,
   heroName, heroMeta, heroRight,
   tabs, children, footer, defaultTab,
+  onEdit, editing, onSave, onCancel,
 }: DetailDialogShellProps) {
+  // 공용 [수정/저장/취소] 자동 footer — footer prop 명시 시 X
+  const autoFooter = !footer && (onEdit || editing) ? (
+    editing ? (
+      <>
+        {onCancel && (
+          <button className="btn" type="button" onClick={onCancel}>
+            <XIcon size={12} weight="bold" /> 취소
+          </button>
+        )}
+        {onSave && (
+          <button className="btn btn-primary" type="button" onClick={onSave}>
+            <FloppyDisk size={12} weight="bold" /> 저장
+          </button>
+        )}
+      </>
+    ) : (
+      <button className="btn btn-primary" type="button" onClick={onEdit}>
+        <Pencil size={12} weight="bold" /> 수정
+      </button>
+    )
+  ) : null;
+  const resolvedFooter = footer ?? autoFooter;
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent title={title}>
@@ -105,7 +139,7 @@ export function DetailDialogShell({
           )}
         </DialogBody>
         <DialogFooter>
-          {footer}
+          {resolvedFooter}
           <DialogClose asChild>
             <button className="btn">닫기</button>
           </DialogClose>

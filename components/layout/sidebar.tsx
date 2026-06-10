@@ -26,7 +26,7 @@ export const MENU_LABELS: Record<MenuKey, string> = {
   receivables: '리스크 관리',
   asset: '자산 관리',
   contract: '계약 관리',
-  finance: '입출금 관리',
+  finance: '재무 관리',
   penalty: '과태료 업무',
   general: '일반 관리',
   devtools: '개발도구',
@@ -153,10 +153,10 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
               <Link
                 href={master ? '/finance' : '/payments'}
                 className={`sb-item ${(isActive('/finance') || isActive('/payments')) ? 'active' : ''}`}
-                title="입출금 관리 — 계좌·자동이체·카드매출·법인카드"
+                title="재무 관리 — 계좌·자동이체·카드매출·법인카드"
               >
                 <CurrencyKrw size={14} weight={(isActive('/finance') || isActive('/payments')) ? 'fill' : 'regular'} />
-                <span>입출금 관리</span>
+                <span>재무 관리</span>
               </Link>
             )}
           </div>

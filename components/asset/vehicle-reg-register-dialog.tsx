@@ -12,7 +12,7 @@
  *   4) [모두 등록] — 일괄 commit
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Plus, X, CircleNotch, CheckCircle, Warning, Upload, Keyboard, FileXls } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -39,11 +39,13 @@ type WorkItem = Partial<Vehicle> & {
 };
 
 export function VehicleRegRegisterDialog({
-  open, onOpenChange, onSaved,
+  open, onOpenChange, onSaved, prefillVehicle,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onSaved?: (v: Vehicle) => void;
+  /** 수정 모드 — vehicle 객체로 수기 탭 prefill (자산 detail 의 [수정] 버튼이 호출) */
+  prefillVehicle?: Vehicle | null;
 }) {
   const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
   const [items, setItems] = useState<WorkItem[]>([]);
@@ -53,6 +55,15 @@ export function VehicleRegRegisterDialog({
   const [mode, setMode] = useState<'ocr' | 'manual' | 'excel'>('ocr');
   // 개별 입력 폼 state
   const [manualDraft, setManualDraft] = useState<Partial<Vehicle>>({});
+
+  // prefillVehicle 변경 시 수기 탭으로 강제 + manualDraft 채움
+  useEffect(() => {
+    if (open && prefillVehicle) {
+      setManualDraft({ ...prefillVehicle });
+      setMode('manual');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, prefillVehicle?.id]);
 
   function reset() {
     setItems([]);

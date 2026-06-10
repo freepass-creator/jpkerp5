@@ -89,6 +89,7 @@ export default function AssetPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [openId, setOpenId] = useState<string | null>(null);
   const [vehicleRegOpen, setVehicleRegOpen] = useState(false);
+  const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [assetView, setAssetView] = useState<'status' | 'registered'>(initialView);
 
   // URL ?view= 이 바뀌면 state 동기화 (sub-page 에서 [등록자산] 클릭으로 진입한 경우)
@@ -544,12 +545,14 @@ export default function AssetPage() {
             view={assetView}
             onUpdate={(v) => { void updateVehicle(v); }}
             onClose={() => setOpenId(null)}
+            onEdit={(v) => setEditVehicle(v)}
           />
         )}
 
         <VehicleRegRegisterDialog
-          open={vehicleRegOpen}
-          onOpenChange={setVehicleRegOpen}
+          open={vehicleRegOpen || !!editVehicle}
+          onOpenChange={(o) => { if (!o) { setVehicleRegOpen(false); setEditVehicle(null); } else setVehicleRegOpen(o); }}
+          prefillVehicle={editVehicle}
         />
       </div>
     </div>
@@ -558,7 +561,7 @@ export default function AssetPage() {
 
 /* ─────────────── 차량 상세 — view 별 분기 (자산현황: 모든 탭 / 등록자산: 요약만) ─────────────── */
 function VehicleDetailDialog({
-  vehicle, history, contracts, view, onUpdate, onClose,
+  vehicle, history, contracts, view, onUpdate, onClose, onEdit,
 }: {
   vehicle: Vehicle;
   history: HistoryEntry[];
@@ -566,6 +569,7 @@ function VehicleDetailDialog({
   view: 'status' | 'registered';
   onUpdate: (v: Vehicle) => void;
   onClose: () => void;
+  onEdit?: (v: Vehicle) => void;
 }) {
   const sortedHistory = useMemo(() => [...history].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')), [history]);
   const sortedContracts = useMemo(() => [...contracts].sort((a, b) => (b.contractDate ?? '').localeCompare(a.contractDate ?? '')), [contracts]);
@@ -597,6 +601,7 @@ function VehicleDetailDialog({
           <span className={`status ${vehicle.status}`}>{vehicle.status}</span>
         </div>
       }
+      onEdit={onEdit ? () => { onClose(); onEdit(vehicle); } : undefined}
       tabs={view === 'registered'
         ? [
             // 등록차량 = 제조사 스펙 + 자등증 정보 + 자등증 첨부 (단일 탭) — showAttachment true

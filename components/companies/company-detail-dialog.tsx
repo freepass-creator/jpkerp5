@@ -10,7 +10,6 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Pencil, FloppyDisk, X as XIcon } from '@phosphor-icons/react';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Section, Field, Grid2, Stack } from '@/components/ui/detail-primitives';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
@@ -83,22 +82,10 @@ export function CompanyDetailDialog({
           <span>대표 {cur.ceo || '-'}</span>
         </>
       }
-      footer={
-        editing ? (
-          <>
-            <button className="btn" type="button" onClick={handleCancel}>
-              <XIcon size={12} weight="bold" /> 취소
-            </button>
-            <button className="btn btn-primary" type="button" onClick={() => void handleSave()}>
-              <FloppyDisk size={12} weight="bold" /> 저장
-            </button>
-          </>
-        ) : (
-          <button className="btn btn-primary" type="button" onClick={() => setEditing(true)}>
-            <Pencil size={12} weight="bold" /> 수정
-          </button>
-        )
-      }
+      onEdit={() => setEditing(true)}
+      editing={editing}
+      onSave={() => void handleSave()}
+      onCancel={handleCancel}
     >
       <Stack>
         {/* 사업자등록 정보 — 사업자등록증에서 나오는 내용 */}
