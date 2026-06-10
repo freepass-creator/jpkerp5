@@ -35,6 +35,7 @@ type WorkItem = Partial<Vehicle> & {
   _error?: string;
   _existingId?: string;        // 기존 차량 매칭 시 update 대상
   _fileName?: string;
+  _fileDataUrl?: string;       // OCR 원본 파일 data URL — 등록증 첨부 보존
 };
 
 export function VehicleRegRegisterDialog({
@@ -71,11 +72,12 @@ export function VehicleRegRegisterDialog({
 
     // 등록증은 1 파일 = 1 등록증. PDF 첫 페이지만 OCR (다중페이지 분리 X)
     const expanded: File[] = arr;
-    await Promise.all(expanded.map(fileToDataUrl));
+    const dataUrls = await Promise.all(expanded.map(fileToDataUrl));
     const placeholders: WorkItem[] = expanded.map((f, i) => ({
       id: `vr-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
       _status: 'pending' as Status,
       _fileName: f.name,
+      _fileDataUrl: dataUrls[i],
     }));
     setItems((prev) => [...prev, ...placeholders]);
     setProgress({ done: 0, total: expanded.length });
@@ -139,6 +141,7 @@ export function VehicleRegRegisterDialog({
             _status: 'done' as Status,
             _existingId: existing?.id,
             _fileName: placeholders[i]._fileName,
+            _fileDataUrl: placeholders[i]._fileDataUrl,
           } : p));
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -177,13 +180,22 @@ export function VehicleRegRegisterDialog({
     let updated = 0, added = 0, fail = 0;
     for (const item of registerableItems) {
       try {
-        const { _status: _s, _error: _e, _existingId, _fileName: _fn, id: _id, ...rest } = item;
+        const { _status: _s, _error: _e, _existingId, _fileName: fn, _fileDataUrl: fileUrl, id: _id, ...rest } = item;
+        // OCR 원본 등록증 첨부 — 자산 상세 다이얼로그에서 미리보기 가능 (보험증권 패턴)
+        const certPatch = fileUrl
+          ? {
+              registrationCertUrl: fileUrl,
+              registrationCertFileName: fn,
+              registrationCertUploadedAt: new Date().toISOString(),
+            }
+          : {};
         if (_existingId) {
           const existing = vehicles.find((v) => v.id === _existingId);
           if (existing) {
-            await updateVehicle({ ...existing, ...rest, id: existing.id } as Vehicle);
+            const merged = { ...existing, ...rest, ...certPatch, id: existing.id } as Vehicle;
+            await updateVehicle(merged);
             updated++;
-            onSaved?.({ ...existing, ...rest, id: existing.id } as Vehicle);
+            onSaved?.(merged);
           }
         } else {
           const newVehicle: Omit<Vehicle, 'id'> = {
@@ -193,6 +205,7 @@ export function VehicleRegRegisterDialog({
             status: rest.status ?? '등록대기',
             createdAt: new Date().toISOString(),
             ...rest,
+            ...certPatch,
           } as Omit<Vehicle, 'id'>;
           const newId = await addVehicle(newVehicle);
           added++;
