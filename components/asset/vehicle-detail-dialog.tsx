@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Field } from '@/components/ui/editable-field';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { DetailTabContent } from '@/components/ui/detail-tab-content';
+import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
 import { COL, COL_FLEX } from '@/lib/table-cols';
 
@@ -27,10 +28,70 @@ function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boo
 }
 
 /* ─── 탭1: 요약 — 자산정보 + 등록증정보 ─── */
-function SummaryTab({ vehicle, onUpdate, showAttachment = true }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void; showAttachment?: boolean }) {
+function SummaryTab({
+  vehicle, onUpdate, contracts, history, showAttachment = true,
+}: {
+  vehicle: Vehicle;
+  onUpdate: (v: Vehicle) => void;
+  contracts: Contract[];
+  history: HistoryEntry[];
+  showAttachment?: boolean;
+}) {
   void onUpdate;
+
+  // 운영 손익 KPI
+  const totalPaid = contracts.reduce(
+    (sum, c) => sum + (c.schedules ?? []).reduce(
+      (s, sch) => s + (sch.payments ?? []).reduce((p, x) => p + x.amount, 0),
+      0,
+    ), 0,
+  );
+  const totalCost = history.reduce((s, h) => s + (h.cost ?? 0), 0);
+  const purchasePrice = vehicle.purchasePrice ?? 0;
+  const netProfit = totalPaid - totalCost - purchasePrice;
+  const totalUnpaid = contracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
+
+  // 가까운 만기 D-day — 보험 / 정기검사 / 자동차세 중 최단
+  const active = contracts.find((c) => c.status === '운행') ?? contracts[0];
+  const today = new Date();
+  const daysTo = (s?: string) => s ? Math.floor((new Date(s).getTime() - today.getTime()) / 86400000) : null;
+  const candidates = [
+    { label: '보험', d: daysTo(active?.insuranceExpiryDate) },
+    { label: '검사', d: daysTo(active?.inspectionDueDate) },
+    { label: '자동차세', d: daysTo(active?.vehicleTaxDueDate) },
+  ].filter((x) => x.d != null) as { label: string; d: number }[];
+  const nextDue = candidates.length > 0
+    ? candidates.reduce((a, b) => (a.d < b.d ? a : b))
+    : null;
+
   return (
     <div className="detail-stack">
+      {/* 운영 손익 KPI — 요약 탭 상단 */}
+      <KpiGrid>
+        <KpiCard
+          label="누적 입금"
+          value={`₩${totalPaid.toLocaleString()}`}
+          hint={contracts.length > 0 ? `${contracts.length}건 계약` : '계약 없음'}
+        />
+        <KpiCard
+          label="누적 비용"
+          value={`₩${totalCost.toLocaleString()}`}
+          hint={`정비·수선 ${history.length}건${purchasePrice > 0 ? ` + 매입 ₩${purchasePrice.toLocaleString()}` : ''}`}
+        />
+        <KpiCard
+          label="순익"
+          value={`₩${netProfit.toLocaleString()}`}
+          positive={netProfit >= 0}
+          hint={totalUnpaid > 0 ? `미수 ₩${totalUnpaid.toLocaleString()}` : undefined}
+        />
+        <KpiCard
+          label={nextDue ? `다음 만기 (${nextDue.label})` : '만기'}
+          value={nextDue ? (nextDue.d < 0 ? `${-nextDue.d}일 경과` : `D-${nextDue.d}`) : '-'}
+          positive={nextDue == null ? undefined : nextDue.d > 30}
+          hint={nextDue == null ? '만기 정보 없음' : undefined}
+        />
+      </KpiGrid>
+
       <section className="detail-section">
         <div className="detail-section-header">제조사 스펙</div>
         <div className="detail-section-body">
@@ -421,10 +482,10 @@ export function VehicleDetailDialog({
       onEdit={onEdit ? () => { onClose(); onEdit(vehicle); } : undefined}
       tabs={view === 'registered'
         ? [
-            { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={true} /> },
+            { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} contracts={sortedContracts} history={sortedHistory} showAttachment={true} /> },
           ]
         : [
-            { value: 'summary', label: '요약', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={false} /> },
+            { value: 'summary', label: '요약', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} contracts={sortedContracts} history={sortedHistory} showAttachment={false} /> },
             { value: 'loan', label: '할부스케줄', content: <LoanScheduleTab vehicle={vehicle} /> },
             { value: 'compliance', label: '보험·검사', content: <ComplianceTab vehicle={vehicle} contracts={sortedContracts} /> },
             { value: 'contract', label: `계약이력 (${sortedContracts.length})`, content: <ContractListTab contracts={sortedContracts} /> },

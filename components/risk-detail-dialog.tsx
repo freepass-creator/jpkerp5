@@ -120,6 +120,9 @@ export function RiskDetailDialog({
       }
       onEdit={onEdit}
     >
+      {/* 채권화 단계 진행 — D+N 경과 기준 자동 진행 + 채권 상태 시 종결 */}
+      <CollectionStageProgress contract={contract} overdueDays={overdueDays} />
+
       {/* 즉시 액션 — 작은 버튼 row (탭 row 와 비슷한 시각 무게) */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button className="btn btn-sm btn-primary" type="button" onClick={() => onAddContact?.(contract)}>
@@ -178,5 +181,70 @@ export function RiskDetailDialog({
         </div>
       </section>
     </DetailDialogShell>
+  );
+}
+
+/**
+ * 채권화 단계 progress — 미납 경과일 / contract.status 기준 자동 진행.
+ *  Stage 1: 초기 연락 (D+1~3)
+ *  Stage 2: 시동제어 권장 (D+4~10)
+ *  Stage 3: 내용증명 발송 (D+11~30)
+ *  Stage 4: 채권화 / 법적조치 (D+31~ 또는 status='채권')
+ */
+function CollectionStageProgress({ contract, overdueDays }: { contract: Contract; overdueDays: number }) {
+  const isDebt = contract.status === '채권';
+  const currentStage = isDebt ? 4
+    : overdueDays >= 31 ? 4
+    : overdueDays >= 11 ? 3
+    : overdueDays >= 4 ? 2
+    : overdueDays >= 1 ? 1
+    : 0;
+  const stages = [
+    { idx: 1, label: '초기 연락', range: 'D+1~3' },
+    { idx: 2, label: '시동제어', range: 'D+4~10' },
+    { idx: 3, label: '내용증명', range: 'D+11~30' },
+    { idx: 4, label: isDebt ? '채권화 (확정)' : '채권화', range: 'D+31~' },
+  ];
+
+  return (
+    <div style={{
+      display: 'flex',
+      gap: 4,
+      padding: '8px 10px',
+      background: 'var(--bg-soft)',
+      border: '1px solid var(--border)',
+      borderRadius: 6,
+    }}>
+      {stages.map((s, i) => {
+        const passed = s.idx < currentStage;
+        const current = s.idx === currentStage;
+        const future = s.idx > currentStage;
+        const color = future ? 'var(--text-weak)'
+          : current ? (s.idx === 4 ? 'var(--red-text)' : 'var(--orange-text, #c2410c)')
+          : 'var(--green-text)';
+        const bg = future ? 'transparent'
+          : current ? (s.idx === 4 ? 'var(--red-bg)' : 'var(--orange-bg)')
+          : 'var(--green-bg)';
+        return (
+          <div key={s.idx} style={{
+            flex: 1,
+            padding: '6px 8px',
+            background: bg,
+            border: `1px solid ${future ? 'var(--border)' : color}`,
+            borderRadius: 4,
+            opacity: future ? 0.55 : 1,
+            fontSize: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+          }}>
+            <div style={{ fontWeight: 600, color }}>
+              {passed ? '✓ ' : current ? '● ' : ''}{s.idx}. {s.label}
+            </div>
+            <div style={{ color: 'var(--text-weak)', fontSize: 9 }}>{s.range}</div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
