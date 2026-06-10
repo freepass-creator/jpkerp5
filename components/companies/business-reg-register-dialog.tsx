@@ -10,7 +10,7 @@
  *   4) [모두 등록] — 일괄 commit
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Plus, X, CircleNotch, CheckCircle, Warning, Upload, Keyboard } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -38,11 +38,13 @@ type WorkItem = Partial<Company> & {
 const normReg = (s?: string) => (s ?? '').replace(/[-\s]/g, '');
 
 export function BusinessRegRegisterDialog({
-  open, onOpenChange, onSaved,
+  open, onOpenChange, onSaved, editId,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onSaved?: (c: Company) => void;
+  /** 수정 모드 — 회사 id. 있으면 수기 탭으로 강제 진입하고 기존 값으로 prefill */
+  editId?: string | null;
 }) {
   const { companies, add: addCompany, update: updateCompany } = useCompanies();
   const [items, setItems] = useState<WorkItem[]>([]);
@@ -51,6 +53,17 @@ export function BusinessRegRegisterDialog({
   const [dragging, setDragging] = useState(false);
   const [mode, setMode] = useState<'ocr' | 'manual'>('ocr');
   const [manualDraft, setManualDraft] = useState<Partial<Company>>({});
+
+  // 수정 모드 — open + editId 변경 시 prefill + 수기 탭 강제
+  const editTarget = editId ? companies.find((c) => c.id === editId) ?? null : null;
+  useEffect(() => {
+    if (open && editTarget) {
+      setManualDraft({ ...editTarget });
+      setMode('manual');
+    }
+  // editTarget?.id 만 watch (재렌더링 방지)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editTarget?.id]);
 
   function reset() {
     setItems([]);
@@ -231,7 +244,8 @@ export function BusinessRegRegisterDialog({
     setBusy(true);
     try {
       const now = new Date().toISOString();
-      const existing = companies.find((c) => {
+      // editId 우선 (수정 모드), 없으면 사업자/법인번호로 매칭
+      const existing = editTarget ?? companies.find((c) => {
         const b = normReg(manualDraft.bizRegNo), p = normReg(manualDraft.corpRegNo);
         if (b && normReg(c.bizRegNo) === b) return true;
         if (p && normReg(c.corpRegNo) === p) return true;
@@ -275,7 +289,7 @@ export function BusinessRegRegisterDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={handleClose}>
-      <DialogContent title="사업자등록증 법인 등록">
+      <DialogContent title={editTarget ? `법인 수정 — ${editTarget.name}` : '사업자등록증 법인 등록'}>
         <DialogBody>
           <Tabs.Root value={mode} onValueChange={(v) => setMode(v as 'ocr' | 'manual')}>
             <Tabs.List className="tabs-list" style={{ marginBottom: 12 }}>

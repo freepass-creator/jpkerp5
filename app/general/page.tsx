@@ -15,6 +15,10 @@ import {
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-apply';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-register-dialog';
+import { audit } from '@/lib/firebase/audit-store';
+import type { Company } from '@/lib/types';
 
 type GeneralView =
   | 'staff' | 'company'
@@ -38,6 +42,8 @@ const VIEW_LABEL: Record<GeneralView, string> = {
 
 export default function GeneralPage() {
   const [view, setView] = useState<GeneralView>('company');
+  const [companyRegisterOpen, setCompanyRegisterOpen] = useState(false);
+  const [editCompanyId, setEditCompanyId] = useState<string | null>(null);
 
   return (
     <div className="layout">
@@ -74,7 +80,7 @@ export default function GeneralPage() {
           </nav>
 
           <main className="page-shell-main" style={(view === 'company' || view === 'fleet_apply') ? { padding: 0, overflow: 'hidden' } : undefined}>
-            {view === 'company' && <CompanyCardsView />}
+            {view === 'company' && <CompanyListView onEdit={setEditCompanyId} />}
             {view === 'fleet_apply' && <FleetApplyView companies={MOCK_COMPANIES} pendingByCompany={MOCK_PENDING} />}
             {view !== 'company' && view !== 'fleet_apply' && <ViewPlaceholder view={view} />}
           </main>
@@ -83,7 +89,7 @@ export default function GeneralPage() {
         <BottomBar
           left={
             view === 'company' ? (
-              <button className="btn btn-primary" type="button">
+              <button className="btn btn-primary" type="button" onClick={() => setCompanyRegisterOpen(true)}>
                 <Plus size={14} weight="bold" /> 법인 등록
               </button>
             ) : (
@@ -93,6 +99,13 @@ export default function GeneralPage() {
             )
           }
           right={<span>{VIEW_LABEL[view]}</span>}
+        />
+
+        {/* 법인 등록·수정 다이얼로그 — OCR/수기 2-mode */}
+        <BusinessRegRegisterDialog
+          open={companyRegisterOpen || !!editCompanyId}
+          editId={editCompanyId}
+          onOpenChange={(o) => { if (!o) { setCompanyRegisterOpen(false); setEditCompanyId(null); } }}
         />
       </div>
     </div>
@@ -145,6 +158,105 @@ const MOCK_PENDING: Record<string, PendingVehicle[]> = {};
 
 const MOCK_COMPANIES: MockCompany[] = [];
 
+/** 실 RTDB 연결 — useCompanies 기반. 행 더블클릭 → 수정 다이얼로그. */
+function CompanyListView({ onEdit }: { onEdit: (id: string) => void }) {
+  const { companies, remove } = useCompanies();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const allChecked = companies.length > 0 && companies.every((c) => selectedIds.has(c.id));
+
+  function toggle(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    if (allChecked) setSelectedIds(new Set());
+    else setSelectedIds(new Set(companies.map((c) => c.id)));
+  }
+  async function deleteSelected() {
+    const target = companies.filter((c) => selectedIds.has(c.id));
+    if (target.length === 0) return;
+    if (!window.confirm(`선택한 ${target.length}건 삭제하시겠습니까?`)) return;
+    for (const c of target) {
+      await remove(c.id);
+      void audit.delete('company', c.id, `법인 삭제 — ${c.name}`);
+    }
+    setSelectedIds(new Set());
+  }
+
+  return (
+    <>
+      {selectedIds.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', marginBottom: 8, background: 'var(--bg-stripe)', border: '1px solid var(--border-soft)', borderRadius: 4, fontSize: 12 }}>
+          <span>선택 <strong>{selectedIds.size}</strong>건</span>
+          <button className="btn btn-sm" type="button" onClick={() => setSelectedIds(new Set())}>선택 해제</button>
+          <button className="btn btn-sm" type="button" onClick={() => void deleteSelected()} style={{ color: 'var(--red-text)', marginLeft: 'auto' }}>
+            <Trash size={11} weight="bold" /> 선택 삭제 ({selectedIds.size})
+          </button>
+        </div>
+      )}
+      <table className="table">
+        <thead>
+          <tr>
+            <th className="checkbox-col">
+              <input
+                type="checkbox"
+                checked={allChecked}
+                ref={(el) => {
+                  if (!el) return;
+                  const some = selectedIds.size > 0;
+                  el.indeterminate = some && !allChecked;
+                }}
+                onChange={toggleAll}
+                aria-label="전체 선택"
+              />
+            </th>
+            <th style={{ minWidth: 220 }}>회사명</th>
+            <th style={{ width: 70 }}>코드</th>
+            <th style={{ width: 130 }}>법인등록</th>
+            <th style={{ width: 120 }}>사업자등록</th>
+            <th style={{ width: 80 }}>대표</th>
+            <th>주소</th>
+            <th style={{ width: 100 }}>업종</th>
+            <th style={{ width: 100 }}>종목</th>
+          </tr>
+        </thead>
+        <tbody>
+          {companies.length === 0 ? (
+            <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>등록된 법인 없음 — 우측 하단 [+ 법인 등록] 으로 시작하세요.</td></tr>
+          ) : companies.map((c) => {
+            const checked = selectedIds.has(c.id);
+            return (
+              <tr
+                key={c.id}
+                style={{ cursor: 'pointer', background: checked ? 'var(--bg-stripe)' : undefined }}
+                onDoubleClick={() => onEdit(c.id)}
+                title="더블클릭 → 상세 정보 (수정)"
+              >
+                <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={checked} onChange={() => toggle(c.id)} aria-label={`${c.name} 선택`} />
+                </td>
+                <td><strong>{c.name || <span className="muted">이름 미입력</span>}</strong></td>
+                <td className="mono dim">{c.code || '-'}</td>
+                <td className="mono dim">{c.corpRegNo || '-'}</td>
+                <td className="mono dim">{c.bizRegNo || '-'}</td>
+                <td>{c.ceo || <span className="muted">-</span>}</td>
+                <td className="dim" style={{ fontSize: 11 }}>{c.address || '-'}</td>
+                <td className="dim">{c.bizType || '-'}</td>
+                <td className="dim">{c.bizItem || '-'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+/** @deprecated MOCK 기반 — CompanyListView 로 교체됨. 미사용 placeholder. */
 function CompanyCardsView() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
