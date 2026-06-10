@@ -400,6 +400,11 @@ export type Company = {
   bizItem?: string;              // 종목
   mainPhone?: string;            // 대표 전화번호 — 손님 페이지 노출
   customerServicePhone?: string; // 고객센터 전화 (별도 운영 시) — 손님 페이지 노출
+  /** 실무 담당자 — 우리 측 운영 contact */
+  contactName?: string;
+  contactRole?: string;          // 직책 (예: 매니저)
+  contactPhone?: string;
+  contactEmail?: string;
   /** 법인 도장(인영) — 누끼 처리된 PNG. 내용증명·계약서 발신인란에 합성 */
   stampUrl?: string;
   stampFileName?: string;

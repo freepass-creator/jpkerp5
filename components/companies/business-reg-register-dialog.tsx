@@ -267,6 +267,10 @@ export function BusinessRegRegisterDialog({
           address: manualDraft.address,
           bizType: manualDraft.bizType,
           bizItem: manualDraft.bizItem,
+          contactName: manualDraft.contactName,
+          contactRole: manualDraft.contactRole,
+          contactPhone: manualDraft.contactPhone,
+          contactEmail: manualDraft.contactEmail,
           accounts: [],
           cards: [],
           locations: [],
@@ -469,6 +473,47 @@ export function BusinessRegRegisterDialog({
                       className="input input-compact"
                       value={manualDraft.bizItem ?? ''}
                       onChange={(e) => setManualDraft({ ...manualDraft, bizItem: e.target.value })}
+                    />
+                  </Field>
+                </div>
+
+                <div style={{ marginTop: 8, paddingTop: 10, borderTop: '1px solid var(--border-soft)', fontSize: 12, fontWeight: 600, color: 'var(--text-sub)' }}>
+                  실무 담당자
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <Field label="이름">
+                    <input
+                      type="text"
+                      className="input input-compact"
+                      value={manualDraft.contactName ?? ''}
+                      onChange={(e) => setManualDraft({ ...manualDraft, contactName: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="직책">
+                    <input
+                      type="text"
+                      className="input input-compact"
+                      placeholder="예: 매니저"
+                      value={manualDraft.contactRole ?? ''}
+                      onChange={(e) => setManualDraft({ ...manualDraft, contactRole: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="연락처">
+                    <input
+                      type="tel"
+                      className="input input-compact mono"
+                      placeholder="010-0000-0000"
+                      value={manualDraft.contactPhone ?? ''}
+                      onChange={(e) => setManualDraft({ ...manualDraft, contactPhone: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="이메일">
+                    <input
+                      type="email"
+                      className="input input-compact"
+                      placeholder="name@company.com"
+                      value={manualDraft.contactEmail ?? ''}
+                      onChange={(e) => setManualDraft({ ...manualDraft, contactEmail: e.target.value })}
                     />
                   </Field>
                 </div>
