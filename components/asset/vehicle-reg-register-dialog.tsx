@@ -29,6 +29,16 @@ import type { Vehicle, CompanyCode } from '@/lib/types';
 const OCR_CONCURRENCY = 30;
 const PLATE_RE = /^\d{2,3}[가-힣]\d{4}$/;
 
+/** 차량번호 정규화 — OCR 공백/invisible 문자 제거 + O→0 / I,l→1 자주 헷갈리는 영문 → 숫자 교정 */
+function normPlate(s: string | undefined): string {
+  if (!s) return '';
+  return s
+    .replace(/[\s​-‍﻿]+/g, '')  // 공백 + zero-width 문자
+    .replace(/O/g, '0').replace(/o/g, '0')
+    .replace(/I/g, '1').replace(/l/g, '1')
+    .replace(/[^0-9가-힣]/g, '');  // 한글·숫자만 남김 (특수문자 차단)
+}
+
 type Status = 'pending' | 'done' | 'failed';
 type WorkItem = Partial<Vehicle> & {
   id: string;
@@ -137,8 +147,8 @@ export function VehicleRegRegisterDialog({
             return Number.isFinite(num) ? num : undefined;
           };
 
-          const plate = s('car_number')?.replace(/\s/g, '');
-          const existing = plate ? vehicles.find((v) => (v.plate ?? '').replace(/\s/g, '') === plate) : undefined;
+          const plate = normPlate(s('car_number'));
+          const existing = plate ? vehicles.find((v) => normPlate(v.plate) === plate) : undefined;
           // 법인등록번호 (자등증 소유자) → 회사 자동 매칭
           const ownerReg = s('owner_biz_no');
           const matchedCompany = matchCompanyByRegNo(ownerReg);
@@ -147,7 +157,7 @@ export function VehicleRegRegisterDialog({
             ...(existing ?? {}),
             id,
             company: (matchedCompany ?? existing?.company) as Partial<Vehicle>['company'],
-            plate: s('car_number') ?? existing?.plate ?? '',
+            plate: plate || existing?.plate || s('car_number') || '',
             model: s('car_name') ?? existing?.model ?? '',
             vehicleType: s('category_hint') ?? existing?.vehicleType,
             vehicleUsage: s('usage_type') ?? existing?.vehicleUsage,
@@ -197,9 +207,9 @@ export function VehicleRegRegisterDialog({
   const doneItems = items.filter((i) => i._status === 'done');
   const failedItems = items.filter((i) => i._status === 'failed');
   const registerableItems = doneItems.filter((i) =>
-    i.plate && PLATE_RE.test((i.plate ?? '').replace(/\s/g, '')),
+    i.plate && PLATE_RE.test(normPlate(i.plate)),
   );
-  const noPlateCount = doneItems.filter((i) => !i.plate || !PLATE_RE.test((i.plate ?? '').replace(/\s/g, ''))).length;
+  const noPlateCount = doneItems.filter((i) => !i.plate || !PLATE_RE.test(normPlate(i.plate))).length;
 
   async function handleCommitAll(): Promise<void> {
     if (registerableItems.length === 0) {
@@ -258,11 +268,11 @@ export function VehicleRegRegisterDialog({
   }
 
   async function handleManualSave(): Promise<void> {
-    const plate = (manualDraft.plate ?? '').replace(/\s/g, '');
+    const plate = normPlate(manualDraft.plate);
     if (!plate || !PLATE_RE.test(plate)) { toast.error('차량번호 필수 (예: 01도9893)'); return; }
     setBusy(true);
     try {
-      const existing = vehicles.find((v) => (v.plate ?? '').replace(/\s/g, '') === plate);
+      const existing = vehicles.find((v) => normPlate(v.plate) === plate);
       if (existing) {
         const merged: Vehicle = { ...existing, ...manualDraft, id: existing.id } as Vehicle;
         await updateVehicle(merged);
@@ -387,7 +397,7 @@ export function VehicleRegRegisterDialog({
                 </thead>
                 <tbody>
                   {items.map((it) => {
-                    const plateOk = it.plate && PLATE_RE.test((it.plate ?? '').replace(/\s/g, ''));
+                    const plateOk = it.plate && PLATE_RE.test(normPlate(it.plate));
                     return (
                       <tr key={it.id}>
                         <td className="center">
