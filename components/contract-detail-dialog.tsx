@@ -16,6 +16,7 @@ import { InsuranceRegisterDialog } from '@/components/insurance/insurance-regist
 import { useInsurances } from '@/lib/firebase/insurance-store';
 import { normPlate } from '@/lib/entity-sync';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
+import { Section } from '@/components/ui/detail-primitives';
 import { toast } from '@/lib/toast';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone, contractStatusTone, scheduleStatusTone } from '@/lib/status-tones';
@@ -187,20 +188,6 @@ function DetailHero({ c }: { c: Contract }) {
 
 /* ─────────────── Sub: Sections / Fields ─────────────── */
 
-export function Section({
-  icon, title, action, children,
-}: { icon: React.ReactNode; title: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="detail-section">
-      <div className="detail-section-header">
-        <span className="icon">{icon}</span>
-        <span className="title">{title}</span>
-        {action}
-      </div>
-      <div className="detail-section-body">{children}</div>
-    </div>
-  );
-}
 
 const Field = SharedField;
 
