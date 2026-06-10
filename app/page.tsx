@@ -25,6 +25,8 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { ageFromIdent } from '@/lib/ident';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { vehicleStateTone, contractStateTone, paymentStateTone } from '@/lib/status-tones';
 import {
   getExpiryDate, daysToExpiry,
   getVehicleState, getContractState, getPaymentState,
@@ -715,12 +717,9 @@ export default function Page() {
                         <td className="center dim">{displayCompanyName(c.company, companyMaster)}</td>
                         {/* 차량상태 — display 만. 변경은 더블클릭 → dialog → 처리 flow 거쳐서 (휴차 사유/반납 검수 등) */}
                         <td className="center">
-                          <span
-                            className={`status ${vs.name}`}
-                            title="더블클릭 → 상세 dialog → 상태 탭에서 처리 (휴차 사유·반납 검수 등 flow 거침)"
-                          >
+                          <StatusBadge tone={vehicleStateTone(vs.name)} title="더블클릭 → 상세 dialog → 상태 탭에서 처리 (휴차 사유·반납 검수 등 flow 거침)">
                             {vs.name}
-                          </span>
+                          </StatusBadge>
                         </td>
                         {/* 차량 */}
                         <td className="plate">{c.vehiclePlate}</td>
@@ -762,7 +761,7 @@ export default function Page() {
                         </td>
                         {/* 계약상태 + 기간 */}
                         <td className="center">
-                          <span className={`status ${cs.name}`}>{cs.name}</span>
+                          <StatusBadge tone={contractStateTone(cs.name)}>{cs.name}</StatusBadge>
                         </td>
                         {/* 시작일 — 휴차=idleSince, 상품화 단계=readiedDate, 운행 등=계약일/인도일 */}
                         <td className="center mono dim">
@@ -829,12 +828,12 @@ export default function Page() {
                         </td>
                         {/* 수납상태 + 미수금 */}
                         <td className="center">
-                          <span className={`status ${ps.name}`}>
+                          <StatusBadge tone={paymentStateTone(ps.name)}>
                             {ps.name}
                             {ps.name === '미납' && ps.days > 0 && (
                               <span style={{ marginLeft: 4, fontWeight: 600 }}>+{ps.days}</span>
                             )}
-                          </span>
+                          </StatusBadge>
                         </td>
                         <td className={`num mono ${c.unpaidAmount > 0 ? 'danger' : ''}`}>
                           {c.unpaidAmount > 0 ? formatCurrency(c.unpaidAmount) : <span className="muted">없음</span>}

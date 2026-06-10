@@ -21,6 +21,7 @@ import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { audit } from '@/lib/firebase/audit-store';
 import { todayKr } from '@/lib/mock-data';
 import type { BankTransaction, Contract } from '@/lib/types';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 type Tab = 'all' | 'autodebit' | 'summary' | 'card' | 'corpcard';
 
@@ -710,7 +711,7 @@ function LedgerTable({
                 <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggleRow(t.id)} aria-label="선택" />
               </td>
               <td className="center">
-                <span className={`status ${status === 'closed' ? '완료' : status === 'posted' ? '예정' : ''}`}>{STATUS_LABEL[status]}</span>
+                <StatusBadge tone={status === 'closed' ? 'green' : status === 'posted' ? 'blue' : 'neutral'}>{STATUS_LABEL[status]}</StatusBadge>
               </td>
               <td className="dim">{t.companyCode || (c ? displayCompanyName(c.company, companyMaster) : '-')}</td>
               <td className="mono" style={{ fontSize: 11 }}>{formatAccountLabel(t, companyMaster, c)}</td>

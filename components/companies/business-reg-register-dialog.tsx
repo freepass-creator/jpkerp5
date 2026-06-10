@@ -16,7 +16,7 @@ import { Plus, X, CircleNotch, CheckCircle, Warning, Upload, Keyboard } from '@p
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
-import { reassignVehiclesToCompany } from '@/lib/companies-sync';
+import { reassignVehiclesToCompany } from '@/lib/entity-sync';
 import { runWithConcurrency } from '@/lib/parallel';
 import { fileToDataUrl } from '@/lib/image-compress';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';

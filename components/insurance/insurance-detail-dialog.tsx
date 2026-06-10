@@ -13,6 +13,7 @@
 
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Field } from '@/components/ui/editable-field';
+import { StatusBadge } from '@/components/ui/status-badge';
 import type { InsurancePolicy, Vehicle, Contract } from '@/lib/types';
 import { daysToExpiry, installmentSum, installmentMatchesTotal } from '@/lib/insurance-calc';
 import { displayCompanyName } from '@/lib/company-display';
@@ -61,9 +62,9 @@ export function InsuranceDetailDialog({
         days != null ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span className="dim" style={{ fontSize: 10 }}>D-N</span>
-            <span className={`status ${days < 0 ? '해지' : days <= 30 ? '만기임박' : '운행'}`}>
+            <StatusBadge tone={days < 0 ? 'red' : days <= 30 ? 'orange' : 'green'}>
               {days < 0 ? `${-days}일 경과` : days === 0 ? '오늘 만기' : `D-${days}`}
-            </span>
+            </StatusBadge>
           </div>
         ) : null
       }

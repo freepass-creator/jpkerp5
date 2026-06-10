@@ -9,6 +9,8 @@ import { displayCompanyName } from '@/lib/company-display';
 import { findCandidates, applyMatch, reverseMatch, applyFifoPayment } from '@/lib/receipt-match';
 import { todayKr } from '@/lib/mock-data';
 import { matchesSearch } from '@/lib/filter-helpers';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { scheduleStatusTone } from '@/lib/status-tones';
 
 /**
  * 자금일보 수동 매칭 다이얼로그.
@@ -137,9 +139,9 @@ export function ReceiptMatchDialog({
                         {candidates.slice(0, 8).map((cand) => (
                           <tr key={`${cand.contract.id}-${cand.scheduleSeq}`}>
                             <td>
-                              <span className={`status ${cand.confidence === 'high' ? '완료' : cand.confidence === 'medium' ? '예정' : ''}`}>
+                              <StatusBadge tone={cand.confidence === 'high' ? 'green' : cand.confidence === 'medium' ? 'blue' : 'neutral'}>
                                 {cand.confidence === 'high' ? '높음' : cand.confidence === 'medium' ? '중간' : '낮음'}
-                              </span>
+                              </StatusBadge>
                             </td>
                             <td className="mono">{cand.contract.vehiclePlate}</td>
                             <td>{cand.contract.customerName}</td>
@@ -240,7 +242,7 @@ export function ReceiptMatchDialog({
                               <td className="mono">{formatDate(s.dueDate)}</td>
                               <td className="num mono">₩{formatCurrency(s.amount)}</td>
                               <td className="num mono">₩{formatCurrency(s.paidAmount)}</td>
-                              <td className="center"><span className={`status ${s.status}`}>{s.status}</span></td>
+                              <td className="center"><StatusBadge tone={scheduleStatusTone(s.status)}>{s.status}</StatusBadge></td>
                               <td>
                                 <button
                                   type="button"

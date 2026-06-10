@@ -426,7 +426,7 @@ function CompanyCardsView() {
                   <strong>{c.name}</strong>
                   {c.branchName && <span className="dim" style={{ marginLeft: 6, fontSize: 11 }}>· {c.branchName}</span>}
                 </td>
-                <td><span className={`status ${c.branchType === '본점' ? '운행중' : ''}`} style={{ fontSize: 10 }}>{c.branchType}</span></td>
+                <td><StatusBadge tone={c.branchType === '본점' ? 'brand' : 'neutral'}>{c.branchType}</StatusBadge></td>
                 <td className="mono dim">{c.corpRegNo}</td>
                 <td className="mono dim">{c.bizRegNo}</td>
                 <td>{c.ceo}</td>
@@ -575,7 +575,7 @@ function CompanyDetailDialogMock({ c, onClose }: { c: MockCompany; onClose: () =
               <tbody>
                 {c.offices.map((o) => (
                   <tr key={o.id} style={{ cursor: 'pointer' }}>
-                    <td><span className={`status ${o.isHeadquarters ? '운행중' : ''}`} style={{ fontSize: 10 }}>{o.isHeadquarters ? '본사' : '지점'}</span></td>
+                    <td><StatusBadge tone={o.isHeadquarters ? 'brand' : 'neutral'}>{o.isHeadquarters ? '본사' : '지점'}</StatusBadge></td>
                     <td><strong>{o.name}</strong></td>
                     <td className="dim">{o.address}</td>
                     <td className="mono dim">{o.subBizRegNo || <span className="muted">-</span>}</td>

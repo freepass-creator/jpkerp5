@@ -19,6 +19,7 @@ import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { formatCurrency, dateWithDow, formatDate } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
 import { buildAllAlerts, alertColor, dDayLabel, type AlertItem } from '@/lib/alerts';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 export default function DashboardPage() {
   const [detailContractId, setDetailContractId] = useState<string | null>(null);
@@ -1309,7 +1310,7 @@ function AlertsPanel({ contracts }: { contracts: import('@/lib/types').Contract[
                     {dDayLabel(a.daysLeft)}
                   </td>
                   <td className="center">
-                    <span className={`status ${a.severity === 'overdue' || a.severity === 'urgent' ? '미납' : '예정'}`}>{KIND_BADGE[a.kind]}</span>
+                    <StatusBadge tone={a.severity === 'overdue' ? 'red' : a.severity === 'urgent' ? 'orange' : 'blue'}>{KIND_BADGE[a.kind]}</StatusBadge>
                   </td>
                   <td className="mono">{formatDate(a.dueDate)}</td>
                   <td className="mono">{a.vehiclePlate}</td>

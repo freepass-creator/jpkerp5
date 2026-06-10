@@ -15,6 +15,7 @@
 
 import { useRef, useState } from 'react';
 import { FileText, Paperclip } from '@phosphor-icons/react';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 export type MockCompanyLite = {
   id: string;
@@ -75,7 +76,7 @@ export function FleetApplyView({ companies, pendingByCompany }: Props) {
                 title="더블클릭 또는 우측 [증차신청서 출력] 버튼"
               >
                 <td><strong>{c.name}</strong></td>
-                <td><span className={`status ${c.branchType === '본점' ? '운행중' : ''}`} style={{ fontSize: 10 }}>{c.branchType}</span></td>
+                <td><StatusBadge tone={c.branchType === '본점' ? 'brand' : 'neutral'}>{c.branchType}</StatusBadge></td>
                 <td className="center mono">{c.fleetLimit} / {c.vehicleCount}</td>
                 <td className="center mono" style={{ color: avail > 0 ? 'var(--green-text)' : 'var(--text-weak)' }}>{avail}대</td>
                 <td className="center mono" style={{ color: pending.length > 0 ? 'var(--orange-text, #c2410c)' : 'var(--text-weak)' }}>

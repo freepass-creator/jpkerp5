@@ -18,7 +18,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { audit } from '@/lib/firebase/audit-store';
 import { displayCompanyShort } from '@/lib/company-display';
-import { reassignVehiclesToCompany } from '@/lib/companies-sync';
+import { reassignVehiclesToCompany } from '@/lib/entity-sync';
 import { toast } from '@/lib/toast';
 import type { Company } from '@/lib/types';
 

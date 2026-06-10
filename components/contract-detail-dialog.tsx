@@ -12,6 +12,8 @@ import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
 import { toast } from '@/lib/toast';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { vehicleStateTone, contractStateTone, paymentStateTone, contractStatusTone, scheduleStatusTone } from '@/lib/status-tones';
 import { DateInput } from '@/components/ui/date-input';
 import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus } from '@/lib/types';
 import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
@@ -119,11 +121,11 @@ function ContractDetailShell({
       heroRight={
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className="dim" style={{ fontSize: 10 }}>차량</span>
-          <span className={`status ${vs.name}`}>{vs.name}</span>
+          <StatusBadge tone={vehicleStateTone(vs.name)}>{vs.name}</StatusBadge>
           <span className="dim" style={{ fontSize: 10, marginLeft: 6 }}>계약</span>
-          <span className={`status ${cs.name}`}>{cs.name}</span>
+          <StatusBadge tone={contractStateTone(cs.name)}>{cs.name}</StatusBadge>
           <span className="dim" style={{ fontSize: 10, marginLeft: 6 }}>수납</span>
-          <span className={`status ${ps.name}`}>{ps.name}</span>
+          <StatusBadge tone={paymentStateTone(ps.name)}>{ps.name}</StatusBadge>
         </div>
       }
       activeTab={activeTab}
@@ -168,11 +170,11 @@ function DetailHero({ c }: { c: Contract }) {
       </div>
       <div className="detail-hero-badges" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span className="dim" style={{ fontSize: 10 }}>차량</span>
-        <span className={`status ${vs.name}`}>{vs.name}</span>
+        <StatusBadge tone={vehicleStateTone(vs.name)}>{vs.name}</StatusBadge>
         <span className="dim" style={{ fontSize: 10, marginLeft: 6 }}>계약</span>
-        <span className={`status ${cs.name}`}>{cs.name}</span>
+        <StatusBadge tone={contractStateTone(cs.name)}>{cs.name}</StatusBadge>
         <span className="dim" style={{ fontSize: 10, marginLeft: 6 }}>수납</span>
-        <span className={`status ${ps.name}`}>{ps.name}</span>
+        <StatusBadge tone={paymentStateTone(ps.name)}>{ps.name}</StatusBadge>
       </div>
     </div>
   );
@@ -1853,7 +1855,7 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
                   {formatCurrency(bal)}
                 </td>
                 <td className="mono dim">{r.paidAt ? formatDateFull(r.paidAt) : '-'}</td>
-                <td className="center"><span className={`status ${r.status}`}>{r.status}</span></td>
+                <td className="center"><StatusBadge tone={scheduleStatusTone(r.status)}>{r.status}</StatusBadge></td>
                 <td className="center" onClick={(e) => e.stopPropagation()}>
                   {r.status !== '면제' && owed > 0 ? (
                     <span style={{ display: 'inline-flex', gap: 4 }}>
@@ -2208,7 +2210,7 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
                       <td className="num mono" style={{ color: (p.unpaidAmount ?? 0) > 0 ? 'var(--red-text)' : undefined }}>
                         {(p.unpaidAmount ?? 0) > 0 ? `₩${formatCurrency(p.unpaidAmount!)}` : '-'}
                       </td>
-                      <td className="center"><span className={`status ${p.status}`}>{p.status}</span></td>
+                      <td className="center"><StatusBadge tone={contractStatusTone(p.status)}>{p.status}</StatusBadge></td>
                       <td className="mono dim">{p.currentSeq && p.totalSeq ? `${p.currentSeq}/${p.totalSeq}` : '-'}</td>
                       <td className="dim" style={{ whiteSpace: 'normal', wordBreak: 'keep-all', fontSize: 10 }}>{p.notes || '-'}</td>
                     </tr>
@@ -2268,7 +2270,7 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
                     {scope === 'vehicle' && <td className="dim">{e.vendor ?? '-'}</td>}
                     {scope === 'vehicle' && <td className="num mono dim">{e.mileage ? `${e.mileage.toLocaleString('ko-KR')} km` : '-'}</td>}
                     <td className="num mono">{e.cost ? `₩${formatCurrency(e.cost)}` : '-'}</td>
-                    <td className="center"><span className={`status ${e.status === '완료' ? '완료' : e.status === '진행' ? '예정' : '예정'}`}>{e.status}</span></td>
+                    <td className="center"><StatusBadge tone={e.status === '완료' ? 'green' : 'blue'}>{e.status}</StatusBadge></td>
                     <td className="center">
                       <button
                         className="btn btn-sm btn-ghost btn-icon"

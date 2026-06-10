@@ -46,6 +46,44 @@ export function findCompanyByRegNo(regNo: string | undefined, companies: Company
   });
 }
 
+/** 회사 식별자 (vehicle.company / contract.company 에 저장할 값) — code 우선, 없으면 name */
+export function companyKey(company: Company): string {
+  return company.code || company.name;
+}
+
+/** 회사 매칭 — Vehicle.ownerRegNo 가 Company.corpRegNo/bizRegNo 와 일치 */
+export function vehiclesMatchingCompany(vehicles: Vehicle[], company: Company): Vehicle[] {
+  const corp = digits(company.corpRegNo);
+  const biz = digits(company.bizRegNo);
+  if (!corp && !biz) return [];
+  return vehicles.filter((v) => {
+    const reg = digits(v.ownerRegNo);
+    if (!reg) return false;
+    return (corp && corp === reg) || (biz && biz === reg);
+  });
+}
+
+/**
+ * 회사 등록·수정 후 호출 — 매칭되는 차량의 company 필드 일괄 재할당.
+ * 사용자 명시: 한 쪽 변경이 다른 쪽에 자동 전파 (SSoT).
+ */
+export async function reassignVehiclesToCompany(
+  vehicles: Vehicle[],
+  company: Company,
+  updateVehicle: (v: Vehicle) => Promise<void>,
+): Promise<number> {
+  const target = vehiclesMatchingCompany(vehicles, company);
+  const key = companyKey(company);
+  if (!key) return 0;
+  let count = 0;
+  for (const v of target) {
+    if (v.company === key) continue;
+    await updateVehicle({ ...v, company: key as Vehicle['company'] });
+    count += 1;
+  }
+  return count;
+}
+
 /** plate 기준 차량 찾기 (정규화 비교) */
 export function findVehicleByPlate(vehicles: Vehicle[], plate?: string): Vehicle | undefined {
   if (!plate) return undefined;
