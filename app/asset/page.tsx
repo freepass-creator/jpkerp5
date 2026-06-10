@@ -754,13 +754,13 @@ function LoanScheduleTab({ vehicle }: { vehicle: Vehicle }) {
       <section className="detail-section">
         <div className="detail-section-header">회차별 스케줄</div>
         <div className="detail-section-body">
-          <table className="table" style={{ fontSize: 12 }}>
+          <table className="table">
             <thead>
               <tr>
                 <th className="num" style={{ width: 60 }}>회차</th>
-                <th>예정일</th>
-                <th className="num">금액</th>
-                <th className="center">상태</th>
+                <th style={{ width: 100 }}>예정일</th>
+                <th className="num" style={{ width: 110 }}>금액</th>
+                <th className="center" style={{ width: 76 }}>상태</th>
               </tr>
             </thead>
             <tbody>
@@ -846,32 +846,32 @@ function ComplianceTab({ vehicle, contracts }: { vehicle: Vehicle; contracts: Co
   );
 }
 
-/* ─── 탭4: 계약이력 ─── */
+/* ─── 탭4: 계약이력 — 운영현황 list 와 동일 컬럼 규격 ─── */
 function ContractListTab({ contracts }: { contracts: Contract[] }) {
   if (contracts.length === 0) return <div className="empty-state">계약 이력 없음</div>;
   return (
-    <table className="table" style={{ fontSize: 12 }}>
+    <table className="table">
       <thead>
         <tr>
-          <th>계약일</th>
-          <th>계약번호</th>
-          <th>계약자</th>
-          <th>약정</th>
-          <th className="num">월대여료</th>
-          <th className="num">보증금</th>
-          <th>상태</th>
+          <th style={{ width: 90 }}>계약일</th>
+          <th style={{ width: 110 }}>계약번호</th>
+          <th style={{ minWidth: 180 }}>계약자</th>
+          <th className="center" style={{ width: 70 }}>약정</th>
+          <th className="num" style={{ width: 100 }}>월대여료</th>
+          <th className="num" style={{ width: 100 }}>보증금</th>
+          <th className="center" style={{ width: 76 }}>상태</th>
         </tr>
       </thead>
       <tbody>
         {contracts.map((c) => (
           <tr key={c.id}>
             <td className="mono">{c.contractDate}</td>
-            <td className="mono dim">{c.contractNo}</td>
-            <td>{c.customerName}</td>
-            <td>{c.termMonths}개월</td>
-            <td className="num mono">₩{(c.monthlyRent ?? 0).toLocaleString()}</td>
-            <td className="num mono">₩{(c.deposit ?? 0).toLocaleString()}</td>
-            <td><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
+            <td className="mono dim">{c.contractNo || <span className="muted">-</span>}</td>
+            <td>{c.customerName || <span className="muted">-</span>}</td>
+            <td className="center mono dim">{c.termMonths ? `${c.termMonths}개월` : <span className="muted">-</span>}</td>
+            <td className="num mono">{c.monthlyRent ? `₩${c.monthlyRent.toLocaleString()}` : <span className="muted">-</span>}</td>
+            <td className="num mono">{c.deposit ? `₩${c.deposit.toLocaleString()}` : <span className="muted">-</span>}</td>
+            <td className="center"><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
           </tr>
         ))}
       </tbody>
@@ -909,25 +909,25 @@ function PaymentHistoryTab({ contracts }: { contracts: Contract[] }) {
       <div style={{ fontSize: 12, color: 'var(--text-weak)' }}>
         총 {rows.length}건 · <strong style={{ color: 'var(--green-text)' }}>₩{total.toLocaleString()}</strong>
       </div>
-      <table className="table" style={{ fontSize: 12 }}>
+      <table className="table">
         <thead>
           <tr>
-            <th>일자</th>
-            <th>계약번호</th>
-            <th>계약자</th>
-            <th>회차</th>
-            <th>경로</th>
-            <th className="num">금액</th>
+            <th style={{ width: 90 }}>일자</th>
+            <th style={{ width: 110 }}>계약번호</th>
+            <th style={{ minWidth: 160 }}>계약자</th>
+            <th className="center" style={{ width: 70 }}>회차</th>
+            <th className="center" style={{ width: 80 }}>경로</th>
+            <th className="num" style={{ width: 110 }}>금액</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r, i) => (
             <tr key={i}>
               <td className="mono">{r.date}</td>
-              <td className="mono dim">{r.contractNo}</td>
-              <td>{r.customer}</td>
-              <td className="dim">{r.memo}</td>
-              <td className="dim">{r.method}</td>
+              <td className="mono dim">{r.contractNo || <span className="muted">-</span>}</td>
+              <td>{r.customer || <span className="muted">-</span>}</td>
+              <td className="center dim">{r.memo}</td>
+              <td className="center dim">{r.method || <span className="muted">-</span>}</td>
               <td className="num mono">₩{r.amount.toLocaleString()}</td>
             </tr>
           ))}
@@ -948,28 +948,28 @@ function RepairHistoryTab({ history }: { history: HistoryEntry[] }) {
       <div style={{ fontSize: 12, color: 'var(--text-weak)' }}>
         총 {history.length}건 · 누적 비용 <strong style={{ color: 'var(--red-text)' }}>₩{total.toLocaleString()}</strong>
       </div>
-      <table className="table" style={{ fontSize: 12 }}>
+      <table className="table">
         <thead>
           <tr>
-            <th>일자</th>
-            <th>분류</th>
-            <th>제목</th>
-            <th>업체</th>
-            <th className="num">주행</th>
-            <th className="num">금액</th>
-            <th>상태</th>
+            <th style={{ width: 90 }}>일자</th>
+            <th className="center" style={{ width: 70 }}>분류</th>
+            <th style={{ minWidth: 180 }}>제목</th>
+            <th style={{ width: 120 }}>업체</th>
+            <th className="num" style={{ width: 90 }}>주행</th>
+            <th className="num" style={{ width: 100 }}>금액</th>
+            <th className="center" style={{ width: 76 }}>상태</th>
           </tr>
         </thead>
         <tbody>
           {history.map((h) => (
             <tr key={h.id}>
               <td className="mono">{h.date}</td>
-              <td>{h.category}</td>
+              <td className="center"><StatusBadge tone="neutral">{h.category}</StatusBadge></td>
               <td>{h.title}</td>
-              <td className="dim">{h.vendor ?? '-'}</td>
-              <td className="num mono dim">{h.mileage ? `${h.mileage.toLocaleString()}km` : '-'}</td>
-              <td className="num mono">{h.cost ? `₩${h.cost.toLocaleString()}` : '-'}</td>
-              <td className="dim">{h.status}</td>
+              <td className="dim">{h.vendor || <span className="muted">-</span>}</td>
+              <td className="num mono dim">{h.mileage ? `${h.mileage.toLocaleString()}km` : <span className="muted">-</span>}</td>
+              <td className="num mono">{h.cost ? `₩${h.cost.toLocaleString()}` : <span className="muted">-</span>}</td>
+              <td className="center">{h.status ? <StatusBadge tone={h.status === '완료' ? 'green' : 'blue'}>{h.status}</StatusBadge> : <span className="muted">-</span>}</td>
             </tr>
           ))}
         </tbody>
