@@ -16,7 +16,6 @@ import { InsuranceRegisterDialog } from '@/components/insurance/insurance-regist
 import { useInsurances } from '@/lib/firebase/insurance-store';
 import { normPlate } from '@/lib/entity-sync';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
-import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { toast } from '@/lib/toast';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone, contractStatusTone, scheduleStatusTone } from '@/lib/status-tones';
@@ -1238,43 +1237,8 @@ const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (
 
   useImperativeHandle(ref, () => ({ startEdit, save, cancel, isEditing: () => editing }), [editing, c, draft]);
 
-  // 운영 KPI — 계약별 누적 입금 / 미수 / 인도일 경과 / 만기까지
-  const totalPaid = (c.schedules ?? []).reduce(
-    (s, sch) => s + (sch.payments ?? []).reduce((p, x) => p + x.amount, 0), 0,
-  );
-  const today = todayKr();
-  const dInDelivered = c.deliveredDate ? daysSince(c.deliveredDate, today) : null;
-  const dToReturn = c.returnScheduledDate
-    ? Math.floor((new Date(c.returnScheduledDate).getTime() - new Date(today).getTime()) / 86400000)
-    : null;
-
   return (
     <div className="detail-stack">
-      <KpiGrid>
-        <KpiCard
-          label="누적 입금"
-          value={`₩${totalPaid.toLocaleString()}`}
-          hint={`${c.currentSeq ?? 0}/${c.totalSeq ?? 0}회차`}
-        />
-        <KpiCard
-          label="현재 미수"
-          value={`₩${(c.unpaidAmount ?? 0).toLocaleString()}`}
-          positive={(c.unpaidAmount ?? 0) === 0}
-          hint={(c.unpaidSeqCount ?? 0) > 0 ? `${c.unpaidSeqCount}회 미납` : undefined}
-        />
-        <KpiCard
-          label="인도 경과"
-          value={dInDelivered != null ? `D+${dInDelivered}` : '-'}
-          hint={c.deliveredDate || '인도 미완료'}
-        />
-        <KpiCard
-          label="만기"
-          value={dToReturn != null ? (dToReturn < 0 ? `${-dToReturn}일 경과` : `D-${dToReturn}`) : '-'}
-          positive={dToReturn == null ? undefined : dToReturn > 30}
-          hint={c.returnScheduledDate || '만기 미정'}
-        />
-      </KpiGrid>
-
       <Section icon={<User size={12} weight="duotone" />} title="고객">
         <div className="detail-grid-2">
           <div>

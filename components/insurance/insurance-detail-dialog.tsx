@@ -15,7 +15,6 @@ import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Field } from '@/components/ui/editable-field';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyRow } from '@/components/ui/empty-row';
-import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import type { InsurancePolicy, Vehicle, Contract } from '@/lib/types';
 import { daysToExpiry, installmentSum, installmentMatchesTotal } from '@/lib/insurance-calc';
 import { displayCompanyName } from '@/lib/company-display';
@@ -80,32 +79,6 @@ export function InsuranceDetailDialog({
 
       {policy && (
         <div className="detail-stack">
-          {/* 갱신 / 분납 / 만기 KPI */}
-          <KpiGrid>
-            <KpiCard
-              label="갱신까지"
-              value={days != null ? (days < 0 ? `${-days}일 경과` : `D-${days}`) : '-'}
-              positive={days == null ? undefined : days > 30}
-              hint={policy.endDate || '만기 미입력'}
-            />
-            <KpiCard
-              label="총보험료"
-              value={policy.totalPremium ? `₩${policy.totalPremium.toLocaleString()}` : '-'}
-              hint={policy.paidPremium ? `납입 ₩${policy.paidPremium.toLocaleString()}` : undefined}
-            />
-            <KpiCard
-              label="분납"
-              value={`${(policy.installments ?? []).filter((it) => it.paid).length}/${(policy.installments ?? []).length}회`}
-              hint={(policy.installments ?? []).length === 0 ? '분납 없음 (일시납)' : undefined}
-            />
-            <KpiCard
-              label="총합 검증"
-              value={totalMatch ? '일치' : '불일치'}
-              positive={totalMatch}
-              hint={!totalMatch ? `합계 ${fmt(totalSum)}` : undefined}
-            />
-          </KpiGrid>
-
           {/* 보험사 정보 */}
           <section className="detail-section">
             <div className="detail-section-header">보험사 · 증권</div>

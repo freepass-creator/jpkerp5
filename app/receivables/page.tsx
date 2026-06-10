@@ -25,6 +25,7 @@ import type { Contract, RiskIssue } from '@/lib/types';
 import { computeActiveIssues, pickPrimaryIssue, computeLatePayStage, ISSUE_COLOR, ISSUE_LABEL, type LatePayStage, needsEngineLockAction, needsNoticeAction } from '@/lib/risk-issues';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
+import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 
 type Filter =
   | '전체'           // 진행중 전체 (종결 제외)
