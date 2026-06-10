@@ -14,8 +14,10 @@ import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Section, Grid2, Stack } from '@/components/ui/detail-primitives';
 import { Field, EditableField } from '@/components/ui/editable-field';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
+import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { useContracts } from '@/lib/firebase/contracts-store';
 import { audit } from '@/lib/firebase/audit-store';
 import { displayCompanyShort } from '@/lib/company-display';
 import { reassignVehiclesToCompany } from '@/lib/entity-sync';
@@ -32,6 +34,7 @@ export function CompanyDetailDialog({
 }) {
   const { companies, update } = useCompanies();
   const { vehicles, update: updateVehicle } = useVehicles();
+  const { contracts } = useContracts();
   const company = companyId ? companies.find((c) => c.id === companyId) ?? null : null;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Company | null>(null);
@@ -51,6 +54,14 @@ export function CompanyDetailDialog({
   if (!company) return null;
 
   const cur = editing && draft ? draft : company;
+
+  // 운영 KPI — 해당 회사의 보유 차량 + 진행 계약 + 누적 미수
+  const companyKey = company.code || company.name;
+  const vehicleCount = vehicles.filter((v) => v.company === companyKey).length;
+  const companyContracts = contracts.filter((c) => c.company === companyKey);
+  const contractCount = companyContracts.length;
+  const activeCount = companyContracts.filter((c) => c.status === '운행' || c.status === '대기').length;
+  const totalUnpaid = companyContracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
 
   async function handleSave() {
     if (!draft) return;
@@ -95,6 +106,13 @@ export function CompanyDetailDialog({
       onCancel={handleCancel}
     >
       <Stack>
+        {/* 운영 요약 KPI — 보유 차량/진행 계약/미수 합계 */}
+        <KpiGrid>
+          <KpiCard label="보유 차량" value={`${vehicleCount}대`} hint={vehicleCount === 0 ? '미배정' : undefined} />
+          <KpiCard label="진행 계약" value={`${activeCount}건`} hint={contractCount > activeCount ? `종결 ${contractCount - activeCount}` : undefined} />
+          <KpiCard label="누적 미수" value={`₩${totalUnpaid.toLocaleString()}`} positive={totalUnpaid === 0 ? undefined : false} />
+        </KpiGrid>
+
         {/* 사업자등록 정보 — 사업자등록증에서 나오는 내용 */}
         <Section title="사업자등록 정보">
           <Grid2>

@@ -187,7 +187,7 @@ function DetailHero({ c }: { c: Contract }) {
 
 /* ─────────────── Sub: Sections / Fields ─────────────── */
 
-function Section({
+export function Section({
   icon, title, action, children,
 }: { icon: React.ReactNode; title: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
   return (

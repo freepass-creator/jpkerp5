@@ -26,29 +26,6 @@ function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boo
   return <Field label={k} value={v == null || v === '' ? '-' : v} mono={mono} muted={v == null || v === ''} />;
 }
 
-/** KPI 카드 — 향후 요약 탭 상단 손익 KPI 등에 재사용 */
-export function Kpi({ label, value, hint, positive }: { label: string; value: string; hint?: string; positive?: boolean }) {
-  return (
-    <div style={{
-      padding: '10px 12px',
-      background: 'var(--bg-soft)',
-      border: '1px solid var(--border)',
-      borderRadius: 6,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 2,
-    }}>
-      <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>{label}</div>
-      <div style={{
-        fontSize: 16,
-        fontWeight: 700,
-        color: positive === undefined ? 'var(--text-main)' : positive ? 'var(--green-text)' : 'var(--red-text)',
-      }}>{value}</div>
-      {hint && <div style={{ fontSize: 10, color: 'var(--text-weak)' }}>{hint}</div>}
-    </div>
-  );
-}
-
 /* ─── 탭1: 요약 — 자산정보 + 등록증정보 ─── */
 function SummaryTab({ vehicle, onUpdate, showAttachment = true }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void; showAttachment?: boolean }) {
   void onUpdate;
