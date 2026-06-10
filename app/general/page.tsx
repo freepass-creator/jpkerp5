@@ -17,6 +17,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-apply';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-register-dialog';
+import { CompanyDetailDialog } from '@/components/companies/company-detail-dialog';
 import { audit } from '@/lib/firebase/audit-store';
 import { useStaffList } from '@/lib/use-staff-list';
 import type { Company } from '@/lib/types';
@@ -143,11 +144,15 @@ export default function GeneralPage() {
           right={<span>{VIEW_LABEL[view]}</span>}
         />
 
-        {/* 법인 등록·수정 다이얼로그 — OCR/수기 2-mode */}
+        {/* 법인 신규 등록 — OCR/수기 다이얼로그 */}
         <BusinessRegRegisterDialog
-          open={companyRegisterOpen || !!editCompanyId}
-          editId={editCompanyId}
-          onOpenChange={(o) => { if (!o) { setCompanyRegisterOpen(false); setEditCompanyId(null); } }}
+          open={companyRegisterOpen}
+          onOpenChange={(o) => { if (!o) setCompanyRegisterOpen(false); }}
+        />
+        {/* 법인 상세 (read-only → [수정]) — DetailDialogShell 패턴 */}
+        <CompanyDetailDialog
+          companyId={editCompanyId}
+          onOpenChange={(o) => { if (!o) setEditCompanyId(null); }}
         />
       </div>
     </div>
@@ -445,12 +450,12 @@ function CompanyCardsView() {
         </tbody>
       </table>
 
-      {opened && <CompanyDetailDialog c={opened} onClose={() => setOpenId(null)} />}
+      {opened && <CompanyDetailDialogMock c={opened} onClose={() => setOpenId(null)} />}
     </>
   );
 }
 
-function CompanyDetailDialog({ c, onClose }: { c: MockCompany; onClose: () => void }) {
+function CompanyDetailDialogMock({ c, onClose }: { c: MockCompany; onClose: () => void }) {
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState(c);
   const fleetAvail = Math.max(0, c.fleetLimit - c.vehicleCount);
