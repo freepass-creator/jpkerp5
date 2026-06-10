@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Upload, Database, ClipboardText, Wrench, Warning, Users } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
-import { isAdmin } from '@/lib/admin-emails';
+import { isDevToolUser } from '@/lib/admin-emails';
 
 type ToolCard = {
   href: string;
@@ -47,7 +47,7 @@ const TOOLS: ToolCard[] = [
 
 export default function DevToolsPage() {
   const { user } = useAuth();
-  const admin = isAdmin(user?.email);
+  const admin = isDevToolUser(user?.email);
 
   return (
     <div className="layout">

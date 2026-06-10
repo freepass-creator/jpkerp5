@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   Gear, User, Sun, Moon, Desktop, ArrowCounterClockwise, SignOut, BookOpen, Snowflake, Leaf, Coffee,
-  Shield, Play, CircleNotch, Users, Buildings, ArrowSquareOut,
+  Shield, Play, CircleNotch, Users, ArrowSquareOut,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -56,12 +56,6 @@ export default function SettingsPage() {
                 <ArrowSquareOut size={11} weight="bold" style={{ marginLeft: 'auto', opacity: 0.5 }} />
               </Link>
             )}
-            <Link href="/companies" className="page-shell-nav-item">
-              <Buildings size={14} />
-              <span>법인관리</span>
-              <ArrowSquareOut size={11} weight="bold" style={{ marginLeft: 'auto', opacity: 0.5 }} />
-            </Link>
-
             <div className="page-shell-nav-group-label" style={{ marginTop: 14 }}>도움</div>
             <Link href="/help" className="page-shell-nav-item">
               <BookOpen size={14} />
