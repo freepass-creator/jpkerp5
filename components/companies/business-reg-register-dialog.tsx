@@ -311,7 +311,7 @@ export function BusinessRegRegisterDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={handleClose}>
-      <DialogContent title={editTarget ? `법인 수정 — ${editTarget.name}` : '사업자등록증 법인 등록'}>
+      <DialogContent title={editTarget ? `법인 수정 — ${editTarget.name}` : '사업자등록증 법인 등록'} mode={editTarget ? 'edit' : 'new'}>
         <DialogBody>
           <Tabs.Root value={mode} onValueChange={(v) => setMode(v as 'ocr' | 'manual')}>
             <Tabs.List className="tabs-list" style={{ marginBottom: 12 }}>

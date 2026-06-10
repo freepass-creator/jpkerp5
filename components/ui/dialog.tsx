@@ -19,6 +19,7 @@ export function DialogContent({
   title,
   size = 'md',
   className,
+  mode = 'view',
 }: {
   children: ReactNode;
   /** 헤더 타이틀. 없으면 헤더 표시 안함 */
@@ -27,14 +28,21 @@ export function DialogContent({
   size?: Size;
   width?: number;
   className?: string;
+  /** 시각 모드 — view 기본 / edit 편집 중 / new 신규 등록.
+   * dialog-content / dialog-title 에 mode-* 클래스 자동 적용 + 타이틀 옆 모드 태그. */
+  mode?: 'view' | 'edit' | 'new';
 }) {
   return (
     <DialogPortal>
       <DialogPrimitive.Overlay className="dialog-overlay" />
-      <DialogPrimitive.Content className={cn('dialog-content', size === 'sm' && 'dialog-sm', className)}>
+      <DialogPrimitive.Content className={cn('dialog-content', `mode-${mode}`, size === 'sm' && 'dialog-sm', className)}>
         {title !== undefined && (
-          <div className="dialog-header">
-            <DialogPrimitive.Title className="dialog-title">{title}</DialogPrimitive.Title>
+          <div className={cn('dialog-header', `mode-${mode}`)}>
+            <DialogPrimitive.Title className="dialog-title">
+              {title}
+              {mode === 'edit' && <span className="detail-mode-tag mode-edit">편집 중</span>}
+              {mode === 'new'  && <span className="detail-mode-tag mode-new">신규 등록</span>}
+            </DialogPrimitive.Title>
             <DialogPrimitive.Close className="dialog-close" aria-label="닫기">
               <X size={16} />
             </DialogPrimitive.Close>

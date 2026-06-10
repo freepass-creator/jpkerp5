@@ -1615,7 +1615,10 @@ input[type="radio"]:disabled {
   padding: 14px 18px;
   border-bottom: 1px solid var(--border);
 }
-.dialog-title { font-weight: var(--font-weight-medium); font-size: 14px; }
+.dialog-title { font-weight: var(--font-weight-medium); font-size: 14px; display: flex; align-items: center; gap: 10px; }
+/* 모드 태그 — dialog-title 옆에서도 동일 룩 (.detail-mode-tag 와 같은 클래스 재사용) */
+.dialog-header.mode-edit { border-bottom: 2px solid var(--orange-text, #c2410c); }
+.dialog-header.mode-new  { border-bottom: 2px solid var(--green-text); }
 .dialog-body { flex: 1; overflow: auto; padding: 18px; }
 .dialog-footer {
   display: flex; gap: 8px; justify-content: flex-end;

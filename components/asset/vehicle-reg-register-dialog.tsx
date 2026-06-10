@@ -304,7 +304,7 @@ export function VehicleRegRegisterDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={handleClose}>
-      <DialogContent title="자동차등록증 등록">
+      <DialogContent title={prefillVehicle ? `자동차등록증 수정` : `자동차등록증 등록`} mode={prefillVehicle ? 'edit' : 'new'}>
         <DialogBody>
           <Tabs.Root value={mode} onValueChange={(v) => setMode(v as 'ocr' | 'manual' | 'excel')}>
             <Tabs.List className="tabs-list" style={{ marginBottom: 10 }}>

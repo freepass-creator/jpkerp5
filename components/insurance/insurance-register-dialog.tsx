@@ -235,7 +235,7 @@ export function InsuranceRegisterDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={handleClose}>
-      <DialogContent title="보험증권 일괄 OCR 등록">
+      <DialogContent title={prefillPolicy ? `보험증권 수정` : `보험증권 일괄 OCR 등록`} mode={prefillPolicy ? 'edit' : 'new'}>
         <DialogBody>
           {/* 드롭존 */}
           <label

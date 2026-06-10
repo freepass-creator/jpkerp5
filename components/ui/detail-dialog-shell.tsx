@@ -83,7 +83,7 @@ export function DetailDialogShell({
   const resolvedFooter = footer ?? autoFooter;
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent title={title} className={`mode-${mode}`}>
+      <DialogContent title={title} mode={mode}>
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
           {/* HERO */}
           <div
@@ -91,11 +91,7 @@ export function DetailDialogShell({
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
           >
             <div className="detail-hero-main">
-              <div className="detail-hero-name">
-                {heroName}
-                {mode === 'edit' && <span className="detail-mode-tag mode-edit">편집 중</span>}
-                {mode === 'new'  && <span className="detail-mode-tag mode-new">신규 등록</span>}
-              </div>
+              <div className="detail-hero-name">{heroName}</div>
               <div className="detail-hero-meta">{heroMeta}</div>
             </div>
             {heroRight && <div className="detail-hero-right">{heroRight}</div>}
