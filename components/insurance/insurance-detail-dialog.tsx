@@ -14,6 +14,7 @@
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Field } from '@/components/ui/editable-field';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { EmptyRow } from '@/components/ui/empty-row';
 import type { InsurancePolicy, Vehicle, Contract } from '@/lib/types';
 import { daysToExpiry, installmentSum, installmentMatchesTotal } from '@/lib/insurance-calc';
 import { displayCompanyName } from '@/lib/company-display';
@@ -164,24 +165,24 @@ export function InsuranceDetailDialog({
                 <KV k="납입한 보험료 (OCR)" v={fmt(policy.paidPremium)} mono />
                 <KV k="총보험료" v={fmt(policy.totalPremium)} mono />
               </div>
-              <table className="table" style={{ fontSize: 11 }}>
+              <table className="table">
                 <thead>
                   <tr>
-                    <th style={{ width: 48 }}>회차</th>
-                    <th className="mono" style={{ width: 110 }}>출금일</th>
-                    <th className="num">금액</th>
-                    <th className="center" style={{ width: 64 }}>납부</th>
+                    <th className="center" style={{ width: 60 }}>회차</th>
+                    <th style={{ width: 100 }}>출금일</th>
+                    <th className="num" style={{ width: 110 }}>금액</th>
+                    <th className="center" style={{ width: 76 }}>납부</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(policy.installments ?? []).length === 0 ? (
-                    <tr><td colSpan={4} className="muted center" style={{ padding: 16 }}>분납 내역 없음</td></tr>
+                    <EmptyRow colSpan={4}>분납 내역 없음</EmptyRow>
                   ) : policy.installments!.map((it) => (
                     <tr key={it.cycle} style={{ background: it.cycle === 1 ? 'var(--brand-bg)' : undefined }}>
-                      <td className="mono center">{it.cycle}{it.cycle === 1 ? ' (산출)' : ''}</td>
-                      <td className="mono">{it.dueDate || '-'}</td>
+                      <td className="center mono">{it.cycle}{it.cycle === 1 ? ' (산출)' : ''}</td>
+                      <td className="mono">{it.dueDate || <span className="muted">-</span>}</td>
                       <td className="num mono">{fmt(it.amount)}</td>
-                      <td className="center">{it.paid ? '✓' : '-'}</td>
+                      <td className="center">{it.paid ? <StatusBadge tone="green">납입</StatusBadge> : <StatusBadge tone="gray">예정</StatusBadge>}</td>
                     </tr>
                   ))}
                 </tbody>
