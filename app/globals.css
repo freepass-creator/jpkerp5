@@ -1235,6 +1235,7 @@ input[type="radio"]:disabled {
   height: var(--row-height);
   font-family: inherit;
   font-size: 12px;
+  letter-spacing: -0.02em;
 }
 
 .table thead th {

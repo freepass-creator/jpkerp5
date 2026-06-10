@@ -125,8 +125,9 @@ export function BusinessRegRegisterDialog({
           const raw = json.extracted as Record<string, string | null>;
 
           const name = (raw.partner_name ?? '').trim();
-          const bizRegNo = (raw.biz_no ?? '').trim();
-          const corpRegNo = (raw.corp_no ?? '').trim();
+          // OCR 결과 공백 모두 제거 (등록번호는 하이픈만 허용) — 표시 시 자간처럼 보이는 공백 차단
+          const bizRegNo = (raw.biz_no ?? '').replace(/\s+/g, '').trim();
+          const corpRegNo = (raw.corp_no ?? '').replace(/\s+/g, '').trim();
           // 같은 회사 매칭 — 사업자번호/법인번호로
           const existing = companies.find((c) => {
             if (bizRegNo && normReg(c.bizRegNo) === normReg(bizRegNo)) return true;
