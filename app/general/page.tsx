@@ -18,6 +18,7 @@ import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-register-dialog';
 import { CompanyDetailDialog } from '@/components/companies/company-detail-dialog';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { audit } from '@/lib/firebase/audit-store';
 import { useStaffList } from '@/lib/use-staff-list';
 import { displayCompanyShort } from '@/lib/company-display';
@@ -683,7 +684,7 @@ function CompanyDetailDialogMock({ c, onClose }: { c: MockCompany; onClose: () =
               <tbody>
                 {c.sites.map((s) => (
                   <tr key={s.id} style={{ cursor: 'pointer' }}>
-                    <td><span className="status" style={{ fontSize: 10 }}>{s.category}</span></td>
+                    <td><StatusBadge tone="neutral">{s.category}</StatusBadge></td>
                     <td><strong>{s.name}</strong></td>
                     <td className="mono dim" style={{ fontSize: 11 }}>{s.url}</td>
                     <td className="mono">{s.userId}</td>

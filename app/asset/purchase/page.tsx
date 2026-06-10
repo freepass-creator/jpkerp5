@@ -13,6 +13,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
+import { EmptyRow } from '@/components/ui/empty-row';
 import { BottomBar } from '@/components/layout/bottom-bar';
 
 export default function PurchasePage() {
@@ -72,7 +73,7 @@ export default function PurchasePage() {
           </thead>
           <tbody>
             {pending.length === 0 ? (
-              <tr><td colSpan={6} className="muted center" style={{ padding: 24 }}>구매대기 차량 없음</td></tr>
+              <EmptyRow colSpan={6}>구매대기 차량 없음</EmptyRow>
             ) : pending.map((v) => (
               <tr key={v.id}>
                 <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
@@ -106,7 +107,7 @@ export default function PurchasePage() {
           </thead>
           <tbody>
             {purchased.length === 0 ? (
-              <tr><td colSpan={7} className="muted center" style={{ padding: 24 }}>매입 완료 차량 없음</td></tr>
+              <EmptyRow colSpan={7}>매입 완료 차량 없음</EmptyRow>
             ) : purchased.map((v) => (
               <tr key={v.id}>
                 <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>

@@ -39,6 +39,7 @@ import type { Vehicle, Contract, HistoryEntry } from '@/lib/types';
 import { DialogRoot, DialogContent, DialogBody, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
@@ -345,12 +346,12 @@ export default function AssetPage() {
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
                       <td className="center">
                         {regMissing
-                          ? <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>
-                          : <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>완료</span>}
+                          ? <StatusBadge tone="red">미입력</StatusBadge>
+                          : <StatusBadge tone="green">완료</StatusBadge>}
                       </td>
                       <td className="center">
                         {insMissing ? (
-                          <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>
+                          <StatusBadge tone="red">미입력</StatusBadge>
                         ) : (() => {
                           // 만기 D-N 계산 — 30일 이내 임박은 주황, 만료는 빨강
                           const exp = v.insuranceExpiryDate;
@@ -360,34 +361,29 @@ export default function AssetPage() {
                             const e = new Date(exp);
                             dDay = Math.round((e.getTime() - today.getTime()) / (24 * 3600 * 1000));
                           }
-                          const tone = dDay == null ? 'green' : dDay < 0 ? 'red' : dDay <= 30 ? 'orange' : 'green';
-                          const colorVar = `var(--${tone}-text)`;
-                          const bgVar = `var(--${tone}-bg)`;
-                          const borderVar = `var(--${tone}-border)`;
+                          const tone: 'red' | 'orange' | 'green' = dDay == null ? 'green' : dDay < 0 ? 'red' : dDay <= 30 ? 'orange' : 'green';
                           return (
-                            <span
-                              className="status"
-                              style={{ background: bgVar, color: colorVar, border: `1px solid ${borderVar}` }}
+                            <StatusBadge
+                              tone={tone}
                               title={[v.insuranceCompany, v.insurancePolicyNo, exp && `만기 ${exp}`].filter(Boolean).join(' · ')}
                             >
                               {dDay == null ? '완료' : dDay < 0 ? `만료 ${-dDay}일` : `D-${dDay}`}
-                            </span>
+                            </StatusBadge>
                           );
                         })()}
                       </td>
                       <td className="center">
                         {v.loanCashOnly ? (
-                          <span className="status" style={{ background: 'var(--bg-stripe)', color: 'var(--text-weak)' }} title="현금 매입">현금</span>
+                          <StatusBadge tone="gray" title="현금 매입">현금</StatusBadge>
                         ) : v.loanCompany ? (
-                          <span
-                            className="status"
-                            style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}
+                          <StatusBadge
+                            tone="green"
                             title={[v.loanCompany, v.loanMonths && `${v.loanMonths}개월`, v.loanStartDate].filter(Boolean).join(' · ')}
                           >
                             {v.loanCompany}
-                          </span>
+                          </StatusBadge>
                         ) : (
-                          <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>
+                          <StatusBadge tone="red">미입력</StatusBadge>
                         )}
                       </td>
                       <td className="center">
@@ -408,15 +404,14 @@ export default function AssetPage() {
                       </td>
                       <td className="center">
                         {gpsMissing ? (
-                          <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미설치</span>
+                          <StatusBadge tone="red">미설치</StatusBadge>
                         ) : (
-                          <span
-                            className="status"
-                            style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}
+                          <StatusBadge
+                            tone="green"
                             title={[v.gpsProvider, v.gpsDeviceId].filter(Boolean).join(' · ')}
                           >
                             설치
-                          </span>
+                          </StatusBadge>
                         )}
                       </td>
                       <td className="dim" style={{ fontSize: 11 }}>
@@ -774,9 +769,9 @@ function LoanScheduleTab({ vehicle }: { vehicle: Vehicle }) {
                   <td className="num mono">₩{r.amount.toLocaleString()}</td>
                   <td className="center">
                     {r.paid ? (
-                      <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>납입</span>
+                      <StatusBadge tone="green">납입</StatusBadge>
                     ) : (
-                      <span className="status" style={{ background: 'var(--bg-soft)', color: 'var(--text-weak)', border: '1px solid var(--border)' }}>예정</span>
+                      <StatusBadge tone="gray">예정</StatusBadge>
                     )}
                   </td>
                 </tr>

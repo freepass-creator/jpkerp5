@@ -6,10 +6,10 @@ import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
   Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch,
   Upload, Warning as WarningIcon, X as XIcon, X, CaretRight,
-  Pencil, FloppyDisk,
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
+import { InlineEditBar } from '@/components/ui/edit-buttons';
 import { DateInput } from '@/components/ui/date-input';
 import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus } from '@/lib/types';
 import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
@@ -284,20 +284,7 @@ function VehicleSpecTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) 
 
   return (
     <div className="detail-stack">
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 4 }}>
-        {!editing ? (
-          <button className="btn btn-sm" type="button" onClick={startEdit}>
-            <Pencil size={12} weight="bold" /> 수정
-          </button>
-        ) : (
-          <>
-            <button className="btn btn-sm" type="button" onClick={cancel}>취소</button>
-            <button className="btn btn-sm btn-primary" type="button" onClick={save}>
-              <FloppyDisk size={12} weight="bold" /> 저장
-            </button>
-          </>
-        )}
-      </div>
+      <InlineEditBar editing={editing} onEdit={startEdit} onCancel={cancel} onSave={save} />
 
       {/* 기본 식별 */}
       <Section icon={<Car size={12} weight="duotone" />} title="차량 식별">
@@ -1150,20 +1137,7 @@ function ContractInfoTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract)
 
   return (
     <div className="detail-stack">
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 4 }}>
-        {!editing ? (
-          <button className="btn btn-sm" type="button" onClick={startEdit}>
-            <Pencil size={12} weight="bold" /> 수정
-          </button>
-        ) : (
-          <>
-            <button className="btn btn-sm" type="button" onClick={cancel}>취소</button>
-            <button className="btn btn-sm btn-primary" type="button" onClick={save}>
-              <FloppyDisk size={12} weight="bold" /> 저장
-            </button>
-          </>
-        )}
-      </div>
+      <InlineEditBar editing={editing} onEdit={startEdit} onCancel={cancel} onSave={save} />
 
       <Section icon={<User size={12} weight="duotone" />} title="고객">
         <div className="detail-grid-2">

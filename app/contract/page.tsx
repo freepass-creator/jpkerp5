@@ -28,6 +28,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { toast } from '@/lib/toast';
+import { EmptyRow } from '@/components/ui/empty-row';
 
 export default function ContractPage() {
   const router = useRouter();
@@ -286,7 +287,7 @@ export default function ContractPage() {
                   </thead>
                   <tbody>
                     {byCustomer.length === 0 ? (
-                      <tr><td colSpan={5} className="muted center" style={{ padding: 32 }}>—</td></tr>
+                      <EmptyRow colSpan={5}>고객별 미수금 집계 없음</EmptyRow>
                     ) : byCustomer.map(([name, list]) => {
                       const totalUnpaid = list.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
                       const totalMonthly = list.reduce((s, c) => s + (c.monthlyRent ?? 0), 0);

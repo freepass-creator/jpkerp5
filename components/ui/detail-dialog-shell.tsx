@@ -19,11 +19,11 @@
  */
 
 import { type ReactNode } from 'react';
-import { Pencil, FloppyDisk, X as XIcon } from '@phosphor-icons/react';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose,
 } from '@/components/ui/dialog';
+import { EditButtons } from '@/components/ui/edit-buttons';
 
 export type ShellTab = {
   value: string;
@@ -70,24 +70,7 @@ export function DetailDialogShell({
 }: DetailDialogShellProps) {
   // 공용 [수정/저장/취소] 자동 footer — footer prop 명시 시 X
   const autoFooter = !footer && (onEdit || editing) ? (
-    editing ? (
-      <>
-        {onCancel && (
-          <button className="btn" type="button" onClick={onCancel}>
-            <XIcon size={12} weight="bold" /> 취소
-          </button>
-        )}
-        {onSave && (
-          <button className="btn btn-primary" type="button" onClick={onSave}>
-            <FloppyDisk size={12} weight="bold" /> 저장
-          </button>
-        )}
-      </>
-    ) : (
-      <button className="btn btn-primary" type="button" onClick={onEdit}>
-        <Pencil size={12} weight="bold" /> 수정
-      </button>
-    )
+    <EditButtons editing={!!editing} onEdit={onEdit} onSave={onSave} onCancel={onCancel} variant="footer" />
   ) : null;
   const resolvedFooter = footer ?? autoFooter;
   return (

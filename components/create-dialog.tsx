@@ -39,6 +39,7 @@ import { normalizePlateLoose } from '@/lib/customer-match';
 import { toast } from '@/lib/toast';
 import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 type Mode = '현황' | '차량' | '계약' | '입출금' | '자동이체' | '카드매출' | '법인카드' | '이력';
 
@@ -1908,12 +1909,12 @@ function SnapshotPane({
                 <td className="center">
                   {(() => {
                     const s = states[i];
-                    if (s === 'contract-new') return <span className="status 완료">계약 신규</span>;
-                    if (s === 'contract-update') return <span className="status 예정" style={{ background: 'var(--brand-bg)', color: 'var(--brand)' }}>계약 갱신</span>;
-                    if (s === 'vehicle-new') return <span className="status 예정">휴차 신규</span>;
-                    if (s === 'vehicle-dup') return <span className="status" style={{ background: 'var(--bg-sunken)', color: 'var(--text-weak)' }}>휴차 중복</span>;
-                    if (s === 'sheet-dup') return <span className="status" style={{ background: 'var(--bg-sunken)', color: 'var(--text-weak)' }}>시트내 중복</span>;
-                    return <span className="status 미납">오류</span>;
+                    if (s === 'contract-new') return <StatusBadge tone="green">계약 신규</StatusBadge>;
+                    if (s === 'contract-update') return <StatusBadge tone="brand">계약 갱신</StatusBadge>;
+                    if (s === 'vehicle-new') return <StatusBadge tone="blue">휴차 신규</StatusBadge>;
+                    if (s === 'vehicle-dup') return <StatusBadge tone="gray">휴차 중복</StatusBadge>;
+                    if (s === 'sheet-dup') return <StatusBadge tone="gray">시트내 중복</StatusBadge>;
+                    return <StatusBadge tone="red">오류</StatusBadge>;
                   })()}
                 </td>
                 <td className="mono">{v.raw.plate || '-'}</td>

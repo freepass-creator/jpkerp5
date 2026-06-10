@@ -13,6 +13,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
@@ -95,8 +96,8 @@ export default function AssetGpsPage() {
                         <td className="mono dim">{v.gpsDeviceId || '-'}</td>
                         <td className="center">
                           {installed
-                            ? <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>설치</span>
-                            : <span className="status" style={{ background: 'var(--bg-stripe)', color: 'var(--text-weak)' }}>미설치</span>}
+                            ? <StatusBadge tone="green">설치</StatusBadge>
+                            : <StatusBadge tone="gray">미설치</StatusBadge>}
                         </td>
                         <td className="center dim">-</td>
                         <td className="center"><span className={`status ${v.status}`}>{v.status}</span></td>

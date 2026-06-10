@@ -10,6 +10,7 @@ import { ClipboardText } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { EmptyRow } from '@/components/ui/empty-row';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
@@ -77,7 +78,7 @@ export default function AssetInspectionPage() {
           </thead>
           <tbody>
             {upcoming.length === 0 ? (
-              <tr><td colSpan={6} className="muted center" style={{ padding: 24 }}>등록된 검사 만기 없음</td></tr>
+              <EmptyRow colSpan={6}>등록된 검사 만기 없음</EmptyRow>
             ) : upcoming.map(({ c, daysLeft }) => {
               const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
               const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
@@ -111,7 +112,7 @@ export default function AssetInspectionPage() {
           </thead>
           <tbody>
             {inspectionEvents.length === 0 ? (
-              <tr><td colSpan={6} className="muted center" style={{ padding: 24 }}>검사 이력 없음</td></tr>
+              <EmptyRow colSpan={6}>검사 이력 없음</EmptyRow>
             ) : inspectionEvents.map((h) => (
               <tr key={h.id}>
                 <td className="mono">{h.date}</td>

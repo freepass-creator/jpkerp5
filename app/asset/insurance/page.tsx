@@ -18,6 +18,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
 import { InsuranceDetailDialog } from '@/components/insurance/insurance-detail-dialog';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
@@ -240,17 +241,17 @@ export default function AssetInsurancePage() {
                             if (minAge == null || age == null) return <span className="muted">-</span>;
                             const ok = age >= minAge;
                             return ok
-                              ? <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }} title={`계약자 ${age}세 ≥ ${minAge}세`}>OK</span>
-                              : <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }} title={`계약자 ${age}세 < ${minAge}세 — 보험 보장 X`}>불일치</span>;
+                              ? <StatusBadge tone="green" title={`계약자 ${age}세 ≥ ${minAge}세`}>OK</StatusBadge>
+                              : <StatusBadge tone="red" title={`계약자 ${age}세 < ${minAge}세 — 보험 보장 X`}>불일치</StatusBadge>;
                           })()}
                         </td>
                         <td className="num mono" style={{ fontWeight: 600 }}>{totalPremium ? `₩${totalPremium.toLocaleString()}` : '-'}</td>
                         <td className="center mono dim">{installmentCount > 0 ? `${installmentCount}회 분납` : '-'}</td>
                         <td className="center">
-                          {status === 'missing' && <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>}
-                          {status === 'expired' && <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>만료</span>}
-                          {status === 'expire' && <span className="status" style={{ background: 'var(--orange-bg)', color: 'var(--orange-text, #c2410c)', border: '1px solid var(--orange-border, #fed7aa)' }}>임박</span>}
-                          {status === 'normal' && <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>정상</span>}
+                          {status === 'missing' && <StatusBadge tone="red">미입력</StatusBadge>}
+                          {status === 'expired' && <StatusBadge tone="red">만료</StatusBadge>}
+                          {status === 'expire' && <StatusBadge tone="orange">임박</StatusBadge>}
+                          {status === 'normal' && <StatusBadge tone="green">정상</StatusBadge>}
                         </td>
                       </tr>
                     );
