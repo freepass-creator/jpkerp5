@@ -40,7 +40,7 @@ export default function ContractPage() {
   const { companies: companyMaster } = useCompanies();
   const [openId, setOpenId] = useState<string | null>(null);
 
-  type QuickFilter = 'all' | 'expire' | 'return' | 'overdue' | 'ended';
+  type QuickFilter = 'all' | 'active' | 'ended' | 'expire' | 'return' | 'overdue';
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = useState('all');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
@@ -89,7 +89,13 @@ export default function ContractPage() {
     return contracts.filter((c) => {
       if (!matchesCompanyFilter(c.company, companyFilter)) return false;
       // 퀵필터 분기
-      if (quickFilter === 'expire') {
+      // 라이프사이클: 유지 = 운행 / 종료 = 해지·반납·채권
+      const ENDED = c.status === '해지' || c.status === '반납' || c.status === '채권';
+      if (quickFilter === 'active') {
+        if (ENDED) return false;
+      } else if (quickFilter === 'ended') {
+        if (!ENDED) return false;
+      } else if (quickFilter === 'expire') {
         // 만기임박: status='운행' && returnScheduledDate D-90 이내
         if (c.status !== '운행') return false;
         if (!c.returnScheduledDate) return false;
@@ -99,8 +105,6 @@ export default function ContractPage() {
         if (c.status !== '반납') return false;
       } else if (quickFilter === 'overdue') {
         if ((c.unpaidAmount ?? 0) <= 0) return false;
-      } else if (quickFilter === 'ended') {
-        if (c.status !== '해지' && c.status !== '반납' && c.status !== '채권') return false;
       }
       if (q) {
         const hay = `${c.customerName} ${c.vehiclePlate} ${c.vehicleModel} ${c.contractNo} ${c.customerPhone1 ?? ''}`.toLowerCase();
@@ -112,18 +116,21 @@ export default function ContractPage() {
 
   // 각 퀵필터 카운트 — chip 라벨에 표시
   const counts = useMemo(() => {
-    let expire = 0, ret = 0, overdue = 0, ended = 0;
+    let expire = 0, ret = 0, overdue = 0, ended = 0, active = 0, all = 0;
     for (const c of contracts) {
       if (!matchesCompanyFilter(c.company, companyFilter)) continue;
+      all++;
+      const isEnded = c.status === '해지' || c.status === '반납' || c.status === '채권';
+      if (isEnded) ended++;
+      else active++;
       if (c.status === '운행' && c.returnScheduledDate) {
         const days = Math.round((new Date(c.returnScheduledDate).getTime() - new Date(today).getTime()) / 86400000);
         if (days >= 0 && days <= 90) expire++;
       }
       if (c.status === '반납') ret++;
       if ((c.unpaidAmount ?? 0) > 0) overdue++;
-      if (c.status === '해지' || c.status === '반납' || c.status === '채권') ended++;
     }
-    return { expire, return: ret, overdue, ended };
+    return { all, active, expire, return: ret, overdue, ended };
   }, [contracts, companyFilter, today]);
 
   // 계약자별 묶음 (customerName 기준)
@@ -146,8 +153,18 @@ export default function ContractPage() {
         <>
           <CompanyFilter value={companyFilter} onChange={setCompanyFilter} options={companyOptions} master={companyMaster} />
           <span className="filter-divider" />
-          {/* 퀵필터 — 같은 list 에서 status 별 행 필터 */}
-          <button type="button" className={`chip ${quickFilter === 'all' ? 'active' : ''}`} onClick={() => setQuickFilter('all')}>전체</button>
+          {/* 라이프사이클 — 전체 / 유지 / 종료 (사용자 표준) */}
+          <button type="button" className={`chip ${quickFilter === 'all' ? 'active' : ''}`} onClick={() => setQuickFilter('all')}>
+            전체{counts.all > 0 && <span className="chip-count">{counts.all}</span>}
+          </button>
+          <button type="button" className={`chip ${quickFilter === 'active' ? 'active' : ''}`} onClick={() => setQuickFilter('active')}>
+            유지{counts.active > 0 && <span className="chip-count">{counts.active}</span>}
+          </button>
+          <button type="button" className={`chip ${quickFilter === 'ended' ? 'active' : ''}`} onClick={() => setQuickFilter('ended')}>
+            종료{counts.ended > 0 && <span className="chip-count">{counts.ended}</span>}
+          </button>
+          <span className="filter-divider" />
+          {/* 보조 — 만기임박/반납/미수금 */}
           <button type="button" className={`chip ${quickFilter === 'expire' ? 'active' : ''}`} onClick={() => setQuickFilter('expire')}>
             만기임박{counts.expire > 0 && <span className="chip-count">{counts.expire}</span>}
           </button>
@@ -156,9 +173,6 @@ export default function ContractPage() {
           </button>
           <button type="button" className={`chip ${quickFilter === 'overdue' ? 'active' : ''}`} onClick={() => setQuickFilter('overdue')}>
             미수금{counts.overdue > 0 && <span className="chip-count">{counts.overdue}</span>}
-          </button>
-          <button type="button" className={`chip ${quickFilter === 'ended' ? 'active' : ''}`} onClick={() => setQuickFilter('ended')}>
-            종료계약{counts.ended > 0 && <span className="chip-count">{counts.ended}</span>}
           </button>
           <span className="filter-divider" />
           <button type="button" className={`chip ${groupBy === 'list' ? 'active' : ''}`} onClick={() => setGroupBy('list')}>전체 리스트</button>
