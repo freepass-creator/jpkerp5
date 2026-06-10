@@ -276,7 +276,7 @@ function TodoBoard() {
             display: 'inline-flex', alignItems: 'center', gap: 4,
             padding: '2px 6px', fontSize: 11, fontWeight: 600,
             background: 'var(--brand-bg)', color: 'var(--brand)',
-            borderRadius: 'var(--radius-pill)',
+            borderRadius: 'var(--radius-sm)',
           }}>
             {name}
             <button
@@ -369,7 +369,7 @@ function TodoBoard() {
                         display: 'inline-flex', alignItems: 'center', gap: 3,
                         padding: '1px 6px', fontSize: 10,
                         background: styles.bg, color: styles.color,
-                        borderRadius: 'var(--radius-pill)',
+                        borderRadius: 'var(--radius-sm)',
                       }}>
                         <span style={{ fontSize: 9 }}>{styles.icon}</span>
                         {a.name}

@@ -40,7 +40,6 @@ import { DialogRoot, DialogContent, DialogBody, DialogClose } from '@/components
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
-import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 
 export default function AssetPage() {
@@ -88,7 +87,6 @@ export default function AssetPage() {
   const [companyFilter, setCompanyFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [openId, setOpenId] = useState<string | null>(null);
-  const [insuranceOpen, setInsuranceOpen] = useState(false);
   const [vehicleRegOpen, setVehicleRegOpen] = useState(false);
   const [assetView, setAssetView] = useState<'status' | 'registered'>(initialView);
 
@@ -467,22 +465,6 @@ export default function AssetPage() {
             onClose={() => setOpenId(null)}
           />
         )}
-
-        <InsuranceRegisterDialog
-          open={insuranceOpen}
-          onOpenChange={setInsuranceOpen}
-          vehicleId={selected?.id}
-          onSaved={(p) => {
-            if (selected) {
-              void updateVehicle({
-                ...selected,
-                insuranceCompany: p.insurer ?? selected.insuranceCompany,
-                insurancePolicyNo: p.policyNo ?? selected.insurancePolicyNo,
-                insuranceExpiryDate: p.endDate ?? selected.insuranceExpiryDate,
-              });
-            }
-          }}
-        />
 
         <VehicleRegRegisterDialog
           open={vehicleRegOpen}

@@ -11,6 +11,7 @@ import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useInsurances } from '@/lib/firebase/insurance-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { downloadInsuranceExcel } from '@/lib/insurance-export';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -34,6 +35,7 @@ export default function AssetInsurancePage() {
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const { policies } = useInsurances();
+  const { update: updateVehicle } = useVehicles();
 
   /** 차량 plate → 활성 계약 (insuranceAge 비교용) */
   const activeContractByPlate = useMemo(() => {
@@ -284,7 +286,23 @@ export default function AssetInsurancePage() {
           right={null}
         />
 
-        <InsuranceRegisterDialog open={registerOpen} onOpenChange={setRegisterOpen} />
+        <InsuranceRegisterDialog
+          open={registerOpen}
+          onOpenChange={setRegisterOpen}
+          onSaved={(p) => {
+            // 매칭된 차량 (plate 기준) 의 보험 캐시 필드 동기화 — 자산관리 본 페이지의 "보험 미입력" 카운트도 즉시 반영
+            if (!p.carNumber) return;
+            const key = p.carNumber.replace(/\s/g, '');
+            const v = vehicles.find((x) => x.plate.replace(/\s/g, '') === key);
+            if (!v) return;
+            void updateVehicle({
+              ...v,
+              insuranceCompany: p.insurer ?? v.insuranceCompany,
+              insurancePolicyNo: p.policyNo ?? v.insurancePolicyNo,
+              insuranceExpiryDate: p.endDate ?? v.insuranceExpiryDate,
+            });
+          }}
+        />
 
         {/* 보험증권 상세 dialog — 차량 행 더블클릭 시 */}
         {(() => {
