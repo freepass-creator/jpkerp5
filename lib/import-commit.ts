@@ -345,7 +345,8 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
   if (!plate || !customerName || monthlyRent <= 0) return null;
 
   const regNoOrName = toStr(get(row, '법인등록번호', '법인번호', '사업자번호', '회사명', '회사', 'corpRegNo', 'bizRegNo', 'company'));
-  const company = resolveCompanyByRegNo(regNoOrName, companies);
+  // 회사 필수 — 누락 시 '기타' fallback (운영현황에서 운영자가 사후 보정)
+  const company = resolveCompanyByRegNo(regNoOrName, companies) || '기타';
   const vehicleModel = toStr(get(row, '차명', '차종', 'vehicleModel')) || '미정';
   const phone = toStr(get(row, '연락처', '연락처1', 'customerPhone1'));
   const period = parseContractPeriod(row);

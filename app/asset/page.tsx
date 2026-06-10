@@ -537,6 +537,7 @@ export default function AssetPage() {
             vehicle={vehicles.find((v) => v.id === openId)!}
             history={history.filter((h) => h.scope === 'vehicle' && h.vehiclePlate === vehicles.find((v) => v.id === openId)?.plate)}
             contracts={contracts.filter((c) => c.vehiclePlate === vehicles.find((v) => v.id === openId)?.plate)}
+            view={assetView}
             onUpdate={(v) => { void updateVehicle(v); }}
             onClose={() => setOpenId(null)}
           />
@@ -551,13 +552,14 @@ export default function AssetPage() {
   );
 }
 
-/* ─────────────── 차량 상세 — 운영현황 패턴 탭 다이얼로그 ─────────────── */
+/* ─────────────── 차량 상세 — view 별 분기 (자산현황: 모든 탭 / 등록자산: 요약만) ─────────────── */
 function VehicleDetailDialog({
-  vehicle, history, contracts, onUpdate, onClose,
+  vehicle, history, contracts, view, onUpdate, onClose,
 }: {
   vehicle: Vehicle;
   history: HistoryEntry[];
   contracts: Contract[];
+  view: 'status' | 'registered';
   onUpdate: (v: Vehicle) => void;
   onClose: () => void;
 }) {
@@ -591,14 +593,20 @@ function VehicleDetailDialog({
           <span className={`status ${vehicle.status}`}>{vehicle.status}</span>
         </div>
       }
-      tabs={[
-        { value: 'summary', label: '요약', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} /> },
-        { value: 'loan', label: '할부스케줄', content: <LoanScheduleTab vehicle={vehicle} /> },
-        { value: 'compliance', label: '보험·검사', content: <ComplianceTab vehicle={vehicle} contracts={sortedContracts} /> },
-        { value: 'contract', label: `계약이력 (${sortedContracts.length})`, content: <ContractListTab contracts={sortedContracts} /> },
-        { value: 'payment', label: '수납이력', content: <PaymentHistoryTab contracts={sortedContracts} /> },
-        { value: 'repair', label: `정비·수선 (${repairHistory.length})`, content: <RepairHistoryTab history={repairHistory} /> },
-      ]}
+      tabs={view === 'registered'
+        ? [
+            // 등록자산 = 제조사 스펙 + 자등증 정보 + 자등증 첨부 (단일 탭)
+            { value: 'summary', label: '등록자산', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} /> },
+          ]
+        : [
+            // 자산현황 = 전체 정보 (모든 탭)
+            { value: 'summary', label: '요약', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} /> },
+            { value: 'loan', label: '할부스케줄', content: <LoanScheduleTab vehicle={vehicle} /> },
+            { value: 'compliance', label: '보험·검사', content: <ComplianceTab vehicle={vehicle} contracts={sortedContracts} /> },
+            { value: 'contract', label: `계약이력 (${sortedContracts.length})`, content: <ContractListTab contracts={sortedContracts} /> },
+            { value: 'payment', label: '수납이력', content: <PaymentHistoryTab contracts={sortedContracts} /> },
+            { value: 'repair', label: `정비·수선 (${repairHistory.length})`, content: <RepairHistoryTab history={repairHistory} /> },
+          ]}
     />
   );
 }
@@ -628,50 +636,41 @@ function Kpi({ label, value, hint, positive }: { label: string; value: string; h
 
 /* ─── 탭1: 요약 — 자산정보 + 등록증정보 ─── */
 function SummaryTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void }) {
-  // 계약사실확인서 첨부는 별도 페이지 (구매대기·구매 예정 차량용) — 자산 상세에서 제거됨
+  // 등록자산 상세 = 제조사 스펙 + 자동차등록증 정보 + 자동차등록증 첨부 (3섹션).
+  // 보험·할부·GPS 같은 자산 운영 정보는 각자 탭(보험·검사 / 할부스케줄)에서 노출.
   void onUpdate;
   return (
     <div className="detail-stack">
       <section className="detail-section">
-        <div className="detail-section-header">기본 정보</div>
+        <div className="detail-section-header">제조사 스펙</div>
         <div className="detail-section-body">
           <div className="detail-grid-2">
             <KV k="회사" v={vehicle.company} />
             <KV k="차량번호" v={vehicle.plate} mono />
-            <KV k="차종" v={vehicle.vehicleModelLine || vehicle.model} />
             <KV k="상태" v={vehicle.status} />
-            <KV k="VIN" v={vehicle.vin} mono />
             <KV k="제조사" v={vehicle.vehicleMaker} />
-            <KV k="세부" v={vehicle.vehicleSubModel} />
+            <KV k="모델" v={vehicle.vehicleModelLine || vehicle.model} />
+            <KV k="세부모델" v={vehicle.vehicleSubModel} />
             <KV k="트림" v={vehicle.vehicleTrim} />
+            <KV k="차종" v={vehicle.vehicleType} />
             <KV k="연료" v={vehicle.fuelType} />
-            <KV k="배기량" v={vehicle.displacementCc ? `${vehicle.displacementCc}cc` : undefined} />
+            <KV k="배기량" v={vehicle.displacementCc ? `${vehicle.displacementCc.toLocaleString()}cc` : undefined} mono />
             <KV k="승차정원" v={vehicle.seatingCapacity ? `${vehicle.seatingCapacity}인` : undefined} />
             <KV k="외부 색상" v={vehicle.exteriorColor} />
+            <KV k="내부 색상" v={vehicle.interiorColor} />
+            <KV k="길이" v={vehicle.vehicleLength ? `${vehicle.vehicleLength.toLocaleString()}mm` : undefined} mono />
+            <KV k="너비" v={vehicle.vehicleWidth ? `${vehicle.vehicleWidth.toLocaleString()}mm` : undefined} mono />
+            <KV k="높이" v={vehicle.vehicleHeight ? `${vehicle.vehicleHeight.toLocaleString()}mm` : undefined} mono />
+            <KV k="총중량" v={vehicle.totalWeight ? `${vehicle.totalWeight.toLocaleString()}kg` : undefined} mono />
           </div>
         </div>
       </section>
 
       <section className="detail-section">
-        <div className="detail-section-header">자산 정보 (보험 · 할부 · GPS)</div>
+        <div className="detail-section-header">자동차등록증 정보</div>
         <div className="detail-section-body">
           <div className="detail-grid-2">
-            <KV k="보험사" v={vehicle.insuranceCompany} />
-            <KV k="증권번호" v={vehicle.insurancePolicyNo} mono />
-            <KV k="할부사" v={vehicle.loanCompany} />
-            <KV k="할부개월" v={vehicle.loanMonths ? `${vehicle.loanMonths}개월` : undefined} />
-            <KV k="잔여원금" v={vehicle.loanRemainingPrincipal ? `₩${vehicle.loanRemainingPrincipal.toLocaleString()}` : undefined} mono />
-            <KV k="할부 개시일" v={vehicle.loanStartDate} mono />
-            <KV k="GPS 공급사" v={vehicle.gpsProvider} />
-            <KV k="GPS 단말번호" v={vehicle.gpsDeviceId} mono />
-          </div>
-        </div>
-      </section>
-
-      <section className="detail-section">
-        <div className="detail-section-header">등록증 정보</div>
-        <div className="detail-section-body">
-          <div className="detail-grid-2">
+            <KV k="VIN" v={vehicle.vin} mono />
             <KV k="용도" v={vehicle.vehicleUsage} />
             <KV k="형식" v={vehicle.vehicleFormat} mono />
             <KV k="원동기형식" v={vehicle.engineFormat} mono />
@@ -681,25 +680,18 @@ function SummaryTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Veh
             <KV k="법인등록번호" v={vehicle.ownerRegNo} mono />
             <KV k="제원관리번호" v={vehicle.specMgmtNo} mono />
             <KV k="사용본거지" v={vehicle.garage} />
-            <KV k="길이" v={vehicle.vehicleLength ? `${vehicle.vehicleLength.toLocaleString()}mm` : undefined} mono />
             <KV k="매입일" v={vehicle.purchasedDate} mono />
             <KV k="매입가" v={vehicle.purchasePrice ? `₩${vehicle.purchasePrice.toLocaleString()}` : undefined} mono />
           </div>
         </div>
       </section>
 
-      {/* 원본 첨부 — AttachedFilePreview 공용 컴포넌트로 통일 */}
+      {/* 원본 자동차등록증 첨부 — 보험증권 패턴 */}
       <AttachedFilePreview
         title="원본 자동차등록증"
         url={vehicle.registrationCertUrl}
         fileName={vehicle.registrationCertFileName}
         uploadedAt={vehicle.registrationCertUploadedAt}
-      />
-      <AttachedFilePreview
-        title="원본 계약사실확인서"
-        url={vehicle.contractDocUrl}
-        fileName={vehicle.contractDocFileName}
-        uploadedAt={vehicle.contractDocUploadedAt}
       />
     </div>
   );
