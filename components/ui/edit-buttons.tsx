@@ -11,6 +11,17 @@
 
 import { Pencil, FloppyDisk, X as XIcon } from '@phosphor-icons/react';
 
+/**
+ * Tab 컴포넌트가 부모(예: DetailDialogShell footer)에게 노출하는 핸들.
+ * 활성 탭이 자체적으로 inline 편집 모드를 켤 수 있도록.
+ */
+export type EditableTabHandle = {
+  /** 편집 모드 진입 (footer [수정] 버튼이 호출) */
+  startEdit: () => void;
+  /** 현재 편집 중인지 (footer가 [저장]/[취소] 버튼 분기) */
+  isEditing: () => boolean;
+};
+
 export type EditButtonsProps = {
   editing: boolean;
   onEdit?: () => void;

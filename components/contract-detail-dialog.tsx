@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useState, useMemo, useEffect, useRef, useImperativeHandle, forwardRef, Fragment } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
-import { InlineEditBar } from '@/components/ui/edit-buttons';
+import { InlineEditBar, type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { DateInput } from '@/components/ui/date-input';
 import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus } from '@/lib/types';
 import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
@@ -67,6 +67,20 @@ function ContractDetailShell({
   const cs = getContractState(contract);
   const ps = getPaymentState(contract);
 
+  // 활성 탭 + 편집 가능한 탭의 ref dispatch (footer 통일 [수정] 버튼 → 활성 탭의 inline edit)
+  // footer 는 [수정] 만 노출 — [저장]/[취소] 는 자식 탭의 inline 버튼이 담당 (state 동기 회피)
+  const [activeTab, setActiveTab] = useState<string>('status');
+  const assetRef = useRef<EditableTabHandle>(null);
+  const contractRef = useRef<EditableTabHandle>(null);
+  const editable: Record<string, React.RefObject<EditableTabHandle | null>> = {
+    asset: assetRef,
+    contract: contractRef,
+  };
+  const canEdit = activeTab in editable;
+  const handleEdit = canEdit
+    ? () => editable[activeTab].current?.startEdit()
+    : undefined;
+
   return (
     <DetailDialogShell
       open={open}
@@ -96,10 +110,14 @@ function ContractDetailShell({
           <span className={`status ${ps.name}`}>{ps.name}</span>
         </div>
       }
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      onEdit={handleEdit}
+      editing={false}
       tabs={[
         { value: 'status', label: '상태', content: <VehicleStatusTab c={contract} onUpdate={onUpdate} /> },
-        { value: 'asset', label: '자산', content: <VehicleSpecTab c={contract} onUpdate={onUpdate} /> },
-        { value: 'contract', label: '계약', content: <ContractInfoTab c={contract} onUpdate={onUpdate} /> },
+        { value: 'asset', label: '자산', content: <VehicleSpecTab ref={assetRef} c={contract} onUpdate={onUpdate} /> },
+        { value: 'contract', label: '계약', content: <ContractInfoTab ref={contractRef} c={contract} onUpdate={onUpdate} /> },
         { value: 'payment', label: '수납', content: <PaymentTab c={contract} onUpdate={onUpdate} /> },
       ]}
     />
@@ -249,7 +267,7 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
 
 /* ─────────────── 차량정보 (스펙) — 별도 탭 ─────────────── */
 
-function VehicleSpecTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u: Contract) => void }>(function VehicleSpecTab({ c, onUpdate }, ref) {
   const { companies } = useCompanies();
   const { vehicles } = useVehicles();
   const { contracts: allContracts } = useContractsList();
@@ -260,6 +278,7 @@ function VehicleSpecTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) 
   const cancel = () => { setDraft(c); setEditing(false); };
   const save = () => { onUpdate(draft); setEditing(false); };
   const set = <K extends keyof Contract>(k: K, v: Contract[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  useImperativeHandle(ref, () => ({ startEdit, isEditing: () => editing }), [editing, c]);
 
   // 같은 plate 차량 마스터 (있으면 매입·등록·상품화 일자 가져옴)
   const vehicle = useMemo(
@@ -424,7 +443,7 @@ function VehicleSpecTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) 
       </Section>
     </div>
   );
-}
+});
 
 /* ─────────────── 차량상태 — 라이프사이클 + 액션 + 체크리스트 ─────────────── */
 
@@ -1119,7 +1138,7 @@ function VehicleLocationEditor({ c, onUpdate }: { c: Contract; onUpdate: (u: Con
 
 /* ─────────────── 계약정보 탭 (고객 + 조건 + 비고) ─────────────── */
 
-function ContractInfoTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u: Contract) => void }>(function ContractInfoTab({ c, onUpdate }, ref) {
   const identMasked = contractIdentMasked(c);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Contract>(c);
@@ -1134,6 +1153,8 @@ function ContractInfoTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract)
   const save = () => { onUpdate(draft); setEditing(false); };
 
   const set = <K extends keyof Contract>(k: K, v: Contract[K]) => setDraft((d) => ({ ...d, [k]: v }));
+
+  useImperativeHandle(ref, () => ({ startEdit, isEditing: () => editing }), [editing, c]);
 
   return (
     <div className="detail-stack">
@@ -1191,7 +1212,7 @@ function ContractInfoTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract)
       </Section>
     </div>
   );
-}
+});
 
 /** 보기/편집 겸용 필드 — editing=true 면 input, 아니면 Field 표시. */
 function EditableField({

@@ -48,8 +48,12 @@ export type DetailDialogShellProps = {
   children?: ReactNode;
   /** Footer 추가 버튼 (닫기 좌측). 미지정 시 [닫기]만 노출. footer prop 사용 시 자동 [수정] 버튼은 비활성화 */
   footer?: ReactNode;
-  /** 초기 활성 탭 (tabs 모드에서만) */
+  /** 초기 활성 탭 (tabs 모드에서만, uncontrolled) */
   defaultTab?: string;
+  /** 활성 탭 controlled — onTabChange와 함께 사용 */
+  activeTab?: string;
+  /** 활성 탭 변경 callback */
+  onTabChange?: (value: string) => void;
 
   /* ─── 공용 [수정] 버튼 — 모든 detail dialog 동일 규격 ─── */
   /** [수정] 버튼 클릭 시 호출. 있으면 footer 에 [수정] 자동 노출 */
@@ -65,7 +69,7 @@ export type DetailDialogShellProps = {
 export function DetailDialogShell({
   open, onOpenChange, title,
   heroName, heroMeta, heroRight,
-  tabs, children, footer, defaultTab,
+  tabs, children, footer, defaultTab, activeTab, onTabChange,
   onEdit, editing, onSave, onCancel,
 }: DetailDialogShellProps) {
   // 공용 [수정/저장/취소] 자동 footer — footer prop 명시 시 X
@@ -92,7 +96,9 @@ export function DetailDialogShell({
           {/* 본문 — Tabs 모드 OR 단일 모드 */}
           {tabs && tabs.length > 0 ? (
             <Tabs.Root
-              defaultValue={defaultTab ?? tabs[0].value}
+              {...(activeTab !== undefined
+                ? { value: activeTab, onValueChange: onTabChange }
+                : { defaultValue: defaultTab ?? tabs[0].value, onValueChange: onTabChange })}
               style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, marginTop: 14 }}
             >
               <Tabs.List className="tabs-list">
