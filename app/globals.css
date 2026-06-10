@@ -2506,8 +2506,10 @@ kbd {
   z-index: 11;
   background: var(--bg-card);
 }
-.table th.sticky-col, .table th.sticky-col-2 {
-  background: var(--bg-card);
+/* thead 의 sticky 컬럼은 다른 헤더 셀과 색 통일 (bg-header) */
+.table thead th.sticky-col,
+.table thead th.sticky-col-2 {
+  background: var(--bg-header);
 }
 
 /* truncate util */
