@@ -18,6 +18,7 @@ import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-register-dialog';
 import { audit } from '@/lib/firebase/audit-store';
+import { useStaffList } from '@/lib/use-staff-list';
 import type { Company } from '@/lib/types';
 
 type GeneralView =
@@ -92,7 +93,7 @@ export default function GeneralPage() {
             <NavBtn label="손익 (집계)" icon={<ChartLineUp size={14} />} active={view === 'profit'} onClick={() => setView('profit')} />
           </nav>
 
-          <main className="page-shell-main" style={(view === 'company' || view === 'fleet_apply') ? { padding: 0, overflow: 'hidden' } : undefined}>
+          <main className="page-shell-main" style={(view === 'company' || view === 'fleet_apply' || view === 'staff') ? { padding: 0, overflow: 'hidden' } : undefined}>
             {view === 'company' && (
               <CompanyListView
                 onEdit={setEditCompanyId}
@@ -100,8 +101,9 @@ export default function GeneralPage() {
                 setSelectedIds={setCompanySelectedIds}
               />
             )}
+            {view === 'staff' && <StaffListView />}
             {view === 'fleet_apply' && <FleetApplyView companies={MOCK_COMPANIES} pendingByCompany={MOCK_PENDING} />}
-            {view !== 'company' && view !== 'fleet_apply' && <ViewPlaceholder view={view} />}
+            {view !== 'company' && view !== 'staff' && view !== 'fleet_apply' && <ViewPlaceholder view={view} />}
           </main>
         </div>
 
@@ -128,6 +130,10 @@ export default function GeneralPage() {
                   </>
                 )}
               </>
+            ) : view === 'staff' ? (
+              <span className="dim" style={{ fontSize: 12 }}>
+                직원은 로그인 화면 [계정 만들기] 로 가입 — 가입 즉시 목록에 자동 반영됩니다.
+              </span>
             ) : (
               <button className="btn btn-primary" type="button">
                 <Plus size={14} weight="bold" /> {VIEW_LABEL[view]} 신규 등록
@@ -193,6 +199,39 @@ type MockCompany = {
 const MOCK_PENDING: Record<string, PendingVehicle[]> = {};
 
 const MOCK_COMPANIES: MockCompany[] = [];
+
+/** 직원 관리 — 가입한 회원 (Firebase Auth + RTDB users) 명단. read-only. */
+function StaffListView() {
+  const { staff, loading, error } = useStaffList();
+  return (
+    <table className="table">
+      <thead>
+        <tr>
+          <th style={{ width: 36 }}>#</th>
+          <th style={{ minWidth: 140 }}>이름</th>
+          <th>이메일</th>
+          <th className="mono" style={{ width: 160 }}>UID</th>
+        </tr>
+      </thead>
+      <tbody>
+        {loading ? (
+          <tr><td colSpan={4} className="muted center" style={{ padding: 32 }}>가입회원 불러오는 중…</td></tr>
+        ) : error ? (
+          <tr><td colSpan={4} className="muted center" style={{ padding: 32, color: 'var(--red-text)' }}>오류: {error}</td></tr>
+        ) : staff.length === 0 ? (
+          <tr><td colSpan={4} className="muted center" style={{ padding: 32 }}>가입한 직원이 없습니다. 로그인 1회 후 자동 등록됩니다.</td></tr>
+        ) : staff.map((s, i) => (
+          <tr key={s.uid}>
+            <td className="dim center">{i + 1}</td>
+            <td>{s.displayName || <span className="muted">이름 없음</span>}</td>
+            <td className="dim">{s.email}</td>
+            <td className="dim" style={{ fontSize: 11 }}>{s.uid}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 /** 실 RTDB 연결 — useCompanies 기반. 행 더블클릭 → 수정 다이얼로그. */
 function CompanyListView({
