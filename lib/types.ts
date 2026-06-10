@@ -320,6 +320,10 @@ export type HistoryEntry = {
   cost?: number;
   status: '완료' | '진행' | '예정';
   vendor?: string;
+  /** 첨부 — OCR/파일 업로드 원본 (보험증권 패턴) */
+  fileUrl?: string;
+  fileName?: string;
+  fileUploadedAt?: string;
   mileage?: number;
   /**
    * 카테고리별 상세 데이터 — 자유 형식 (스키마는 카테고리별 컨벤션):
@@ -447,6 +451,22 @@ export type Vehicle = {
   insuranceCertUrl?: string;          // 보험가입증명서 첨부 URL (Firebase Storage)
   insuranceCertFileName?: string;
   insuranceCertUploadedAt?: string;
+  /** 할부계약서 첨부 — OCR/파일 업로드 시 자동 보관 (보험증권 패턴) */
+  loanContractUrl?: string;
+  loanContractFileName?: string;
+  loanContractUploadedAt?: string;
+  /** 정기검사증 첨부 */
+  inspectionCertUrl?: string;
+  inspectionCertFileName?: string;
+  inspectionCertUploadedAt?: string;
+  /** GPS 설치 증빙 (영수증·설치확인서) */
+  gpsInstallUrl?: string;
+  gpsInstallFileName?: string;
+  gpsInstallUploadedAt?: string;
+  /** 매각계약서·매도증 */
+  disposalCertUrl?: string;
+  disposalCertFileName?: string;
+  disposalCertUploadedAt?: string;
 
   // ─── 자동차등록증 추가 필드 (v4 자산등록현황 컬럼 대응) ───
   assetCode?: string;          // 자산코드 — 회사 scope (예: CP02VH0001), 자동 발급

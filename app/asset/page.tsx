@@ -38,6 +38,7 @@ import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers'
 import type { Vehicle, Contract, HistoryEntry } from '@/lib/types';
 import { DialogRoot, DialogContent, DialogBody, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
+import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
@@ -687,37 +688,19 @@ function SummaryTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Veh
         </div>
       </section>
 
-      {/* 원본 자동차등록증 — 보험증권 detail dialog 패턴 동일 */}
-      {vehicle.registrationCertUrl && (
-        <section className="detail-section">
-          <div className="detail-section-header">
-            <span>원본 자동차등록증</span>
-            {vehicle.registrationCertFileName && (
-              <span className="dim" style={{ marginLeft: 'auto', fontSize: 10 }}>{vehicle.registrationCertFileName}</span>
-            )}
-          </div>
-          <div className="detail-section-body">
-            {vehicle.registrationCertUrl.startsWith('data:image') || /\.(png|jpe?g|webp|gif)$/i.test(vehicle.registrationCertFileName ?? '') ? (
-              <img
-                src={vehicle.registrationCertUrl}
-                alt={vehicle.registrationCertFileName ?? '자동차등록증'}
-                style={{ maxWidth: '100%', maxHeight: 600, border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-sm)' }}
-              />
-            ) : (
-              <embed
-                src={vehicle.registrationCertUrl}
-                type="application/pdf"
-                style={{ width: '100%', height: 600, border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-sm)' }}
-              />
-            )}
-            {vehicle.registrationCertUploadedAt && (
-              <div className="dim" style={{ fontSize: 10, marginTop: 6 }}>
-                업로드 {vehicle.registrationCertUploadedAt.slice(0, 16).replace('T', ' ')}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+      {/* 원본 첨부 — AttachedFilePreview 공용 컴포넌트로 통일 */}
+      <AttachedFilePreview
+        title="원본 자동차등록증"
+        url={vehicle.registrationCertUrl}
+        fileName={vehicle.registrationCertFileName}
+        uploadedAt={vehicle.registrationCertUploadedAt}
+      />
+      <AttachedFilePreview
+        title="원본 계약사실확인서"
+        url={vehicle.contractDocUrl}
+        fileName={vehicle.contractDocFileName}
+        uploadedAt={vehicle.contractDocUploadedAt}
+      />
     </div>
   );
 }
@@ -802,6 +785,12 @@ function LoanScheduleTab({ vehicle }: { vehicle: Vehicle }) {
           </div>
         </div>
       </section>
+      <AttachedFilePreview
+        title="원본 할부계약서"
+        url={vehicle.loanContractUrl}
+        fileName={vehicle.loanContractFileName}
+        uploadedAt={vehicle.loanContractUploadedAt}
+      />
     </div>
   );
 }
@@ -841,6 +830,18 @@ function ComplianceTab({ vehicle, contracts }: { vehicle: Vehicle; contracts: Co
           </div>
         </div>
       </section>
+      <AttachedFilePreview
+        title="원본 보험가입증명서"
+        url={vehicle.insuranceCertUrl}
+        fileName={vehicle.insuranceCertFileName}
+        uploadedAt={vehicle.insuranceCertUploadedAt}
+      />
+      <AttachedFilePreview
+        title="원본 정기검사증"
+        url={vehicle.inspectionCertUrl}
+        fileName={vehicle.inspectionCertFileName}
+        uploadedAt={vehicle.inspectionCertUploadedAt}
+      />
     </div>
   );
 }
