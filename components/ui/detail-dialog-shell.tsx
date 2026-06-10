@@ -64,14 +64,18 @@ export type DetailDialogShellProps = {
   onSave?: () => void;
   /** 편집 중일 때 [취소] 버튼 핸들러 */
   onCancel?: () => void;
+  /** 신규 등록 모드 — true 면 hero 좌측에 brand 띠 + "신규 등록" badge */
+  isNew?: boolean;
 };
 
 export function DetailDialogShell({
   open, onOpenChange, title,
   heroName, heroMeta, heroRight,
   tabs, children, footer, defaultTab, activeTab, onTabChange,
-  onEdit, editing, onSave, onCancel,
+  onEdit, editing, onSave, onCancel, isNew,
 }: DetailDialogShellProps) {
+  // 모드 — view / edit / new — hero/footer 시각 차별용
+  const mode: 'view' | 'edit' | 'new' = isNew ? 'new' : editing ? 'edit' : 'view';
   // 공용 [수정/저장/취소] 자동 footer — footer prop 명시 시 X
   const autoFooter = !footer && (onEdit || editing) ? (
     <EditButtons editing={!!editing} onEdit={onEdit} onSave={onSave} onCancel={onCancel} variant="footer" />
@@ -79,15 +83,19 @@ export function DetailDialogShell({
   const resolvedFooter = footer ?? autoFooter;
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent title={title}>
+      <DialogContent title={title} className={`mode-${mode}`}>
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
           {/* HERO */}
           <div
-            className="detail-hero"
+            className={`detail-hero mode-${mode}`}
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
           >
             <div className="detail-hero-main">
-              <div className="detail-hero-name">{heroName}</div>
+              <div className="detail-hero-name">
+                {heroName}
+                {mode === 'edit' && <span className="detail-mode-tag mode-edit">편집 중</span>}
+                {mode === 'new'  && <span className="detail-mode-tag mode-new">신규 등록</span>}
+              </div>
               <div className="detail-hero-meta">{heroMeta}</div>
             </div>
             {heroRight && <div className="detail-hero-right">{heroRight}</div>}

@@ -2160,6 +2160,38 @@ input[type="radio"]:disabled {
   font-weight: 700;
   letter-spacing: -0.015em;
   color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* 모드 태그 — 편집 중 / 신규 등록 — hero name 옆에 inline */
+.dialog-content .detail-mode-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid;
+  text-transform: uppercase;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.dialog-content .detail-mode-tag.mode-edit {
+  color: var(--orange-text, #c2410c);
+  background: var(--orange-bg, #fff7ed);
+  border-color: rgba(194,65,12,0.35);
+}
+.dialog-content .detail-mode-tag.mode-new {
+  color: var(--green-text);
+  background: var(--green-bg);
+  border-color: var(--green-border, rgba(22,101,52,0.35));
+}
+/* 모드별 hero 좌측 띠 — 편집/신규 식별 보강 */
+.dialog-content .detail-hero.mode-edit {
+  border-left: 3px solid var(--orange-text, #c2410c);
+}
+.dialog-content .detail-hero.mode-new {
+  border-left: 3px solid var(--green-text);
 }
 .dialog-content .detail-hero-meta {
   font-size: 11.5px;
