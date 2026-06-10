@@ -13,6 +13,7 @@
 
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Field } from '@/components/ui/editable-field';
+import { Section, Stack, Grid2 } from '@/components/ui/detail-primitives';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyRow } from '@/components/ui/empty-row';
 import type { InsurancePolicy, Vehicle, Contract } from '@/lib/types';
@@ -78,165 +79,137 @@ export function InsuranceDetailDialog({
       )}
 
       {policy && (
-        <div className="detail-stack">
-          {/* 보험사 정보 */}
-          <section className="detail-section">
-            <div className="detail-section-header">보험사 · 증권</div>
-            <div className="detail-section-body">
-              <div className="detail-grid-2">
-                <KV k="보험사" v={policy.insurer} />
-                <KV k="상품명" v={policy.productName} />
-                <KV k="증권번호" v={policy.policyNo} mono />
-                <KV k="사업자번호" v={policy.bizNo} mono />
-                <KV k="계약자" v={policy.contractor} />
-                <KV k="피보험자" v={policy.insured} />
-              </div>
-            </div>
-          </section>
+        <Stack>
+          <Section title="보험사 · 증권">
+            <Grid2>
+              <KV k="보험사" v={policy.insurer} />
+              <KV k="상품명" v={policy.productName} />
+              <KV k="증권번호" v={policy.policyNo} mono />
+              <KV k="사업자번호" v={policy.bizNo} mono />
+              <KV k="계약자" v={policy.contractor} />
+              <KV k="피보험자" v={policy.insured} />
+            </Grid2>
+          </Section>
 
-          {/* 보험기간 + 운전 조건 */}
-          <section className="detail-section">
-            <div className="detail-section-header">보험기간 · 운전 조건</div>
-            <div className="detail-section-body">
-              <div className="detail-grid-2">
-                <KV k="시작일" v={policy.startDate} mono />
-                <KV k="만기일" v={policy.endDate} mono />
-                <KV k="운전자 범위" v={policy.driverScope} />
-                <KV k="운전 가능 연령" v={policy.driverAge} />
-                <KV k="물적할증" v={policy.deductibleMan ? `${policy.deductibleMan.toLocaleString()}만원` : undefined} />
-                {contract && (
-                  <KV k="계약자 연령" v={contract.insuranceAge ? `${contract.insuranceAge}세` : undefined} />
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* 차량 사항 */}
-          <section className="detail-section">
-            <div className="detail-section-header">차량 사항</div>
-            <div className="detail-section-body">
-              <div className="detail-grid-2">
-                <KV k="차량(차대)번호" v={policy.carNumber} mono />
-                <KV k="차명" v={policy.carName} />
-                <KV k="연식" v={policy.carYear ? String(policy.carYear) : undefined} mono />
-                <KV k="차종" v={policy.carClass} />
-                <KV k="배기량" v={policy.displacement ? `${policy.displacement.toLocaleString()}cc` : undefined} mono />
-                <KV k="정원" v={policy.seats ? `${policy.seats}인` : undefined} mono />
-                <KV k="차량가액" v={policy.vehicleValueMan ? `${policy.vehicleValueMan.toLocaleString()}만원` : undefined} mono />
-                <KV k="부속품가액" v={policy.accessoryValueMan ? `${policy.accessoryValueMan.toLocaleString()}만원` : undefined} mono />
-              </div>
-              {policy.accessories && (
-                <div style={{ marginTop: 8 }}>
-                  <span className="dim" style={{ fontSize: 11 }}>부속품: </span>
-                  <span style={{ fontSize: 12 }}>{policy.accessories}</span>
-                </div>
+          <Section title="보험기간 · 운전 조건">
+            <Grid2>
+              <KV k="시작일" v={policy.startDate} mono />
+              <KV k="만기일" v={policy.endDate} mono />
+              <KV k="운전자 범위" v={policy.driverScope} />
+              <KV k="운전 가능 연령" v={policy.driverAge} />
+              <KV k="물적할증" v={policy.deductibleMan ? `${policy.deductibleMan.toLocaleString()}만원` : undefined} />
+              {contract && (
+                <KV k="계약자 연령" v={contract.insuranceAge ? `${contract.insuranceAge}세` : undefined} />
               )}
-            </div>
-          </section>
+            </Grid2>
+          </Section>
 
-          {/* 가입담보 / 보상한도 */}
-          <section className="detail-section">
-            <div className="detail-section-header">가입 담보 · 보상 한도</div>
-            <div className="detail-section-body">
-              <div className="detail-grid-2">
-                <KV k="대인배상Ⅰ" v={policy.covPersonal1} />
-                <KV k="대인배상Ⅱ" v={policy.covPersonal2} />
-                <KV k="대물배상" v={policy.covProperty} />
-                <KV k="자기신체사고" v={policy.covSelfAccident} />
-                <KV k="무보험차상해" v={policy.covUninsured} />
-                <KV k="자기차량손해" v={policy.covSelfVehicle} />
-                <KV k="긴급출동" v={policy.covEmergency} />
+          <Section title="차량 사항">
+            <Grid2>
+              <KV k="차량(차대)번호" v={policy.carNumber} mono />
+              <KV k="차명" v={policy.carName} />
+              <KV k="연식" v={policy.carYear ? String(policy.carYear) : undefined} mono />
+              <KV k="차종" v={policy.carClass} />
+              <KV k="배기량" v={policy.displacement ? `${policy.displacement.toLocaleString()}cc` : undefined} mono />
+              <KV k="정원" v={policy.seats ? `${policy.seats}인` : undefined} mono />
+              <KV k="차량가액" v={policy.vehicleValueMan ? `${policy.vehicleValueMan.toLocaleString()}만원` : undefined} mono />
+              <KV k="부속품가액" v={policy.accessoryValueMan ? `${policy.accessoryValueMan.toLocaleString()}만원` : undefined} mono />
+            </Grid2>
+            {policy.accessories && (
+              <div style={{ marginTop: 8 }}>
+                <span className="dim" style={{ fontSize: 11 }}>부속품: </span>
+                <span style={{ fontSize: 12 }}>{policy.accessories}</span>
               </div>
-            </div>
-          </section>
+            )}
+          </Section>
 
-          {/* 보험료 + 분납 */}
-          <section className="detail-section">
-            <div className="detail-section-header">
-              <span>보험료 — 1회차 자동 산출</span>
-              {!totalMatch && (
-                <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--orange-text)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Warning size={11} weight="duotone" /> 분납 합계 ≠ 총보험료 ({fmt(totalSum)})
-                </span>
-              )}
-            </div>
-            <div className="detail-section-body">
-              <div className="detail-grid-2" style={{ marginBottom: 10 }}>
-                <KV k="납입한 보험료 (OCR)" v={fmt(policy.paidPremium)} mono />
-                <KV k="총보험료" v={fmt(policy.totalPremium)} mono />
-              </div>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th className="center" style={{ width: 60 }}>회차</th>
-                    <th style={{ width: 100 }}>출금일</th>
-                    <th className="num" style={{ width: 110 }}>금액</th>
-                    <th className="center" style={{ width: 76 }}>납부</th>
+          <Section title="가입 담보 · 보상 한도">
+            <Grid2>
+              <KV k="대인배상Ⅰ" v={policy.covPersonal1} />
+              <KV k="대인배상Ⅱ" v={policy.covPersonal2} />
+              <KV k="대물배상" v={policy.covProperty} />
+              <KV k="자기신체사고" v={policy.covSelfAccident} />
+              <KV k="무보험차상해" v={policy.covUninsured} />
+              <KV k="자기차량손해" v={policy.covSelfVehicle} />
+              <KV k="긴급출동" v={policy.covEmergency} />
+            </Grid2>
+          </Section>
+
+          <Section
+            title="보험료 — 1회차 자동 산출"
+            action={!totalMatch ? (
+              <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--orange-text)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Warning size={11} weight="duotone" /> 분납 합계 ≠ 총보험료 ({fmt(totalSum)})
+              </span>
+            ) : null}
+          >
+            <Grid2>
+              <KV k="납입한 보험료 (OCR)" v={fmt(policy.paidPremium)} mono />
+              <KV k="총보험료" v={fmt(policy.totalPremium)} mono />
+            </Grid2>
+            <table className="table" style={{ marginTop: 10 }}>
+              <thead>
+                <tr>
+                  <th className="center" style={{ width: 60 }}>회차</th>
+                  <th style={{ width: 100 }}>출금일</th>
+                  <th className="num" style={{ width: 110 }}>금액</th>
+                  <th className="center" style={{ width: 76 }}>납부</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(policy.installments ?? []).length === 0 ? (
+                  <EmptyRow colSpan={4}>분납 내역 없음</EmptyRow>
+                ) : policy.installments!.map((it) => (
+                  <tr key={it.cycle} style={{ background: it.cycle === 1 ? 'var(--brand-bg)' : undefined }}>
+                    <td className="center mono">{it.cycle}{it.cycle === 1 ? ' (산출)' : ''}</td>
+                    <td className="mono">{it.dueDate || <span className="muted">-</span>}</td>
+                    <td className="num mono">{fmt(it.amount)}</td>
+                    <td className="center">{it.paid ? <StatusBadge tone="green">납입</StatusBadge> : <StatusBadge tone="gray">예정</StatusBadge>}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {(policy.installments ?? []).length === 0 ? (
-                    <EmptyRow colSpan={4}>분납 내역 없음</EmptyRow>
-                  ) : policy.installments!.map((it) => (
-                    <tr key={it.cycle} style={{ background: it.cycle === 1 ? 'var(--brand-bg)' : undefined }}>
-                      <td className="center mono">{it.cycle}{it.cycle === 1 ? ' (산출)' : ''}</td>
-                      <td className="mono">{it.dueDate || <span className="muted">-</span>}</td>
-                      <td className="num mono">{fmt(it.amount)}</td>
-                      <td className="center">{it.paid ? <StatusBadge tone="green">납입</StatusBadge> : <StatusBadge tone="gray">예정</StatusBadge>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                ))}
+              </tbody>
+            </table>
+          </Section>
 
-          {/* 자동이체 */}
-          <section className="detail-section">
-            <div className="detail-section-header">분납 자동이체</div>
-            <div className="detail-section-body">
-              <div className="detail-grid-2">
-                <KV k="이체 은행" v={policy.autoDebitBank} />
-                <KV k="이체 계좌" v={policy.autoDebitAccount} mono />
-                <KV k="이체 예금주" v={policy.autoDebitHolder} />
-              </div>
-            </div>
-          </section>
+          <Section title="분납 자동이체">
+            <Grid2>
+              <KV k="이체 은행" v={policy.autoDebitBank} />
+              <KV k="이체 계좌" v={policy.autoDebitAccount} mono />
+              <KV k="이체 예금주" v={policy.autoDebitHolder} />
+            </Grid2>
+          </Section>
 
-          {/* 원본 파일 — OCR 시 첨부됨 */}
           {policy.fileUrl && (
-            <section className="detail-section">
-              <div className="detail-section-header">
-                <span>원본 파일</span>
-                {policy.fileName && <span className="dim" style={{ marginLeft: 'auto', fontSize: 10 }}>{policy.fileName}</span>}
-              </div>
-              <div className="detail-section-body">
-                {policy.fileUrl.startsWith('data:image') ? (
-                  <img
-                    src={policy.fileUrl}
-                    alt={policy.fileName ?? '보험증권 원본'}
-                    style={{ maxWidth: '100%', maxHeight: 480, objectFit: 'scale-down', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
-                  />
-                ) : policy.fileUrl.startsWith('data:application/pdf') ? (
-                  <embed src={policy.fileUrl} type="application/pdf" style={{ width: '100%', height: 480, border: '1px solid var(--border)', borderRadius: 'var(--radius)' }} />
-                ) : (
-                  <a href={policy.fileUrl} download={policy.fileName ?? 'insurance.pdf'} className="btn">
-                    원본 다운로드
-                  </a>
+            <Section
+              title="원본 파일"
+              action={policy.fileName ? <span className="dim" style={{ marginLeft: 'auto', fontSize: 10 }}>{policy.fileName}</span> : null}
+            >
+              {policy.fileUrl.startsWith('data:image') ? (
+                <img
+                  src={policy.fileUrl}
+                  alt={policy.fileName ?? '보험증권 원본'}
+                  style={{ maxWidth: '100%', maxHeight: 480, objectFit: 'scale-down', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
+                />
+              ) : policy.fileUrl.startsWith('data:application/pdf') ? (
+                <embed src={policy.fileUrl} type="application/pdf" style={{ width: '100%', height: 480, border: '1px solid var(--border)', borderRadius: 'var(--radius)' }} />
+              ) : (
+                <a href={policy.fileUrl} download={policy.fileName ?? 'insurance.pdf'} className="btn">
+                  원본 다운로드
+                </a>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <a href={policy.fileUrl} download={policy.fileName ?? 'insurance.pdf'} style={{ fontSize: 11, color: 'var(--brand)' }}>
+                  {policy.fileName ?? 'insurance.pdf'} 다운로드
+                </a>
+                {policy.uploadedAt && (
+                  <span className="dim" style={{ marginLeft: 8, fontSize: 10 }}>
+                    업로드: {policy.uploadedAt.slice(0, 10)}
+                  </span>
                 )}
-                <div style={{ marginTop: 8 }}>
-                  <a href={policy.fileUrl} download={policy.fileName ?? 'insurance.pdf'} style={{ fontSize: 11, color: 'var(--brand)' }}>
-                    {policy.fileName ?? 'insurance.pdf'} 다운로드
-                  </a>
-                  {policy.uploadedAt && (
-                    <span className="dim" style={{ marginLeft: 8, fontSize: 10 }}>
-                      업로드: {policy.uploadedAt.slice(0, 10)}
-                    </span>
-                  )}
-                </div>
               </div>
-            </section>
+            </Section>
           )}
-        </div>
+        </Stack>
       )}
     </DetailDialogShell>
   );

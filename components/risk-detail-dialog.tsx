@@ -16,6 +16,7 @@ import {
   Phone, Warning, Gavel, Note, CurrencyKrw, PaperPlaneTilt, Power, FileText, X as XIcon,
 } from '@phosphor-icons/react';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
+import { Section, Stack } from '@/components/ui/detail-primitives';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
@@ -120,31 +121,27 @@ export function RiskDetailDialog({
       }
       onEdit={onEdit}
     >
-      {/* 채권화 단계 진행 — D+N 경과 기준 자동 진행 + 채권 상태 시 종결 */}
-      <CollectionStageProgress contract={contract} overdueDays={overdueDays} />
+      <Stack>
+        {/* 채권화 단계 진행 — D+N 경과 기준 자동 진행 + 채권 상태 시 종결 */}
+        <CollectionStageProgress contract={contract} overdueDays={overdueDays} />
 
-      {/* 즉시 액션 — 작은 버튼 row (탭 row 와 비슷한 시각 무게) */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button className="btn btn-sm btn-primary" type="button" onClick={() => onAddContact?.(contract)}>
-          <Phone size={11} weight="bold" /> + 연락기록
-        </button>
-        <button className="btn btn-sm" type="button" onClick={() => onEngineLock?.(contract)}>
-          <Power size={11} weight="bold" /> 시동제어
-        </button>
-        <button className="btn btn-sm" type="button" onClick={() => onSendSms?.(contract)}>
-          <PaperPlaneTilt size={11} weight="bold" /> 내용증명·SMS
-        </button>
-        <button className="btn btn-sm" type="button" onClick={() => onMarkDebt?.(contract)} style={{ color: 'var(--red-text)' }}>
-          <FileText size={11} weight="bold" /> 채권화
-        </button>
-      </div>
-
-      {/* 조치 타임라인 */}
-      <section className="detail-section">
-        <div className="detail-section-header">
-          <span className="title">조치 이력 ({timeline.length})</span>
+        {/* 즉시 액션 — 작은 버튼 row */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button className="btn btn-sm btn-primary" type="button" onClick={() => onAddContact?.(contract)}>
+            <Phone size={11} weight="bold" /> + 연락기록
+          </button>
+          <button className="btn btn-sm" type="button" onClick={() => onEngineLock?.(contract)}>
+            <Power size={11} weight="bold" /> 시동제어
+          </button>
+          <button className="btn btn-sm" type="button" onClick={() => onSendSms?.(contract)}>
+            <PaperPlaneTilt size={11} weight="bold" /> 내용증명·SMS
+          </button>
+          <button className="btn btn-sm" type="button" onClick={() => onMarkDebt?.(contract)} style={{ color: 'var(--red-text)' }}>
+            <FileText size={11} weight="bold" /> 채권화
+          </button>
         </div>
-        <div className="detail-section-body" style={{ padding: 0 }}>
+
+        <Section title={`조치 이력 (${timeline.length})`} bodyPadding={0}>
           {timeline.length === 0 ? (
             <div className="muted center" style={{ padding: 24, fontSize: 12 }}>
               아직 등록된 조치 이력이 없음 — 상단 + 연락기록 버튼으로 시작
@@ -178,8 +175,8 @@ export function RiskDetailDialog({
               ))}
             </ul>
           )}
-        </div>
-      </section>
+        </Section>
+      </Stack>
     </DetailDialogShell>
   );
 }

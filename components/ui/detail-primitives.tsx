@@ -11,12 +11,14 @@ import type { ReactNode } from 'react';
 
 /** Section — 카드 박스. detail-section CSS 자동 적용 (운영현황·자산 dialog 동일) */
 export function Section({
-  title, icon, action, children,
+  title, icon, action, children, bodyPadding,
 }: {
   title: ReactNode;
   icon?: ReactNode;
-  /** 헤더 우측 action 영역 — 버튼 등 */
+  /** 헤더 우측 action 영역 — 버튼/요약 등 */
   action?: ReactNode;
+  /** body padding override — table 직렬 시 0 권장 */
+  bodyPadding?: number | string;
   children: ReactNode;
 }) {
   return (
@@ -26,7 +28,12 @@ export function Section({
         <span className="title">{title}</span>
         {action}
       </div>
-      <div className="detail-section-body">{children}</div>
+      <div
+        className="detail-section-body"
+        style={bodyPadding !== undefined ? { padding: bodyPadding } : undefined}
+      >
+        {children}
+      </div>
     </section>
   );
 }
