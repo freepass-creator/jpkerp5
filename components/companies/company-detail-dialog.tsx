@@ -83,19 +83,19 @@ export function CompanyDetailDialog({
           <span>대표 {cur.ceo || '-'}</span>
         </>
       }
-      heroRight={
+      footer={
         editing ? (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-sm" type="button" onClick={handleCancel}>
-              <XIcon size={11} weight="bold" /> 취소
+          <>
+            <button className="btn" type="button" onClick={handleCancel}>
+              <XIcon size={12} weight="bold" /> 취소
             </button>
-            <button className="btn btn-sm btn-primary" type="button" onClick={() => void handleSave()}>
-              <FloppyDisk size={11} weight="bold" /> 저장
+            <button className="btn btn-primary" type="button" onClick={() => void handleSave()}>
+              <FloppyDisk size={12} weight="bold" /> 저장
             </button>
-          </div>
+          </>
         ) : (
-          <button className="btn btn-sm" type="button" onClick={() => setEditing(true)}>
-            <PencilSimple size={11} weight="bold" /> 수정
+          <button className="btn btn-primary" type="button" onClick={() => setEditing(true)}>
+            <PencilSimple size={12} weight="bold" /> 수정
           </button>
         )
       }
