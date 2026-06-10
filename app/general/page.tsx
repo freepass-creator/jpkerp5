@@ -277,6 +277,7 @@ function CompanyListView({
             />
           </th>
           <th style={{ minWidth: 200 }}>회사명</th>
+          <th style={{ width: 60 }}>구분</th>
           <th style={{ width: 130 }}>법인등록</th>
           <th style={{ width: 120 }}>사업자등록</th>
           <th style={{ width: 70 }}>대표</th>
@@ -290,7 +291,7 @@ function CompanyListView({
       </thead>
       <tbody>
         {companies.length === 0 ? (
-          <tr><td colSpan={11} className="muted center" style={{ padding: 32 }}>등록된 법인 없음 — 우측 하단 [+ 법인 등록] 으로 시작하세요.</td></tr>
+          <tr><td colSpan={12} className="muted center" style={{ padding: 32 }}>등록된 법인 없음 — 우측 하단 [+ 법인 등록] 으로 시작하세요.</td></tr>
         ) : companies.map((c) => {
           const checked = selectedIds.has(c.id);
           return (
@@ -304,6 +305,7 @@ function CompanyListView({
                 <input type="checkbox" checked={checked} onChange={() => toggle(c.id)} aria-label={`${c.name} 선택`} />
               </td>
               <td>{c.name || <span className="muted">이름 미입력</span>}</td>
+              <td className="dim">{c.partnerKind || '기타'}</td>
               <td className="dim">{c.corpRegNo?.replace(/[^\d-]/g, '') || '-'}</td>
               <td className="dim">{c.bizRegNo?.replace(/[^\d-]/g, '') || '-'}</td>
               <td>{c.ceo || <span className="muted">-</span>}</td>

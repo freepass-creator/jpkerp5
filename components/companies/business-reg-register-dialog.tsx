@@ -150,6 +150,7 @@ export function BusinessRegRegisterDialog({
             address: raw.address ?? existing?.address,
             bizType: raw.industry ?? existing?.bizType,
             bizItem: raw.category ?? existing?.bizItem,
+            partnerKind: existing?.partnerKind ?? '기타',  // OCR 시 기본 '기타'
             _status: 'done' as Status,
             _existingId: existing?.id,
           } : p));
@@ -274,6 +275,7 @@ export function BusinessRegRegisterDialog({
           address: manualDraft.address,
           bizType: manualDraft.bizType,
           bizItem: manualDraft.bizItem,
+          partnerKind: manualDraft.partnerKind ?? '기타',
           homepage: manualDraft.homepage,
           mainPhone: manualDraft.mainPhone,
           contactName: manualDraft.contactName,
@@ -427,14 +429,27 @@ export function BusinessRegRegisterDialog({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 560 }}>
                 {/* 사업자등록 정보 — 서류 기반 */}
                 <GroupLabel>사업자등록 정보</GroupLabel>
-                <Field label="회사명 *">
-                  <input
-                    type="text"
-                    className="input input-compact"
-                    value={manualDraft.name ?? ''}
-                    onChange={(e) => setManualDraft({ ...manualDraft, name: e.target.value })}
-                  />
-                </Field>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8 }}>
+                  <Field label="회사명 *">
+                    <input
+                      type="text"
+                      className="input input-compact"
+                      value={manualDraft.name ?? ''}
+                      onChange={(e) => setManualDraft({ ...manualDraft, name: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="구분">
+                    <select
+                      className="input input-compact"
+                      value={manualDraft.partnerKind ?? '기타'}
+                      onChange={(e) => setManualDraft({ ...manualDraft, partnerKind: e.target.value as '위탁' | '직영' | '기타' })}
+                    >
+                      <option value="위탁">위탁</option>
+                      <option value="직영">직영</option>
+                      <option value="기타">기타</option>
+                    </select>
+                  </Field>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <Field label="대표자">
                     <input

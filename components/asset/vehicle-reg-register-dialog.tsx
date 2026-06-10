@@ -18,6 +18,7 @@ import { Plus, X, CircleNotch, CheckCircle, Warning, Upload, Keyboard, FileXls }
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { MoneyInput } from '@/components/ui/money-input';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
 import { runWithConcurrency } from '@/lib/parallel';
 import { fileToDataUrl } from '@/lib/image-compress';
@@ -48,6 +49,20 @@ export function VehicleRegRegisterDialog({
   prefillVehicle?: Vehicle | null;
 }) {
   const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
+  const { companies } = useCompanies();
+
+  /** 법인등록번호로 회사 매칭 → company 코드 반환. 미매칭 시 undefined */
+  function matchCompanyByRegNo(rawRegNo?: string): string | undefined {
+    if (!rawRegNo) return undefined;
+    const norm = rawRegNo.replace(/[^\d]/g, '');
+    if (!norm) return undefined;
+    const hit = companies.find((c) => {
+      const corp = (c.corpRegNo ?? '').replace(/[^\d]/g, '');
+      const biz = (c.bizRegNo ?? '').replace(/[^\d]/g, '');
+      return (corp && corp === norm) || (biz && biz === norm);
+    });
+    return hit?.code || hit?.name;
+  }
   const [items, setItems] = useState<WorkItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -124,10 +139,14 @@ export function VehicleRegRegisterDialog({
 
           const plate = s('car_number')?.replace(/\s/g, '');
           const existing = plate ? vehicles.find((v) => (v.plate ?? '').replace(/\s/g, '') === plate) : undefined;
+          // 법인등록번호 (자등증 소유자) → 회사 자동 매칭
+          const ownerReg = s('owner_biz_no');
+          const matchedCompany = matchCompanyByRegNo(ownerReg);
 
           setItems((prev) => prev.map((p) => p.id === id ? {
             ...(existing ?? {}),
             id,
+            company: (matchedCompany ?? existing?.company) as Partial<Vehicle>['company'],
             plate: s('car_number') ?? existing?.plate ?? '',
             model: s('car_name') ?? existing?.model ?? '',
             vehicleType: s('category_hint') ?? existing?.vehicleType,
