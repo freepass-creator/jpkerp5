@@ -400,8 +400,9 @@ export type Company = {
   bizItem?: string;              // 종목
   mainPhone?: string;            // 대표 전화번호 — 손님 페이지 노출
   customerServicePhone?: string; // 고객센터 전화 (별도 운영 시) — 손님 페이지 노출
-  /** 실무 담당자 — 우리 측 운영 contact */
-  contactName?: string;
+  /** 회사 정보 — 홈페이지·실무 담당자 */
+  homepage?: string;             // 회사 홈페이지 URL
+  contactName?: string;          // 실무 담당자 이름
   contactRole?: string;          // 직책 (예: 매니저)
   contactPhone?: string;
   contactEmail?: string;

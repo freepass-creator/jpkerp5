@@ -274,6 +274,8 @@ export function BusinessRegRegisterDialog({
           address: manualDraft.address,
           bizType: manualDraft.bizType,
           bizItem: manualDraft.bizItem,
+          homepage: manualDraft.homepage,
+          mainPhone: manualDraft.mainPhone,
           contactName: manualDraft.contactName,
           contactRole: manualDraft.contactRole,
           contactPhone: manualDraft.contactPhone,
@@ -420,9 +422,11 @@ export function BusinessRegRegisterDialog({
               )}
             </Tabs.Content>
 
-            {/* 수기 탭 */}
+            {/* 수기 탭 — 서류 기반(사업자등록 정보) / 그 외(회사 정보) 두 그룹 분리 */}
             <Tabs.Content value="manual">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 560 }}>
+                {/* 사업자등록 정보 — 서류 기반 */}
+                <GroupLabel>사업자등록 정보</GroupLabel>
                 <Field label="회사명 *">
                   <input
                     type="text"
@@ -431,6 +435,25 @@ export function BusinessRegRegisterDialog({
                     onChange={(e) => setManualDraft({ ...manualDraft, name: e.target.value })}
                   />
                 </Field>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <Field label="대표자">
+                    <input
+                      type="text"
+                      className="input input-compact"
+                      value={manualDraft.ceo ?? ''}
+                      onChange={(e) => setManualDraft({ ...manualDraft, ceo: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="법인등록번호">
+                    <input
+                      type="text"
+                      className="input input-compact mono"
+                      placeholder="000000-0000000"
+                      value={manualDraft.corpRegNo ?? ''}
+                      onChange={(e) => setManualDraft({ ...manualDraft, corpRegNo: e.target.value })}
+                    />
+                  </Field>
+                </div>
                 <Field label="사업자등록번호">
                   <input
                     type="text"
@@ -438,31 +461,6 @@ export function BusinessRegRegisterDialog({
                     placeholder="000-00-00000"
                     value={manualDraft.bizRegNo ?? ''}
                     onChange={(e) => setManualDraft({ ...manualDraft, bizRegNo: e.target.value })}
-                  />
-                </Field>
-                <Field label="법인등록번호">
-                  <input
-                    type="text"
-                    className="input input-compact mono"
-                    placeholder="000000-0000000"
-                    value={manualDraft.corpRegNo ?? ''}
-                    onChange={(e) => setManualDraft({ ...manualDraft, corpRegNo: e.target.value })}
-                  />
-                </Field>
-                <Field label="대표자">
-                  <input
-                    type="text"
-                    className="input input-compact"
-                    value={manualDraft.ceo ?? ''}
-                    onChange={(e) => setManualDraft({ ...manualDraft, ceo: e.target.value })}
-                  />
-                </Field>
-                <Field label="주소">
-                  <input
-                    type="text"
-                    className="input input-compact"
-                    value={manualDraft.address ?? ''}
-                    onChange={(e) => setManualDraft({ ...manualDraft, address: e.target.value })}
                   />
                 </Field>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -483,12 +481,37 @@ export function BusinessRegRegisterDialog({
                     />
                   </Field>
                 </div>
+                <Field label="주소">
+                  <input
+                    type="text"
+                    className="input input-compact"
+                    value={manualDraft.address ?? ''}
+                    onChange={(e) => setManualDraft({ ...manualDraft, address: e.target.value })}
+                  />
+                </Field>
 
-                <div style={{ marginTop: 8, paddingTop: 10, borderTop: '1px solid var(--border-soft)', fontSize: 12, fontWeight: 600, color: 'var(--text-sub)' }}>
-                  실무 담당자
-                </div>
+                {/* 회사 정보 — 홈페이지·실무 담당자 (서류 외 운영 정보) */}
+                <GroupLabel>회사 정보 (운영용)</GroupLabel>
+                <Field label="홈페이지">
+                  <input
+                    type="url"
+                    className="input input-compact"
+                    placeholder="https://www.company.com"
+                    value={manualDraft.homepage ?? ''}
+                    onChange={(e) => setManualDraft({ ...manualDraft, homepage: e.target.value })}
+                  />
+                </Field>
+                <Field label="대표 전화">
+                  <input
+                    type="tel"
+                    className="input input-compact mono"
+                    placeholder="02-0000-0000"
+                    value={manualDraft.mainPhone ?? ''}
+                    onChange={(e) => setManualDraft({ ...manualDraft, mainPhone: e.target.value })}
+                  />
+                </Field>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <Field label="이름">
+                  <Field label="실무자">
                     <input
                       type="text"
                       className="input input-compact"
@@ -496,7 +519,7 @@ export function BusinessRegRegisterDialog({
                       onChange={(e) => setManualDraft({ ...manualDraft, contactName: e.target.value })}
                     />
                   </Field>
-                  <Field label="직책">
+                  <Field label="실무자 직책">
                     <input
                       type="text"
                       className="input input-compact"
@@ -505,7 +528,7 @@ export function BusinessRegRegisterDialog({
                       onChange={(e) => setManualDraft({ ...manualDraft, contactRole: e.target.value })}
                     />
                   </Field>
-                  <Field label="연락처">
+                  <Field label="실무자 연락처">
                     <input
                       type="tel"
                       className="input input-compact mono"
@@ -514,7 +537,7 @@ export function BusinessRegRegisterDialog({
                       onChange={(e) => setManualDraft({ ...manualDraft, contactPhone: e.target.value })}
                     />
                   </Field>
-                  <Field label="이메일">
+                  <Field label="실무자 이메일">
                     <input
                       type="email"
                       className="input input-compact"
@@ -561,6 +584,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <span style={{ fontSize: 11, color: 'var(--text-sub)', fontWeight: 600 }}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      marginTop: 8, paddingTop: 10,
+      borderTop: '1px solid var(--border-soft)',
+      fontSize: 12, fontWeight: 700, color: 'var(--text-main)',
+    }}>
       {children}
     </div>
   );

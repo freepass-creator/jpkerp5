@@ -101,25 +101,28 @@ export function CompanyDetailDialog({
       }
     >
       <Stack>
-        <Section title="회사 정보">
+        {/* 사업자등록 정보 — 사업자등록증에서 나오는 내용 */}
+        <Section title="사업자등록 정보">
           <Grid2>
             <EditableField editing={editing} label="회사명" value={cur.name} onChange={(v) => setDraft((d) => d && { ...d, name: v })} />
-            <EditableField editing={editing} label="코드" value={cur.code} readonly mono />
+            <EditableField editing={editing} label="대표자" value={cur.ceo} onChange={(v) => setDraft((d) => d && { ...d, ceo: v })} />
             <EditableField editing={editing} label="법인등록번호" value={cleanReg(cur.corpRegNo)} onChange={(v) => setDraft((d) => d && { ...d, corpRegNo: v })} mono />
             <EditableField editing={editing} label="사업자등록번호" value={cleanReg(cur.bizRegNo)} onChange={(v) => setDraft((d) => d && { ...d, bizRegNo: v })} mono />
-            <EditableField editing={editing} label="대표자" value={cur.ceo} onChange={(v) => setDraft((d) => d && { ...d, ceo: v })} />
-            <EditableField editing={editing} label="주소" value={cur.address} onChange={(v) => setDraft((d) => d && { ...d, address: v })} />
             <EditableField editing={editing} label="업종" value={cur.bizType} onChange={(v) => setDraft((d) => d && { ...d, bizType: v })} />
             <EditableField editing={editing} label="종목" value={cur.bizItem} onChange={(v) => setDraft((d) => d && { ...d, bizItem: v })} />
+            <EditableField editing={editing} label="주소" value={cur.address} onChange={(v) => setDraft((d) => d && { ...d, address: v })} />
           </Grid2>
         </Section>
 
-        <Section title="실무 담당자">
+        {/* 회사 정보 — 홈페이지·실무 담당자 (운영 contact) */}
+        <Section title="회사 정보">
           <Grid2>
-            <EditableField editing={editing} label="이름" value={cur.contactName} onChange={(v) => setDraft((d) => d && { ...d, contactName: v })} />
-            <EditableField editing={editing} label="직책" value={cur.contactRole} onChange={(v) => setDraft((d) => d && { ...d, contactRole: v })} />
-            <EditableField editing={editing} label="연락처" value={cleanReg(cur.contactPhone)} onChange={(v) => setDraft((d) => d && { ...d, contactPhone: v })} mono />
-            <EditableField editing={editing} label="이메일" value={cur.contactEmail} onChange={(v) => setDraft((d) => d && { ...d, contactEmail: v })} />
+            <EditableField editing={editing} label="홈페이지" value={cur.homepage} onChange={(v) => setDraft((d) => d && { ...d, homepage: v })} />
+            <EditableField editing={editing} label="대표 전화" value={cleanReg(cur.mainPhone)} onChange={(v) => setDraft((d) => d && { ...d, mainPhone: v })} mono />
+            <EditableField editing={editing} label="실무자" value={cur.contactName} onChange={(v) => setDraft((d) => d && { ...d, contactName: v })} />
+            <EditableField editing={editing} label="실무자 직책" value={cur.contactRole} onChange={(v) => setDraft((d) => d && { ...d, contactRole: v })} />
+            <EditableField editing={editing} label="실무자 연락처" value={cleanReg(cur.contactPhone)} onChange={(v) => setDraft((d) => d && { ...d, contactPhone: v })} mono />
+            <EditableField editing={editing} label="실무자 이메일" value={cur.contactEmail} onChange={(v) => setDraft((d) => d && { ...d, contactEmail: v })} />
           </Grid2>
         </Section>
 
