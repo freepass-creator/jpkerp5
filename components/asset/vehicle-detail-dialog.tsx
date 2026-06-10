@@ -1,0 +1,459 @@
+'use client';
+
+/**
+ * 자산(차량) 상세 다이얼로그 — 6탭 구성.
+ *
+ *  · 자산현황 view: 6탭 모두 (요약·할부·보험·계약이력·수납·정비)
+ *  · 등록차량 view: 요약 탭 단일 (제조사 스펙 + 자등증 + 첨부)
+ *
+ *  탭 컴포넌트는 향후 별도 파일로 분할 예정 (vehicle-detail/tabs/*).
+ *  공용 부품: DetailTabContent (탭 wrapper), COL/COL_FLEX (표 컬럼 width 토큰).
+ */
+
+import React, { useMemo } from 'react';
+import type { Vehicle, Contract, HistoryEntry } from '@/lib/types';
+import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
+import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Field } from '@/components/ui/editable-field';
+import { EmptyRow } from '@/components/ui/empty-row';
+import { DetailTabContent } from '@/components/ui/detail-tab-content';
+import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
+import { COL, COL_FLEX } from '@/lib/table-cols';
+
+/** KV — 공용 Field wrap alias (시각 통일). */
+function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boolean }) {
+  return <Field label={k} value={v == null || v === '' ? '-' : v} mono={mono} muted={v == null || v === ''} />;
+}
+
+/** KPI 카드 — 향후 요약 탭 상단 손익 KPI 등에 재사용 */
+export function Kpi({ label, value, hint, positive }: { label: string; value: string; hint?: string; positive?: boolean }) {
+  return (
+    <div style={{
+      padding: '10px 12px',
+      background: 'var(--bg-soft)',
+      border: '1px solid var(--border)',
+      borderRadius: 6,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2,
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>{label}</div>
+      <div style={{
+        fontSize: 16,
+        fontWeight: 700,
+        color: positive === undefined ? 'var(--text-main)' : positive ? 'var(--green-text)' : 'var(--red-text)',
+      }}>{value}</div>
+      {hint && <div style={{ fontSize: 10, color: 'var(--text-weak)' }}>{hint}</div>}
+    </div>
+  );
+}
+
+/* ─── 탭1: 요약 — 자산정보 + 등록증정보 ─── */
+function SummaryTab({ vehicle, onUpdate, showAttachment = true }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void; showAttachment?: boolean }) {
+  void onUpdate;
+  return (
+    <div className="detail-stack">
+      <section className="detail-section">
+        <div className="detail-section-header">제조사 스펙</div>
+        <div className="detail-section-body">
+          <div className="detail-grid-2">
+            <KV k="회사" v={vehicle.company} />
+            <KV k="차량번호" v={vehicle.plate} mono />
+            <KV k="상태" v={vehicle.status} />
+            <KV k="제조사" v={vehicle.vehicleMaker} />
+            <KV k="모델" v={vehicle.vehicleModelLine || vehicle.model} />
+            <KV k="세부모델" v={vehicle.vehicleSubModel} />
+            <KV k="트림" v={vehicle.vehicleTrim} />
+            <KV k="차종" v={vehicle.vehicleType} />
+            <KV k="연료" v={vehicle.fuelType} />
+            <KV k="배기량" v={vehicle.displacementCc ? `${vehicle.displacementCc.toLocaleString()}cc` : undefined} mono />
+            <KV k="승차정원" v={vehicle.seatingCapacity ? `${vehicle.seatingCapacity}인` : undefined} />
+            <KV k="외부 색상" v={vehicle.exteriorColor} />
+            <KV k="내부 색상" v={vehicle.interiorColor} />
+            <KV k="길이" v={vehicle.vehicleLength ? `${vehicle.vehicleLength.toLocaleString()}mm` : undefined} mono />
+            <KV k="너비" v={vehicle.vehicleWidth ? `${vehicle.vehicleWidth.toLocaleString()}mm` : undefined} mono />
+            <KV k="높이" v={vehicle.vehicleHeight ? `${vehicle.vehicleHeight.toLocaleString()}mm` : undefined} mono />
+            <KV k="총중량" v={vehicle.totalWeight ? `${vehicle.totalWeight.toLocaleString()}kg` : undefined} mono />
+          </div>
+        </div>
+      </section>
+
+      <section className="detail-section">
+        <div className="detail-section-header">자동차등록증 정보</div>
+        <div className="detail-section-body">
+          <div className="detail-grid-2">
+            <KV k="VIN" v={vehicle.vin} mono />
+            <KV k="용도" v={vehicle.vehicleUsage} />
+            <KV k="형식" v={vehicle.vehicleFormat} mono />
+            <KV k="원동기형식" v={vehicle.engineFormat} mono />
+            <KV k="제작연월" v={vehicle.manufacturedDate} mono />
+            <KV k="최초등록" v={vehicle.firstRegisteredDate} mono />
+            <KV k="소유자" v={vehicle.ownerName} />
+            <KV k="법인등록번호" v={vehicle.ownerRegNo} mono />
+            <KV k="제원관리번호" v={vehicle.specMgmtNo} mono />
+            <KV k="사용본거지" v={vehicle.garage} />
+            <KV k="매입일" v={vehicle.purchasedDate} mono />
+            <KV k="매입가" v={vehicle.purchasePrice ? `₩${vehicle.purchasePrice.toLocaleString()}` : undefined} mono />
+          </div>
+        </div>
+      </section>
+
+      {showAttachment && (
+        <AttachedFilePreview
+          title="원본 자동차등록증"
+          url={vehicle.registrationCertUrl}
+          fileName={vehicle.registrationCertFileName}
+          uploadedAt={vehicle.registrationCertUploadedAt}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── 탭2: 할부스케줄 ─── */
+function LoanScheduleTab({ vehicle }: { vehicle: Vehicle }) {
+  const months = vehicle.loanMonths ?? 0;
+  const start = vehicle.loanStartDate;
+  const remaining = vehicle.loanRemainingPrincipal ?? 0;
+  const purchasePrice = vehicle.purchasePrice ?? 0;
+
+  if (!vehicle.loanCompany || !months || !start) {
+    return (
+      <DetailTabContent isEmpty emptySummary="할부 정보 미입력 — 자산 등록 시 할부사·개월·개시일 입력하면 회차별 스케줄 자동 생성">
+        <table className="table">
+          <thead>
+            <tr>
+              <th className="num" style={{ width: COL.cycle }}>회차</th>
+              <th style={{ width: 100 }}>예정일</th>
+              <th className="num" style={{ width: COL.money }}>금액</th>
+              <th className="center" style={{ width: COL.status }}>상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            <EmptyRow colSpan={4}>할부 정보 없음</EmptyRow>
+          </tbody>
+        </table>
+      </DetailTabContent>
+    );
+  }
+
+  const monthly = purchasePrice && months ? Math.round(purchasePrice / months) : 0;
+  const startD = new Date(start);
+  const today = new Date();
+  const rows = Array.from({ length: months }, (_, i) => {
+    const due = new Date(startD);
+    due.setMonth(due.getMonth() + i);
+    const dueIso = due.toISOString().slice(0, 10);
+    const paid = due < today;
+    return { seq: i + 1, dueDate: dueIso, amount: monthly, paid };
+  });
+  const paidCount = rows.filter((r) => r.paid).length;
+  const paidSum = paidCount * monthly;
+
+  return (
+    <div className="detail-stack">
+      <section className="detail-section">
+        <div className="detail-section-header">할부 개요</div>
+        <div className="detail-section-body">
+          <div className="detail-grid-2">
+            <KV k="할부사" v={vehicle.loanCompany} />
+            <KV k="할부개월" v={`${months}개월`} />
+            <KV k="개시일" v={start} mono />
+            <KV k="잔여원금" v={`₩${remaining.toLocaleString()}`} mono />
+            <KV k="납입회차" v={`${paidCount} / ${months}`} />
+            <KV k="누적납입" v={`₩${paidSum.toLocaleString()}`} mono />
+          </div>
+        </div>
+      </section>
+
+      <section className="detail-section">
+        <div className="detail-section-header">회차별 스케줄</div>
+        <div className="detail-section-body">
+          <table className="table">
+            <thead>
+              <tr>
+                <th className="num" style={{ width: COL.cycle }}>회차</th>
+                <th style={{ width: 100 }}>예정일</th>
+                <th className="num" style={{ width: COL.money }}>금액</th>
+                <th className="center" style={{ width: COL.status }}>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.seq}>
+                  <td className="num mono">{r.seq}</td>
+                  <td className="mono">{r.dueDate}</td>
+                  <td className="num mono">₩{r.amount.toLocaleString()}</td>
+                  <td className="center">
+                    {r.paid ? <StatusBadge tone="green">납입</StatusBadge> : <StatusBadge tone="gray">예정</StatusBadge>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-weak)' }}>
+            ※ 실 납입 여부는 카드내역/계좌내역 매칭으로 자동 확정 — 위는 균등분할 추정치
+          </div>
+        </div>
+      </section>
+      <AttachedFilePreview
+        title="원본 할부계약서"
+        url={vehicle.loanContractUrl}
+        fileName={vehicle.loanContractFileName}
+        uploadedAt={vehicle.loanContractUploadedAt}
+      />
+    </div>
+  );
+}
+
+/* ─── 탭3: 보험·검사 ─── */
+function ComplianceTab({ vehicle, contracts }: { vehicle: Vehicle; contracts: Contract[] }) {
+  const active = contracts.find((c) => c.status === '운행') ?? contracts[0];
+  const insExp = active?.insuranceExpiryDate;
+  const inspDue = active?.inspectionDueDate;
+  const taxDue = active?.vehicleTaxDueDate;
+  const today = new Date();
+  const d = (s?: string) => s ? Math.floor((new Date(s).getTime() - today.getTime()) / 86400000) : null;
+
+  return (
+    <div className="detail-stack">
+      <section className="detail-section">
+        <div className="detail-section-header">자동차보험</div>
+        <div className="detail-section-body">
+          <div className="detail-grid-2">
+            <KV k="보험사" v={vehicle.insuranceCompany} />
+            <KV k="증권번호" v={vehicle.insurancePolicyNo} mono />
+            <KV k="만기일" v={insExp} mono />
+            <KV k="만기까지" v={d(insExp) != null ? `${d(insExp)}일` : undefined} />
+          </div>
+        </div>
+      </section>
+
+      <section className="detail-section">
+        <div className="detail-section-header">정기검사 · 자동차세</div>
+        <div className="detail-section-body">
+          <div className="detail-grid-2">
+            <KV k="다음 검사" v={inspDue} mono />
+            <KV k="검사까지" v={d(inspDue) != null ? `${d(inspDue)}일` : undefined} />
+            <KV k="자동차세 납기" v={taxDue} mono />
+            <KV k="납기까지" v={d(taxDue) != null ? `${d(taxDue)}일` : undefined} />
+          </div>
+        </div>
+      </section>
+      <AttachedFilePreview
+        title="원본 보험가입증명서"
+        url={vehicle.insuranceCertUrl}
+        fileName={vehicle.insuranceCertFileName}
+        uploadedAt={vehicle.insuranceCertUploadedAt}
+      />
+      <AttachedFilePreview
+        title="원본 정기검사증"
+        url={vehicle.inspectionCertUrl}
+        fileName={vehicle.inspectionCertFileName}
+        uploadedAt={vehicle.inspectionCertUploadedAt}
+      />
+    </div>
+  );
+}
+
+/* ─── 탭4: 계약이력 ─── */
+function ContractListTab({ contracts }: { contracts: Contract[] }) {
+  const totalUnpaid = contracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
+  const isEmpty = contracts.length === 0;
+  return (
+    <DetailTabContent
+      isEmpty={isEmpty}
+      summary={<>총 {contracts.length}건{totalUnpaid > 0 && <> · 현재 미수 <strong style={{ color: 'var(--red-text)' }}>₩{totalUnpaid.toLocaleString()}</strong></>}</>}
+      emptySummary="총 0건 — 운영현황에서 계약 등록 시 표시"
+    >
+      <table className="table">
+        <thead>
+          <tr>
+            <th style={{ width: COL.date }}>계약일</th>
+            <th style={{ width: COL.contractNo }}>계약번호</th>
+            <th style={COL_FLEX.customer}>계약자</th>
+            <th className="center" style={{ width: COL.term }}>약정</th>
+            <th className="num" style={{ width: COL.money }}>월대여료</th>
+            <th className="num" style={{ width: COL.money }}>보증금</th>
+            <th className="center" style={{ width: COL.status }}>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {isEmpty ? (
+            <EmptyRow colSpan={7}>계약 이력 없음</EmptyRow>
+          ) : contracts.map((c) => (
+            <tr key={c.id}>
+              <td className="mono">{c.contractDate}</td>
+              <td className="mono dim">{c.contractNo || <span className="muted">-</span>}</td>
+              <td>{c.customerName || <span className="muted">-</span>}</td>
+              <td className="center mono dim">{c.termMonths ? `${c.termMonths}개월` : <span className="muted">-</span>}</td>
+              <td className="num mono">{c.monthlyRent ? `₩${c.monthlyRent.toLocaleString()}` : <span className="muted">-</span>}</td>
+              <td className="num mono">{c.deposit ? `₩${c.deposit.toLocaleString()}` : <span className="muted">-</span>}</td>
+              <td className="center"><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </DetailTabContent>
+  );
+}
+
+/* ─── 탭5: 수납이력 ─── */
+function PaymentHistoryTab({ contracts }: { contracts: Contract[] }) {
+  type Row = { date: string; contractNo?: string; customer?: string; amount: number; method?: string; memo?: string };
+  const rows: Row[] = [];
+  for (const c of contracts) {
+    for (const s of c.schedules ?? []) {
+      for (const p of s.payments ?? []) {
+        rows.push({
+          date: p.date,
+          contractNo: c.contractNo,
+          customer: c.customerName,
+          amount: p.amount,
+          method: p.source,
+          memo: `${s.seq}회차`,
+        });
+      }
+    }
+  }
+  rows.sort((a, b) => b.date.localeCompare(a.date));
+  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const isEmpty = rows.length === 0;
+
+  return (
+    <DetailTabContent
+      isEmpty={isEmpty}
+      summary={<>총 {rows.length}건 · <strong style={{ color: 'var(--green-text)' }}>₩{total.toLocaleString()}</strong></>}
+      emptySummary="총 0건 — 계좌·카드 매칭으로 자동 등록"
+    >
+      <table className="table">
+        <thead>
+          <tr>
+            <th style={{ width: COL.date }}>일자</th>
+            <th style={{ width: COL.contractNo }}>계약번호</th>
+            <th style={COL_FLEX.customer}>계약자</th>
+            <th className="center" style={{ width: COL.term }}>회차</th>
+            <th className="center" style={{ width: COL.paymentMethod }}>경로</th>
+            <th className="num" style={{ width: COL.money }}>금액</th>
+          </tr>
+        </thead>
+        <tbody>
+          {isEmpty ? (
+            <EmptyRow colSpan={6}>수납 이력 없음</EmptyRow>
+          ) : rows.map((r, i) => (
+            <tr key={i}>
+              <td className="mono">{r.date}</td>
+              <td className="mono dim">{r.contractNo || <span className="muted">-</span>}</td>
+              <td>{r.customer || <span className="muted">-</span>}</td>
+              <td className="center dim">{r.memo}</td>
+              <td className="center dim">{r.method || <span className="muted">-</span>}</td>
+              <td className="num mono">₩{r.amount.toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </DetailTabContent>
+  );
+}
+
+/* ─── 탭6: 정비·수선 ─── */
+function RepairHistoryTab({ history }: { history: HistoryEntry[] }) {
+  const total = history.reduce((s, h) => s + (h.cost ?? 0), 0);
+  const isEmpty = history.length === 0;
+  return (
+    <DetailTabContent
+      isEmpty={isEmpty}
+      summary={<>총 {history.length}건 · 누적 비용 <strong style={{ color: 'var(--red-text)' }}>₩{total.toLocaleString()}</strong></>}
+      emptySummary="총 0건 — 운영현황 → 계약 행 → 이력 추가로 등록"
+    >
+      <table className="table">
+        <thead>
+          <tr>
+            <th style={{ width: COL.date }}>일자</th>
+            <th className="center" style={{ width: COL.category }}>분류</th>
+            <th style={COL_FLEX.title}>제목</th>
+            <th style={{ width: COL.vendor }}>업체</th>
+            <th className="num" style={{ width: COL.mileage }}>주행</th>
+            <th className="num" style={{ width: COL.money }}>금액</th>
+            <th className="center" style={{ width: COL.status }}>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {isEmpty ? (
+            <EmptyRow colSpan={7}>정비·수선 이력 없음</EmptyRow>
+          ) : history.map((h) => (
+            <tr key={h.id}>
+              <td className="mono">{h.date}</td>
+              <td className="center"><StatusBadge tone="neutral">{h.category}</StatusBadge></td>
+              <td>{h.title}</td>
+              <td className="dim">{h.vendor || <span className="muted">-</span>}</td>
+              <td className="num mono dim">{h.mileage ? `${h.mileage.toLocaleString()}km` : <span className="muted">-</span>}</td>
+              <td className="num mono">{h.cost ? `₩${h.cost.toLocaleString()}` : <span className="muted">-</span>}</td>
+              <td className="center">{h.status ? <StatusBadge tone={h.status === '완료' ? 'green' : 'blue'}>{h.status}</StatusBadge> : <span className="muted">-</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </DetailTabContent>
+  );
+}
+
+/* ─── 메인 다이얼로그 ─── */
+export function VehicleDetailDialog({
+  vehicle, history, contracts, view, onUpdate, onClose, onEdit,
+}: {
+  vehicle: Vehicle;
+  history: HistoryEntry[];
+  contracts: Contract[];
+  view: 'status' | 'registered';
+  onUpdate: (v: Vehicle) => void;
+  onClose: () => void;
+  onEdit?: (v: Vehicle) => void;
+}) {
+  const sortedHistory = useMemo(() => [...history].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')), [history]);
+  const sortedContracts = useMemo(() => [...contracts].sort((a, b) => (b.contractDate ?? '').localeCompare(a.contractDate ?? '')), [contracts]);
+
+  const repairHistory = useMemo(
+    () => sortedHistory.filter((h) => ['정비', '수선', '사고', '검사', '세차'].includes(h.category as string)),
+    [sortedHistory],
+  );
+
+  return (
+    <DetailDialogShell
+      open={true}
+      onOpenChange={(v) => !v && onClose()}
+      title={`자산 상세 — ${vehicle.plate || '미정'} ${vehicle.model || ''}`}
+      heroName={vehicle.vehicleModelLine || vehicle.model || vehicle.plate || '미정'}
+      heroMeta={
+        <>
+          <span className="plate">{vehicle.plate || '-'}</span>
+          <span>·</span>
+          <span>{vehicle.vehicleMaker || '제조사 미입력'}</span>
+          <span>·</span>
+          <span>{vehicle.company || '회사 미지정'}</span>
+          {vehicle.vin && (<><span>·</span><span style={{ fontFamily: 'var(--font-mono)' }}>{vehicle.vin}</span></>)}
+        </>
+      }
+      heroRight={
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <span className="dim" style={{ fontSize: 10 }}>상태</span>
+          <StatusBadge tone={vehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusBadge>
+        </div>
+      }
+      onEdit={onEdit ? () => { onClose(); onEdit(vehicle); } : undefined}
+      tabs={view === 'registered'
+        ? [
+            { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={true} /> },
+          ]
+        : [
+            { value: 'summary', label: '요약', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={false} /> },
+            { value: 'loan', label: '할부스케줄', content: <LoanScheduleTab vehicle={vehicle} /> },
+            { value: 'compliance', label: '보험·검사', content: <ComplianceTab vehicle={vehicle} contracts={sortedContracts} /> },
+            { value: 'contract', label: `계약이력 (${sortedContracts.length})`, content: <ContractListTab contracts={sortedContracts} /> },
+            { value: 'payment', label: `수납이력 (${sortedContracts.reduce((n, c) => n + (c.schedules ?? []).reduce((m, s) => m + (s.payments ?? []).length, 0), 0)})`, content: <PaymentHistoryTab contracts={sortedContracts} /> },
+            { value: 'repair', label: `정비·수선 (${repairHistory.length})`, content: <RepairHistoryTab history={repairHistory} /> },
+          ]}
+    />
+  );
+}
