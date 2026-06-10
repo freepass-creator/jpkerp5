@@ -1424,13 +1424,13 @@ function VehiclePaymentsTab({ c }: { c: Contract }) {
       {/* 계약자별 요약 (시각 구분 도움) */}
       {customerGroups.length > 0 && (
         <Section icon={<User size={12} weight="duotone" />} title={`계약자 ${customerGroups.length}명`}>
-          <table className="table" style={{ fontSize: 11 }}>
+          <table className="table">
             <thead>
               <tr>
-                <th>계약자</th>
-                <th className="mono">계약일자</th>
-                <th className="num">누적 입금액</th>
-                <th className="num">현재 미수</th>
+                <th style={{ minWidth: 140 }}>계약자</th>
+                <th style={{ width: 110 }}>계약일자</th>
+                <th className="num" style={{ width: 130 }}>누적 입금액</th>
+                <th className="num" style={{ width: 130 }}>현재 미수</th>
               </tr>
             </thead>
             <tbody>
@@ -2183,23 +2183,23 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
             이 차량의 모든 계약 — 최근 → 과거 순 (시트의 우측 = 직전 계약 순서대로)
           </div>
           <div style={{ overflow: 'auto' }}>
-            <table className="table" style={{ fontSize: 11, minWidth: 1400 }}>
+            <table className="table" style={{ minWidth: 1400 }}>
               <thead>
                 <tr>
-                  <th>계약자</th>
-                  <th className="mono" style={{ width: 100 }}>계약일자</th>
-                  <th className="mono" style={{ width: 90 }}>반납예정</th>
-                  <th className="mono" style={{ width: 90 }}>인도일</th>
-                  <th className="mono" style={{ width: 90 }}>반납일</th>
-                  <th className="center" style={{ width: 56 }}>약정</th>
-                  <th className="num" style={{ width: 90 }}>월대여료</th>
-                  <th className="num" style={{ width: 90 }}>보증금</th>
+                  <th style={{ minWidth: 180 }}>계약자</th>
+                  <th style={{ width: 90 }}>계약일자</th>
+                  <th style={{ width: 90 }}>반납예정</th>
+                  <th style={{ width: 90 }}>인도일</th>
+                  <th style={{ width: 90 }}>반납일</th>
+                  <th className="center" style={{ width: 70 }}>약정</th>
+                  <th className="num" style={{ width: 100 }}>월대여료</th>
+                  <th className="num" style={{ width: 100 }}>보증금</th>
                   <th className="center" style={{ width: 60 }}>결제일</th>
-                  <th style={{ width: 70 }}>결제방법</th>
+                  <th className="center" style={{ width: 80 }}>결제방법</th>
                   <th className="center" style={{ width: 60 }}>보험</th>
-                  <th className="num" style={{ width: 90 }}>미수</th>
-                  <th className="center" style={{ width: 64 }}>상태</th>
-                  <th style={{ width: 56 }}>회차</th>
+                  <th className="num" style={{ width: 100 }}>미수</th>
+                  <th className="center" style={{ width: 76 }}>상태</th>
+                  <th className="center" style={{ width: 60 }}>회차</th>
                   <th style={{ minWidth: 140 }}>비고</th>
                 </tr>
               </thead>
@@ -2314,16 +2314,16 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
               <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title} ({myEntries.length}건)</span>
               {totalCost > 0 && <span>누적 비용 <strong className="mono" style={{ color: 'var(--text-main)' }}>₩{formatCurrency(totalCost)}</strong></span>}
             </div>
-            <table className="table" style={{ fontSize: 11 }}>
+            <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: 110 }}>일자</th>
-                  <th className="center" style={{ width: 80 }}>분류</th>
-                  <th>제목 / 내용</th>
+                  <th style={{ width: 90 }}>일자</th>
+                  <th className="center" style={{ width: 70 }}>분류</th>
+                  <th style={{ minWidth: 180 }}>제목 / 내용</th>
                   {scope === 'vehicle' && <th style={{ width: 120 }}>업체</th>}
-                  {scope === 'vehicle' && <th className="num" style={{ width: 80 }}>주행거리</th>}
+                  {scope === 'vehicle' && <th className="num" style={{ width: 90 }}>주행거리</th>}
                   <th className="num" style={{ width: 100 }}>비용</th>
-                  <th className="center" style={{ width: 64 }}>상태</th>
+                  <th className="center" style={{ width: 76 }}>상태</th>
                   <th style={{ width: 36 }}></th>
                 </tr>
               </thead>
@@ -2331,7 +2331,7 @@ function HistoryListTab({ scope, c, onNavigate }: { scope: 'contract' | 'vehicle
                 {myEntries.map((e) => (
                   <tr key={e.id}>
                     <td className="mono">{e.date}</td>
-                    <td className="center"><span className="chip" style={{ height: 18, padding: '0 8px', fontSize: 10 }}>{e.category}</span></td>
+                    <td className="center"><StatusBadge tone="neutral">{e.category}</StatusBadge></td>
                     <td>
                       <div style={{ fontWeight: 500 }}>{e.title}</div>
                       {e.description && <div className="dim" style={{ fontSize: 10, marginTop: 2 }}>{e.description}</div>}
