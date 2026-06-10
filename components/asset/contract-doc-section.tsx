@@ -17,6 +17,7 @@ import { Paperclip, CircleNotch, CheckCircle, X, Camera, Warning } from '@phosph
 import { DateInput } from '@/components/ui/date-input';
 import type { Vehicle } from '@/lib/types';
 import { normalizePlateLoose as normalizePlate } from '@/lib/customer-match';
+import { fileToDataUrl } from '@/lib/image-compress';
 
 type Extracted = {
   car_number?: string;
@@ -40,6 +41,7 @@ export function ContractDocSection({
   const [error, setError] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<Extracted | null>(null);
   const [pendingFileName, setPendingFileName] = useState<string>('');
+  const [pendingFileDataUrl, setPendingFileDataUrl] = useState<string>('');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Vehicle>(vehicle);
 
@@ -51,6 +53,8 @@ export function ContractDocSection({
     setExtracted(null);
     setPendingFileName(file.name);
     try {
+      // 원본 파일 data URL 보존 — 첨부 보존 (보험증권·자동차등록증 패턴)
+      try { setPendingFileDataUrl(await fileToDataUrl(file)); } catch { /* fallback */ }
       const fd = new FormData();
       fd.append('file', file);
       fd.append('type', 'contract_doc');
@@ -92,6 +96,7 @@ export function ContractDocSection({
     const updated: Vehicle = {
       ...vehicle,
       contractDocFileName: pendingFileName || vehicle.contractDocFileName,
+      contractDocUrl: pendingFileDataUrl || vehicle.contractDocUrl,
       contractDocUploadedAt: vehicle.contractDocUploadedAt ?? now,
       contractDocOcrAt: now,
       contractDocSeller: extracted.seller ?? vehicle.contractDocSeller,
@@ -103,6 +108,7 @@ export function ContractDocSection({
     onUpdate(updated);
     setExtracted(null);
     setPendingFileName('');
+    setPendingFileDataUrl('');
   }
 
   function clearDoc() {

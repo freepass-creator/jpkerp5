@@ -10,6 +10,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { audit } from '@/lib/firebase/audit-store';
+import { fileToDataUrl } from '@/lib/image-compress';
 import type {
   Company, BankAccount, CorporateCard, CompanyLocation, CompanyDocument, LocationKind,
 } from '@/lib/types';
@@ -628,6 +629,19 @@ function InfoEditor({ draft, onChange }: { draft: Company; onChange: (c: Company
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || 'OCR 실패');
       const raw = json.extracted as Record<string, string | null>;
+      // 원본 파일 첨부 — documents 에 사업자등록증 한 줄 추가 (보험증권 패턴)
+      let fileUrl: string | undefined;
+      try { fileUrl = await fileToDataUrl(file); } catch { /* fallback — OCR 결과만 */ }
+      const now = new Date().toISOString();
+      const newDoc: CompanyDocument | null = fileUrl
+        ? {
+            id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            title: '사업자등록증',
+            fileUrl,
+            fileName: file.name,
+            uploadedAt: now,
+          }
+        : null;
       onChange({
         ...draft,
         name: (raw.partner_name ?? draft.name) || draft.name,
@@ -637,6 +651,7 @@ function InfoEditor({ draft, onChange }: { draft: Company; onChange: (c: Company
         address: raw.address ?? draft.address,
         bizType: raw.industry ?? draft.bizType,
         bizItem: raw.category ?? draft.bizItem,
+        documents: newDoc ? [...(draft.documents ?? []), newDoc] : draft.documents,
       });
     } catch (e) {
       setOcrError((e as Error).message ?? String(e));
