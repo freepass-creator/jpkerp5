@@ -35,6 +35,17 @@ function digits(s?: string): string {
   return (s ?? '').replace(/[^\d]/g, '');
 }
 
+/** 사업자/법인등록번호 raw → 회사 마스터 매칭 (자등증·보험·기타 OCR 공용) */
+export function findCompanyByRegNo(regNo: string | undefined, companies: Company[]): Company | undefined {
+  const norm = digits(regNo);
+  if (!norm) return undefined;
+  return companies.find((c) => {
+    const corp = digits(c.corpRegNo);
+    const biz = digits(c.bizRegNo);
+    return (corp && corp === norm) || (biz && biz === norm);
+  });
+}
+
 /** plate 기준 차량 찾기 (정규화 비교) */
 export function findVehicleByPlate(vehicles: Vehicle[], plate?: string): Vehicle | undefined {
   if (!plate) return undefined;
@@ -52,11 +63,7 @@ export function findCompanyForPolicy(
     const hit = companies.find((c) => c.code === policy.companyCode || c.name === policy.companyCode);
     if (hit) return hit;
   }
-  const biz = digits(policy.bizNo);
-  if (!biz) return undefined;
-  return companies.find(
-    (c) => digits(c.corpRegNo) === biz || digits(c.bizRegNo) === biz,
-  );
+  return findCompanyByRegNo(policy.bizNo, companies);
 }
 
 /** 계약의 회사 식별자 → 회사 마스터 매칭 */

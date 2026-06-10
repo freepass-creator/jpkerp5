@@ -17,7 +17,7 @@ import { Plus, X, CircleNotch, CheckCircle, Warning, Upload } from '@phosphor-ic
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useInsurances } from '@/lib/firebase/insurance-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
-import { upsertVehicleFromPolicy } from '@/lib/entity-sync';
+import { upsertVehicleFromPolicy, findCompanyByRegNo } from '@/lib/entity-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { buildInsurancePolicyFromOcr } from '@/lib/insurance-calc';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
@@ -144,18 +144,11 @@ export function InsuranceRegisterDialog({
           const matchedVehicle = carNumber
             ? vehicles.find((v) => (v.plate ?? '').replace(/\s/g, '') === carNumber)
             : undefined;
-          // 회사 매칭: 1) 매칭 차량의 company 우선 / 2) 차량 미매칭 시 보험증권 bizNo 로 직접 매칭
+          // 회사 매칭: 1) 매칭 차량의 company 우선 / 2) 차량 미매칭 시 보험증권 bizNo 로 직접 매칭 (공용 헬퍼)
           let companyMatch = matchedVehicle?.company;
           if (!companyMatch) {
-            const bizNoRaw = String(raw.biz_no ?? raw.bizNo ?? '').replace(/[^\d]/g, '');
-            if (bizNoRaw) {
-              const hit = companies.find((c) => {
-                const corp = (c.corpRegNo ?? '').replace(/[^\d]/g, '');
-                const biz = (c.bizRegNo ?? '').replace(/[^\d]/g, '');
-                return (corp && corp === bizNoRaw) || (biz && biz === bizNoRaw);
-              });
-              companyMatch = hit?.code || hit?.name;
-            }
+            const hit = findCompanyByRegNo(String(raw.biz_no ?? raw.bizNo ?? ''), companies);
+            companyMatch = hit?.code || hit?.name;
           }
 
           const policy = buildInsurancePolicyFromOcr(raw, {

@@ -25,19 +25,10 @@ import { fileToDataUrl } from '@/lib/image-compress';
 import { getFirebaseAuth } from '@/lib/firebase/client';
 import { toast } from '@/lib/toast';
 import type { Vehicle, CompanyCode } from '@/lib/types';
+import { normPlate, findCompanyByRegNo } from '@/lib/entity-sync';
 
 const OCR_CONCURRENCY = 30;
 const PLATE_RE = /^\d{2,3}[가-힣]\d{4}$/;
-
-/** 차량번호 정규화 — OCR 공백/invisible 문자 제거 + O→0 / I,l→1 자주 헷갈리는 영문 → 숫자 교정 */
-function normPlate(s: string | undefined): string {
-  if (!s) return '';
-  return s
-    .replace(/[\s​-‍﻿]+/g, '')  // 공백 + zero-width 문자
-    .replace(/O/g, '0').replace(/o/g, '0')
-    .replace(/I/g, '1').replace(/l/g, '1')
-    .replace(/[^0-9가-힣]/g, '');  // 한글·숫자만 남김 (특수문자 차단)
-}
 
 type Status = 'pending' | 'done' | 'failed';
 type WorkItem = Partial<Vehicle> & {
@@ -61,16 +52,9 @@ export function VehicleRegRegisterDialog({
   const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
   const { companies } = useCompanies();
 
-  /** 법인등록번호로 회사 매칭 → company 코드 반환. 미매칭 시 undefined */
+  /** 법인등록번호로 회사 매칭 → company 코드 (공용 entity-sync 헬퍼 사용) */
   function matchCompanyByRegNo(rawRegNo?: string): string | undefined {
-    if (!rawRegNo) return undefined;
-    const norm = rawRegNo.replace(/[^\d]/g, '');
-    if (!norm) return undefined;
-    const hit = companies.find((c) => {
-      const corp = (c.corpRegNo ?? '').replace(/[^\d]/g, '');
-      const biz = (c.bizRegNo ?? '').replace(/[^\d]/g, '');
-      return (corp && corp === norm) || (biz && biz === norm);
-    });
+    const hit = findCompanyByRegNo(rawRegNo, companies);
     return hit?.code || hit?.name;
   }
   const [items, setItems] = useState<WorkItem[]>([]);
