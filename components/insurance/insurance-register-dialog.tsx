@@ -12,7 +12,7 @@
  *   4) [모두 등록] — 등록 가능한 항목만 일괄 commit
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, X, CircleNotch, CheckCircle, Warning, Upload } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useInsurances } from '@/lib/firebase/insurance-store';
@@ -41,14 +41,16 @@ const PLATE_RE = /^\d{2,3}[가-힣]\d{4}$/;
 const fmt = (n: number | undefined): string => n == null ? '-' : `₩${n.toLocaleString('ko-KR')}`;
 
 export function InsuranceRegisterDialog({
-  open, onOpenChange, vehicleId, onSaved,
+  open, onOpenChange, vehicleId, onSaved, prefillPolicy,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   vehicleId?: string;
   onSaved?: (policy: InsurancePolicy) => void;
+  /** 수정 모드 — policy 객체로 표 prefill (insurance-detail dialog [수정] 호출) */
+  prefillPolicy?: InsurancePolicy | null;
 }) {
-  const { policies, add: addPolicy } = useInsurances();
+  const { policies, add: addPolicy, update: updatePolicy } = useInsurances();
   const { vehicles } = useVehicles();
   const { companies } = useCompanies();
   const [items, setItems] = useState<WorkItem[]>([]);
@@ -56,6 +58,21 @@ export function InsuranceRegisterDialog({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // 수정 모드 — open + prefillPolicy 변경 시 표에 1행 prefill (수정 후 저장 시 update)
+  useEffect(() => {
+    if (open && prefillPolicy) {
+      const matchedVehicle = vehicles.find((v) => v.id === prefillPolicy.vehicleId);
+      setItems([{
+        ...prefillPolicy,
+        _status: 'done',
+        _matchedVehicleId: matchedVehicle?.id,
+        _fileName: prefillPolicy.fileName,
+        _fileDataUrl: prefillPolicy.fileUrl,
+      }]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, prefillPolicy?.id]);
 
   function toggleRow(id: string) {
     setSelectedIds((prev) => {
@@ -192,11 +209,19 @@ export function InsuranceRegisterDialog({
     let success = 0, fail = 0;
     for (const item of registerableItems) {
       try {
-        const { _status: _s, _error: _e, _matchedVehicleId: _m, _fileDataUrl: fileUrl, _fileName: fn, id: _id, ...rest } = item;
-        // OCR 원본 파일도 함께 저장 — 상세 다이얼로그에서 미리보기 + 다운로드 가능
-        const newId = await addPolicy({ ...rest, fileName: fn, fileUrl, uploadedAt: new Date().toISOString() });
-        success++;
-        onSaved?.({ ...rest, id: newId, fileName: fn, fileUrl });
+        const { _status: _s, _error: _e, _matchedVehicleId: _m, _fileDataUrl: fileUrl, _fileName: fn, id: itemId, ...rest } = item;
+        // 수정 모드 — prefillPolicy 와 같은 id면 update
+        if (prefillPolicy && itemId === prefillPolicy.id) {
+          const updated: InsurancePolicy = { ...rest, id: itemId, fileName: fn, fileUrl };
+          await updatePolicy(updated);
+          success++;
+          onSaved?.(updated);
+        } else {
+          // OCR 원본 파일도 함께 저장 — 상세 다이얼로그에서 미리보기 + 다운로드 가능
+          const newId = await addPolicy({ ...rest, fileName: fn, fileUrl, uploadedAt: new Date().toISOString() });
+          success++;
+          onSaved?.({ ...rest, id: newId, fileName: fn, fileUrl });
+        }
       } catch (e) {
         console.error('insurance add failed', item.id, e);
         fail++;

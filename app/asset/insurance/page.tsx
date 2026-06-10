@@ -75,6 +75,7 @@ export default function AssetInsurancePage() {
   const [qf, setQf] = useState<QF>('all');
   const [registerOpen, setRegisterOpen] = useState(false);
   const [detailVehicleId, setDetailVehicleId] = useState<string | null>(null);
+  const [editPolicyId, setEditPolicyId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   function toggleRow(id: string) {
     setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -288,7 +289,11 @@ export default function AssetInsurancePage() {
 
         <InsuranceRegisterDialog
           open={registerOpen}
-          onOpenChange={setRegisterOpen}
+          onOpenChange={(o) => {
+            setRegisterOpen(o);
+            if (!o) setEditPolicyId(null);   // 닫을 때 수정 상태 해제
+          }}
+          prefillPolicy={editPolicyId ? policies.find((p) => p.id === editPolicyId) ?? null : null}
           onSaved={(p) => {
             // 매칭된 차량 (plate 기준) 의 보험 캐시 필드 동기화 — 자산관리 본 페이지의 "보험 미입력" 카운트도 즉시 반영
             if (!p.carNumber) return;
@@ -317,6 +322,12 @@ export default function AssetInsurancePage() {
               policy={p}
               contract={c}
               companyMaster={companyMaster}
+              onEdit={p ? () => {
+                // 상세 → 등록 다이얼로그(수정 모드) 전환
+                setEditPolicyId(p.id);
+                setDetailVehicleId(null);
+                setRegisterOpen(true);
+              } : undefined}
             />
           );
         })()}

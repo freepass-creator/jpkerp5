@@ -9,6 +9,7 @@ import { EngineLockDialog } from '@/components/engine-lock-dialog';
 import dynamic from 'next/dynamic';
 const CreateDialog = dynamic(() => import('@/components/create-dialog').then((m) => m.CreateDialog), { ssr: false });
 const RiskDetailDialog = dynamic(() => import('@/components/risk-detail-dialog').then((m) => m.RiskDetailDialog), { ssr: false });
+const ContractDetailDialog = dynamic(() => import('@/components/contract-detail-dialog').then((m) => m.ContractDetailDialog), { ssr: false });
 import { buildCompanyOptions } from '@/lib/filter-helpers';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -101,6 +102,8 @@ export default function ReceivablesPage() {
   const [smsOpen, setSmsOpen] = useState(false);
   const [engineLockTarget, setEngineLockTarget] = useState<Contract | null>(null);
   const [detailContract, setDetailContract] = useState<Contract | null>(null);
+  /** 리스크 상세 → [수정] 시 풀 계약 다이얼로그 열기 */
+  const [editContract, setEditContract] = useState<Contract | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const today = todayKr();
@@ -691,6 +694,17 @@ export default function ReceivablesPage() {
         onEngineLock={(c) => { setDetailContract(null); openEngineLockDialog(c); }}
         onSendSms={(c) => { setDetailContract(null); setSelectedIds(new Set([c.id])); setSmsOpen(true); }}
         onMarkDebt={(c) => { void updateContract({ ...c, status: '채권' }); }}
+        onEdit={detailContract ? () => {
+          // 리스크 다이얼로그 → 풀 계약 상세 dialog (수정 가능)
+          setEditContract(detailContract);
+          setDetailContract(null);
+        } : undefined}
+      />
+      <ContractDetailDialog
+        contract={editContract}
+        open={!!editContract}
+        onOpenChange={(v) => { if (!v) setEditContract(null); }}
+        onUpdate={(updated) => { void updateContract(updated); }}
       />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filtered} selectedIds={selectedIds} />
       <EngineLockDialog
