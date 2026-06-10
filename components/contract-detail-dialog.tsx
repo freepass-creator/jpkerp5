@@ -69,17 +69,21 @@ function ContractDetailShell({
 
   // 활성 탭 + 편집 가능한 탭의 ref dispatch (footer 통일 [수정] 버튼 → 활성 탭의 inline edit)
   // footer 는 [수정] 만 노출 — [저장]/[취소] 는 자식 탭의 inline 버튼이 담당 (state 동기 회피)
-  const [activeTab, setActiveTab] = useState<string>('status');
+  // 디폴트 탭 = 'asset' (수정 가장 자주 — footer [수정] 즉시 작동)
+  const [activeTab, setActiveTab] = useState<string>('asset');
   const assetRef = useRef<EditableTabHandle>(null);
   const contractRef = useRef<EditableTabHandle>(null);
   const editable: Record<string, React.RefObject<EditableTabHandle | null>> = {
     asset: assetRef,
     contract: contractRef,
   };
-  const canEdit = activeTab in editable;
-  const handleEdit = canEdit
-    ? () => editable[activeTab].current?.startEdit()
-    : undefined;
+  // footer [수정] — 모든 탭에서 노출. editable 아닌 탭에서 누르면 'asset'으로 자동 전환 + 편집
+  const handleEdit = () => {
+    const target = activeTab in editable ? activeTab : 'asset';
+    if (target !== activeTab) setActiveTab(target);
+    // ref 가 다음 렌더 후 mount 되도록 마이크로태스크 지연
+    queueMicrotask(() => editable[target].current?.startEdit());
+  };
 
   return (
     <DetailDialogShell
