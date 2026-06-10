@@ -16,7 +16,7 @@ import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { audit } from '@/lib/firebase/audit-store';
-import { stripCorpAndEnglish } from '@/lib/company-display';
+import { displayCompanyShort } from '@/lib/company-display';
 import { reassignVehiclesToCompany } from '@/lib/companies-sync';
 import { toast } from '@/lib/toast';
 import type { Company } from '@/lib/types';
@@ -80,7 +80,7 @@ export function CompanyDetailDialog({
       open={!!company}
       onOpenChange={onOpenChange}
       title={`법인 상세 — ${company.name}`}
-      heroName={stripCorpAndEnglish(cur.name) || cur.name}
+      heroName={displayCompanyShort(cur)}
       heroMeta={
         <>
           {cleanReg(cur.bizRegNo) && (<><span className="mono">{cleanReg(cur.bizRegNo)}</span><span>·</span></>)}
@@ -97,7 +97,8 @@ export function CompanyDetailDialog({
         {/* 사업자등록 정보 — 사업자등록증에서 나오는 내용 */}
         <Section title="사업자등록 정보">
           <Grid2>
-            <EditableField editing={editing} label="회사명" value={cur.name} onChange={(v) => setDraft((d) => d && { ...d, name: v })} />
+            <EditableField editing={editing} label="회사명 (정식)" value={cur.name} onChange={(v) => setDraft((d) => d && { ...d, name: v })} />
+            <EditableField editing={editing} label="표기명" value={cur.displayName} onChange={(v) => setDraft((d) => d && { ...d, displayName: v })} />
             <EditableField editing={editing} label="대표자" value={cur.ceo} onChange={(v) => setDraft((d) => d && { ...d, ceo: v })} />
             <EditableField editing={editing} label="법인등록번호" value={cleanReg(cur.corpRegNo)} onChange={(v) => setDraft((d) => d && { ...d, corpRegNo: v })} mono />
             <EditableField editing={editing} label="사업자등록번호" value={cleanReg(cur.bizRegNo)} onChange={(v) => setDraft((d) => d && { ...d, bizRegNo: v })} mono />

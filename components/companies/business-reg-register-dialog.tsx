@@ -280,6 +280,7 @@ export function BusinessRegRegisterDialog({
           bizType: manualDraft.bizType,
           bizItem: manualDraft.bizItem,
           partnerKind: manualDraft.partnerKind ?? '기타',
+          displayName: manualDraft.displayName,
           homepage: manualDraft.homepage,
           mainPhone: manualDraft.mainPhone,
           contactName: manualDraft.contactName,
@@ -456,6 +457,15 @@ export function BusinessRegRegisterDialog({
                     </select>
                   </Field>
                 </div>
+                <Field label="표기명 (선택 — 비우면 정식 회사명 그대로 표시)">
+                  <input
+                    type="text"
+                    className="input input-compact"
+                    placeholder="예: 스위치플랜"
+                    value={manualDraft.displayName ?? ''}
+                    onChange={(e) => setManualDraft({ ...manualDraft, displayName: e.target.value })}
+                  />
+                </Field>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <Field label="대표자">
                     <input

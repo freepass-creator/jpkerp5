@@ -402,6 +402,8 @@ export type Company = {
   customerServicePhone?: string; // 고객센터 전화 (별도 운영 시) — 손님 페이지 노출
   /** 운영 구분 — 위탁/직영/기타. OCR/미지정 시 기본 '기타' */
   partnerKind?: '위탁' | '직영' | '기타';
+  /** 표기명 — 화면에 노출할 짧은 명칭 (예: 정식 '스위치플랜 주식회사' / 표기 '스위치플랜'). 비어있으면 stripCorpAndEnglish(name) 자동 표시 */
+  displayName?: string;
   /** 회사 정보 — 홈페이지·실무 담당자 */
   homepage?: string;             // 회사 홈페이지 URL
   contactName?: string;          // 실무 담당자 이름

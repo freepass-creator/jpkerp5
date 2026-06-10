@@ -39,6 +39,15 @@ export function stripCorpSuffix(name: string): string {
   return n.replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * 회사 표기명 — Company.displayName 우선, 입력 안 했으면 정식 회사명(name) 그대로.
+ * 사용자가 한 곳에서 표기명을 바꾸면 모든 페이지 일괄 반영.
+ */
+export function displayCompanyShort(c: { displayName?: string; name: string }): string {
+  const d = (c.displayName ?? '').trim();
+  return d || c.name;
+}
+
 /** "스위치플랜 (Switch Plan Co.,Ltd)" / "Switch Plan 주식회사" → "스위치플랜" — 한글 회사명만 추출 */
 export function stripCorpAndEnglish(name: string): string {
   if (!name) return '';
@@ -105,7 +114,10 @@ export function displayCompanyName(
   });
 
   if (matched) {
-    return stripCorpSuffix(matched.name) || matched.name;
+    // 사용자 입력 표기명 우선
+    const d = (matched.displayName ?? '').trim();
+    if (d) return d;
+    return matched.name;
   }
 
   // 마스터 못 찾음 — 원본이 식별번호 모양이면 뒷자리 추출

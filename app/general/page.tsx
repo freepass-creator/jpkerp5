@@ -20,7 +20,7 @@ import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-r
 import { CompanyDetailDialog } from '@/components/companies/company-detail-dialog';
 import { audit } from '@/lib/firebase/audit-store';
 import { useStaffList } from '@/lib/use-staff-list';
-import { stripCorpAndEnglish } from '@/lib/company-display';
+import { displayCompanyShort } from '@/lib/company-display';
 import type { Company } from '@/lib/types';
 
 type GeneralView =
@@ -305,7 +305,16 @@ function CompanyListView({
               <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                 <input type="checkbox" checked={checked} onChange={() => toggle(c.id)} aria-label={`${c.name} 선택`} />
               </td>
-              <td>{stripCorpAndEnglish(c.name) || c.name || <span className="muted">이름 미입력</span>}</td>
+              <td>
+                {c.name || c.displayName ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <span>{displayCompanyShort(c)}</span>
+                    {c.displayName?.trim() && c.displayName.trim() !== c.name && (
+                      <span className="dim" style={{ fontSize: 11 }}>{c.name}</span>
+                    )}
+                  </div>
+                ) : <span className="muted">이름 미입력</span>}
+              </td>
               <td className="dim">{c.partnerKind || '기타'}</td>
               <td className="dim">{c.corpRegNo?.replace(/[^\d-]/g, '') || '-'}</td>
               <td className="dim">{c.bizRegNo?.replace(/[^\d-]/g, '') || '-'}</td>
