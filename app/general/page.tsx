@@ -260,14 +260,14 @@ function CompanyListView({
                 <input type="checkbox" checked={checked} onChange={() => toggle(c.id)} aria-label={`${c.name} 선택`} />
               </td>
               <td>{c.name || <span className="muted">이름 미입력</span>}</td>
-              <td className="mono dim">{c.corpRegNo || '-'}</td>
-              <td className="mono dim">{c.bizRegNo || '-'}</td>
+              <td className="dim">{c.corpRegNo || '-'}</td>
+              <td className="dim">{c.bizRegNo || '-'}</td>
               <td>{c.ceo || <span className="muted">-</span>}</td>
               <td className="dim">{c.address || '-'}</td>
               <td className="dim">{c.bizType || '-'}</td>
               <td className="dim">{c.bizItem || '-'}</td>
               <td>{c.contactName || <span className="muted">-</span>}{c.contactRole && <span className="dim" style={{ marginLeft: 4 }}>· {c.contactRole}</span>}</td>
-              <td className="mono dim">{c.contactPhone || '-'}</td>
+              <td className="dim">{c.contactPhone || '-'}</td>
               <td className="dim">{c.contactEmail || '-'}</td>
             </tr>
           );
