@@ -40,6 +40,7 @@ import { toast } from '@/lib/toast';
 import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { upsertVehicleFromContract } from '@/lib/entity-sync';
 
 type Mode = '현황' | '차량' | '계약' | '입출금' | '자동이체' | '카드매출' | '법인카드' | '이력';
 
@@ -2022,7 +2023,8 @@ function ContractRegisterPane({
 function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
   const companyNames = useCompanyNames();
   const { add: addContract } = useContracts();
-  const { vehicles, add: addVehicle } = useVehicles();
+  const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
+  const { companies } = useCompanies();
   const [company, setCompany] = useState(companyNames[0] ?? '');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone1, setCustomerPhone1] = useState('');
@@ -2125,7 +2127,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
       const contractNo = `ICR-${yy}${mm}-${genCode(4)}`;
 
       // Phosphor types CompanyCode 가 alias 라 그대로 사용
-      await addContract({
+      const newContractId = await addContract({
         contractNo,
         company: (company || '기타') as import('@/lib/types').CompanyCode,
         customerName: customerName.trim(),
@@ -2165,6 +2167,34 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
         unpaidAmount: 0,
         unpaidSeqCount: 0,
       });
+      // SSoT: 같은 plate Vehicle 자동 upsert (없으면 자동 생성 + 자산 노출)
+      try {
+        const builtContract = {
+          id: newContractId,
+          contractNo,
+          company: (company || '기타') as import('@/lib/types').CompanyCode,
+          vehiclePlate: plate.trim() || '미정',
+          vehicleModel: buildVehicleFullName({
+            maker: vehicleMaker, model: vehicleModelLine, subModel: vehicleSubModel,
+            variant: vehicleVariant, trim: vehicleTrim,
+          }) || '미정',
+          vehicleStatus: '구매대기' as import('@/lib/types').VehicleStatus,
+          vehicleMaker: vehicleMaker.trim() || undefined,
+          vehicleModelLine: vehicleModelLine.trim() || undefined,
+          vehicleSubModel: vehicleSubModel.trim() || undefined,
+          vehicleVariant: vehicleVariant.trim() || undefined,
+          vehicleTrim: vehicleTrim.trim() || undefined,
+          status: '대기' as import('@/lib/types').ContractStatus,
+          customerName: customerName.trim(),
+          customerPhone1: customerPhone1.trim(),
+          contractDate,
+        } as unknown as import('@/lib/types').Contract;
+        await upsertVehicleFromContract(builtContract, {
+          vehicles, companies, addVehicle, updateVehicle,
+        });
+      } catch (syncErr) {
+        console.error('vehicle sync from contract failed', syncErr);
+      }
       onSubmit();
     } catch (e) {
       alert('계약 등록 실패: ' + ((e as Error).message ?? String(e)));

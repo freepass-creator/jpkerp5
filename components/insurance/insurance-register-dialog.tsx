@@ -17,6 +17,7 @@ import { Plus, X, CircleNotch, CheckCircle, Warning, Upload } from '@phosphor-ic
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useInsurances } from '@/lib/firebase/insurance-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { upsertVehicleFromPolicy } from '@/lib/entity-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { buildInsurancePolicyFromOcr } from '@/lib/insurance-calc';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
@@ -51,7 +52,7 @@ export function InsuranceRegisterDialog({
   prefillPolicy?: InsurancePolicy | null;
 }) {
   const { policies, add: addPolicy, update: updatePolicy } = useInsurances();
-  const { vehicles } = useVehicles();
+  const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
   const { companies } = useCompanies();
   const [items, setItems] = useState<WorkItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -206,21 +207,30 @@ export function InsuranceRegisterDialog({
       return;
     }
     setBusy(true);
-    let success = 0, fail = 0;
+    let success = 0, fail = 0, vehicleCreated = 0;
     for (const item of registerableItems) {
       try {
         const { _status: _s, _error: _e, _matchedVehicleId: _m, _fileDataUrl: fileUrl, _fileName: fn, id: itemId, ...rest } = item;
         // 수정 모드 — prefillPolicy 와 같은 id면 update
+        let savedPolicy: InsurancePolicy;
         if (prefillPolicy && itemId === prefillPolicy.id) {
-          const updated: InsurancePolicy = { ...rest, id: itemId, fileName: fn, fileUrl };
-          await updatePolicy(updated);
-          success++;
-          onSaved?.(updated);
+          savedPolicy = { ...rest, id: itemId, fileName: fn, fileUrl };
+          await updatePolicy(savedPolicy);
         } else {
           // OCR 원본 파일도 함께 저장 — 상세 다이얼로그에서 미리보기 + 다운로드 가능
           const newId = await addPolicy({ ...rest, fileName: fn, fileUrl, uploadedAt: new Date().toISOString() });
-          success++;
-          onSaved?.({ ...rest, id: newId, fileName: fn, fileUrl });
+          savedPolicy = { ...rest, id: newId, fileName: fn, fileUrl };
+        }
+        success++;
+        onSaved?.(savedPolicy);
+        // SSoT: Vehicle 자동 upsert — 같은 plate 차량 없으면 자동 생성 + 보험 캐시 sync
+        try {
+          const sync = await upsertVehicleFromPolicy(savedPolicy, {
+            vehicles, companies, addVehicle, updateVehicle,
+          });
+          if (sync?.created) vehicleCreated++;
+        } catch (syncErr) {
+          console.error('vehicle sync from policy failed', syncErr);
         }
       } catch (e) {
         console.error('insurance add failed', item.id, e);
@@ -228,7 +238,10 @@ export function InsuranceRegisterDialog({
       }
     }
     setBusy(false);
-    if (success > 0) toast.success(`보험증권 ${success}건 등록${fail > 0 ? ` (실패 ${fail}건)` : ''}`);
+    if (success > 0) {
+      const veh = vehicleCreated > 0 ? ` (차량 ${vehicleCreated}대 자동 등록)` : '';
+      toast.success(`보험증권 ${success}건 등록${veh}${fail > 0 ? ` (실패 ${fail}건)` : ''}`);
+    }
     if (fail > 0 && success === 0) toast.error(`등록 모두 실패 (${fail}건)`);
     handleClose(false);
   }
