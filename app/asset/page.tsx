@@ -41,6 +41,7 @@ import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
+import { Field } from '@/components/ui/editable-field';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
@@ -977,11 +978,7 @@ function RepairHistoryTab({ history }: { history: HistoryEntry[] }) {
   );
 }
 
-function KV({ k, v, mono = false }: { k: string; v?: string | number | null; mono?: boolean }) {
-  return (
-    <div className="detail-field">
-      <div className="label">{k}</div>
-      <div className={`value ${mono ? 'mono' : ''} ${v ? '' : 'muted'}`}>{v ?? '-'}</div>
-    </div>
-  );
+// KV — 공용 Field wrap alias (시각 통일).
+function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boolean }) {
+  return <Field label={k} value={v == null || v === '' ? '-' : v} mono={mono} muted={v == null || v === ''} />;
 }

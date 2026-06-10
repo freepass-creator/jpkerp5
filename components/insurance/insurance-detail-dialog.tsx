@@ -12,6 +12,7 @@
  */
 
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
+import { Field } from '@/components/ui/editable-field';
 import type { InsurancePolicy, Vehicle, Contract } from '@/lib/types';
 import { daysToExpiry, installmentSum, installmentMatchesTotal } from '@/lib/insurance-calc';
 import { displayCompanyName } from '@/lib/company-display';
@@ -239,13 +240,7 @@ export function InsuranceDetailDialog({
   );
 }
 
-function KV({ k, v, mono = false }: { k: string; v?: string | number | null; mono?: boolean }) {
-  return (
-    <div className="detail-field" style={{ display: 'flex', gap: 8 }}>
-      <span className="detail-field-label" style={{ minWidth: 96, color: 'var(--text-sub)', fontSize: 11 }}>{k}</span>
-      <span className={`detail-field-value ${mono ? 'mono' : ''}`} style={{ fontSize: 12, color: 'var(--text-main)', flex: 1 }}>
-        {v == null || v === '' ? <span className="muted">-</span> : v}
-      </span>
-    </div>
-  );
+// KV — 공용 Field wrap alias (시각 통일).
+function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boolean }) {
+  return <Field label={k} value={v == null || v === '' ? '-' : v} mono={mono} muted={v == null || v === ''} />;
 }
