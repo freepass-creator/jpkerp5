@@ -6,10 +6,12 @@ import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
   Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch,
   Upload, Warning as WarningIcon, X as XIcon, X, CaretRight,
+  Pencil,
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
+import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
 import { toast } from '@/lib/toast';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -283,6 +285,7 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
   const { vehicles } = useVehicles();
   const { contracts: allContracts } = useContractsList();
   const [editing, setEditing] = useState(false);
+  const [regOpen, setRegOpen] = useState(false);     // 자동차등록증 OCR 다이얼로그 inline
   const [draft, setDraft] = useState<Contract>(c);
   useEffect(() => { if (!editing) setDraft(c); }, [c, editing]);
   useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
@@ -431,26 +434,44 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
         </Section>
       )}
 
-      {/* 등록증 정보 — OCR 자동입력 영역 (현재 mock) */}
-      <Section icon={<Car size={12} weight="duotone" />} title="자동차등록증 (OCR 자동입력)">
+      {/* 등록증 정보 — Vehicle 마스터에서 직접. 미보유 시 inline [등록증 등록] 버튼 */}
+      <Section
+        icon={<Car size={12} weight="duotone" />}
+        title="자동차등록증"
+        action={
+          vehicle ? (
+            <button className="btn btn-sm" type="button" onClick={() => setRegOpen(true)}>
+              <Pencil size={11} weight="bold" /> {vehicle.vin ? '등록증 수정' : '등록증 등록'}
+            </button>
+          ) : null
+        }
+      >
         <div className="detail-grid-2">
           <div>
-            <Field label="차대번호" value={<span className="muted">-</span>} mono />
-            <Field label="연식" value={<span className="muted">-</span>} mono />
-            <Field label="색상" value={<span className="muted">-</span>} />
-            <Field label="연료" value={<span className="muted">-</span>} />
+            <Field label="차대번호" value={vehicle?.vin || <span className="muted">-</span>} mono />
+            <Field label="제조연월" value={vehicle?.manufacturedDate || <span className="muted">-</span>} mono />
+            <Field label="외장 색상" value={vehicle?.exteriorColor || <span className="muted">-</span>} />
+            <Field label="연료" value={vehicle?.fuelType || <span className="muted">-</span>} />
           </div>
           <div>
-            <Field label="배기량" value={<span className="muted">-</span>} mono />
-            <Field label="용도" value={<span className="muted">-</span>} />
-            <Field label="제조사" value={<span className="muted">-</span>} />
-            <Field label="형식" value={<span className="muted">-</span>} />
+            <Field label="배기량" value={vehicle?.displacementCc ? `${vehicle.displacementCc}cc` : <span className="muted">-</span>} mono />
+            <Field label="용도" value={vehicle?.vehicleUsage || <span className="muted">-</span>} />
+            <Field label="제조사" value={vehicle?.vehicleMaker || <span className="muted">-</span>} />
+            <Field label="형식" value={vehicle?.vehicleFormat || <span className="muted">-</span>} />
           </div>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-weak)', marginTop: 8 }}>
-          ↑ 자동차등록증 사진 스캔 시 자동 채움 — 현재 데이터 미보유
-        </div>
+        {(!vehicle?.vin) && (
+          <div style={{ fontSize: 11, color: 'var(--text-weak)', marginTop: 8 }}>
+            ↑ {vehicle ? '자동차등록증 OCR 등록으로 자동 채움' : '같은 차량번호의 자산이 아직 없음 — 운영현황 저장 시 자동 생성됨'}
+          </div>
+        )}
       </Section>
+      <VehicleRegRegisterDialog
+        open={regOpen}
+        onOpenChange={setRegOpen}
+        prefillVehicle={vehicle ?? null}
+        onSaved={() => setRegOpen(false)}
+      />
     </div>
   );
 });
