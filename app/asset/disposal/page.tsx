@@ -18,6 +18,8 @@ import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { vehicleStatusTone } from '@/lib/status-tones';
 
 const DISPOSAL_STATUSES = ['매각검토', '매각대기', '매각'] as const;
 
@@ -98,7 +100,7 @@ export default function AssetDisposalPage() {
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
                       <td className="mono dim">{v.manufacturedDate?.slice(0, 7) || '-'}</td>
                       <td className="num mono">{v.purchasePrice ? `₩${v.purchasePrice.toLocaleString()}` : '-'}</td>
-                      <td className="center"><span className={`status ${v.status}`}>{v.status}</span></td>
+                      <td className="center"><StatusBadge tone={vehicleStatusTone(v.status)}>{v.status}</StatusBadge></td>
                     </tr>
                   ))}
                 </tbody>

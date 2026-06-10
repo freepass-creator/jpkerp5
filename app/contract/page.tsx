@@ -29,6 +29,8 @@ import { todayKr } from '@/lib/mock-data';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { toast } from '@/lib/toast';
 import { EmptyRow } from '@/components/ui/empty-row';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { contractStatusTone } from '@/lib/status-tones';
 
 export default function ContractPage() {
   const router = useRouter();
@@ -240,27 +242,27 @@ export default function ContractPage() {
                           aria-label="전체 선택"
                         />
                       </th>
-                      <th style={{ width: 60 }}>회사</th>
+                      <th style={{ width: 56 }}>회사</th>
                       <th style={{ width: 110 }}>계약번호</th>
-                      <th style={{ width: 90 }}>차량번호</th>
-                      <th>계약자</th>
+                      <th style={{ width: 96 }}>차량번호</th>
+                      <th style={{ minWidth: 180 }}>계약자</th>
                       <th style={{ width: 110 }}>연락처</th>
                       <th style={{ width: 90 }}>계약일</th>
                       <th style={{ width: 90 }}>만기일</th>
                       <th className="num" style={{ width: 100 }}>월대여료</th>
                       <th className="num" style={{ width: 100 }}>보증금</th>
-                      <th style={{ width: 60 }}>상태</th>
+                      <th className="center" style={{ width: 76 }}>상태</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.length === 0 ? (
-                      <tr><td colSpan={11} className="muted center" style={{ padding: 32 }}>계약 없음</td></tr>
+                      <EmptyRow colSpan={11}>계약 없음</EmptyRow>
                     ) : filtered.map((c) => (
                       <tr key={c.id} onDoubleClick={() => setOpenId(c.id)} style={{ cursor: 'pointer' }} className={selectedIds.has(c.id) ? 'selected-row' : undefined}>
                         <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleRow(c.id)} aria-label="행 선택" />
                         </td>
-                        <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
+                        <td>{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                         <td className="mono">{c.contractNo}</td>
                         <td className="mono">{c.vehiclePlate}</td>
                         <td>{c.customerName}</td>
@@ -269,7 +271,7 @@ export default function ContractPage() {
                         <td className="mono dim">{c.returnScheduledDate || '-'}</td>
                         <td className="num mono">₩{(c.monthlyRent ?? 0).toLocaleString()}</td>
                         <td className="num mono">₩{(c.deposit ?? 0).toLocaleString()}</td>
-                        <td><span className={`status ${c.status}`}>{c.status}</span></td>
+                        <td className="center"><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
                       </tr>
                     ))}
                   </tbody>

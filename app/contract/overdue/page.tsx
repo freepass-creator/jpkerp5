@@ -15,6 +15,8 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { contractStatusTone } from '@/lib/status-tones';
 
 export default function ContractOverduePage() {
   const { contracts } = useContracts();
@@ -102,7 +104,7 @@ export default function ContractOverduePage() {
                 ₩{(c.unpaidAmount ?? 0).toLocaleString()}
               </td>
               <td className="mono dim">{c.lastPaidDate || '-'}</td>
-              <td><span className={`status ${c.status}`}>{c.status}</span></td>
+              <td><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
             </tr>
           ))}
         </tbody>

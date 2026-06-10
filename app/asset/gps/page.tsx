@@ -14,6 +14,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { vehicleStatusTone } from '@/lib/status-tones';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
@@ -100,7 +101,7 @@ export default function AssetGpsPage() {
                             : <StatusBadge tone="gray">미설치</StatusBadge>}
                         </td>
                         <td className="center dim">-</td>
-                        <td className="center"><span className={`status ${v.status}`}>{v.status}</span></td>
+                        <td className="center"><StatusBadge tone={vehicleStatusTone(v.status)}>{v.status}</StatusBadge></td>
                       </tr>
                     );
                   })}

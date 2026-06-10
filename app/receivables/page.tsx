@@ -23,6 +23,8 @@ import { todayKr } from '@/lib/mock-data';
 import { friendlyError } from '@/lib/friendly-error';
 import type { Contract, RiskIssue } from '@/lib/types';
 import { computeActiveIssues, pickPrimaryIssue, computeLatePayStage, ISSUE_COLOR, ISSUE_LABEL, type LatePayStage, needsEngineLockAction, needsNoticeAction } from '@/lib/risk-issues';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { vehicleStatusTone } from '@/lib/status-tones';
 
 type Filter =
   | '전체'           // 진행중 전체 (종결 제외)
@@ -390,7 +392,7 @@ export default function ReceivablesPage() {
                             />
                           </td>
                           <td className="center dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
-                          <td className="center"><span className={`status ${c.vehicleStatus}`}>{c.vehicleStatus || '-'}</span></td>
+                          <td className="center">{c.vehicleStatus ? <StatusBadge tone={vehicleStatusTone(c.vehicleStatus)}>{c.vehicleStatus}</StatusBadge> : <span className="muted">-</span>}</td>
                           <td className="mono">{c.vehiclePlate}</td>
                           <td>{c.customerName}</td>
                           <td className="mono">{c.customerPhone1 || '-'}</td>

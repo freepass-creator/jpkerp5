@@ -14,6 +14,8 @@ import { displayCompanyName } from '@/lib/company-display';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
 import { EmptyRow } from '@/components/ui/empty-row';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { vehicleStatusTone } from '@/lib/status-tones';
 import { BottomBar } from '@/components/layout/bottom-bar';
 
 export default function PurchasePage() {
@@ -115,7 +117,7 @@ export default function PurchasePage() {
                 <td>{v.model}</td>
                 <td className="mono">{v.purchasedDate}</td>
                 <td className="num mono">{v.purchasePrice ? `₩${v.purchasePrice.toLocaleString()}` : '-'}</td>
-                <td><span className={`status ${v.status}`}>{v.status}</span></td>
+                <td><StatusBadge tone={vehicleStatusTone(v.status)}>{v.status}</StatusBadge></td>
                 <td className="mono dim">{v.registeredDate || '-'}</td>
               </tr>
             ))}

@@ -19,6 +19,8 @@ import { useRole } from '@/lib/use-role';
 import { todayKr } from '@/lib/mock-data';
 import { IdleLocationDialog } from '@/components/idle-location-dialog';
 import type { Contract } from '@/lib/types';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { vehicleStatusTone } from '@/lib/status-tones';
 
 export default function ContractIdlePage() {
   const router = useRouter();
@@ -139,7 +141,7 @@ export default function ContractIdlePage() {
                 <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                 <td className="mono">{c.vehiclePlate}</td>
                 <td className="dim">{c.vehicleModel || '-'}</td>
-                <td><span className={`status ${c.vehicleStatus}`}>{c.vehicleStatus}</span></td>
+                <td><StatusBadge tone={vehicleStatusTone(c.vehicleStatus)}>{c.vehicleStatus}</StatusBadge></td>
                 <td className="mono">{c.idleSince || '-'}</td>
                 <td className="num mono" style={{ color: days != null && days > 30 ? 'var(--red-text)' : undefined, fontWeight: days != null && days > 30 ? 700 : undefined }}>
                   {days != null ? `D+${days}` : '-'}

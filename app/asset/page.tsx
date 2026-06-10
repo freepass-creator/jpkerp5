@@ -40,6 +40,7 @@ import { DialogRoot, DialogContent, DialogBody, DialogClose } from '@/components
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
@@ -419,7 +420,7 @@ export default function AssetPage() {
                           ? <span style={{ color: 'var(--green-text)' }}>✓ 모두 입력 완료</span>
                           : <span style={{ color: 'var(--red-text)' }}>● {missing.join(' · ')} 미입력</span>}
                       </td>
-                      <td className="center"><span className={`status ${v.status}`}>{v.status}</span></td>
+                      <td className="center"><StatusBadge tone={vehicleStatusTone(v.status)}>{v.status}</StatusBadge></td>
                     </tr>
                   );
                   })}
@@ -593,7 +594,7 @@ function VehicleDetailDialog({
       heroRight={
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <span className="dim" style={{ fontSize: 10 }}>상태</span>
-          <span className={`status ${vehicle.status}`}>{vehicle.status}</span>
+          <StatusBadge tone={vehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusBadge>
         </div>
       }
       onEdit={onEdit ? () => { onClose(); onEdit(vehicle); } : undefined}
@@ -869,7 +870,7 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
             <td>{c.termMonths}개월</td>
             <td className="num mono">₩{(c.monthlyRent ?? 0).toLocaleString()}</td>
             <td className="num mono">₩{(c.deposit ?? 0).toLocaleString()}</td>
-            <td><span className={`status ${c.status}`}>{c.status}</span></td>
+            <td><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
           </tr>
         ))}
       </tbody>
