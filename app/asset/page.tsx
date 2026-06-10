@@ -599,12 +599,12 @@ function VehicleDetailDialog({
       }
       tabs={view === 'registered'
         ? [
-            // 등록자산 = 제조사 스펙 + 자등증 정보 + 자등증 첨부 (단일 탭)
-            { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} /> },
+            // 등록차량 = 제조사 스펙 + 자등증 정보 + 자등증 첨부 (단일 탭) — showAttachment true
+            { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={true} /> },
           ]
         : [
-            // 자산현황 = 전체 정보 (모든 탭)
-            { value: 'summary', label: '요약', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} /> },
+            // 자산현황 = 전체 정보 (모든 탭). 점검 페이지 성격이라 자등증 첨부 미리보기는 숨김
+            { value: 'summary', label: '요약', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={false} /> },
             { value: 'loan', label: '할부스케줄', content: <LoanScheduleTab vehicle={vehicle} /> },
             { value: 'compliance', label: '보험·검사', content: <ComplianceTab vehicle={vehicle} contracts={sortedContracts} /> },
             { value: 'contract', label: `계약이력 (${sortedContracts.length})`, content: <ContractListTab contracts={sortedContracts} /> },
@@ -639,7 +639,7 @@ function Kpi({ label, value, hint, positive }: { label: string; value: string; h
 }
 
 /* ─── 탭1: 요약 — 자산정보 + 등록증정보 ─── */
-function SummaryTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void }) {
+function SummaryTab({ vehicle, onUpdate, showAttachment = true }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void; showAttachment?: boolean }) {
   // 등록자산 상세 = 제조사 스펙 + 자동차등록증 정보 + 자동차등록증 첨부 (3섹션).
   // 보험·할부·GPS 같은 자산 운영 정보는 각자 탭(보험·검사 / 할부스케줄)에서 노출.
   void onUpdate;
@@ -690,13 +690,15 @@ function SummaryTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Veh
         </div>
       </section>
 
-      {/* 원본 자동차등록증 첨부 — 보험증권 패턴 */}
-      <AttachedFilePreview
-        title="원본 자동차등록증"
-        url={vehicle.registrationCertUrl}
-        fileName={vehicle.registrationCertFileName}
-        uploadedAt={vehicle.registrationCertUploadedAt}
-      />
+      {/* 원본 자동차등록증 첨부 — 등록차량 view 일 때만 (자산현황은 점검 페이지라 첨부 미리보기 없음) */}
+      {showAttachment && (
+        <AttachedFilePreview
+          title="원본 자동차등록증"
+          url={vehicle.registrationCertUrl}
+          fileName={vehicle.registrationCertFileName}
+          uploadedAt={vehicle.registrationCertUploadedAt}
+        />
+      )}
     </div>
   );
 }
