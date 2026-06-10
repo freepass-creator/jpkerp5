@@ -11,6 +11,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { audit } from '@/lib/firebase/audit-store';
 import { fileToDataUrl } from '@/lib/image-compress';
+import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-register-dialog';
 import type {
   Company, BankAccount, CorporateCard, CompanyLocation, CompanyDocument, LocationKind,
 } from '@/lib/types';
@@ -23,6 +24,7 @@ export default function CompaniesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Company | null>(null);
   const [creating, setCreating] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('info');
 
   const usageByName = useMemo(() => {
@@ -279,9 +281,19 @@ export default function CompaniesPage() {
         <BottomBar
           left={
             isEditing ? null : (
-              <button className="btn btn-primary" type="button" onClick={startCreate}>
-                <Plus weight="bold" /> 신규 법인
-              </button>
+              <>
+                <button className="btn btn-primary" type="button" onClick={startCreate}>
+                  <Plus weight="bold" /> 신규 법인
+                </button>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => setBulkOpen(true)}
+                  title="사업자등록증 OCR 일괄 등록 (또는 수기 입력)"
+                >
+                  <Camera weight="bold" /> 사업자등록증 OCR
+                </button>
+              </>
             )
           }
           right={
@@ -291,6 +303,12 @@ export default function CompaniesPage() {
               <span>계약 <strong>{contracts.length}</strong>건</span>
             </>
           }
+        />
+
+        <BusinessRegRegisterDialog
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+          onSaved={(c) => setSelectedId(c.id)}
         />
       </div>
     </div>
