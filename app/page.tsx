@@ -677,7 +677,7 @@ export default function Page() {
               <tbody>
                 {filteredContracts.length === 0 ? (
                   <tr>
-                    <td colSpan={17} className="muted center" style={{ padding: 32 }}>표시할 계약이 없습니다.</td>
+                    <td colSpan={18} className="muted center" style={{ padding: 32 }}>표시할 계약이 없습니다.</td>
                   </tr>
                 ) : (
                   filteredContracts.map((c) => {
