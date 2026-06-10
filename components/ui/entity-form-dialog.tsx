@@ -136,9 +136,14 @@ export function EntityFormDialog({
     currentMode === 'duplicate' ? '등록' :
     submitLabel ?? '등록';
 
+  // DialogContent.mode 매핑 — view/edit/new(create+duplicate). DialogContent 가 hero/footer 시각 자동.
+  const dcMode: 'view' | 'edit' | 'new' =
+    currentMode === 'view' ? 'view' :
+    currentMode === 'edit' ? 'edit' : 'new';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent title={titleNode} size={size}>
+      <DialogContent title={titleNode} size={size} mode={dcMode}>
         <fieldset
           disabled={isReadonly}
           className={cn('form-stack', `form-mode-${currentMode}`)}

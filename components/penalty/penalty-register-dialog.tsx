@@ -178,7 +178,7 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
           </button>
         </DialogTrigger>
       )}
-      <DialogContent title="고지서 등록 (자동 OCR)" size="xl">
+      <DialogContent title="고지서 등록 (자동 OCR)" size="xl" mode="new">
         <div className="space-y-3" style={{ padding: '16px 20px' }}>
           {/* 계약 마스터 로딩 안내 — OCR 매칭 정확도 위해 contracts 동기화 대기 */}
           {contractStatus.loading && (

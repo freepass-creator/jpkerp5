@@ -358,7 +358,7 @@ export function BusinessRegRegisterDialog({
 
               {items.length > 0 && (
                 <div style={{ marginTop: 14, maxHeight: 360, overflow: 'auto' }}>
-                  <table className="table" style={{ fontSize: 12 }}>
+                  <table className="table">
                     <thead>
                       <tr>
                         <th style={{ width: 28 }}></th>

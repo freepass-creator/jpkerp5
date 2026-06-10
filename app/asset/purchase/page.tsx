@@ -66,7 +66,7 @@ export default function PurchasePage() {
           <thead>
             <tr>
               <th style={{ width: 56 }}>회사</th>
-              <th style={{ width: 100 }}>차량번호</th>
+              <th style={{ width: 96 }}>차량번호</th>
               <th>차종</th>
               <th style={{ width: 100 }}>제조사</th>
               <th style={{ width: 100 }}>매입예정일</th>
@@ -99,7 +99,7 @@ export default function PurchasePage() {
           <thead>
             <tr>
               <th style={{ width: 56 }}>회사</th>
-              <th style={{ width: 100 }}>차량번호</th>
+              <th style={{ width: 96 }}>차량번호</th>
               <th>차종</th>
               <th style={{ width: 90 }}>매입일</th>
               <th className="num" style={{ width: 110 }}>매입가</th>

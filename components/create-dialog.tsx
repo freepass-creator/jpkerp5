@@ -450,7 +450,7 @@ export function CreateDialog({
         if (!v) reset();
       }}
     >
-      <DialogContent title="신규 등록">
+      <DialogContent title="신규 등록" mode="new">
         <input
           id="jpk-bulk-file-input"
           type="file"

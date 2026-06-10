@@ -69,7 +69,7 @@ export default function AssetInspectionPage() {
           <thead>
             <tr>
               <th style={{ width: 60 }}>회사</th>
-              <th style={{ width: 90 }}>차량번호</th>
+              <th style={{ width: 96 }}>차량번호</th>
               <th>차종</th>
               <th>계약자</th>
               <th className="mono" style={{ width: 110 }}>검사 만기</th>
@@ -103,7 +103,7 @@ export default function AssetInspectionPage() {
           <thead>
             <tr>
               <th style={{ width: 90 }}>일자</th>
-              <th style={{ width: 90 }}>차량번호</th>
+              <th style={{ width: 96 }}>차량번호</th>
               <th>제목</th>
               <th style={{ width: 140 }}>업체</th>
               <th className="num" style={{ width: 100 }}>금액</th>

@@ -78,8 +78,8 @@ export default function ContractOverduePage() {
       <table className="table">
         <thead>
           <tr>
-            <th style={{ width: 60 }}>회사</th>
-            <th style={{ width: 90 }}>차량번호</th>
+            <th style={{ width: 56 }}>회사</th>
+            <th style={{ width: 96 }}>차량번호</th>
             <th>계약자</th>
             <th style={{ width: 110 }}>연락처</th>
             <th className="num" style={{ width: 110 }}>월 대여료</th>
