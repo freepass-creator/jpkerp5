@@ -11,7 +11,8 @@
 
 import { useEffect, useState } from 'react';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
-import { Section, Field, Grid2, Stack } from '@/components/ui/detail-primitives';
+import { Section, Grid2, Stack } from '@/components/ui/detail-primitives';
+import { Field, EditableField } from '@/components/ui/editable-field';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
@@ -141,31 +142,3 @@ export function CompanyDetailDialog({
   );
 }
 
-function EditableField({
-  editing, label, value, onChange, mono = false, readonly = false,
-}: {
-  editing: boolean;
-  label: string;
-  value?: string;
-  onChange?: (v: string) => void;
-  mono?: boolean;
-  readonly?: boolean;
-}) {
-  if (!editing || readonly) {
-    return <Field label={label} value={value || '-'} mono={mono} />;
-  }
-  return (
-    <div className="detail-field">
-      <div className="label">{label}</div>
-      <div className="value">
-        <input
-          type="text"
-          className={`input input-compact ${mono ? 'mono' : ''}`}
-          value={value ?? ''}
-          onChange={(e) => onChange?.(e.target.value)}
-          style={{ width: '100%' }}
-        />
-      </div>
-    </div>
-  );
-}

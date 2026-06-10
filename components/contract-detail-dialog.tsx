@@ -10,6 +10,8 @@ import {
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
+import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
+import { toast } from '@/lib/toast';
 import { DateInput } from '@/components/ui/date-input';
 import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus } from '@/lib/types';
 import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
@@ -86,8 +88,14 @@ function ContractDetailShell({
     if (target !== activeTab) setActiveTab(target);
     queueMicrotask(() => editable[target].current?.startEdit());
   };
-  const handleSave = () => editable[activeTab]?.current?.save();
-  const handleCancel = () => editable[activeTab]?.current?.cancel();
+  const handleSave = () => {
+    editable[activeTab]?.current?.save();
+    toast.success('저장되었습니다');
+  };
+  const handleCancel = () => {
+    editable[activeTab]?.current?.cancel();
+    toast.info('변경사항을 버렸습니다');
+  };
 
   return (
     <DetailDialogShell
@@ -187,16 +195,7 @@ function Section({
   );
 }
 
-function Field({
-  label, value, mono, muted,
-}: { label: string; value: React.ReactNode; mono?: boolean; muted?: boolean }) {
-  return (
-    <div className="detail-field">
-      <div className="label">{label}</div>
-      <div className={`value ${mono ? 'mono' : ''} ${muted ? 'muted' : ''}`}>{value}</div>
-    </div>
-  );
-}
+const Field = SharedField;
 
 /* ─────────────── 차량정보 탭 (차량 + 라이프사이클 액션) ─────────────── */
 
@@ -1224,34 +1223,7 @@ const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (
 });
 
 /** 보기/편집 겸용 필드 — editing=true 면 input, 아니면 Field 표시. */
-function EditableField({
-  label, value, editing, onChange, mono, placeholder,
-}: {
-  label: string;
-  value: string;
-  editing: boolean;
-  onChange: (v: string) => void;
-  mono?: boolean;
-  placeholder?: string;
-}) {
-  if (!editing) return <Field label={label} value={value || (placeholder ?? '-')} mono={mono} />;
-  return (
-    <div className="detail-field" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-      <span className="detail-field-label" style={{ minWidth: 70, fontSize: 11, color: 'var(--text-weak)' }}>{label}</span>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          flex: 1, fontSize: 12, padding: '4px 6px',
-          border: '1px solid var(--border)', borderRadius: 4,
-          fontFamily: mono ? 'var(--font-mono, monospace)' : undefined,
-        }}
-      />
-    </div>
-  );
-}
+const EditableField = SharedEditableField;
 
 /* ─────────────── 차량 수납이력 탭 (채권탭 대응 — 차량번호 기준 통합 입금) ─────────────── */
 

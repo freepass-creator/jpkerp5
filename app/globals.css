@@ -1582,7 +1582,7 @@ input[type="radio"]:disabled {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.4);
   z-index: var(--z-modal);
-  animation: fadeIn 0.12s ease;
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 /* 다이얼로그 — 모든 종류 고정 크기 (1200×860). 화면 작으면 vw/vh 클램프. */
 .dialog-content {
@@ -1597,7 +1597,7 @@ input[type="radio"]:disabled {
   flex-direction: column;
   z-index: calc(var(--z-modal) + 1);
   box-shadow: var(--shadow-lg);
-  animation: zoomIn 0.14s ease;
+  animation: zoomIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
 }
 /* 컴팩트 모달 — 시동제어, 확인 등 단순 액션용 */
@@ -1608,7 +1608,7 @@ input[type="radio"]:disabled {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-@keyframes zoomIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.97) } to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
+@keyframes zoomIn { from { opacity: 0; transform: translate(-50%, -46%) scale(0.96) } to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
 
 .dialog-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -2340,6 +2340,32 @@ input[type="radio"]:disabled {
 }
 .detail-field .value.muted { color: var(--text-weak); font-weight: 400; }
 .detail-field .value.wrap { white-space: normal; overflow: visible; }   /* 다줄 허용용 modifier */
+
+/* 편집용 input — .value 와 정확히 같은 위치·폰트·사이즈로 렌더.
+ * border 는 bottom 만 살짝 (filled 박스보다 자연스러움).
+ * 뷰 ⟷ 수정 토글 시 텍스트가 같은 좌표에 머무름. */
+.detail-field .detail-field-input {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-main);
+  padding: 0 2px;
+  width: 100%;
+  outline: none;
+  line-height: 1.45;
+  min-width: 0;
+}
+.detail-field .detail-field-input.mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.detail-field .detail-field-input:focus {
+  border-bottom-color: var(--brand);
+}
+.detail-field.is-editing { background: rgba(27,42,74,0.025); }
 
 /* ────────────── Utility ────────────── */
 .empty-state {
