@@ -163,6 +163,26 @@ export default function AssetPage() {
     return c;
   }, [vehicles]);
 
+  // 차량별 수선·정비 카운트 + 최근일자 (정비/수선/사고/검사/세차 모두 집계)
+  // history 는 vehiclePlate 기준 → vehicle.id 매핑은 plate lookup
+  const repairByPlate = useMemo(() => {
+    const m = new Map<string, { count: number; latestDate?: string; latestLabel?: string }>();
+    const cats = new Set<string>(['정비', '수선', '사고', '검사', '세차']);
+    for (const h of history) {
+      if (!cats.has(h.category as string)) continue;
+      const plate = (h.vehiclePlate ?? '').replace(/\s/g, '');
+      if (!plate) continue;
+      const cur = m.get(plate) ?? { count: 0 };
+      cur.count += 1;
+      if (!cur.latestDate || (h.date ?? '') > cur.latestDate) {
+        cur.latestDate = h.date;
+        cur.latestLabel = h.category as string;
+      }
+      m.set(plate, cur);
+    }
+    return m;
+  }, [history]);
+
   // 차량별 active contract + last history
   const contractByPlate = useMemo(() => {
     const m = new Map<string, Contract>();
@@ -292,17 +312,18 @@ export default function AssetPage() {
                     <th style={{ width: 96 }}>차량번호</th>
                     <th style={{ width: 130 }}>차종</th>
                     <th className="center" style={{ width: 90 }}>등록증</th>
-                    <th className="center" style={{ width: 90 }}>보험증권</th>
+                    <th className="center" style={{ width: 96 }}>보험증권</th>
                     <th className="center" style={{ width: 90 }}>구매방식</th>
-                    <th className="center" style={{ width: 90 }}>GPS</th>
-                    <th style={{ minWidth: 240 }}>미입력 알람</th>
+                    <th className="center" style={{ width: 64 }}>수선</th>
+                    <th className="center" style={{ width: 80 }}>GPS</th>
+                    <th style={{ minWidth: 220 }}>미입력 알람</th>
                     <th className="center" style={{ width: 76 }}>상태</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td>
+                      <td colSpan={11} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td>
                     </tr>
                   ) : filtered.map((v) => {
                     const regMissing = v.id.startsWith('contract-derived-') || !v.vin;
@@ -326,21 +347,75 @@ export default function AssetPage() {
                           : <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>완료</span>}
                       </td>
                       <td className="center">
-                        {insMissing
-                          ? <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>
-                          : <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>완료</span>}
+                        {insMissing ? (
+                          <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>
+                        ) : (() => {
+                          // 만기 D-N 계산 — 30일 이내 임박은 주황, 만료는 빨강
+                          const exp = v.insuranceExpiryDate;
+                          let dDay: number | null = null;
+                          if (exp && exp.length >= 10) {
+                            const today = new Date(); today.setHours(0, 0, 0, 0);
+                            const e = new Date(exp);
+                            dDay = Math.round((e.getTime() - today.getTime()) / (24 * 3600 * 1000));
+                          }
+                          const tone = dDay == null ? 'green' : dDay < 0 ? 'red' : dDay <= 30 ? 'orange' : 'green';
+                          const colorVar = `var(--${tone}-text)`;
+                          const bgVar = `var(--${tone}-bg)`;
+                          const borderVar = `var(--${tone}-border)`;
+                          return (
+                            <span
+                              className="status"
+                              style={{ background: bgVar, color: colorVar, border: `1px solid ${borderVar}` }}
+                              title={[v.insuranceCompany, v.insurancePolicyNo, exp && `만기 ${exp}`].filter(Boolean).join(' · ')}
+                            >
+                              {dDay == null ? '완료' : dDay < 0 ? `만료 ${-dDay}일` : `D-${dDay}`}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="center">
-                        {v.loanCashOnly
-                          ? <span className="status" style={{ background: 'var(--bg-stripe)', color: 'var(--text-weak)' }}>없음</span>
-                          : v.loanCompany
-                            ? <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>완료</span>
-                            : <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>}
+                        {v.loanCashOnly ? (
+                          <span className="status" style={{ background: 'var(--bg-stripe)', color: 'var(--text-weak)' }} title="현금 매입">현금</span>
+                        ) : v.loanCompany ? (
+                          <span
+                            className="status"
+                            style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}
+                            title={[v.loanCompany, v.loanMonths && `${v.loanMonths}개월`, v.loanStartDate].filter(Boolean).join(' · ')}
+                          >
+                            {v.loanCompany}
+                          </span>
+                        ) : (
+                          <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미입력</span>
+                        )}
                       </td>
                       <td className="center">
-                        {gpsMissing
-                          ? <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미설치</span>
-                          : <span className="status" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}>설치</span>}
+                        {(() => {
+                          const key = (v.plate ?? '').replace(/\s/g, '');
+                          const r = repairByPlate.get(key);
+                          if (!r || r.count === 0) return <span className="muted">-</span>;
+                          return (
+                            <span
+                              className="mono"
+                              style={{ fontWeight: 600, color: 'var(--text-main)' }}
+                              title={[r.latestLabel && `최근 ${r.latestLabel}`, r.latestDate].filter(Boolean).join(' · ')}
+                            >
+                              {r.count}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="center">
+                        {gpsMissing ? (
+                          <span className="status" style={{ background: 'var(--red-bg)', color: 'var(--red-text)', border: '1px solid var(--red-border)' }}>미설치</span>
+                        ) : (
+                          <span
+                            className="status"
+                            style={{ background: 'var(--green-bg)', color: 'var(--green-text)', border: '1px solid var(--green-border)' }}
+                            title={[v.gpsProvider, v.gpsDeviceId].filter(Boolean).join(' · ')}
+                          >
+                            설치
+                          </span>
+                        )}
                       </td>
                       <td className="dim" style={{ fontSize: 11 }}>
                         {missing.length === 0
