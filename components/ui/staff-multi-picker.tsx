@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { CaretDown } from '@phosphor-icons/react';
 import { useStaffList, type StaffMember } from '@/lib/use-staff-list';
 
 export type StaffMultiPickerProps = {
@@ -67,10 +68,14 @@ export function StaffMultiPicker({
           fontSize: 12, cursor: 'pointer', textAlign: 'left',
           padding: '4px 8px', minWidth,
           color: selected.length === 0 ? 'var(--text-weak)' : 'var(--text-main)',
+          display: 'inline-flex', alignItems: 'center', gap: 6,
         }}
         title="가입회원 중 선택"
       >
-        {selected.length === 0 ? `${placeholder} ▾` : `${placeholder} ${selected.length}명 ▾`}
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selected.length === 0 ? placeholder : `${placeholder} ${selected.length}명`}
+        </span>
+        <CaretDown size={10} weight="bold" style={{ color: 'var(--text-weak)', flexShrink: 0 }} />
       </button>
       {open && (
         <div className="popover-shell" style={{
