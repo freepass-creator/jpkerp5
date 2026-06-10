@@ -39,6 +39,18 @@ export function stripCorpSuffix(name: string): string {
   return n.replace(/\s+/g, ' ').trim();
 }
 
+/** "스위치플랜 Inc." / "Switch Plan 주식회사" → "스위치플랜" — 한글 회사명만 추출 */
+export function stripCorpAndEnglish(name: string): string {
+  if (!name) return '';
+  let n = stripCorpSuffix(name);
+  // 영문 법인 표기 (Inc., Corp., Ltd., Co., LLC, LLP) 제거
+  n = n.replace(/\b(Inc|Corp|Corporation|Ltd|Limited|Co|Company|LLC|LLP|LP|Plc)\.?\b/gi, ' ').trim();
+  // 일반 영문 단어 제거 (한글 회사명만 남기기)
+  n = n.replace(/[A-Za-z]+/g, ' ').trim();
+  // 다중 공백 정리
+  return n.replace(/\s+/g, ' ').trim();
+}
+
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

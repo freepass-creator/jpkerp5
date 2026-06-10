@@ -14,7 +14,10 @@ import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Section, Field, Grid2, Stack } from '@/components/ui/detail-primitives';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { audit } from '@/lib/firebase/audit-store';
+import { stripCorpAndEnglish } from '@/lib/company-display';
+import { reassignVehiclesToCompany } from '@/lib/companies-sync';
 import { toast } from '@/lib/toast';
 import type { Company } from '@/lib/types';
 
@@ -27,6 +30,7 @@ export function CompanyDetailDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { companies, update } = useCompanies();
+  const { vehicles, update: updateVehicle } = useVehicles();
   const company = companyId ? companies.find((c) => c.id === companyId) ?? null : null;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Company | null>(null);
@@ -52,7 +56,9 @@ export function CompanyDetailDialog({
     try {
       await update(draft);
       void audit.update('company', draft.id, `법인 수정 — ${draft.name}`);
-      toast.success(`저장됨 — ${draft.name}`);
+      // 매칭 차량 자동 재할당 (corpRegNo/bizRegNo 변경 시 효과)
+      const reassigned = await reassignVehiclesToCompany(vehicles, draft, updateVehicle);
+      toast.success(reassigned > 0 ? `저장됨 — ${draft.name} (차량 ${reassigned}대 자동 매칭)` : `저장됨 — ${draft.name}`);
       setEditing(false);
     } catch (e) {
       toast.error(`저장 실패: ${(e as Error).message}`);
@@ -74,7 +80,7 @@ export function CompanyDetailDialog({
       open={!!company}
       onOpenChange={onOpenChange}
       title={`법인 상세 — ${company.name}`}
-      heroName={cur.name}
+      heroName={stripCorpAndEnglish(cur.name) || cur.name}
       heroMeta={
         <>
           {cleanReg(cur.bizRegNo) && (<><span className="mono">{cleanReg(cur.bizRegNo)}</span><span>·</span></>)}

@@ -15,6 +15,8 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { Plus, X, CircleNotch, CheckCircle, Warning, Upload, Keyboard } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { reassignVehiclesToCompany } from '@/lib/companies-sync';
 import { runWithConcurrency } from '@/lib/parallel';
 import { fileToDataUrl } from '@/lib/image-compress';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
@@ -47,6 +49,7 @@ export function BusinessRegRegisterDialog({
   editId?: string | null;
 }) {
   const { companies, add: addCompany, update: updateCompany } = useCompanies();
+  const { vehicles, update: updateVehicle } = useVehicles();
   const [items, setItems] = useState<WorkItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -263,7 +266,8 @@ export function BusinessRegRegisterDialog({
         const merged: Company = { ...existing, ...manualDraft, id: existing.id } as Company;
         await updateCompany(merged);
         void audit.update('company', merged.id, `법인 수기 수정 — ${merged.name}`);
-        toast.success(`법인 업데이트 — ${name}`);
+        const reassigned = await reassignVehiclesToCompany(vehicles, merged, updateVehicle);
+        toast.success(reassigned > 0 ? `법인 업데이트 — ${name} (차량 ${reassigned}대 매칭)` : `법인 업데이트 — ${name}`);
         onSaved?.(merged);
       } else {
         const payload: Omit<Company, 'id'> = {
@@ -291,8 +295,10 @@ export function BusinessRegRegisterDialog({
         };
         const newId = await addCompany(payload);
         void audit.create('company', newId, `법인 수기 등록 — ${name}`);
-        toast.success(`신규 법인 등록 — ${name}`);
-        onSaved?.({ ...(payload as Company), id: newId });
+        const saved = { ...(payload as Company), id: newId };
+        const reassigned = await reassignVehiclesToCompany(vehicles, saved, updateVehicle);
+        toast.success(reassigned > 0 ? `신규 법인 등록 — ${name} (차량 ${reassigned}대 매칭)` : `신규 법인 등록 — ${name}`);
+        onSaved?.(saved);
       }
       handleClose(false);
     } catch (e) {

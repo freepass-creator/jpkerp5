@@ -20,6 +20,7 @@ import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-r
 import { CompanyDetailDialog } from '@/components/companies/company-detail-dialog';
 import { audit } from '@/lib/firebase/audit-store';
 import { useStaffList } from '@/lib/use-staff-list';
+import { stripCorpAndEnglish } from '@/lib/company-display';
 import type { Company } from '@/lib/types';
 
 type GeneralView =
@@ -304,7 +305,7 @@ function CompanyListView({
               <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                 <input type="checkbox" checked={checked} onChange={() => toggle(c.id)} aria-label={`${c.name} 선택`} />
               </td>
-              <td>{c.name || <span className="muted">이름 미입력</span>}</td>
+              <td>{stripCorpAndEnglish(c.name) || c.name || <span className="muted">이름 미입력</span>}</td>
               <td className="dim">{c.partnerKind || '기타'}</td>
               <td className="dim">{c.corpRegNo?.replace(/[^\d-]/g, '') || '-'}</td>
               <td className="dim">{c.bizRegNo?.replace(/[^\d-]/g, '') || '-'}</td>
