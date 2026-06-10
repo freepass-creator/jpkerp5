@@ -23,7 +23,7 @@ const fmt = (n: number | undefined | null): string =>
   n == null ? '-' : `₩${n.toLocaleString('ko-KR')}`;
 
 export function InsuranceDetailDialog({
-  open, onOpenChange, vehicle, policy, contract, companyMaster,
+  open, onOpenChange, vehicle, policy, contract, companyMaster, onEdit,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -31,6 +31,8 @@ export function InsuranceDetailDialog({
   policy: InsurancePolicy | undefined | null;
   contract?: Contract | undefined;
   companyMaster: CompanyMaster;
+  /** 수정 콜백 — 호출 시 보험 등록 다이얼로그(수정 모드) 열기 */
+  onEdit?: () => void;
 }) {
   if (!vehicle) return null;
 
@@ -64,6 +66,7 @@ export function InsuranceDetailDialog({
           </div>
         ) : null
       }
+      onEdit={onEdit}
     >
       {!policy && (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-sub)', fontSize: 13 }}>

@@ -46,7 +46,7 @@ function categoryTone(cat: HistoryCategory): string {
 }
 
 export function RiskDetailDialog({
-  contract, open, onOpenChange, onAddContact, onEngineLock, onSendSms, onMarkDebt,
+  contract, open, onOpenChange, onAddContact, onEngineLock, onSendSms, onMarkDebt, onEdit,
 }: {
   contract: Contract | null;
   open: boolean;
@@ -55,6 +55,8 @@ export function RiskDetailDialog({
   onEngineLock?: (c: Contract) => void;
   onSendSms?: (c: Contract) => void;
   onMarkDebt?: (c: Contract) => void;
+  /** 수정 콜백 — 계약 상세 dialog 호출 등 */
+  onEdit?: () => void;
 }) {
   const { entries: allHistory } = useHistoryEntries();
   const { companies } = useCompanies();
@@ -116,6 +118,7 @@ export function RiskDetailDialog({
           </div>
         </div>
       }
+      onEdit={onEdit}
     >
       {/* 즉시 액션 — 작은 버튼 row (탭 row 와 비슷한 시각 무게) */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
