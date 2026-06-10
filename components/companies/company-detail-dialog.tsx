@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { PencilSimple, FloppyDisk, X as XIcon } from '@phosphor-icons/react';
+import { Pencil, FloppyDisk, X as XIcon } from '@phosphor-icons/react';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Section, Field, Grid2, Stack } from '@/components/ui/detail-primitives';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
@@ -95,7 +95,7 @@ export function CompanyDetailDialog({
           </>
         ) : (
           <button className="btn btn-primary" type="button" onClick={() => setEditing(true)}>
-            <PencilSimple size={12} weight="bold" /> 수정
+            <Pencil size={12} weight="bold" /> 수정
           </button>
         )
       }
