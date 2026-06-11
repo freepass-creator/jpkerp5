@@ -1440,12 +1440,11 @@ input[type="radio"]:disabled {
 .table tbody tr:nth-child(even) td.checkbox-col {
   background: var(--bg-stripe);
 }
-/* hover 시 체크박스 셀도 같은 hover 색 — sticky background 가 hover 룰 덮는 문제 회피 */
-.table tbody tr:hover td.checkbox-col {
+/* hover 가 selected/stripe 보다 우선 (사용자 룰 — 커서 댄 곳이 맨 위) */
+.table tbody tr:hover td.checkbox-col,
+.table tbody tr.selected-row:hover td.checkbox-col,
+.table tbody tr:nth-child(even):hover td.checkbox-col {
   background: var(--bg-hover);
-}
-.table tbody tr.selected-row:hover td.checkbox-col {
-  background: var(--brand-bg);
 }
 /* input 을 셀 정중앙에 절대 고정 — 행 높이/내용에 관계없이 항상 같은 위치 */
 .table .checkbox-col {
@@ -1465,7 +1464,9 @@ input[type="radio"]:disabled {
 }
 /* 체크박스 — 전역 input[type=checkbox] 규격 사용 */
 .table tbody tr.selected-row { background: var(--brand-bg); }
-.table tbody tr.selected-row:hover { background: var(--brand-bg); }
+/* selected-row hover 시 hover 색 우선 (커서 댄 곳이 맨 위) */
+.table tbody tr.selected-row:hover { background: var(--bg-hover); }
+.table tbody tr.selected-row:hover td { background: var(--bg-hover); }
 
 /* Customer name with avatar */
 .cust {
