@@ -73,6 +73,8 @@ export default function ContractOverduePage() {
                 disabled={overdue.length === 0}
                 onClick={() => downloadContractsExcel(overdue, companyMaster, {
                   title: `미수금 — ${bucket === 'all' ? '전체' : bucket === 'high' ? '심각(3회+)' : bucket === 'mid' ? '주의(2회)' : '경증(1회)'}`,
+                  fileName: `미수금-${bucket === 'all' ? '전체' : bucket === 'high' ? '심각' : bucket === 'mid' ? '주의' : '경증'}`,
+                  sheetName: '미수금',
                   filter: bucket === 'all' ? undefined : `${overdue.length}건`,
                 })}
               >

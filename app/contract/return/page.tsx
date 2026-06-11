@@ -40,7 +40,7 @@ export default function ContractReturnPage() {
           className="btn"
           type="button"
           disabled={rows.length === 0}
-          onClick={() => downloadContractsExcel(rows, companyMaster, { title: '반납 계약', filter: `${rows.length}건` })}
+          onClick={() => downloadContractsExcel(rows, companyMaster, { title: '반납 계약', fileName: '반납계약', sheetName: '반납', filter: `${rows.length}건` })}
         >
           <FileXls size={14} weight="bold" /> 엑셀
         </button>

@@ -75,6 +75,8 @@ export default function ExpirePage() {
               disabled={rows.length === 0}
               onClick={() => downloadContractsExcel(rows.map((r) => r.contract), companyMaster, {
                 title: `만기 임박 — ${bucket === 'all' ? '전체' : bucket === 'expired' ? '만기 경과' : bucket === 'd30' ? 'D-30' : 'D-31~90'}`,
+                fileName: `만기임박-${bucket === 'all' ? '전체' : bucket === 'expired' ? '경과' : bucket === 'd30' ? 'D30' : 'D90'}`,
+                sheetName: '만기임박',
                 filter: `${rows.length}건`,
               })}
             >

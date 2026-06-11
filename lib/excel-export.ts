@@ -98,7 +98,10 @@ export function exportToExcel<T = Record<string, unknown>>(opts: Options<T>): { 
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, (opts.sheetName ?? opts.title).slice(0, 31));
-  const fileName = opts.fileName ?? `${opts.title}-${todayStr()}.xlsx`;
+  // fileName 미지정 시 title-날짜.xlsx 자동, 지정했고 확장자 없으면 -날짜.xlsx 자동 append
+  const fileName = opts.fileName
+    ? (opts.fileName.endsWith('.xlsx') ? opts.fileName : `${opts.fileName}-${todayStr()}.xlsx`)
+    : `${opts.title}-${todayStr()}.xlsx`;
   XLSX.writeFile(wb, fileName);
   return { ok: true, count: opts.rows.length };
 }

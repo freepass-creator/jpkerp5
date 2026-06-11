@@ -94,6 +94,7 @@ export default function AssetInspectionPage() {
                 ];
                 exportToExcel({
                   title: '검사 내역',
+                  fileName: '검사내역',
                   sheetName: '검사',
                   rows,
                   columns: [

@@ -156,6 +156,7 @@ export default function RepairPage() {
                   });
                   exportToExcel({
                     title: `수선 내역${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
+                    fileName: '수선내역',
                     sheetName: '수선',
                     rows,
                     columns: [

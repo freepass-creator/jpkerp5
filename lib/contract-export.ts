@@ -58,7 +58,7 @@ type CompanyMaster = Parameters<typeof displayCompanyName>[1];
 export function downloadContractsExcel(
   contracts: Contract[],
   companyMaster: CompanyMaster,
-  meta?: { title?: string; filter?: string },
+  meta?: { title?: string; filter?: string; fileName?: string; sheetName?: string },
 ) {
   const wb = XLSX.utils.book_new();
   const title = meta?.title ?? '계약 리스트';
@@ -132,8 +132,9 @@ export function downloadContractsExcel(
   ];
   ws['!rows'] = [{ hpt: 26 }, { hpt: 16 }, { hpt: 8 }, { hpt: 22 }];
 
-  XLSX.utils.book_append_sheet(wb, ws, '계약');
-  const fname = `계약리스트-${todayKr().replace(/-/g, '')}.xlsx`;
+  XLSX.utils.book_append_sheet(wb, ws, meta?.sheetName ?? '계약');
+  const baseName = meta?.fileName ?? (meta?.title ? meta.title.replace(/\s+/g, '-') : '계약리스트');
+  const fname = `${baseName}-${todayKr().replace(/-/g, '')}.xlsx`;
   XLSX.writeFile(wb, fname, { bookType: 'xlsx', compression: true });
 }
 

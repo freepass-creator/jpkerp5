@@ -123,6 +123,7 @@ export default function AssetDisposalPage() {
                 onClick={() => {
                   exportToExcel({
                     title: `처분 자산${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
+                    fileName: '처분자산',
                     sheetName: '처분',
                     rows: filtered.map((v) => ({
                       회사: v.company ? displayCompanyName(v.company, companyMaster) : '',

@@ -72,6 +72,7 @@ export default function PurchasePage() {
                 }));
                 exportToExcel({
                   title: '매입 관리',
+                  fileName: '매입관리',
                   sheetName: '매입',
                   rows,
                   columns: [

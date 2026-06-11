@@ -936,11 +936,16 @@ export default function Page() {
             <button
               className="btn"
               type="button"
-              onClick={() => downloadContractsExcel(filteredContracts, companyMaster, { filter: `${view}${companyFilter !== '전체' ? ` · ${companyFilter}` : ''}` })}
-              title="현재 표시중인 계약 리스트 엑셀로 내려받기"
+              onClick={() => downloadContractsExcel(filteredContracts, companyMaster, {
+                title: `운영현황 — ${view}${companyFilter !== '전체' ? ` (${companyFilter})` : ''}`,
+                fileName: `운영현황-${view}`,
+                sheetName: '운영현황',
+                filter: `${view}${companyFilter !== '전체' ? ` · ${companyFilter}` : ''}`,
+              })}
+              title={`현재 페이지 목록 (${filteredContracts.length}건) 엑셀 다운로드`}
               disabled={filteredContracts.length === 0}
             >
-              <DownloadSimple size={14} /> 계약 엑셀
+              <DownloadSimple size={14} /> 엑셀 <span className="chip-count">{filteredContracts.length}</span>
             </button>
             {superAdmin && (
               <>

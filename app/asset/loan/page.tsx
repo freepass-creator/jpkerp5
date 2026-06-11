@@ -118,6 +118,7 @@ export default function AssetLoanPage() {
                 onClick={() => {
                   exportToExcel({
                     title: `구매방식 (할부) 현황${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
+                    fileName: '구매방식',
                     sheetName: '할부',
                     rows: filtered.map((v) => ({
                       회사: v.company ? displayCompanyName(v.company, companyMaster) : '',

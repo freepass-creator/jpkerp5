@@ -117,7 +117,7 @@ export default function ContractIdlePage() {
               className="btn"
               type="button"
               disabled={rows.length === 0}
-              onClick={() => downloadContractsExcel(rows, companyMaster, { title: '휴차 차량', filter: `${rows.length}건` })}
+              onClick={() => downloadContractsExcel(rows, companyMaster, { title: '휴차 차량', fileName: '휴차차량', sheetName: '휴차', filter: `${rows.length}건` })}
             >
               <FileXls size={14} weight="bold" /> 엑셀
             </button>

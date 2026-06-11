@@ -12,7 +12,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Plus, Trash } from '@phosphor-icons/react';
+import { Plus, Trash, FileXls } from '@phosphor-icons/react';
+import { exportToExcel } from '@/lib/excel-export';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -555,6 +556,39 @@ export default function AssetPage() {
                 }}
               >
                 <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
+              </button>
+              <button
+                className="btn"
+                type="button"
+                disabled={filtered.length === 0}
+                title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
+                onClick={() => {
+                  exportToExcel({
+                    title: `자산 ${assetView === 'registered' ? '등록차량' : '자산현황'}${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
+                    fileName: `자산-${assetView === 'registered' ? '등록차량' : '자산현황'}`,
+                    sheetName: '자산',
+                    rows: filtered.map((v) => ({
+                      회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
+                      차량번호: v.plate ?? '',
+                      차종: v.model ?? '',
+                      VIN: v.vin ?? '',
+                      제작연월: v.manufacturedDate ?? '',
+                      상태: v.status ?? '',
+                      매입가: v.purchasePrice ?? '',
+                    })),
+                    columns: [
+                      { key: '회사', header: '회사', width: 14 },
+                      { key: '차량번호', header: '차량번호', width: 14, type: 'mono' },
+                      { key: '차종', header: '차종', width: 20 },
+                      { key: 'VIN', header: 'VIN', width: 18, type: 'mono' },
+                      { key: '제작연월', header: '제작연월', width: 12, type: 'mono' },
+                      { key: '상태', header: '상태', width: 12, type: 'center' },
+                      { key: '매입가', header: '매입가', width: 14, type: 'number' },
+                    ],
+                  });
+                }}
+              >
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
               </button>
             </>
           }

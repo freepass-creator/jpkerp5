@@ -125,6 +125,7 @@ export default function AssetGpsPage() {
                 onClick={() => {
                   exportToExcel({
                     title: `GPS 설치 현황${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
+                    fileName: 'GPS설치',
                     sheetName: 'GPS',
                     rows: filtered.map((v) => ({
                       회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
