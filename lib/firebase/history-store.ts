@@ -22,8 +22,16 @@ export function useHistoryEntries(): {
   update: (e: HistoryEntry) => Promise<void>;
   remove: (id: string) => Promise<void>;
 } {
-  const [entries, setEntries] = useState<HistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const CACHE_KEY = 'cache:history';
+  const [entries, setEntries] = useState<HistoryEntry[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) return JSON.parse(raw) as HistoryEntry[];
+    } catch {}
+    return [];
+  });
+  const [loading, setLoading] = useState(() => entries.length === 0);
   const [configured] = useState(() => isFirebaseConfigured());
 
   useEffect(() => {
@@ -43,6 +51,7 @@ export function useHistoryEntries(): {
         list.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
         setEntries(list);
         setLoading(false);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(list)); } catch {}
       });
     })();
     return () => { cancelled = true; if (unsub) unsub(); };

@@ -14,8 +14,16 @@ import type { InsurancePolicy } from '@/lib/types';
 const PATH = dbPath('insurances');
 
 export function useInsurances() {
-  const [policies, setPolicies] = useState<InsurancePolicy[]>([]);
-  const [loading, setLoading] = useState(true);
+  const CACHE_KEY = 'cache:insurances';
+  const [policies, setPolicies] = useState<InsurancePolicy[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) return JSON.parse(raw) as InsurancePolicy[];
+    } catch {}
+    return [];
+  });
+  const [loading, setLoading] = useState(() => policies.length === 0);
   const [configured] = useState(() => isFirebaseConfigured());
 
   useEffect(() => {
@@ -36,8 +44,10 @@ export function useInsurances() {
           }
           return p;
         };
-        setPolicies(val ? Object.values<InsurancePolicy>(val).map(normalize) : []);
+        const arr = val ? Object.values<InsurancePolicy>(val).map(normalize) : [];
+        setPolicies(arr);
         setLoading(false);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(arr)); } catch {}
       });
     })();
     return () => { cancelled = true; if (unsub) unsub(); };

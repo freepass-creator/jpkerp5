@@ -17,8 +17,17 @@ export function useVehicles(): {
   update: (v: Vehicle) => Promise<void>;
   remove: (id: string) => Promise<void>;
 } {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
+  // localStorage 캐시 — 새로고침 즉시 마지막 데이터 표시, Firebase 신선 데이터 받으면 갱신
+  const CACHE_KEY = 'cache:vehicles';
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) return JSON.parse(raw) as Vehicle[];
+    } catch {}
+    return [];
+  });
+  const [loading, setLoading] = useState(() => vehicles.length === 0);
   const [configured] = useState(() => isFirebaseConfigured());
 
   useEffect(() => {
@@ -34,8 +43,10 @@ export function useVehicles(): {
       const r = ref(db, VEHICLES_PATH);
       unsub = onValue(r, (snap) => {
         const val = snap.val();
-        setVehicles(val ? Object.values<Vehicle>(val) : []);
+        const arr = val ? Object.values<Vehicle>(val) : [];
+        setVehicles(arr);
         setLoading(false);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(arr)); } catch {}
       });
     })();
 
