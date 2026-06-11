@@ -23,17 +23,8 @@ export function useCompanies(): {
   update: (c: Company) => Promise<void>;
   remove: (id: string) => Promise<void>;
 } {
-  // localStorage 캐시 — 새로고침 즉시 마지막 데이터 표시
-  const CACHE_KEY = 'cache:companies';
-  const [companies, setCompanies] = useState<Company[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (raw) return JSON.parse(raw) as Company[];
-    } catch {}
-    return [];
-  });
-  const [loading, setLoading] = useState(() => companies.length === 0);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
   const [configured] = useState(() => isFirebaseConfigured());
 
   useEffect(() => {
@@ -49,10 +40,8 @@ export function useCompanies(): {
       const r = ref(db, COMPANIES_PATH);
       unsub = onValue(r, (snap) => {
         const val = snap.val();
-        const arr = val ? Object.values<Company>(val) : [];
-        setCompanies(arr);
+        setCompanies(val ? Object.values<Company>(val) : []);
         setLoading(false);
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(arr)); } catch {}
       });
     })();
 

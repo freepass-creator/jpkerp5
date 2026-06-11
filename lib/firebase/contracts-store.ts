@@ -24,17 +24,8 @@ export function useContracts(): {
   add: (c: Omit<Contract, 'id'>) => Promise<string>;
   addMany: (rows: Array<Omit<Contract, 'id'>>) => Promise<number>;
 } {
-  // localStorage 캐시 — 새로고침 즉시 마지막 데이터 표시
-  const CACHE_KEY = 'cache:contracts';
-  const [contracts, setContracts] = useState<Contract[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (raw) return JSON.parse(raw) as Contract[];
-    } catch {}
-    return [];
-  });
-  const [loading, setLoading] = useState(() => contracts.length === 0);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
   const [configured] = useState(() => isFirebaseConfigured());
 
   useEffect(() => {
@@ -68,7 +59,6 @@ export function useContracts(): {
         const recalced = raw.map((c) => recalcContract(c, today));
         setContracts(recalced);
         setLoading(false);
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(raw)); } catch {}
       });
     })();
 
