@@ -22,6 +22,10 @@ export type Contract = {
   endDate: string;
   companyCode: string;
   status: '운행중' | '대기' | '만기' | '해지';
+  /** 종료 사유 — 과태료 부과 근거 (정상/중도 → 계약자, 채권보전 → 회사 부담) */
+  endReason?: '정상종료' | '중도해지' | '채권보전';
+  endedAt?: string;
+  unpaidAtEnd?: number;
 };
 
 function adapt(c: JpkContract): Contract {
@@ -41,6 +45,9 @@ function adapt(c: JpkContract): Contract {
       : c.status === '대기' ? '대기'
       : c.status === '반납' ? '만기'
       : '해지',
+    endReason: c.endReason,
+    endedAt: c.endedAt,
+    unpaidAtEnd: c.unpaidAtEnd,
   };
 }
 

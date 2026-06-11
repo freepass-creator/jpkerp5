@@ -1435,10 +1435,17 @@ input[type="radio"]:disabled {
   background: var(--bg-header);
 }
 .table tbody tr.selected-row td.checkbox-col {
-  background: var(--bg-selected, var(--brand-bg));
+  background: var(--brand-bg);
 }
 .table tbody tr:nth-child(even) td.checkbox-col {
   background: var(--bg-stripe);
+}
+/* hover 시 체크박스 셀도 같은 hover 색 — sticky background 가 hover 룰 덮는 문제 회피 */
+.table tbody tr:hover td.checkbox-col {
+  background: var(--bg-hover);
+}
+.table tbody tr.selected-row:hover td.checkbox-col {
+  background: var(--brand-bg);
 }
 /* input 을 셀 정중앙에 절대 고정 — 행 높이/내용에 관계없이 항상 같은 위치 */
 .table .checkbox-col {

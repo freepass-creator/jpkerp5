@@ -98,6 +98,13 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
           end_date: matched.endDate,
           product_type: '장기렌트',
           partner_code: matched.companyCode,
+          end_reason: matched.endReason,
+          ended_at: matched.endedAt,
+          /** 부과 근거 — 정상/중도 → 계약자 부과 / 채권보전 → 회사 부담 (추심별도) */
+          billing_party:
+            matched.endReason === '채권보전' ? '회사' :
+            (matched.endReason === '정상종료' || matched.endReason === '중도해지' || matched.status === '운행중' || matched.status === '대기') ? '계약자' :
+            '계약자',
         } : null,
         _company: matched ? findCompanyByCode(matched.companyCode) : null,
       };
