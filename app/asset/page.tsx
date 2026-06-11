@@ -237,6 +237,14 @@ export default function AssetPage() {
     return { all: base.length, reg, ins, loan, gps };
   }, [vehicles, companyFilter, isMissing]);
 
+  // 현재 선택 중인 chip 의 카운트가 0 되면 '전체' 로 자동 전환 (반응형)
+  useEffect(() => {
+    if (assetQF === 'reg-missing' && assetCounts.reg === 0) setAssetQF('all');
+    else if (assetQF === 'ins-missing' && assetCounts.ins === 0) setAssetQF('all');
+    else if (assetQF === 'loan-missing' && assetCounts.loan === 0) setAssetQF('all');
+    else if (assetQF === 'gps-missing' && assetCounts.gps === 0) setAssetQF('all');
+  }, [assetQF, assetCounts, setAssetQF]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const groupMatch = (status?: VehicleStatus) => {
@@ -279,28 +287,28 @@ export default function AssetPage() {
           onViewChange={setAssetView}
           extraFilters={
             <>
+              {/* 전체 — 항상 표시. 나머지 chip 은 카운트 > 0 일 때만 (해당 없는/유지중이어도 숨김). */}
               <button type="button" className={`chip ${assetQF === 'all' ? 'active' : ''}`} onClick={() => setAssetQF('all')}>
                 전체<span className="chip-count">{assetCounts.all}</span>
               </button>
-              {/* 값 0 이면 chip 숨김 — "있는 거만 떠 있음" 사용자 룰. 단, 현재 선택된 필터는 0이어도 유지 (해제 가능). */}
-              {(assetCounts.reg > 0 || assetQF === 'reg-missing') && (
+              {assetCounts.reg > 0 && (
                 <button type="button" className={`chip ${assetQF === 'reg-missing' ? 'active' : ''}`} onClick={() => setAssetQF('reg-missing')}>
-                  등록증 미입력{assetCounts.reg > 0 && <span className="chip-count">{assetCounts.reg}</span>}
+                  등록증 미입력<span className="chip-count">{assetCounts.reg}</span>
                 </button>
               )}
-              {(assetCounts.ins > 0 || assetQF === 'ins-missing') && (
+              {assetCounts.ins > 0 && (
                 <button type="button" className={`chip ${assetQF === 'ins-missing' ? 'active' : ''}`} onClick={() => setAssetQF('ins-missing')}>
-                  보험 미입력{assetCounts.ins > 0 && <span className="chip-count">{assetCounts.ins}</span>}
+                  보험 미입력<span className="chip-count">{assetCounts.ins}</span>
                 </button>
               )}
-              {(assetCounts.loan > 0 || assetQF === 'loan-missing') && (
+              {assetCounts.loan > 0 && (
                 <button type="button" className={`chip ${assetQF === 'loan-missing' ? 'active' : ''}`} onClick={() => setAssetQF('loan-missing')}>
-                  구매방식 미입력{assetCounts.loan > 0 && <span className="chip-count">{assetCounts.loan}</span>}
+                  구매방식 미입력<span className="chip-count">{assetCounts.loan}</span>
                 </button>
               )}
-              {(assetCounts.gps > 0 || assetQF === 'gps-missing') && (
+              {assetCounts.gps > 0 && (
                 <button type="button" className={`chip ${assetQF === 'gps-missing' ? 'active' : ''}`} onClick={() => setAssetQF('gps-missing')}>
-                  GPS 미설치{assetCounts.gps > 0 && <span className="chip-count">{assetCounts.gps}</span>}
+                  GPS 미설치<span className="chip-count">{assetCounts.gps}</span>
                 </button>
               )}
             </>

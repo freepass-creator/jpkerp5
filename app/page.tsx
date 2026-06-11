@@ -501,15 +501,20 @@ export default function Page() {
     };
   }, [contracts, companyFilter]);
 
-  /** 화면에 표시할 view 칩 목록 — 데이터 있는 conditional view만 포함 */
+  /** 화면에 표시할 view 칩 목록 — 사용자 룰: 전체만 항상, 나머지는 count > 0 일 때만 (반응형 필터) */
   const visibleViews = useMemo<View[]>(() => {
-    const out: View[] = ['전체', '계약중'];
-    for (const v of CONDITIONAL_VIEWS) {
+    const out: View[] = ['전체'];
+    const candidates: View[] = ['계약중', ...CONDITIONAL_VIEWS, '휴차', '미수'];
+    for (const v of candidates) {
       if (viewCounts[v] > 0) out.push(v);
     }
-    out.push('휴차', '미수');
     return out;
   }, [viewCounts]);
+
+  // 현재 view 의 count 가 0 이면 [전체] 로 자동 전환
+  useEffect(() => {
+    if (view !== '전체' && viewCounts[view] === 0) setView('전체');
+  }, [view, viewCounts]);
 
   /** 회사 칩 카운트 — 상태 필터를 적용한 상태에서 각 회사별 수 (양방향 연동) */
   const companyCounts = useMemo(() => {

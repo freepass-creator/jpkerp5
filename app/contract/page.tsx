@@ -47,7 +47,7 @@ export default function ContractPage() {
   type QuickFilter = 'all' | 'active' | 'ended' | 'expire' | 'return' | 'overdue';
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:contract:company', 'all');
-  const [quickFilter, setQuickFilter] = usePersistentState<QuickFilter>('filter:contract:quick', 'all');
+  const [quickFilter, setQuickFilter] = usePersistentState<QuickFilter>('filter:contract:quick', 'active');
   const [groupBy, setGroupBy] = usePersistentState<'list' | 'customer'>('filter:contract:groupBy', 'list');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
@@ -157,26 +157,32 @@ export default function ContractPage() {
         <>
           <CompanyFilter value={companyFilter} onChange={setCompanyFilter} options={companyOptions} master={companyMaster} />
           <span className="filter-divider" />
-          {/* 라이프사이클 — 전체 / 유지 / 종료 (사용자 표준) */}
-          <button type="button" className={`chip ${quickFilter === 'all' ? 'active' : ''}`} onClick={() => setQuickFilter('all')}>
-            전체{counts.all > 0 && <span className="chip-count">{counts.all}</span>}
-          </button>
+          {/* 보조 퀵필터 — count > 0 일 때만 표시 (반응형) */}
+          {counts.expire > 0 && (
+            <button type="button" className={`chip ${quickFilter === 'expire' ? 'active' : ''}`} onClick={() => setQuickFilter('expire')}>
+              만기임박<span className="chip-count">{counts.expire}</span>
+            </button>
+          )}
+          {counts.return > 0 && (
+            <button type="button" className={`chip ${quickFilter === 'return' ? 'active' : ''}`} onClick={() => setQuickFilter('return')}>
+              반납<span className="chip-count">{counts.return}</span>
+            </button>
+          )}
+          {counts.overdue > 0 && (
+            <button type="button" className={`chip ${quickFilter === 'overdue' ? 'active' : ''}`} onClick={() => setQuickFilter('overdue')}>
+              미수금<span className="chip-count">{counts.overdue}</span>
+            </button>
+          )}
+          {/* 라이프사이클 — 우측 push (필터 아닌 view 분류, 항상 표시) */}
+          <span style={{ marginLeft: 'auto' }} />
           <button type="button" className={`chip ${quickFilter === 'active' ? 'active' : ''}`} onClick={() => setQuickFilter('active')}>
-            유지{counts.active > 0 && <span className="chip-count">{counts.active}</span>}
+            유지<span className="chip-count">{counts.active}</span>
           </button>
           <button type="button" className={`chip ${quickFilter === 'ended' ? 'active' : ''}`} onClick={() => setQuickFilter('ended')}>
-            종료{counts.ended > 0 && <span className="chip-count">{counts.ended}</span>}
+            종료<span className="chip-count">{counts.ended}</span>
           </button>
-          <span className="filter-divider" />
-          {/* 보조 — 만기임박/반납/미수금 */}
-          <button type="button" className={`chip ${quickFilter === 'expire' ? 'active' : ''}`} onClick={() => setQuickFilter('expire')}>
-            만기임박{counts.expire > 0 && <span className="chip-count">{counts.expire}</span>}
-          </button>
-          <button type="button" className={`chip ${quickFilter === 'return' ? 'active' : ''}`} onClick={() => setQuickFilter('return')}>
-            반납{counts.return > 0 && <span className="chip-count">{counts.return}</span>}
-          </button>
-          <button type="button" className={`chip ${quickFilter === 'overdue' ? 'active' : ''}`} onClick={() => setQuickFilter('overdue')}>
-            미수금{counts.overdue > 0 && <span className="chip-count">{counts.overdue}</span>}
+          <button type="button" className={`chip ${quickFilter === 'all' ? 'active' : ''}`} onClick={() => setQuickFilter('all')}>
+            전체<span className="chip-count">{counts.all}</span>
           </button>
           <span className="filter-divider" />
           <button type="button" className={`chip ${groupBy === 'list' ? 'active' : ''}`} onClick={() => setGroupBy('list')}>전체 리스트</button>

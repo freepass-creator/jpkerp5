@@ -121,6 +121,18 @@ export type Contract = {
   // 상태
   status: ContractStatus;
   notes?: string;
+  /**
+   * 종료 사유 — 계약이 status 변경되어 종료될 때 명시. 과태료 부과 근거.
+   *
+   *  · 정상종료: 약정 만기 도래 + 정산 완료
+   *  · 중도해지: 약정 만기 전 해지 (위약금 부과 근거)
+   *  · 채권보전: 미수 잔액 남은 채로 종료 (채권 추심 대상)
+   */
+  endReason?: '정상종료' | '중도해지' | '채권보전';
+  endedAt?: string;              // 종료 처리 일자 (YYYY-MM-DD)
+  unpaidAtEnd?: number;          // 종료 시점 미수 잔액 (채권보전 산출 근거)
+  earlyTerminationFee?: number;  // 중도해지 위약금 (부과 근거)
+  endNotes?: string;             // 종료 사유 부연 (담당자 메모, 추심 단계 등)
   /** 선도구매 — 계약자 없이 회사가 미리 차량 구매 (재고 확보용) */
   isInventoryPurchase?: boolean;
   // 계약서 발송 상태
