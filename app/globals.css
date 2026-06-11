@@ -1008,17 +1008,26 @@ a { color: var(--text-link); text-decoration: none; }
   background: var(--bg-card);
   color: var(--text-main);
   cursor: pointer;
-  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease, box-shadow 0.12s ease, transform 0.12s ease;
   white-space: nowrap;
   font-size: 12px;
   font-weight: var(--font-weight-medium);
   letter-spacing: -0.005em;
   font-family: inherit;
   user-select: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 .btn > svg { width: 14px; height: 14px; flex-shrink: 0; }
-.btn:hover { background: var(--bg-sunken); }
-.btn:active { background: var(--bg-stripe); }
+.btn:hover {
+  background: var(--bg-sunken);
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.09);
+  transform: translateY(-0.5px);
+}
+.btn:active {
+  background: var(--bg-stripe);
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+  transform: translateY(0);
+}
 .btn:focus-visible {
   outline: none;
   border-color: var(--brand);
@@ -1146,9 +1155,10 @@ input[type="radio"]:disabled {
   gap: 5px;
   height: var(--button-height);
   padding: 0 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  background: var(--bg-card);
+  /* chip 은 평평한 plate 느낌 (버튼과 구분) — 살짝 어두운 배경 */
+  background: var(--bg-soft);
   font-size: 12px;
   font-weight: var(--font-weight-medium);
   color: var(--text-sub);
@@ -1160,8 +1170,12 @@ input[type="radio"]:disabled {
   user-select: none;
 }
 .chip > svg { width: 12px; height: 12px; flex-shrink: 0; }
-.chip:hover { background: var(--bg-sunken); color: var(--text-main); }
-.chip:active { background: var(--bg-stripe); }
+.chip:hover {
+  background: var(--bg-card);
+  border-color: var(--border);
+  color: var(--text-main);
+}
+.chip:active { background: var(--bg-sunken); }
 .chip:focus-visible {
   outline: none;
   border-color: var(--brand);
@@ -1171,6 +1185,8 @@ input[type="radio"]:disabled {
   background: var(--brand);
   color: var(--text-inverse);
   border-color: var(--brand);
+  /* 선택된 chip 만 살짝 떠 보임 */
+  box-shadow: 0 1px 2px rgba(27, 42, 74, 0.18);
 }
 .chip.active:hover { background: var(--brand-h); border-color: var(--brand-h); color: var(--text-inverse); }
 
@@ -1493,7 +1509,7 @@ input[type="radio"]:disabled {
 /* ────────────── Filters ────────────── */
 .filter-bar {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -1502,10 +1518,10 @@ input[type="radio"]:disabled {
 .quick-filters {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex-wrap: wrap;
 }
-.quick-filters .filter-divider { margin: 0 4px; }
+.quick-filters .filter-divider { margin: 0 3px; }
 
 /* 하단바 버튼 그룹 구분선 — 주 액션 + 보조 액션 묶음 사이 */
 .btn-sep {

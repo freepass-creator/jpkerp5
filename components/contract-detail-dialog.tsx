@@ -127,8 +127,13 @@ function ContractDetailShell({
               <span>{contract.contractNo}</span>
             </>
           )}
-          <span>·</span>
-          <span>담당 {contract.manager || '-'}</span>
+          {/* 담당 — 계약(customer) 있을 때만, 차량만 있는 무계약은 자산 hero 와 일관되게 생략 */}
+          {contract.customerName?.trim() && (
+            <>
+              <span>·</span>
+              <span>담당 {contract.manager || '-'}</span>
+            </>
+          )}
         </>
       }
       heroRight={null}
@@ -717,93 +722,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
         </div>
       </Section>
 
-      {/* 운영 기본 — 인도/반납/만기/회차/금액 (운영 정보 한눈에) */}
-      <Section icon={<FileText size={12} weight="duotone" />} title="운영 기본">
-        <div className="detail-grid-2">
-          <Field label="인도일" value={formatDateFull(c.deliveredDate) || <span className="muted">미인도</span>} mono />
-          <Field label="반납 예정" value={formatDateFull(c.returnScheduledDate) || <span className="muted">미정</span>} mono />
-          <Field
-            label="회차"
-            value={c.currentSeq && c.totalSeq ? `${c.currentSeq} / ${c.totalSeq}` : <span className="muted">-</span>}
-            mono
-          />
-          <Field
-            label="월 대여료"
-            value={c.monthlyRent ? `₩${formatCurrency(c.monthlyRent)}` : <span className="muted">-</span>}
-            mono
-          />
-          <Field
-            label="보증금"
-            value={c.deposit ? `₩${formatCurrency(c.deposit)}` : <span className="muted">-</span>}
-            mono
-          />
-          <Field label="결제일" value={c.paymentDay ? `매월 ${c.paymentDay}일` : <span className="muted">-</span>} mono />
-          <Field label="장단기" value={c.longTerm ? '장기' : '단기'} />
-          <Field label="담당자" value={c.manager || <span className="muted">-</span>} />
-        </div>
-      </Section>
-
-      {/* 리스크 관리 — 미비한 것·체크해줘야할 것 한눈에 */}
-      <Section icon={<WarningIcon size={12} weight="duotone" />} title="리스크 관리">
-        <div className="detail-grid-2">
-          <Field
-            label="현재 미수"
-            value={(c.unpaidAmount ?? 0) > 0
-              ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>₩{formatCurrency(c.unpaidAmount ?? 0)}</span>
-              : <span className="muted">없음</span>}
-            mono
-          />
-          <Field
-            label="미납 회차"
-            value={(c.unpaidSeqCount ?? 0) > 0
-              ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>{c.unpaidSeqCount}회</span>
-              : <span className="muted">없음</span>}
-            mono
-          />
-          <Field
-            label="시동제어"
-            value={c.engineDisabled
-              ? <StatusBadge tone="red">ON</StatusBadge>
-              : <span className="muted">정상</span>}
-          />
-          <Field
-            label="위반 사항"
-            value={c.hasViolations
-              ? <StatusBadge tone="red">있음</StatusBadge>
-              : <span className="muted">없음</span>}
-          />
-          <Field
-            label="면허"
-            value={c.customerLicenseStatus && c.customerLicenseStatus !== '정상' && c.customerLicenseStatus !== '미조회'
-              ? <StatusBadge tone="red">{c.customerLicenseStatus}</StatusBadge>
-              : <span className="muted">{c.customerLicenseStatus || '미조회'}</span>}
-          />
-          <Field
-            label="정기검사"
-            value={c.inspectionDueDate && c.inspectionDueDate < todayKr()
-              ? <StatusBadge tone="red">만기 경과</StatusBadge>
-              : c.inspectionDueDate ? formatDateFull(c.inspectionDueDate) : <span className="muted">-</span>}
-            mono
-          />
-        </div>
-      </Section>
-
-      {/* 현재 위치 + 작업 상태 + 휴차 정보 */}
-      <Section icon={<Car size={12} weight="duotone" />} title="현재 위치">
-        <VehicleLocationEditor c={c} onUpdate={onUpdate} workingContext={workingContext} />
-        {c.idleSince && (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)' }}>
-            <div className="detail-grid-2">
-              <Field label="휴차 시작" value={formatDateFull(c.idleSince)} mono />
-              <Field label="종료 예정" value={formatDateFull(c.idleUntil) || <span className="muted">미정</span>} mono />
-              <Field label="사유" value={c.idleReason || '-'} />
-              <Field label="휴차 일수" value={`${daysSince(c.idleSince, todayKr())}일`} mono />
-            </div>
-          </div>
-        )}
-      </Section>
-
-      {/* 처리·진행 — 단계별 액션 + 체크리스트 + picker */}
+      {/* 처리·진행 — 단계별 액션 + 체크리스트 + picker (현재 상태 바로 밑) */}
       <Section
         icon={<ArrowsLeftRight size={12} weight="duotone" />}
         title="처리·진행"
@@ -1184,6 +1103,92 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
               현재 <span className="plate">{c.tempReplacementPlate}</span> {c.tempReplacementModel || ''}
             </div>
             {c.tempReason && <div style={{ color: 'var(--text-sub)', marginTop: 4 }}>{c.tempReason}</div>}
+          </div>
+        )}
+      </Section>
+
+      {/* 운영 기본 — 인도/반납/만기/회차/금액 (운영 정보 한눈에) */}
+      <Section icon={<FileText size={12} weight="duotone" />} title="운영 기본">
+        <div className="detail-grid-2">
+          <Field label="인도일" value={formatDateFull(c.deliveredDate) || <span className="muted">미인도</span>} mono />
+          <Field label="반납 예정" value={formatDateFull(c.returnScheduledDate) || <span className="muted">미정</span>} mono />
+          <Field
+            label="회차"
+            value={c.currentSeq && c.totalSeq ? `${c.currentSeq} / ${c.totalSeq}` : <span className="muted">-</span>}
+            mono
+          />
+          <Field
+            label="월 대여료"
+            value={c.monthlyRent ? `₩${formatCurrency(c.monthlyRent)}` : <span className="muted">-</span>}
+            mono
+          />
+          <Field
+            label="보증금"
+            value={c.deposit ? `₩${formatCurrency(c.deposit)}` : <span className="muted">-</span>}
+            mono
+          />
+          <Field label="결제일" value={c.paymentDay ? `매월 ${c.paymentDay}일` : <span className="muted">-</span>} mono />
+          <Field label="장단기" value={c.longTerm ? '장기' : '단기'} />
+          <Field label="담당자" value={c.manager || <span className="muted">-</span>} />
+        </div>
+      </Section>
+
+      {/* 리스크 관리 — 미비한 것·체크해줘야할 것 한눈에 */}
+      <Section icon={<WarningIcon size={12} weight="duotone" />} title="리스크 관리">
+        <div className="detail-grid-2">
+          <Field
+            label="현재 미수"
+            value={(c.unpaidAmount ?? 0) > 0
+              ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>₩{formatCurrency(c.unpaidAmount ?? 0)}</span>
+              : <span className="muted">없음</span>}
+            mono
+          />
+          <Field
+            label="미납 회차"
+            value={(c.unpaidSeqCount ?? 0) > 0
+              ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>{c.unpaidSeqCount}회</span>
+              : <span className="muted">없음</span>}
+            mono
+          />
+          <Field
+            label="시동제어"
+            value={c.engineDisabled
+              ? <StatusBadge tone="red">ON</StatusBadge>
+              : <span className="muted">정상</span>}
+          />
+          <Field
+            label="위반 사항"
+            value={c.hasViolations
+              ? <StatusBadge tone="red">있음</StatusBadge>
+              : <span className="muted">없음</span>}
+          />
+          <Field
+            label="면허"
+            value={c.customerLicenseStatus && c.customerLicenseStatus !== '정상' && c.customerLicenseStatus !== '미조회'
+              ? <StatusBadge tone="red">{c.customerLicenseStatus}</StatusBadge>
+              : <span className="muted">{c.customerLicenseStatus || '미조회'}</span>}
+          />
+          <Field
+            label="정기검사"
+            value={c.inspectionDueDate && c.inspectionDueDate < todayKr()
+              ? <StatusBadge tone="red">만기 경과</StatusBadge>
+              : c.inspectionDueDate ? formatDateFull(c.inspectionDueDate) : <span className="muted">-</span>}
+            mono
+          />
+        </div>
+      </Section>
+
+      {/* 현재 위치 + 작업 상태 + 휴차 정보 */}
+      <Section icon={<Car size={12} weight="duotone" />} title="현재 위치">
+        <VehicleLocationEditor c={c} onUpdate={onUpdate} workingContext={workingContext} />
+        {c.idleSince && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)' }}>
+            <div className="detail-grid-2">
+              <Field label="휴차 시작" value={formatDateFull(c.idleSince)} mono />
+              <Field label="종료 예정" value={formatDateFull(c.idleUntil) || <span className="muted">미정</span>} mono />
+              <Field label="사유" value={c.idleReason || '-'} />
+              <Field label="휴차 일수" value={`${daysSince(c.idleSince, todayKr())}일`} mono />
+            </div>
           </div>
         )}
       </Section>
