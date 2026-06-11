@@ -1326,80 +1326,141 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
  *   · 비고 (담당자 메모, 추심 단계 등)
  */
 function EndInfoSection({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Partial<Contract>>({});
+  useEffect(() => { if (!editing) setDraft({}); }, [c, editing]);
+
+  const v = (k: keyof Contract) => (editing && k in draft ? draft[k] : c[k]) as unknown;
+  const set = (k: keyof Contract, val: unknown) => setDraft((p) => ({ ...p, [k]: val }));
+
   const toneFor = (r?: Contract['endReason']) =>
     r === '정상종료' ? 'green' : r === '중도해지' ? 'amber' : r === '채권보전' ? 'red' : 'gray';
+
+  function handleSave() {
+    onUpdate({ ...c, ...draft });
+    setEditing(false);
+    setDraft({});
+  }
+  function handleCancel() {
+    setEditing(false);
+    setDraft({});
+  }
+
+  const action = editing ? (
+    <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+      <button className="btn btn-sm" onClick={handleCancel}>취소</button>
+      <button className="btn btn-sm btn-primary" onClick={handleSave}>저장</button>
+    </div>
+  ) : (
+    <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setEditing(true)}>
+      수정
+    </button>
+  );
+
+  const curEndReason = v('endReason') as Contract['endReason'] | undefined;
+
   return (
-    <Section icon={<ArrowUUpLeft size={12} weight="duotone" />} title="종료 정보">
-      <div className="detail-grid-2">
-        <div>
-          <div className="detail-field">
-            <label className="detail-field-label">종료 사유</label>
-            <select
-              className="input input-compact"
-              value={c.endReason ?? ''}
-              onChange={(e) => onUpdate({ ...c, endReason: (e.target.value || undefined) as Contract['endReason'] })}
-              style={{ width: '100%' }}
-            >
-              <option value="">미지정</option>
-              <option value="정상종료">정상종료</option>
-              <option value="중도해지">중도해지</option>
-              <option value="채권보전">채권보전</option>
-            </select>
-            {c.endReason && (
-              <div style={{ marginTop: 4 }}>
-                <StatusBadge tone={toneFor(c.endReason)}>{c.endReason}</StatusBadge>
-              </div>
+    <Section icon={<ArrowUUpLeft size={12} weight="duotone" />} title="종료 정보" action={action}>
+      {!editing ? (
+        // ─── 보기 모드 — read-only Field
+        <div className="detail-grid-2">
+          <div>
+            <Field
+              label="종료 사유"
+              value={c.endReason ? <StatusBadge tone={toneFor(c.endReason)}>{c.endReason}</StatusBadge> : <span className="muted">미지정</span>}
+            />
+            <Field label="종료일" value={formatDateFull(c.endedAt) || <span className="muted">-</span>} mono />
+          </div>
+          <div>
+            <Field
+              label="종료 시 미수"
+              value={c.unpaidAtEnd != null ? `₩${c.unpaidAtEnd.toLocaleString()}` : <span className="muted">-</span>}
+              mono
+            />
+            {c.endReason === '중도해지' && (
+              <Field
+                label="중도해지 위약금"
+                value={c.earlyTerminationFee != null ? `₩${c.earlyTerminationFee.toLocaleString()}` : <span className="muted">미산정</span>}
+                mono
+              />
             )}
           </div>
-          <div className="detail-field">
-            <label className="detail-field-label">종료일</label>
-            <input
-              type="date"
-              className="input input-compact mono"
-              value={c.endedAt ?? ''}
-              onChange={(e) => onUpdate({ ...c, endedAt: e.target.value || undefined })}
-              style={{ width: '100%' }}
-            />
-          </div>
-        </div>
-        <div>
-          <div className="detail-field">
-            <label className="detail-field-label">종료 시 미수 잔액 (채권보전 근거)</label>
-            <input
-              type="number"
-              className="input input-compact mono num"
-              value={c.unpaidAtEnd ?? ''}
-              onChange={(e) => onUpdate({ ...c, unpaidAtEnd: e.target.value === '' ? undefined : Number(e.target.value) })}
-              style={{ width: '100%' }}
-              placeholder="자동 캡처 — 수정 가능"
-            />
-          </div>
-          {c.endReason === '중도해지' && (
-            <div className="detail-field">
-              <label className="detail-field-label">중도해지 위약금</label>
-              <input
-                type="number"
-                className="input input-compact mono num"
-                value={c.earlyTerminationFee ?? ''}
-                onChange={(e) => onUpdate({ ...c, earlyTerminationFee: e.target.value === '' ? undefined : Number(e.target.value) })}
-                style={{ width: '100%' }}
-                placeholder="약정 잔여 회차 × 월대여료 등"
-              />
+          {c.endNotes && (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Field label="비고" value={c.endNotes} />
             </div>
           )}
         </div>
-      </div>
-      <div className="detail-field" style={{ marginTop: 6 }}>
-        <label className="detail-field-label">비고 (담당자 메모 · 추심 단계 등)</label>
-        <textarea
-          className="input input-compact"
-          rows={2}
-          value={c.endNotes ?? ''}
-          onChange={(e) => onUpdate({ ...c, endNotes: e.target.value || undefined })}
-          style={{ width: '100%', resize: 'vertical' }}
-          placeholder="채권 추심 진행 단계 · 변호사 위임 · 위약금 협상 등"
-        />
-      </div>
+      ) : (
+        // ─── 수정 모드 — input
+        <>
+          <div className="detail-grid-2">
+            <div>
+              <div className="detail-field">
+                <label className="detail-field-label">종료 사유</label>
+                <select
+                  className="input input-compact"
+                  value={(curEndReason ?? '')}
+                  onChange={(e) => set('endReason', e.target.value || undefined)}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">미지정</option>
+                  <option value="정상종료">정상종료</option>
+                  <option value="중도해지">중도해지</option>
+                  <option value="채권보전">채권보전</option>
+                </select>
+              </div>
+              <div className="detail-field">
+                <label className="detail-field-label">종료일</label>
+                <input
+                  type="date"
+                  className="input input-compact mono"
+                  value={(v('endedAt') as string | undefined) ?? ''}
+                  onChange={(e) => set('endedAt', e.target.value || undefined)}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="detail-field">
+                <label className="detail-field-label">종료 시 미수 잔액 (채권보전 근거)</label>
+                <input
+                  type="number"
+                  className="input input-compact mono num"
+                  value={(v('unpaidAtEnd') as number | undefined) ?? ''}
+                  onChange={(e) => set('unpaidAtEnd', e.target.value === '' ? undefined : Number(e.target.value))}
+                  style={{ width: '100%' }}
+                  placeholder="자동 캡처 — 수정 가능"
+                />
+              </div>
+              {curEndReason === '중도해지' && (
+                <div className="detail-field">
+                  <label className="detail-field-label">중도해지 위약금</label>
+                  <input
+                    type="number"
+                    className="input input-compact mono num"
+                    value={(v('earlyTerminationFee') as number | undefined) ?? ''}
+                    onChange={(e) => set('earlyTerminationFee', e.target.value === '' ? undefined : Number(e.target.value))}
+                    style={{ width: '100%' }}
+                    placeholder="약정 잔여 회차 × 월대여료 등"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="detail-field" style={{ marginTop: 6 }}>
+            <label className="detail-field-label">비고 (담당자 메모 · 추심 단계 등)</label>
+            <textarea
+              className="input input-compact"
+              rows={2}
+              value={(v('endNotes') as string | undefined) ?? ''}
+              onChange={(e) => set('endNotes', e.target.value || undefined)}
+              style={{ width: '100%', resize: 'vertical' }}
+              placeholder="채권 추심 진행 단계 · 변호사 위임 · 위약금 협상 등"
+            />
+          </div>
+        </>
+      )}
     </Section>
   );
 }
