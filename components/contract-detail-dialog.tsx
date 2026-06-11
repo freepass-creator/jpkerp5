@@ -109,8 +109,8 @@ function ContractDetailShell({
     <DetailDialogShell
       open={open}
       onOpenChange={onOpenChange}
-      title={`상세 정보 — ${contract.vehiclePlate} · ${contract.customerName}`}
-      heroName={contract.customerName}
+      title={`상세 정보 — ${contract.vehiclePlate} · ${contract.customerName || '(무계약)'}`}
+      heroName={contract.customerName?.trim() || contract.vehicleModelLine || contract.vehicleModel || contract.vehiclePlate || '-'}
       heroMeta={
         <>
           <span className="plate">{contract.vehiclePlate}</span>
@@ -683,10 +683,28 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
   return (
     <div className="detail-stack">
-      {/* 상태 전환 */}
+      {/* 현재 상태 — 큰 상태 + 위치 + 휴차 정보 (가장 자주 보는 정보, 맨 위) */}
+      <Section
+        icon={<Car size={12} weight="duotone" />}
+        title={`현재 상태 — ${stageLabel(stage)}${stage === '휴차' && c.idleReason ? ` (${c.idleReason.split(' — ')[0]})` : ''}`}
+      >
+        <VehicleLocationEditor c={c} onUpdate={onUpdate} />
+        {c.idleSince && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)' }}>
+            <div className="detail-grid-2">
+              <Field label="휴차 시작" value={formatDateFull(c.idleSince)} mono />
+              <Field label="종료 예정" value={formatDateFull(c.idleUntil) || <span className="muted">미정</span>} mono />
+              <Field label="사유" value={c.idleReason || '-'} />
+              <Field label="휴차 일수" value={`${daysSince(c.idleSince, todayKr())}일`} mono />
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* 세부 조건 이행 — 단계별 액션 + 체크리스트 + picker */}
       <Section
         icon={<ArrowsLeftRight size={12} weight="duotone" />}
-        title={`현재 ${stageLabel(stage)}${stage === '휴차' && c.idleReason ? ` (${c.idleReason.split(' — ')[0]})` : ''}`}
+        title="세부 조건 이행"
         action={null}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -1086,19 +1104,6 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
         </div>
       </Section>
 
-      {/* 현재 위치 — 항상 노출 (휴차 아니라도 메모 가능) */}
-      <Section icon={<Car size={12} weight="duotone" />} title="현재 위치">
-        <VehicleLocationEditor c={c} onUpdate={onUpdate} />
-      </Section>
-
-      {c.idleSince && (
-        <Section icon={<PauseCircle size={12} weight="duotone" />} title="휴차 기간">
-          <Field label="시작일" value={formatDateFull(c.idleSince)} mono />
-          <Field label="종료예정" value={formatDateFull(c.idleUntil) || <span className="muted">미정</span>} mono />
-          <Field label="사유" value={c.idleReason || '-'} />
-          <Field label="휴차 일수" value={`${daysSince(c.idleSince, todayKr())}일`} mono />
-        </Section>
-      )}
     </div>
   );
 }
