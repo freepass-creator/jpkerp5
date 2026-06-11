@@ -1154,10 +1154,9 @@ input[type="radio"]:disabled {
   align-items: center;
   gap: 5px;
   height: var(--button-height);
-  padding: 0 12px;
+  padding: 0 10px;
   border: 1px solid var(--border-soft);
-  /* 필터 chip — pill (완전 둥근). 탭(tabs-trigger 사각 박스)과 시각 구분 */
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius);
   /* chip 은 평평한 plate 느낌 (버튼과 구분) — 살짝 어두운 배경 */
   background: var(--bg-soft);
   font-size: 12px;
@@ -1191,9 +1190,18 @@ input[type="radio"]:disabled {
 }
 .chip.active:hover { background: var(--brand-h); border-color: var(--brand-h); color: var(--text-inverse); }
 
-/* chip-nav — sub-page 이동용. 시각적 차이는 없음 (목록형 통일).
-   퀵필터 chip 과 동일한 .chip 규격. 클래스만 의미적으로 구분 (검색/리팩토링용). */
-.chip.chip-nav { /* 별도 스타일 없음 */ }
+/* chip-nav — sub-page 이동/메뉴 전환용 (필터 chip 과 색 구분).
+   필터 = brand 채움 / 메뉴(chip-nav) = brand 테두리만 (ghost). 둘 다 의미가 다름. */
+.chip.chip-nav.active {
+  background: var(--bg-card);
+  color: var(--brand);
+  border-color: var(--brand);
+}
+.chip.chip-nav.active:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+  border-color: var(--brand-h);
+}
 .chip:disabled,
 .chip[disabled] {
   color: var(--text-weak);
@@ -1202,12 +1210,12 @@ input[type="radio"]:disabled {
 }
 .chip-count {
   background: rgba(255,255,255,0.22);
-  padding: 0 6px;
+  padding: 0 5px;
   font-size: 10px;
   height: 16px;
   display: inline-flex;
   align-items: center;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius);
 }
 .chip:not(.active) .chip-count {
   background: var(--bg-sunken);
