@@ -81,7 +81,7 @@ function ContractDetailShell({
   // 공용 DetailDialogShell footer 패턴 그대로:
   //   [수정][닫기] ⟷ [취소][저장][닫기]
   // 자식 inline 편집 state 를 부모로 lift — 자식 onEditingChange 콜백으로 부모에 알림.
-  const [activeTab, setActiveTab] = useState<string>('asset');
+  const [activeTab, setActiveTab] = useState<string>('status');
   const [editingTab, setEditingTab] = useState<string | null>(null);
   const assetRef = useRef<EditableTabHandle>(null);
   const contractRef = useRef<EditableTabHandle>(null);
@@ -114,26 +114,23 @@ function ContractDetailShell({
       heroMeta={
         <>
           <span className="plate">{contract.vehiclePlate}</span>
-          <span>·</span>
-          <span>{contract.vehicleModel}</span>
+          {/* customerName 있을 때만 차종 — 없으면 차종이 heroName 이라 중복 회피 */}
+          {contract.customerName?.trim() && (
+            <span>{contract.vehicleModel}</span>
+          )}
           <span>·</span>
           <span>{companyDisplay}</span>
-          <span>·</span>
-          <span>{contract.contractNo}</span>
+          {contract.contractNo && (
+            <>
+              <span>·</span>
+              <span>{contract.contractNo}</span>
+            </>
+          )}
           <span>·</span>
           <span>담당 {contract.manager || '-'}</span>
         </>
       }
-      heroRight={
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span className="dim" style={{ fontSize: 10 }}>차량</span>
-          <StatusBadge tone={vehicleStateTone(vs.name)}>{vs.name}</StatusBadge>
-          <span className="dim" style={{ fontSize: 10, marginLeft: 6 }}>계약</span>
-          <StatusBadge tone={contractStateTone(cs.name)}>{cs.name}</StatusBadge>
-          <span className="dim" style={{ fontSize: 10, marginLeft: 6 }}>수납</span>
-          <StatusBadge tone={paymentStateTone(ps.name)}>{ps.name}</StatusBadge>
-        </div>
-      }
+      heroRight={null}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onEdit={handleEdit}
@@ -515,6 +512,30 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
 
 function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const stage = currentStage(c);
+  const vs = getVehicleState(c);
+  const cs = getContractState(c);
+  const ps = getPaymentState(c);
+
+  // 현재 작업 상태 — 위치 + stage 기반 합성 문장
+  const workingContext = (() => {
+    const s = c.vehicleStatus;
+    const loc = c.idleLocation;
+    if (s === '구매대기') return loc ? `${loc}에서 구매 진행` : '구매 대기 중';
+    if (s === '등록대기') return loc ? `${loc}에서 등록 진행` : '등록 대기 중';
+    if (s === '상품화중' || s === '상품화대기') return loc ? `${loc}에서 상품화 작업` : '상품화 작업 중';
+    if (s === '인도대기' || s === '출고대기') return loc ? `${loc}에서 인도 준비` : '인도 준비 중';
+    if (s === '휴차' || s === '휴차대기') {
+      const reason = c.idleReason?.split(' — ')[0] ?? '대기';
+      return loc ? `${loc}에서 ${reason}` : `${reason} 중`;
+    }
+    if (s === '정비') return loc ? `${loc}에서 정비 작업` : '정비 중';
+    if (s === '사고') return loc ? `${loc}에서 사고 수리` : '사고 수리 중';
+    if (s === '매각검토') return loc ? `${loc}에서 매각 검토` : '매각 검토 중';
+    if (s === '매각대기') return loc ? `${loc}에서 매각 진행` : '매각 진행 중';
+    if (s === '운행') return c.customerName ? `${c.customerName} 인도 — 운행 중` : '운행 중';
+    if (s === '임시배차') return c.tempReplacementPlate ? `${c.tempReplacementPlate} 임시 배차 중` : '임시 배차 중';
+    return stageLabel(stage);
+  })();
   const [actionDate, setActionDate] = useState<string>(todayKr());
   const [idlePicker, setIdlePicker] = useState(false);
   const [idleSubReason, setIdleSubReason] = useState<IdleReason>('정비');
@@ -683,12 +704,92 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
   return (
     <div className="detail-stack">
-      {/* 현재 상태 — 큰 상태 + 위치 + 휴차 정보 (가장 자주 보는 정보, 맨 위) */}
+      {/* 현재 상태 — 핵심 상태 칩 (심플 한눈 요약, stage 는 밑 Field 에서 노출) */}
       <Section
         icon={<Car size={12} weight="duotone" />}
-        title={`현재 상태 — ${stageLabel(stage)}${stage === '휴차' && c.idleReason ? ` (${c.idleReason.split(' — ')[0]})` : ''}`}
+        title="현재 상태"
       >
-        <VehicleLocationEditor c={c} onUpdate={onUpdate} />
+        <div className="detail-grid-2">
+          <Field label="차량 상태" value={<StatusBadge tone={vehicleStateTone(vs.name)}>{vs.name}</StatusBadge>} />
+          <Field label="계약 상태" value={<StatusBadge tone={contractStateTone(cs.name)}>{cs.name}</StatusBadge>} />
+          <Field label="수납 상태" value={<StatusBadge tone={paymentStateTone(ps.name)}>{ps.name}</StatusBadge>} />
+        </div>
+      </Section>
+
+      {/* 운영 기본 — 인도/반납/만기/회차/금액 (운영 정보 한눈에) */}
+      <Section icon={<FileText size={12} weight="duotone" />} title="운영 기본">
+        <div className="detail-grid-2">
+          <Field label="인도일" value={formatDateFull(c.deliveredDate) || <span className="muted">미인도</span>} mono />
+          <Field label="반납 예정" value={formatDateFull(c.returnScheduledDate) || <span className="muted">미정</span>} mono />
+          <Field
+            label="회차"
+            value={c.currentSeq && c.totalSeq ? `${c.currentSeq} / ${c.totalSeq}` : <span className="muted">-</span>}
+            mono
+          />
+          <Field
+            label="월 대여료"
+            value={c.monthlyRent ? `₩${formatCurrency(c.monthlyRent)}` : <span className="muted">-</span>}
+            mono
+          />
+          <Field
+            label="보증금"
+            value={c.deposit ? `₩${formatCurrency(c.deposit)}` : <span className="muted">-</span>}
+            mono
+          />
+          <Field label="결제일" value={c.paymentDay ? `매월 ${c.paymentDay}일` : <span className="muted">-</span>} mono />
+          <Field label="장단기" value={c.longTerm ? '장기' : '단기'} />
+          <Field label="담당자" value={c.manager || <span className="muted">-</span>} />
+        </div>
+      </Section>
+
+      {/* 리스크 관리 — 미비한 것·체크해줘야할 것 한눈에 */}
+      <Section icon={<WarningIcon size={12} weight="duotone" />} title="리스크 관리">
+        <div className="detail-grid-2">
+          <Field
+            label="현재 미수"
+            value={(c.unpaidAmount ?? 0) > 0
+              ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>₩{formatCurrency(c.unpaidAmount ?? 0)}</span>
+              : <span className="muted">없음</span>}
+            mono
+          />
+          <Field
+            label="미납 회차"
+            value={(c.unpaidSeqCount ?? 0) > 0
+              ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>{c.unpaidSeqCount}회</span>
+              : <span className="muted">없음</span>}
+            mono
+          />
+          <Field
+            label="시동제어"
+            value={c.engineDisabled
+              ? <StatusBadge tone="red">ON</StatusBadge>
+              : <span className="muted">정상</span>}
+          />
+          <Field
+            label="위반 사항"
+            value={c.hasViolations
+              ? <StatusBadge tone="red">있음</StatusBadge>
+              : <span className="muted">없음</span>}
+          />
+          <Field
+            label="면허"
+            value={c.customerLicenseStatus && c.customerLicenseStatus !== '정상' && c.customerLicenseStatus !== '미조회'
+              ? <StatusBadge tone="red">{c.customerLicenseStatus}</StatusBadge>
+              : <span className="muted">{c.customerLicenseStatus || '미조회'}</span>}
+          />
+          <Field
+            label="정기검사"
+            value={c.inspectionDueDate && c.inspectionDueDate < todayKr()
+              ? <StatusBadge tone="red">만기 경과</StatusBadge>
+              : c.inspectionDueDate ? formatDateFull(c.inspectionDueDate) : <span className="muted">-</span>}
+            mono
+          />
+        </div>
+      </Section>
+
+      {/* 현재 위치 + 작업 상태 + 휴차 정보 */}
+      <Section icon={<Car size={12} weight="duotone" />} title="현재 위치">
+        <VehicleLocationEditor c={c} onUpdate={onUpdate} workingContext={workingContext} />
         {c.idleSince && (
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)' }}>
             <div className="detail-grid-2">
@@ -701,10 +802,10 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
         )}
       </Section>
 
-      {/* 세부 조건 이행 — 단계별 액션 + 체크리스트 + picker */}
+      {/* 처리·진행 — 단계별 액션 + 체크리스트 + picker */}
       <Section
         icon={<ArrowsLeftRight size={12} weight="duotone" />}
-        title="세부 조건 이행"
+        title="처리·진행"
         action={null}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -1104,7 +1205,61 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
         </div>
       </Section>
 
+      {/* 첨부 파일 — 첨부 상태 + 다운로드 (미리보기 없음) */}
+      <AttachmentList c={c} />
+
     </div>
+  );
+}
+
+/** 첨부 파일 목록 — 운영현황 상세 맨 아래. 첨부 여부 + 파일명 + 다운로드만 (미리보기 없음). */
+function AttachmentList({ c }: { c: Contract }) {
+  // 같은 plate Vehicle 마스터에서 자등증/보험증명서/할부계약서/정기검사증/GPS설치/매각계약서 첨부 확인
+  const { vehicles } = useVehicles();
+  const vehicle = useMemo(
+    () => vehicles.find((v) => v.plate?.trim() === c.vehiclePlate?.trim()),
+    [vehicles, c.vehiclePlate]
+  );
+
+  const items: { label: string; url?: string; fileName?: string; uploadedAt?: string }[] = [
+    { label: '자동차등록증',     url: vehicle?.registrationCertUrl,  fileName: vehicle?.registrationCertFileName,  uploadedAt: vehicle?.registrationCertUploadedAt },
+    { label: '보험가입증명서',   url: vehicle?.insuranceCertUrl,     fileName: vehicle?.insuranceCertFileName,     uploadedAt: vehicle?.insuranceCertUploadedAt },
+    { label: '할부계약서',       url: vehicle?.loanContractUrl,      fileName: vehicle?.loanContractFileName,      uploadedAt: vehicle?.loanContractUploadedAt },
+    { label: '정기검사증',       url: vehicle?.inspectionCertUrl,    fileName: vehicle?.inspectionCertFileName,    uploadedAt: vehicle?.inspectionCertUploadedAt },
+    { label: 'GPS 설치 증빙',    url: vehicle?.gpsInstallUrl,        fileName: vehicle?.gpsInstallFileName,        uploadedAt: vehicle?.gpsInstallUploadedAt },
+    { label: '매도증·매각계약서', url: vehicle?.disposalCertUrl,      fileName: vehicle?.disposalCertFileName,      uploadedAt: vehicle?.disposalCertUploadedAt },
+    { label: '면허증 사본',      url: c.customerLicenseCertUrl,      fileName: c.customerLicenseCertFileName,      uploadedAt: c.customerLicenseCertUploadedAt },
+  ];
+  const attached = items.filter((it) => !!it.url).length;
+
+  return (
+    <Section
+      icon={<FileText size={12} weight="duotone" />}
+      title="첨부 파일"
+      action={<span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-weak)' }}>{attached}/{items.length}</span>}
+    >
+      <div className="detail-grid-2">
+        {items.map((it) => (
+          <div key={it.label} className="detail-field" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span className="label" style={{ minWidth: 110 }}>{it.label}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              {it.url ? (
+                <a
+                  href={it.url}
+                  download={it.fileName ?? `${it.label}.pdf`}
+                  style={{ color: 'var(--brand)', fontSize: 12, textDecoration: 'none' }}
+                  title={it.uploadedAt ? `업로드 ${it.uploadedAt.slice(0, 10)}` : undefined}
+                >
+                  📎 {it.fileName ?? '다운로드'}
+                </a>
+              ) : (
+                <span className="muted">미첨부</span>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 
@@ -1113,7 +1268,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
  * 휴차 차량은 보관 장소, 운행 차량도 임시 보관/정비 입고 등 위치 메모 가능.
  * v4 IOC 패턴 — 위치 변경 시 차량 이력에 자동 기록.
  */
-function VehicleLocationEditor({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+function VehicleLocationEditor({ c, onUpdate, workingContext }: { c: Contract; onUpdate: (u: Contract) => void; workingContext?: string }) {
   const { entries, add: addHistory } = useHistoryEntries();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({
@@ -1164,6 +1319,7 @@ function VehicleLocationEditor({ c, onUpdate }: { c: Contract; onUpdate: (u: Con
           <span style={{ color: 'var(--text-weak)' }}>현재 위치</span>
           <span>
             {oldLocation ? <strong>{oldLocation}</strong> : <span className="muted">미입력</span>}
+            {workingContext && <span style={{ marginLeft: 8, color: 'var(--text-sub)' }}>/ {workingContext}</span>}
             {c.idleContact && <span className="dim mono" style={{ marginLeft: 8, fontSize: 11 }}>({c.idleContact})</span>}
           </span>
           <button type="button" className="btn btn-sm" onClick={() => setEditing(true)}>

@@ -475,7 +475,6 @@ export function VehicleDetailDialog({
       heroMeta={
         <>
           <span className="plate">{vehicle.plate || '-'}</span>
-          <span>·</span>
           <span>{vehicle.vehicleMaker || '제조사 미입력'}</span>
           <span>·</span>
           <span>{vehicle.company || '회사 미지정'}</span>

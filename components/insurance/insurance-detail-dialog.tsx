@@ -53,7 +53,6 @@ export function InsuranceDetailDialog({
       heroMeta={
         <>
           <span className="plate">{vehicle.plate || '-'}</span>
-          <span>·</span>
           <span>{policy?.carName || vehicle.vehicleModelLine || vehicle.model || '-'}</span>
           <span>·</span>
           <span>{vehicle.company ? displayCompanyName(vehicle.company, companyMaster) : '회사 미지정'}</span>

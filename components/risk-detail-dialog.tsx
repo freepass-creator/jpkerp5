@@ -85,12 +85,13 @@ export function RiskDetailDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`리스크 — ${contract.vehiclePlate} · ${contract.customerName}`}
-      heroName={contract.customerName}
+      heroName={contract.customerName?.trim() || contract.vehicleModelLine || contract.vehicleModel || contract.vehiclePlate || '-'}
       heroMeta={
         <>
           <span className="plate">{contract.vehiclePlate}</span>
-          <span>·</span>
-          <span>{contract.vehicleModel}</span>
+          {contract.customerName?.trim() && (
+            <span>{contract.vehicleModel}</span>
+          )}
           <span>·</span>
           <span>{displayCompanyName(contract.company, companies)}</span>
           <span>·</span>
