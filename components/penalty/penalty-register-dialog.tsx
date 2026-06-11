@@ -277,6 +277,7 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
                       <th>위반장소</th>
                       <th className="num">금액</th>
                       <th>임차인</th>
+                      <th className="center" style={{ width: 90 }}>부과 근거</th>
                       <th className="center" style={{ width: 50 }}></th>
                     </tr>
                   </thead>
@@ -302,6 +303,19 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
                           <td className="dim truncate" style={{ maxWidth: 200 }}>{p.location || '-'}</td>
                           <td className="num">{p.amount ? p.amount.toLocaleString('ko-KR') : '-'}</td>
                           <td className="dim">{p._contract?.contractor_name || <span className="text-muted">미매칭</span>}</td>
+                          <td className="center">
+                            {!p._contract ? (
+                              <span className="text-muted" style={{ fontSize: 10 }}>-</span>
+                            ) : p._contract.billing_party === '회사' ? (
+                              <StatusBadge tone="red" title={`종료 사유: ${p._contract.end_reason ?? '미지정'} — 회사 부담 (추심 별도)`}>
+                                회사
+                              </StatusBadge>
+                            ) : (
+                              <StatusBadge tone={p._contract.end_reason === '중도해지' ? 'amber' : 'green'} title={p._contract.end_reason ? `종료: ${p._contract.end_reason}` : '활성 계약 — 계약자 부과'}>
+                                계약자
+                              </StatusBadge>
+                            )}
+                          </td>
                           <td className="center">
                             <button
                               className="btn-ghost btn btn-sm"

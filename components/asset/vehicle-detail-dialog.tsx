@@ -26,6 +26,102 @@ function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boo
   return <Field label={k} value={v == null || v === '' ? '-' : v} mono={mono} muted={v == null || v === ''} />;
 }
 
+/* ─── 자산현황 탭1: 운영 요약 — 한 화면 운영 상태 한눈에 ─── */
+function OperationOverviewTab({
+  vehicle, contracts, history,
+}: {
+  vehicle: Vehicle;
+  contracts: Contract[];
+  history: HistoryEntry[];
+}) {
+  // 등록 상태 — 자등증 입력 여부
+  const regOk = !!vehicle.vin && !!vehicle.manufacturedDate;
+  // 보험 만기 D-N
+  const insExpiry = vehicle.insuranceExpiryDate;
+  const insDaysLeft = insExpiry ? Math.round((new Date(insExpiry).getTime() - Date.now()) / 86400000) : null;
+  // 정비 누적
+  const repairs = history.filter((h) => ['정비', '수선', '부품교체'].includes(h.category as string));
+  const repairCount = repairs.length;
+  const repairTotal = repairs.reduce((s, h) => s + (h.cost ?? 0), 0);
+  const repairLast = repairs[0];
+  // 활성 계약
+  const activeContract = contracts.find((c) => c.status === '운행' || c.status === '대기');
+  const unpaid = contracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
+  // 검사 만기
+  const inspectExpiry = activeContract?.inspectionDueDate;
+  const inspectDaysLeft = inspectExpiry ? Math.round((new Date(inspectExpiry).getTime() - Date.now()) / 86400000) : null;
+
+  return (
+    <Stack>
+      <Section title="등록 상태">
+        <Grid2>
+          <KV k="자등증 입력" v={regOk ? <StatusBadge tone="green">완료</StatusBadge> : <StatusBadge tone="orange">미입력</StatusBadge>} />
+          <KV k="차량번호" v={vehicle.plate} mono />
+          <KV k="제조사·모델" v={`${vehicle.vehicleMaker ?? '-'} ${vehicle.vehicleModelLine ?? vehicle.model ?? ''}`.trim() || undefined} />
+          <KV k="차종·연료" v={[vehicle.vehicleType, vehicle.fuelType].filter(Boolean).join(' · ') || undefined} />
+          <KV k="VIN" v={vehicle.vin} mono />
+          <KV k="제작연월" v={vehicle.manufacturedDate} mono />
+        </Grid2>
+      </Section>
+
+      <Section title="보험 가입">
+        <Grid2>
+          <KV k="보험사" v={vehicle.insurer} />
+          <KV k="만기" v={insExpiry ? (
+            <span style={{ color: insDaysLeft != null && insDaysLeft < 30 ? 'var(--red-text)' : insDaysLeft != null && insDaysLeft < 90 ? 'var(--orange-text)' : undefined }}>
+              {insExpiry} {insDaysLeft != null && <span className="dim">(D{insDaysLeft >= 0 ? '-' : '+'}{Math.abs(insDaysLeft)})</span>}
+            </span>
+          ) : undefined} mono />
+          <KV k="보험연령" v={activeContract?.insuranceAge ? `${activeContract.insuranceAge}세 이상` : undefined} />
+          <KV k="자차" v={activeContract?.selfInsured === '자차' ? <StatusBadge tone="green">자차</StatusBadge> : activeContract?.selfInsured === '무자차' ? <StatusBadge tone="orange">무자차</StatusBadge> : undefined} />
+        </Grid2>
+      </Section>
+
+      <Section title="구매방식 (할부·매입가)">
+        <Grid2>
+          <KV k="매입가" v={vehicle.purchasePrice ? `₩${vehicle.purchasePrice.toLocaleString()}` : undefined} mono />
+          <KV k="매입일" v={vehicle.purchasedDate} mono />
+          <KV k="할부사" v={vehicle.loanCompany} />
+          <KV k="할부 개월" v={vehicle.loanMonths ? `${vehicle.loanMonths}개월` : undefined} mono />
+          <KV k="잔여 원금" v={vehicle.loanRemainingPrincipal != null ? `₩${vehicle.loanRemainingPrincipal.toLocaleString()}` : undefined} mono />
+          <KV k="개시일" v={vehicle.loanStartDate} mono />
+        </Grid2>
+      </Section>
+
+      <Section title="GPS 설치">
+        <Grid2>
+          <KV k="설치 여부" v={vehicle.gpsInstalled ? <StatusBadge tone="green">설치</StatusBadge> : <StatusBadge tone="orange">미설치</StatusBadge>} />
+          <KV k="GPS 공급사" v={vehicle.gpsVendor} />
+          <KV k="단말번호" v={vehicle.gpsDeviceNo} mono />
+          <KV k="시동제어" v={vehicle.gpsImmobilizer ? <StatusBadge tone="brand">가능</StatusBadge> : undefined} />
+        </Grid2>
+      </Section>
+
+      <Section title="검사·정비">
+        <Grid2>
+          <KV k="다음 검사" v={inspectExpiry ? (
+            <span style={{ color: inspectDaysLeft != null && inspectDaysLeft < 0 ? 'var(--red-text)' : inspectDaysLeft != null && inspectDaysLeft < 30 ? 'var(--orange-text)' : undefined }}>
+              {inspectExpiry} {inspectDaysLeft != null && <span className="dim">(D{inspectDaysLeft >= 0 ? '-' : '+'}{Math.abs(inspectDaysLeft)})</span>}
+            </span>
+          ) : undefined} mono />
+          <KV k="정비 횟수" v={repairCount > 0 ? `${repairCount}회` : undefined} mono />
+          <KV k="누적 비용" v={repairTotal > 0 ? `₩${repairTotal.toLocaleString()}` : undefined} mono />
+          <KV k="최근 정비" v={repairLast ? `${repairLast.date} · ${repairLast.title}` : undefined} />
+        </Grid2>
+      </Section>
+
+      <Section title="운영 현황">
+        <Grid2>
+          <KV k="현재 상태" v={<StatusBadge tone={vehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusBadge>} />
+          <KV k="회사" v={vehicle.company} />
+          <KV k="활성 계약" v={activeContract ? `${activeContract.contractNo ?? ''} · ${activeContract.customerName ?? ''}` : <span className="dim">없음</span>} />
+          <KV k="누적 미수" v={unpaid > 0 ? <span style={{ color: 'var(--red-text)' }}>₩{unpaid.toLocaleString()}</span> : <span className="dim">없음</span>} mono />
+        </Grid2>
+      </Section>
+    </Stack>
+  );
+}
+
 /* ─── 탭1: 요약 — 자산정보 + 등록증정보 ─── */
 function SummaryTab({
   vehicle, onUpdate, showAttachment = true,
@@ -493,7 +589,8 @@ export function VehicleDetailDialog({
             { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={true} /> },
           ]
         : [
-            { value: 'summary', label: '요약', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={false} /> },
+            // 자산현황 view 첫 탭 — 운영 요약 (한 화면 KV 그리드: 등록상태/보험/구매방식/GPS/검사정비/운영현황)
+            { value: 'overview', label: '운영 요약', content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} /> },
             { value: 'loan', label: '할부스케줄', content: <LoanScheduleTab vehicle={vehicle} /> },
             { value: 'compliance', label: '보험·검사', content: <ComplianceTab vehicle={vehicle} contracts={sortedContracts} /> },
             { value: 'contract', label: `계약이력 (${sortedContracts.length})`, content: <ContractListTab contracts={sortedContracts} /> },
