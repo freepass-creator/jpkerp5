@@ -516,29 +516,59 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
 
 /* ─────────────── 차량상태 — 라이프사이클 + 액션 + 체크리스트 ─────────────── */
 
-/** 한 줄 inline 편집 — 평소 텍스트 표시, 클릭/포커스 시 input, blur 시 자동 저장 */
+/** 클릭하여 편집 — 평소 텍스트, 클릭 시 input, blur/Enter 저장, ESC 취소 */
 function StatusInlineEdit({
-  label, value, placeholder, onSave,
+  label, value, placeholder, hint, onSave,
 }: {
   label: string;
   value: string | undefined;
+  /** input 안 placeholder (편집 모드) */
   placeholder?: string;
+  /** read-only 모드에서 값 없을 때 보일 안내 (작업 상태 컨텍스트 등) */
+  hint?: string;
   onSave: (next: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
   useEffect(() => { setDraft(value ?? ''); }, [value]);
+
   const persist = () => {
     if (draft !== (value ?? '')) onSave(draft);
+    setEditing(false);
   };
+  const cancel = () => { setDraft(value ?? ''); setEditing(false); };
+
+  if (!editing) {
+    return (
+      <div
+        className="detail-field detail-field-clickable"
+        onClick={() => setEditing(true)}
+        title="클릭하여 수정"
+        style={{ cursor: 'text' }}
+      >
+        <div className="label">{label}</div>
+        <div className="value">
+          {value
+            ? value
+            : <span className="muted">{hint || placeholder || '클릭하여 입력'}</span>}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="detail-field">
+    <div className="detail-field is-editing">
       <div className="label">{label}</div>
       <input
         className="detail-field-input"
         value={draft}
+        autoFocus
         onChange={(e) => setDraft(e.target.value)}
         onBlur={persist}
-        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') persist();
+          if (e.key === 'Escape') cancel();
+        }}
         placeholder={placeholder}
       />
     </div>

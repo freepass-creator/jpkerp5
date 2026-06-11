@@ -279,7 +279,7 @@ a { color: var(--text-link); text-decoration: none; }
 .bottom-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   padding: 0 10px;
   height: var(--bottombar-h);
   background: var(--bg-card);
@@ -289,7 +289,7 @@ a { color: var(--text-link); text-decoration: none; }
 .bottom-bar-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 6px;
   flex: 1;
   flex-wrap: wrap;
   font-size: 12px;
@@ -298,7 +298,7 @@ a { color: var(--text-link); text-decoration: none; }
 .bottom-bar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -1154,9 +1154,10 @@ input[type="radio"]:disabled {
   align-items: center;
   gap: 5px;
   height: var(--button-height);
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
+  /* 필터 chip — pill (완전 둥근). 탭(tabs-trigger 사각 박스)과 시각 구분 */
+  border-radius: var(--radius-pill);
   /* chip 은 평평한 plate 느낌 (버튼과 구분) — 살짝 어두운 배경 */
   background: var(--bg-soft);
   font-size: 12px;
@@ -1201,12 +1202,12 @@ input[type="radio"]:disabled {
 }
 .chip-count {
   background: rgba(255,255,255,0.22);
-  padding: 0 5px;
+  padding: 0 6px;
   font-size: 10px;
   height: 16px;
   display: inline-flex;
   align-items: center;
-  border-radius: var(--radius);
+  border-radius: var(--radius-pill);
 }
 .chip:not(.active) .chip-count {
   background: var(--bg-sunken);
@@ -1518,10 +1519,10 @@ input[type="radio"]:disabled {
 .quick-filters {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   flex-wrap: wrap;
 }
-.quick-filters .filter-divider { margin: 0 3px; }
+.quick-filters .filter-divider { margin: 0 4px; }
 
 /* 하단바 버튼 그룹 구분선 — 주 액션 + 보조 액션 묶음 사이 */
 .btn-sep {
@@ -2684,7 +2685,7 @@ kbd {
   font-size: 10px;
   font-weight: 600;
   border: 1px solid var(--border);
-  border-radius: 0;
+  border-radius: 2px;
   white-space: nowrap;
   line-height: 1.5;
   background: var(--bg-sunken);
