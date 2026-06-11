@@ -20,6 +20,7 @@ import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers'
 import { useTableSelection } from '@/lib/use-table-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { exportToExcel } from '@/lib/excel-export';
 
 export default function RepairPage() {
   const router = useRouter();
@@ -135,7 +136,43 @@ export default function RepairPage() {
             <>
               <button className="btn btn-primary" type="button"><Plus size={14} weight="bold" /> 정비 등록</button>
               <span className="btn-sep" />
-              <button className="btn" type="button"><FileXls size={14} weight="bold" /> 엑셀</button>
+              <button
+                className="btn"
+                type="button"
+                disabled={filtered.length === 0}
+                onClick={() => {
+                  const rows = filtered.map((v) => {
+                    const r = v.plate ? repairByPlate.get(v.plate.replace(/\s/g, '')) : undefined;
+                    return {
+                      회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
+                      차량번호: v.plate ?? '',
+                      차종: v.model ?? '',
+                      정비횟수: r?.count ?? 0,
+                      누적비용: r?.totalCost ?? 0,
+                      최근정비일: r?.lastDate ?? '',
+                      최근항목: r?.lastTitle ?? '',
+                      업체: r?.lastVendor ?? '',
+                    };
+                  });
+                  exportToExcel({
+                    title: `수선 내역${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
+                    sheetName: '수선',
+                    rows,
+                    columns: [
+                      { key: '회사', header: '회사', width: 14 },
+                      { key: '차량번호', header: '차량번호', width: 14, type: 'mono' },
+                      { key: '차종', header: '차종', width: 20 },
+                      { key: '정비횟수', header: '정비횟수', width: 10, type: 'number' },
+                      { key: '누적비용', header: '누적비용', width: 14, type: 'number' },
+                      { key: '최근정비일', header: '최근정비일', width: 14, type: 'date' },
+                      { key: '최근항목', header: '최근항목', width: 20 },
+                      { key: '업체', header: '업체', width: 18 },
+                    ],
+                  });
+                }}
+              >
+                <FileXls size={14} weight="bold" /> 엑셀
+              </button>
             </>
           }
           right={null}

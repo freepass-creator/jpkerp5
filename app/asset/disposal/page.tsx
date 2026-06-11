@@ -21,6 +21,7 @@ import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-che
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { exportToExcel } from '@/lib/excel-export';
 
 const DISPOSAL_STATUSES = ['매각검토', '매각대기', '매각'] as const;
 
@@ -115,7 +116,41 @@ export default function AssetDisposalPage() {
             <>
               <button className="btn btn-primary" type="button"><Plus size={14} weight="bold" /> 처분 등록</button>
               <span className="btn-sep" />
-              <button className="btn" type="button"><FileXls size={14} weight="bold" /> 엑셀</button>
+              <button
+                className="btn"
+                type="button"
+                disabled={filtered.length === 0}
+                onClick={() => {
+                  exportToExcel({
+                    title: `처분 자산${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
+                    sheetName: '처분',
+                    rows: filtered.map((v) => ({
+                      회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
+                      차량번호: v.plate ?? '',
+                      차종: v.model ?? '',
+                      VIN: v.vin ?? '',
+                      제작연월: v.manufacturedDate ?? '',
+                      매입가: v.purchasePrice ?? '',
+                      상태: v.status ?? '',
+                      매각예상가: v.salePrice ?? '',
+                      매각일: v.saleDate ?? '',
+                    })),
+                    columns: [
+                      { key: '회사', header: '회사', width: 14 },
+                      { key: '차량번호', header: '차량번호', width: 14, type: 'mono' },
+                      { key: '차종', header: '차종', width: 20 },
+                      { key: 'VIN', header: 'VIN', width: 18, type: 'mono' },
+                      { key: '제작연월', header: '제작연월', width: 12, type: 'mono' },
+                      { key: '매입가', header: '매입가', width: 14, type: 'number' },
+                      { key: '상태', header: '상태', width: 12, type: 'center' },
+                      { key: '매각예상가', header: '매각예상가', width: 14, type: 'number' },
+                      { key: '매각일', header: '매각일', width: 14, type: 'date' },
+                    ],
+                  });
+                }}
+              >
+                <FileXls size={14} weight="bold" /> 엑셀
+              </button>
             </>
           }
           right={null}

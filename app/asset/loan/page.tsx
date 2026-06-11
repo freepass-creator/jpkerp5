@@ -19,6 +19,7 @@ import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers'
 import { useTableSelection } from '@/lib/use-table-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { exportToExcel } from '@/lib/excel-export';
 
 export default function AssetLoanPage() {
   const router = useRouter();
@@ -110,7 +111,39 @@ export default function AssetLoanPage() {
             <>
               <button className="btn btn-primary" type="button"><Plus size={14} weight="bold" /> 할부 등록</button>
               <span className="btn-sep" />
-              <button className="btn" type="button"><FileXls size={14} weight="bold" /> 엑셀</button>
+              <button
+                className="btn"
+                type="button"
+                disabled={filtered.length === 0}
+                onClick={() => {
+                  exportToExcel({
+                    title: `구매방식 (할부) 현황${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
+                    sheetName: '할부',
+                    rows: filtered.map((v) => ({
+                      회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
+                      차량번호: v.plate ?? '',
+                      차종: v.model ?? '',
+                      할부사: v.loanLender ?? '',
+                      개시일: v.loanStartDate ?? '',
+                      할부개월: v.loanMonths ?? '',
+                      매입가: v.purchasePrice ?? '',
+                      잔여원금: v.loanRemainingPrincipal ?? '',
+                    })),
+                    columns: [
+                      { key: '회사', header: '회사', width: 14 },
+                      { key: '차량번호', header: '차량번호', width: 14, type: 'mono' },
+                      { key: '차종', header: '차종', width: 20 },
+                      { key: '할부사', header: '할부사', width: 16 },
+                      { key: '개시일', header: '개시일', width: 14, type: 'date' },
+                      { key: '할부개월', header: '할부개월', width: 10, type: 'number' },
+                      { key: '매입가', header: '매입가', width: 14, type: 'number' },
+                      { key: '잔여원금', header: '잔여원금', width: 14, type: 'number' },
+                    ],
+                  });
+                }}
+              >
+                <FileXls size={14} weight="bold" /> 엑셀
+              </button>
             </>
           }
           right={null}

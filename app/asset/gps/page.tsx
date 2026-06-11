@@ -21,6 +21,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
+import { exportToExcel } from '@/lib/excel-export';
 
 export default function AssetGpsPage() {
   const router = useRouter();
@@ -117,7 +118,39 @@ export default function AssetGpsPage() {
             <>
               <button className="btn btn-primary" type="button"><Plus size={14} weight="bold" /> GPS 등록</button>
               <span className="btn-sep" />
-              <button className="btn" type="button"><FileXls size={14} weight="bold" /> 엑셀</button>
+              <button
+                className="btn"
+                type="button"
+                disabled={filtered.length === 0}
+                onClick={() => {
+                  exportToExcel({
+                    title: `GPS 설치 현황${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
+                    sheetName: 'GPS',
+                    rows: filtered.map((v) => ({
+                      회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
+                      차량번호: v.plate ?? '',
+                      차종: v.model ?? '',
+                      상태: v.status ?? '',
+                      GPS공급사: v.gpsVendor ?? '',
+                      단말번호: v.gpsDeviceNo ?? '',
+                      설치일: v.gpsInstalledAt ?? '',
+                      시동제어: v.gpsImmobilizer ? 'O' : '',
+                    })),
+                    columns: [
+                      { key: '회사', header: '회사', width: 14 },
+                      { key: '차량번호', header: '차량번호', width: 14, type: 'mono' },
+                      { key: '차종', header: '차종', width: 20 },
+                      { key: '상태', header: '상태', width: 10, type: 'center' },
+                      { key: 'GPS공급사', header: 'GPS공급사', width: 14 },
+                      { key: '단말번호', header: '단말번호', width: 16, type: 'mono' },
+                      { key: '설치일', header: '설치일', width: 14, type: 'date' },
+                      { key: '시동제어', header: '시동제어', width: 10, type: 'center' },
+                    ],
+                  });
+                }}
+              >
+                <FileXls size={14} weight="bold" /> 엑셀
+              </button>
             </>
           }
           right={null}

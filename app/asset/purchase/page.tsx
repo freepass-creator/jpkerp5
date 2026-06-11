@@ -7,7 +7,8 @@
  */
 
 import { useMemo } from 'react';
-import { ShoppingCart } from '@phosphor-icons/react';
+import { ShoppingCart, FileXls } from '@phosphor-icons/react';
+import { exportToExcel } from '@/lib/excel-export';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
@@ -53,7 +54,42 @@ export default function PurchasePage() {
       bottomBar={
         <BottomBar
           left={<button className="btn btn-primary" type="button">+ 차량 매입 등록</button>}
-          right={<button className="btn" type="button">엑셀</button>}
+          right={
+            <button
+              className="btn"
+              type="button"
+              disabled={pending.length + purchased.length === 0}
+              onClick={() => {
+                const rows = [...pending, ...purchased].map((v) => ({
+                  회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
+                  차량번호: v.plate ?? '',
+                  차종: v.model ?? '',
+                  VIN: v.vin ?? '',
+                  제작연월: v.manufacturedDate ?? '',
+                  매입일: v.purchasedDate ?? '',
+                  매입가: v.purchasePrice ?? '',
+                  상태: v.status ?? '',
+                }));
+                exportToExcel({
+                  title: '매입 관리',
+                  sheetName: '매입',
+                  rows,
+                  columns: [
+                    { key: '회사', header: '회사', width: 14 },
+                    { key: '차량번호', header: '차량번호', width: 14, type: 'mono' },
+                    { key: '차종', header: '차종', width: 20 },
+                    { key: 'VIN', header: 'VIN', width: 18, type: 'mono' },
+                    { key: '제작연월', header: '제작연월', width: 12, type: 'mono' },
+                    { key: '매입일', header: '매입일', width: 14, type: 'date' },
+                    { key: '매입가', header: '매입가', width: 14, type: 'number' },
+                    { key: '상태', header: '상태', width: 12, type: 'center' },
+                  ],
+                });
+              }}
+            >
+              <FileXls size={14} weight="bold" /> 엑셀
+            </button>
+          }
         />
       }
     >

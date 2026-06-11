@@ -6,7 +6,8 @@
  */
 
 import { useMemo } from 'react';
-import { ClipboardText } from '@phosphor-icons/react';
+import { ClipboardText, FileXls } from '@phosphor-icons/react';
+import { exportToExcel } from '@/lib/excel-export';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -59,7 +60,60 @@ export default function AssetInspectionPage() {
       bottomBar={
         <BottomBar
           left={<button className="btn btn-primary" type="button">+ 검사 등록</button>}
-          right={<button className="btn" type="button">엑셀</button>}
+          right={
+            <button
+              className="btn"
+              type="button"
+              disabled={upcoming.length === 0 && inspectionEvents.length === 0}
+              onClick={() => {
+                const rows = [
+                  ...upcoming.map(({ c, daysLeft }) => ({
+                    구분: '만기 추적',
+                    회사: c.company ? displayCompanyName(c.company, companyMaster) : '',
+                    차량번호: c.vehiclePlate ?? '',
+                    차종: c.vehicleModel ?? '',
+                    예정일: c.inspectionDueDate ?? '',
+                    DN: daysLeft,
+                    이력일: '',
+                    항목: '',
+                    업체: '',
+                    비용: '',
+                  })),
+                  ...inspectionEvents.map((h) => ({
+                    구분: '검사 이력',
+                    회사: '',
+                    차량번호: h.vehiclePlate ?? '',
+                    차종: '',
+                    예정일: '',
+                    DN: '',
+                    이력일: h.date ?? '',
+                    항목: h.title ?? '',
+                    업체: h.vendor ?? '',
+                    비용: h.cost ?? '',
+                  })),
+                ];
+                exportToExcel({
+                  title: '검사 내역',
+                  sheetName: '검사',
+                  rows,
+                  columns: [
+                    { key: '구분', header: '구분', width: 12, type: 'center' },
+                    { key: '회사', header: '회사', width: 14 },
+                    { key: '차량번호', header: '차량번호', width: 14, type: 'mono' },
+                    { key: '차종', header: '차종', width: 18 },
+                    { key: '예정일', header: '예정일', width: 14, type: 'date' },
+                    { key: 'DN', header: 'D-N', width: 8, type: 'number' },
+                    { key: '이력일', header: '이력일', width: 14, type: 'date' },
+                    { key: '항목', header: '항목', width: 18 },
+                    { key: '업체', header: '업체', width: 16 },
+                    { key: '비용', header: '비용', width: 14, type: 'number' },
+                  ],
+                });
+              }}
+            >
+              <FileXls size={14} weight="bold" /> 엑셀
+            </button>
+          }
         />
       }
     >
