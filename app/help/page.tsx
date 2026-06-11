@@ -65,7 +65,11 @@ export default function HelpPage() {
                 <a href="#roles" className="help-link">9. 권한 시스템</a>
                 <a href="#tips" className="help-link">10. 자주 쓰는 작업</a>
                 <a href="#notes" className="help-link">11. 주의사항</a>
-                <a href="#contact" className="help-link">12. 문의·오류 신고</a>
+                <a href="#end" className="help-link">13. 계약 종료 처리</a>
+                <a href="#penalty-billing" className="help-link">14. 과태료 부과 근거</a>
+                <a href="#asset-overview" className="help-link">15. 자산현황 운영 요약</a>
+                <a href="#excel" className="help-link">16. 엑셀 다운로드</a>
+                <a href="#contact" className="help-link">17. 문의·오류 신고</a>
               </div>
             </Section>
 
@@ -372,8 +376,89 @@ export default function HelpPage() {
               </ul>
             </Section>
 
+            {/* 13. 계약 종료 처리 (신규) */}
+            <Section icon={<ArrowRight weight="bold" />} title="13. 계약 종료 처리 (정상·중도·채권)" id="end">
+              <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
+                계약을 종료할 때 사유를 명시하면 과태료 부과·내용증명·채권 추심 등에 자동 활용됩니다.
+              </div>
+              <Step n={1} icon={<CheckCircle size={14} />}>
+                <strong>반납 처리</strong> — 운영현황 상세 → 차량상태 탭 → [반납회수] 클릭
+                <Hint>종료 사유 자동 결정: 미수 잔액 있으면 <Chip color="red">채권보전</Chip>, 만기 전이면 <Chip>중도해지</Chip>, 그 외 <Chip>정상종료</Chip></Hint>
+              </Step>
+              <Step n={2} icon={<Plus size={14} />}>
+                <strong>종료 정보 확인·정정</strong> — 상세 → 차량상태 → 종료 정보 Section → [수정] 버튼
+                <Hint>종료 사유 / 종료일 / 미수 잔액 / 중도해지 위약금 / 비고 (추심 단계·변호사 위임 등) 모두 기록</Hint>
+              </Step>
+              <SubSection title="종료 사유 3종">
+                · <Chip>정상종료</Chip> 약정 만기 + 정산 완료. 마지막 계약자 책임 종결.<br />
+                · <Chip>중도해지</Chip> 약정 전 해지. 위약금 부과 근거. 마지막 계약자 책임 유지.<br />
+                · <Chip color="red">채권보전</Chip> 미수 잔액 남은 채로 종료. 채권 추심 대상. 과태료는 회사 부담.
+              </SubSection>
+            </Section>
+
+            {/* 14. 과태료 부과 근거 (신규) */}
+            <Section icon={<Receipt weight="bold" />} title="14. 과태료 부과 근거 자동 결정" id="penalty-billing">
+              <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
+                통지서 OCR 등록 시 위반일·차량번호로 계약을 찾고, 종료 사유에 따라 부과 책임자를 자동 결정.
+              </div>
+              <Workflow
+                q="과태료 등록 시 [부과 근거] 컬럼 의미"
+                a={<>
+                  <Chip>계약자</Chip> (green) — 정상종료·활성 계약 — 마지막 계약자에게 부과 (내용증명 발송)<br />
+                  <Chip>계약자</Chip> (amber) — 중도해지 — 마지막 계약자에게 부과 + 위약금 별도<br />
+                  <Chip color="red">회사</Chip> — 채권보전 종료 — 회사 부담 (채권 추심 별도 진행)<br />
+                  <Chip>-</Chip> — 미매칭 — 차량번호로 계약 못 찾음 (수동 매칭 필요)
+                </>}
+              />
+              <Hint>판정 근거는 hover 툴팁에 표시됩니다. 잘못된 경우 운영현황 상세 → 종료 정보 [수정] 으로 정정 후 재매칭.</Hint>
+            </Section>
+
+            {/* 15. 자산현황 운영 요약 detail (신규) */}
+            <Section icon={<Car weight="bold" />} title="15. 자산현황 상세 — 운영 요약 한 화면" id="asset-overview">
+              <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
+                자산관리 → 자산현황 view → 행 더블클릭 → 운영 요약 탭 (6 섹션 한눈에).
+              </div>
+              <Row icon={<CheckCircle size={14} />} title="등록 상태">
+                자등증 입력 여부 + 차량번호·제조사·차종·VIN·제작연월
+              </Row>
+              <Row icon={<ShieldCheck size={14} />} title="보험 가입">
+                보험사·만기 D-N (red &lt;30 / orange &lt;90)·보험연령·자차
+              </Row>
+              <Row icon={<CurrencyKrw size={14} />} title="구매방식">
+                매입가·할부사·잔여 원금·개시일
+              </Row>
+              <Row icon={<MagnifyingGlass size={14} />} title="GPS 설치">
+                설치 여부·공급사·단말번호·시동제어
+              </Row>
+              <Row icon={<Wrench size={14} />} title="검사·정비">
+                다음 검사 D-N·정비 횟수·누적 비용·최근 정비
+              </Row>
+              <Row icon={<ChartBar size={14} />} title="운영 현황">
+                현재 상태·회사·활성 계약·누적 미수
+              </Row>
+              <Hint>자세히 보고 싶으면 옆 탭 (할부스케줄 / 보험·검사 / 계약이력 / 수납이력 / 정비·수선 / 사고·위반) 클릭.</Hint>
+            </Section>
+
+            {/* 16. 엑셀 다운로드 통일 패턴 (신규) */}
+            <Section icon={<FileXls weight="bold" />} title="16. 엑셀 다운로드 — 모든 페이지 동일 패턴" id="excel">
+              <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
+                모든 list 페이지 우하단 BottomBar에 [엑셀 N건] 버튼. 현재 필터된 목록만 다운로드.
+              </div>
+              <SubSection title="동작 방식">
+                · 카운트 chip 으로 다운받을 건수 미리 확인<br />
+                · 빈 결과(0건) 시 disabled<br />
+                · 파일명 = 페이지별 자동 (예: <span className="mono">자산-등록차량-20260611.xlsx</span>)<br />
+                · 헤더 = JPK 네이비, 컬럼 폭 자동, 천단위 콤마
+              </SubSection>
+              <SubSection title="페이지별 파일명">
+                운영현황-{`{view}`} / 계약리스트 / 미수금-{`{bucket}`} / 만기임박 / 반납계약 / 휴차차량 /<br />
+                자산-{`{view}`} / 수선내역 / 구매방식 / GPS설치 / 처분자산 / 매입관리 / 검사내역 / 법인마스터
+              </SubSection>
+              <Hint>필터를 적용한 상태에서 다운받으면 그 필터된 결과만 들어갑니다. 회사·상태·검색어 모두 적용됨.</Hint>
+            </Section>
+
             {/* 12. 문의 */}
-            <Section icon={<Phone weight="bold" />} title="12. 문의 · 오류 신고" id="contact">
+            <Section icon={<Phone weight="bold" />} title="17. 문의 · 오류 신고" id="contact">
               <div style={{ padding: '14px 16px', background: 'var(--bg-sunken)', borderRadius: 6, fontSize: 13, lineHeight: 1.7 }}>
                 사용 중 막히면 <strong>화면 캡쳐 + 어떤 작업 중이었는지</strong>를 같이 보내주세요. 빠르게 조치합니다.
                 <br />
