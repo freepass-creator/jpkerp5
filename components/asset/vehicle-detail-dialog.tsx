@@ -20,6 +20,8 @@ import { EmptyRow } from '@/components/ui/empty-row';
 import { Section, Stack, Grid2 } from '@/components/ui/detail-primitives';
 import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
 import { COL, COL_FLEX } from '@/lib/table-cols';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import { displayCompanyName } from '@/lib/company-display';
 
 /** KV — 공용 Field wrap alias (시각 통일). */
 function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boolean }) {
@@ -34,6 +36,7 @@ function OperationOverviewTab({
   contracts: Contract[];
   history: HistoryEntry[];
 }) {
+  const { companies } = useCompanies();
   // 등록 상태 — 자등증 입력 여부
   const regOk = !!vehicle.vin && !!vehicle.manufacturedDate;
   // 보험 만기 D-N
@@ -113,7 +116,7 @@ function OperationOverviewTab({
       <Section title="운영 현황">
         <Grid2>
           <KV k="현재 상태" v={<StatusBadge tone={vehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusBadge>} />
-          <KV k="회사" v={vehicle.company} />
+          <KV k="회사" v={vehicle.company ? displayCompanyName(vehicle.company, companies) : undefined} />
           <KV k="활성 계약" v={activeContract ? `${activeContract.contractNo ?? ''} · ${activeContract.customerName ?? ''}` : <span className="dim">없음</span>} />
           <KV k="누적 미수" v={unpaid > 0 ? <span style={{ color: 'var(--red-text)' }}>₩{unpaid.toLocaleString()}</span> : <span className="dim">없음</span>} mono />
         </Grid2>
@@ -170,11 +173,12 @@ function SummaryTab({
   showAttachment?: boolean;
 }) {
   void onUpdate;
+  const { companies } = useCompanies();
   return (
     <Stack>
       <Section title="제조사 스펙">
         <Grid2>
-          <KV k="회사" v={vehicle.company} />
+          <KV k="회사" v={vehicle.company ? displayCompanyName(vehicle.company, companies) : undefined} />
           <KV k="차량번호" v={vehicle.plate} mono />
           <KV k="상태" v={vehicle.status} />
           <KV k="제조사" v={vehicle.vehicleMaker} />

@@ -94,7 +94,7 @@ export function CreateDialog({
 
   // RTDB stores
   const { contracts, addMany: addContracts, updateMany: updateContracts } = useContracts();
-  const { vehicles, addMany: addVehicles } = useVehicles();
+  const { vehicles, add: addVehicle, addMany: addVehicles, update: updateVehicle } = useVehicles();
   const { rows: existingBankTx, addMany: addBankTx } = useBankTx();
   const { rows: existingCardTx, addMany: addCardTx } = useCardTx();
   const { companies } = useCompanies();
@@ -162,6 +162,12 @@ export function CreateDialog({
       const dedup = dedupAgainst(valid, contracts, contractKeys);
       const skipped = dedup.duplicates.length;
       const n = await addContracts(dedup.unique);
+      // 차량 자동 동기화 — 계약 등록 후 같은 plate Vehicle 없으면 자동 생성
+      const syncCtx = { vehicles, companies, addVehicle, updateVehicle };
+      for (const c of dedup.unique) {
+        try { await upsertVehicleFromContract(c as Contract, syncCtx); }
+        catch (e) { console.error('bulk vehicle sync failed', c.contractNo, e); }
+      }
       const invalid = rows.length - valid.length;
       const note = [
         invalid > 0 ? `필수값 누락 ${invalid}` : '',
@@ -243,6 +249,12 @@ export function CreateDialog({
       const dedup = dedupAgainst(all, contracts, contractKeys);
       const skipped = dedup.duplicates.length;
       const created = await addContracts(dedup.unique);
+      // 차량 자동 동기화 — 가로확장 import 후 vehicle 자동 생성/매칭
+      const syncCtx = { vehicles, companies, addVehicle, updateVehicle };
+      for (const c of dedup.unique) {
+        try { await upsertVehicleFromContract(c as Contract, syncCtx); }
+        catch (e) { console.error('horizontal import vehicle sync failed', c.contractNo, e); }
+      }
       const msg = `가로확장 import 완료 — ${created}건 등록${skipped > 0 ? ` (중복 ${skipped}건 제외)` : ''}`;
       setResult(msg);
       if (created > 0) toast.success(`계약 ${created}건 import`);
@@ -371,6 +383,12 @@ export function CreateDialog({
       }
       if (updates.length > 0) await updateContracts(updates);
       const created = creates.length > 0 ? await addContracts(creates) : 0;
+      // 차량 자동 동기화 — 신규 계약에 대해 vehicle 자동 생성/매칭 (updates 도 status 갱신)
+      const syncCtx = { vehicles, companies, addVehicle, updateVehicle };
+      for (const c of [...updates, ...creates]) {
+        try { await upsertVehicleFromContract(c as Contract, syncCtx); }
+        catch (e) { console.error('snapshot vehicle sync failed', (c as Contract).contractNo, e); }
+      }
 
       // 2) 휴차 차량 — vehicle 만 등록 (이미 같은 plate 의 vehicle 있으면 skip)
       const existingPlates = new Set([
@@ -2624,6 +2642,12 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
         };
       });
       await addContracts(newContracts);
+      // 차량 자동 동기화 — 신규 계약에 대해 vehicle upsert (currentContractId 갱신 + 신규 vehicle 생성)
+      const syncCtx2 = { vehicles, companies, addVehicle, updateVehicle };
+      for (const c of newContracts) {
+        try { await upsertVehicleFromContract(c as Contract, syncCtx2); }
+        catch (e) { console.error('legacy contracts vehicle sync failed', (c as Contract).contractNo, e); }
+      }
       alert(`✓ ${valid.length}건 계약 등록${toCreateVehicles.length > 0 ? ` (신규 차량 ${toCreateVehicles.length}대 자동 생성)` : ''}`);
       onSubmit();
     } catch (e) {
