@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileText, MagnifyingGlass, ArrowLeft, FileXls } from '@phosphor-icons/react';
+import { FileText, MagnifyingGlass, ArrowLeft, FileXls, Trash } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -40,7 +40,7 @@ export default function ContractPage() {
     if (!roleLoading && !master) router.replace('/');
   }, [master, roleLoading, router]);
 
-  const { contracts, update: updateContract } = useContracts();
+  const { contracts, update: updateContract, remove: removeContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -224,6 +224,23 @@ export default function ContractPage() {
             onClick={handleExcelSelected}
           >
             선택 엑셀 {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+          </button>
+          <button
+            className="btn"
+            type="button"
+            disabled={selectedIds.size === 0}
+            title="체크박스로 선택한 계약 일괄 삭제 (감사로그 남음)"
+            style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
+            onClick={async () => {
+              if (selectedIds.size === 0) return;
+              if (!confirm(`선택한 ${selectedIds.size}건의 계약을 삭제하시겠습니까? (감사로그 남음)`)) return;
+              for (const id of selectedIds) {
+                try { await removeContract(id); } catch (e) { console.error('contract delete failed', id, e); }
+              }
+              setSelectedIds(new Set());
+            }}
+          >
+            <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
           </button>
         </>
       }

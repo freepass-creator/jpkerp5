@@ -118,7 +118,46 @@ function OperationOverviewTab({
           <KV k="누적 미수" v={unpaid > 0 ? <span style={{ color: 'var(--red-text)' }}>₩{unpaid.toLocaleString()}</span> : <span className="dim">없음</span>} mono />
         </Grid2>
       </Section>
+
+      {/* 첨부 파일 — 자산 전체 등록 서류 일괄 (자등증/보험/할부/검사/GPS/매도증) */}
+      <AttachmentSummary vehicle={vehicle} />
     </Stack>
+  );
+}
+
+/** 자산 첨부 파일 요약 — 자등증/보험/할부/검사/GPS/매도증 6종 일괄 표시 (다운로드 링크). */
+function AttachmentSummary({ vehicle }: { vehicle: Vehicle }) {
+  const items: { label: string; url?: string; fileName?: string; uploadedAt?: string }[] = [
+    { label: '자동차등록증',     url: vehicle.registrationCertUrl,  fileName: vehicle.registrationCertFileName,  uploadedAt: vehicle.registrationCertUploadedAt },
+    { label: '보험가입증명서',   url: vehicle.insuranceCertUrl,     fileName: vehicle.insuranceCertFileName,     uploadedAt: vehicle.insuranceCertUploadedAt },
+    { label: '할부계약서',       url: vehicle.loanContractUrl,      fileName: vehicle.loanContractFileName,      uploadedAt: vehicle.loanContractUploadedAt },
+    { label: '정기검사증',       url: vehicle.inspectionCertUrl,    fileName: vehicle.inspectionCertFileName,    uploadedAt: vehicle.inspectionCertUploadedAt },
+    { label: 'GPS 설치 증빙',    url: vehicle.gpsInstallUrl,        fileName: vehicle.gpsInstallFileName,        uploadedAt: vehicle.gpsInstallUploadedAt },
+    { label: '매도증·매각계약서', url: vehicle.disposalCertUrl,      fileName: vehicle.disposalCertFileName,      uploadedAt: vehicle.disposalCertUploadedAt },
+  ];
+  const attached = items.filter((it) => !!it.url).length;
+  return (
+    <Section title="첨부 파일">
+      <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-sub)' }}>
+        등록 완료 <strong style={{ color: 'var(--brand)' }}>{attached}</strong> / {items.length}
+      </div>
+      <div className="detail-grid-2">
+        {items.map((it) => (
+          <div key={it.label} className="detail-field" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0' }}>
+            <span className="label" style={{ minWidth: 130, fontSize: 12, color: 'var(--text-sub)' }}>{it.label}</span>
+            {it.url ? (
+              <a href={it.url} download={it.fileName ?? undefined} target="_blank" rel="noopener noreferrer"
+                style={{ flex: 1, color: 'var(--brand)', fontSize: 12, fontWeight: 500, textDecoration: 'none' }}>
+                {it.fileName ?? '다운로드'}
+                {it.uploadedAt && <span className="dim" style={{ marginLeft: 6, fontSize: 10 }}>{it.uploadedAt.slice(0, 10)}</span>}
+              </a>
+            ) : (
+              <span style={{ flex: 1, color: 'var(--text-weak)', fontSize: 11 }}>미첨부</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 
