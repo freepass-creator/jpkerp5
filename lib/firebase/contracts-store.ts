@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
+import { useState } from 'react';
+import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
-import { recalcContract } from '@/lib/payment-schedule';
-import { todayKr } from '@/lib/mock-data';
+import { useDataContext } from '@/lib/data-context';
 import type { Contract } from '@/lib/types';
 
 const CONTRACTS_PATH = dbPath('contracts');
@@ -24,59 +23,16 @@ export function useContracts(): {
   add: (c: Omit<Contract, 'id'>) => Promise<string>;
   addMany: (rows: Array<Omit<Contract, 'id'>>) => Promise<number>;
 } {
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [loading, setLoading] = useState(true);
+  // DataProvider 에서 한 번만 subscribe — 페이지 이동 시 유지
+  const { contracts, contractsLoading } = useDataContext();
   const [configured] = useState(() => isFirebaseConfigured());
-
-  useEffect(() => {
-    if (!configured) {
-      setLoading(false);
-      return;
-    }
-    let unsub: (() => void) | undefined;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        await ensureAuth();
-      } catch {
-        setLoading(false);
-        return;
-      }
-      if (cancelled) return;
-      const db = getRtdb();
-      if (!db) {
-        setLoading(false);
-        return;
-      }
-      const r = ref(db, CONTRACTS_PATH);
-      unsub = onValue(r, (snap) => {
-        const val = snap.val();
-        const raw = val ? Object.values<Contract>(val) : [];
-        // read 시점 자동 재계산 — dueDate 지난 '예정' 회차 → '연체' 자동 전환
-        // unpaidAmount, unpaidSeqCount, currentSeq 캐시 fresh 보장
-        const today = todayKr();
-        const recalced = raw.map((c) => recalcContract(c, today));
-        setContracts(recalced);
-        setLoading(false);
-      });
-    })();
-
-    return () => {
-      cancelled = true;
-      if (unsub) unsub();
-    };
-  }, [configured]);
 
   return {
     contracts,
-    loading,
+    loading: contractsLoading,
     configured,
     update: async (c: Contract) => {
-      if (!configured) {
-        setContracts((prev) => prev.map((x) => (x.id === c.id ? c : x)));
-        return;
-      }
+      if (!configured) return;
       await ensureAuth();
       const db = getRtdb();
       if (!db) return;
@@ -85,10 +41,7 @@ export function useContracts(): {
     },
     remove: async (id: string) => {
       const target = contracts.find((c) => c.id === id);
-      if (!configured) {
-        setContracts((prev) => prev.filter((x) => x.id !== id));
-        return;
-      }
+      if (!configured) return;
       await ensureAuth();
       const db = getRtdb();
       if (!db) return;
@@ -96,11 +49,7 @@ export function useContracts(): {
       void audit.delete('contract', id, `계약 삭제 ${target?.contractNo ?? id} ${target?.vehiclePlate ?? ''} ${target?.customerName ?? ''}`);
     },
     add: async (c: Omit<Contract, 'id'>) => {
-      if (!configured) {
-        const id = `local-${Date.now()}`;
-        setContracts((prev) => [...prev, { ...c, id } as Contract]);
-        return id;
-      }
+      if (!configured) return `local-${Date.now()}`;
       await ensureAuth();
       const db = getRtdb();
       if (!db) return '';
@@ -114,14 +63,7 @@ export function useContracts(): {
     },
     addMany: async (rows: Array<Omit<Contract, 'id'>>) => {
       if (rows.length === 0) return 0;
-      if (!configured) {
-        const stamped = rows.map((c) => ({
-          ...c,
-          id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        })) as Contract[];
-        setContracts((prev) => [...prev, ...stamped]);
-        return stamped.length;
-      }
+      if (!configured) return rows.length;
       await ensureAuth();
       const db = getRtdb();
       if (!db) return 0;
@@ -138,14 +80,7 @@ export function useContracts(): {
     },
     updateMany: async (rows: Contract[]) => {
       if (rows.length === 0) return;
-      if (!configured) {
-        setContracts((prev) => {
-          const m = new Map(prev.map((c) => [c.id, c]));
-          for (const r of rows) m.set(r.id, r);
-          return Array.from(m.values());
-        });
-        return;
-      }
+      if (!configured) return;
       await ensureAuth();
       const db = getRtdb();
       if (!db) return;

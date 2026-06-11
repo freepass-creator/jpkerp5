@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
+import { useState } from 'react';
+import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, getFirebaseAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
+import { useDataContext } from '@/lib/data-context';
 import type { HistoryEntry } from '@/lib/types';
 
 const PATH = dbPath('history_entries');
@@ -22,44 +23,17 @@ export function useHistoryEntries(): {
   update: (e: HistoryEntry) => Promise<void>;
   remove: (id: string) => Promise<void>;
 } {
-  const [entries, setEntries] = useState<HistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { history, historyLoading } = useDataContext();
   const [configured] = useState(() => isFirebaseConfigured());
 
-  useEffect(() => {
-    if (!configured) { setLoading(false); return; }
-    let unsub: (() => void) | undefined;
-    let cancelled = false;
-    (async () => {
-      try { await ensureAuth(); } catch { setLoading(false); return; }
-      if (cancelled) return;
-      const db = getRtdb();
-      if (!db) { setLoading(false); return; }
-      const r = ref(db, PATH);
-      unsub = onValue(r, (snap) => {
-        const val = snap.val();
-        const list = val ? Object.values<HistoryEntry>(val) : [];
-        // 최근순
-        list.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
-        setEntries(list);
-        setLoading(false);
-      });
-    })();
-    return () => { cancelled = true; if (unsub) unsub(); };
-  }, [configured]);
-
   return {
-    entries,
-    loading,
+    entries: history,
+    loading: historyLoading,
     configured,
     add: async (e) => {
       const createdBy = getFirebaseAuth()?.currentUser?.email ?? undefined;
       const createdAt = new Date().toISOString();
-      if (!configured) {
-        const id = `local-${Date.now()}`;
-        setEntries((prev) => [{ ...e, id, createdAt, createdBy } as HistoryEntry, ...prev]);
-        return id;
-      }
+      if (!configured) return `local-${Date.now()}`;
       await ensureAuth();
       const db = getRtdb(); if (!db) return '';
       const newRef = push(ref(db, PATH));
@@ -71,21 +45,15 @@ export function useHistoryEntries(): {
       return id;
     },
     update: async (e) => {
-      if (!configured) {
-        setEntries((prev) => prev.map((x) => (x.id === e.id ? e : x)));
-        return;
-      }
+      if (!configured) return;
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
       await rtdbUpdate(ref(db, `${PATH}/${e.id}`), pruneUndefined(e as unknown as Record<string, unknown>));
       void audit.update('document', e.id, `이력 수정 ${e.title}`);
     },
     remove: async (id) => {
-      const target = entries.find((e) => e.id === id);
-      if (!configured) {
-        setEntries((prev) => prev.filter((x) => x.id !== id));
-        return;
-      }
+      const target = history.find((e) => e.id === id);
+      if (!configured) return;
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
       await rtdbRemove(ref(db, `${PATH}/${id}`));
