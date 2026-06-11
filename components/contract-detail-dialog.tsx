@@ -516,6 +516,35 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
 
 /* ─────────────── 차량상태 — 라이프사이클 + 액션 + 체크리스트 ─────────────── */
 
+/** 한 줄 inline 편집 — 평소 텍스트 표시, 클릭/포커스 시 input, blur 시 자동 저장 */
+function StatusInlineEdit({
+  label, value, placeholder, onSave,
+}: {
+  label: string;
+  value: string | undefined;
+  placeholder?: string;
+  onSave: (next: string) => void;
+}) {
+  const [draft, setDraft] = useState(value ?? '');
+  useEffect(() => { setDraft(value ?? ''); }, [value]);
+  const persist = () => {
+    if (draft !== (value ?? '')) onSave(draft);
+  };
+  return (
+    <div className="detail-field">
+      <div className="label">{label}</div>
+      <input
+        className="detail-field-input"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={persist}
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
 function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const stage = currentStage(c);
   const vs = getVehicleState(c);
@@ -710,15 +739,35 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
   return (
     <div className="detail-stack">
-      {/* 현재 상태 — 핵심 상태 칩 (심플 한눈 요약, stage 는 밑 Field 에서 노출) */}
+      {/* 현재 상태 — 1행 상태 칩 3개 + 2행 위치/작업/비고 (inline 편집) */}
       <Section
         icon={<Car size={12} weight="duotone" />}
         title="현재 상태"
       >
-        <div className="detail-grid-2">
+        <div className="detail-grid-3">
           <Field label="차량 상태" value={<StatusBadge tone={vehicleStateTone(vs.name)}>{vs.name}</StatusBadge>} />
           <Field label="계약 상태" value={<StatusBadge tone={contractStateTone(cs.name)}>{cs.name}</StatusBadge>} />
           <Field label="수납 상태" value={<StatusBadge tone={paymentStateTone(ps.name)}>{ps.name}</StatusBadge>} />
+        </div>
+        <div className="detail-grid-3" style={{ marginTop: 8 }}>
+          <StatusInlineEdit
+            label="현재 위치"
+            value={c.idleLocation}
+            placeholder="예: 김포 주차장 B-12"
+            onSave={(v) => onUpdate({ ...c, idleLocation: v || undefined })}
+          />
+          <StatusInlineEdit
+            label="작업 상태"
+            value={c.idleReason}
+            placeholder={workingContext}
+            onSave={(v) => onUpdate({ ...c, idleReason: v || undefined })}
+          />
+          <StatusInlineEdit
+            label="비고"
+            value={c.notes}
+            placeholder="메모"
+            onSave={(v) => onUpdate({ ...c, notes: v || undefined })}
+          />
         </div>
       </Section>
 

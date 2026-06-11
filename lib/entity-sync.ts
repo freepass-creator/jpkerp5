@@ -15,6 +15,7 @@
  */
 
 import type { InsurancePolicy, Vehicle, Contract, Company } from '@/lib/types';
+import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
 
 /** plate 정규화 — 공백/제로폭/하이픈 제거. O→0, I→1 OCR 보정 */
 export function normPlate(s?: string): string {
@@ -185,14 +186,18 @@ export async function upsertVehicleFromContract(
   const plate = contract.vehiclePlate;
   if (!plate || plate === '미정') return null;
 
+  // plate 정규성 기반 자동 status — 빈/임판/정상 → 구매대기/등록대기/운행
+  const autoStatus = deriveVehicleStatusFromContract(plate);
   const isActive = contract.status === '운행' || contract.status === '대기';
   const existing = findVehicleByPlate(ctx.vehicles, plate);
 
   if (existing) {
+    // 종료 계약(반납/해지/채권) 시에는 기존 status 보존 (휴차 결정은 사용자 명시)
+    const nextStatus = isActive ? autoStatus : existing.status;
     const next: Vehicle = {
       ...existing,
       currentContractId: contract.id,
-      status: isActive ? '운행' : existing.status,
+      status: nextStatus,
       // 빈 필드만 계약 임베드로 보강 — 기존 값 보존
       vehicleModelLine: existing.vehicleModelLine || contract.vehicleModelLine,
       model: existing.model || contract.vehicleModel,
@@ -225,7 +230,8 @@ export async function upsertVehicleFromContract(
     vehicleVariant: contract.vehicleVariant,
     vehicleTrim: contract.vehicleTrim,
     company: (company?.code || company?.name || contract.company || '') as Vehicle['company'],
-    status: isActive ? '운행' : '상품대기',
+    // 신규 차량 — plate 정규성 기반 자동 status
+    status: autoStatus,
     currentContractId: contract.id,
     createdAt: new Date().toISOString(),
   };
