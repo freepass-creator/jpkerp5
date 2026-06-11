@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from 'react';
-import { ArrowUUpLeft } from '@phosphor-icons/react';
+import { ArrowUUpLeft, FileXls } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -14,6 +14,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { contractStatusTone } from '@/lib/status-tones';
+import { downloadContractsExcel } from '@/lib/contract-export';
 
 export default function ContractReturnPage() {
   const { contracts } = useContracts();
@@ -34,7 +35,16 @@ export default function ContractReturnPage() {
           반납<span className="chip-count">{rows.length}</span>
         </button>
       }
-      bottomBar={<BottomBar left={<button className="btn" type="button">엑셀</button>} right={null} />}
+      bottomBar={<BottomBar left={
+        <button
+          className="btn"
+          type="button"
+          disabled={rows.length === 0}
+          onClick={() => downloadContractsExcel(rows, companyMaster, { title: '반납 계약', filter: `${rows.length}건` })}
+        >
+          <FileXls size={14} weight="bold" /> 엑셀
+        </button>
+      } right={null} />}
     >
       <table className="table">
         <thead>

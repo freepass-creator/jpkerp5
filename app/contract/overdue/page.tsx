@@ -7,7 +7,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Warning } from '@phosphor-icons/react';
+import { Warning, FileXls } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
@@ -17,6 +17,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { contractStatusTone } from '@/lib/status-tones';
+import { downloadContractsExcel } from '@/lib/contract-export';
 
 export default function ContractOverduePage() {
   const { contracts } = useContracts();
@@ -66,7 +67,17 @@ export default function ContractOverduePage() {
         <BottomBar
           left={
             <>
-              <button className="btn" type="button">엑셀</button>
+              <button
+                className="btn"
+                type="button"
+                disabled={overdue.length === 0}
+                onClick={() => downloadContractsExcel(overdue, companyMaster, {
+                  title: `미수금 — ${bucket === 'all' ? '전체' : bucket === 'high' ? '심각(3회+)' : bucket === 'mid' ? '주의(2회)' : '경증(1회)'}`,
+                  filter: bucket === 'all' ? undefined : `${overdue.length}건`,
+                })}
+              >
+                <FileXls size={14} weight="bold" /> 엑셀
+              </button>
               <span className="btn-sep" />
               <Link href="/receivables" className="btn">→ 리스크 관리로 (액션 중심)</Link>
             </>

@@ -6,7 +6,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Calendar } from '@phosphor-icons/react';
+import { Calendar, FileXls } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -15,6 +15,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { downloadContractsExcel } from '@/lib/contract-export';
 
 export default function ExpirePage() {
   const { contracts } = useContracts();
@@ -67,7 +68,19 @@ export default function ExpirePage() {
       }
       bottomBar={
         <BottomBar
-          left={<button className="btn" type="button">엑셀</button>}
+          left={
+            <button
+              className="btn"
+              type="button"
+              disabled={rows.length === 0}
+              onClick={() => downloadContractsExcel(rows.map((r) => r.contract), companyMaster, {
+                title: `만기 임박 — ${bucket === 'all' ? '전체' : bucket === 'expired' ? '만기 경과' : bucket === 'd30' ? 'D-30' : 'D-31~90'}`,
+                filter: `${rows.length}건`,
+              })}
+            >
+              <FileXls size={14} weight="bold" /> 엑셀
+            </button>
+          }
           right={null}
         />
       }

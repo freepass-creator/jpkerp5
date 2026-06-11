@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pause, MagnifyingGlass, MapPin } from '@phosphor-icons/react';
+import { Pause, MagnifyingGlass, MapPin, FileXls } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -21,6 +21,7 @@ import { IdleLocationDialog } from '@/components/idle-location-dialog';
 import type { Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
+import { downloadContractsExcel } from '@/lib/contract-export';
 
 export default function ContractIdlePage() {
   const router = useRouter();
@@ -111,7 +112,16 @@ export default function ContractIdlePage() {
       }
       bottomBar={
         <BottomBar
-          left={<button className="btn" type="button">엑셀</button>}
+          left={
+            <button
+              className="btn"
+              type="button"
+              disabled={rows.length === 0}
+              onClick={() => downloadContractsExcel(rows, companyMaster, { title: '휴차 차량', filter: `${rows.length}건` })}
+            >
+              <FileXls size={14} weight="bold" /> 엑셀
+            </button>
+          }
           right={null}
         />
       }
