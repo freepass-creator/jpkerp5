@@ -25,7 +25,7 @@ import type { VehicleStatus } from '@/lib/types';
  */
 const ASSET_STATUS_VALUES: VehicleStatus[] = [
   '구매대기', '등록대기', '상품화대기', '상품화중', '상품대기',
-  '운행', '정비', '사고',
+  '휴차', '운행', '정비', '사고',
   '매각검토', '매각대기', '매각',
 ];
 const ASSET_STATUS_SET = new Set<string>(ASSET_STATUS_VALUES);
@@ -42,8 +42,19 @@ import { vehicleStatusTone } from '@/lib/status-tones';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
+import { setVehicleAttachments } from '@/lib/firebase/vehicle-attachments-store';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 import { VehicleDetailDialog } from '@/components/asset/vehicle-detail-dialog';
+
+const ATTACHMENT_FIELDS = [
+  'registrationCertUrl', 'registrationCertFileName', 'registrationCertUploadedAt',
+  'insuranceCertUrl', 'insuranceCertFileName', 'insuranceCertUploadedAt',
+  'loanContractUrl', 'loanContractFileName', 'loanContractUploadedAt',
+] as const;
+
+/** plate 기반 자동 결정 대상 status — 사용자 명시 상태(운행/정비/사고/매각 등)는 보존 */
+const AUTO_CALCULABLE_STATUS = new Set<string>(['구매대기', '등록대기', '휴차']);
 
 export default function AssetPage() {
   const router = useRouter();
@@ -271,18 +282,27 @@ export default function AssetPage() {
               <button type="button" className={`chip ${assetQF === 'all' ? 'active' : ''}`} onClick={() => setAssetQF('all')}>
                 전체<span className="chip-count">{assetCounts.all}</span>
               </button>
-              <button type="button" className={`chip ${assetQF === 'reg-missing' ? 'active' : ''}`} onClick={() => setAssetQF('reg-missing')}>
-                등록증 미입력{assetCounts.reg > 0 && <span className="chip-count">{assetCounts.reg}</span>}
-              </button>
-              <button type="button" className={`chip ${assetQF === 'ins-missing' ? 'active' : ''}`} onClick={() => setAssetQF('ins-missing')}>
-                보험 미입력{assetCounts.ins > 0 && <span className="chip-count">{assetCounts.ins}</span>}
-              </button>
-              <button type="button" className={`chip ${assetQF === 'loan-missing' ? 'active' : ''}`} onClick={() => setAssetQF('loan-missing')}>
-                구매방식 미입력{assetCounts.loan > 0 && <span className="chip-count">{assetCounts.loan}</span>}
-              </button>
-              <button type="button" className={`chip ${assetQF === 'gps-missing' ? 'active' : ''}`} onClick={() => setAssetQF('gps-missing')}>
-                GPS 미설치{assetCounts.gps > 0 && <span className="chip-count">{assetCounts.gps}</span>}
-              </button>
+              {/* 값 0 이면 chip 숨김 — "있는 거만 떠 있음" 사용자 룰. 단, 현재 선택된 필터는 0이어도 유지 (해제 가능). */}
+              {(assetCounts.reg > 0 || assetQF === 'reg-missing') && (
+                <button type="button" className={`chip ${assetQF === 'reg-missing' ? 'active' : ''}`} onClick={() => setAssetQF('reg-missing')}>
+                  등록증 미입력{assetCounts.reg > 0 && <span className="chip-count">{assetCounts.reg}</span>}
+                </button>
+              )}
+              {(assetCounts.ins > 0 || assetQF === 'ins-missing') && (
+                <button type="button" className={`chip ${assetQF === 'ins-missing' ? 'active' : ''}`} onClick={() => setAssetQF('ins-missing')}>
+                  보험 미입력{assetCounts.ins > 0 && <span className="chip-count">{assetCounts.ins}</span>}
+                </button>
+              )}
+              {(assetCounts.loan > 0 || assetQF === 'loan-missing') && (
+                <button type="button" className={`chip ${assetQF === 'loan-missing' ? 'active' : ''}`} onClick={() => setAssetQF('loan-missing')}>
+                  구매방식 미입력{assetCounts.loan > 0 && <span className="chip-count">{assetCounts.loan}</span>}
+                </button>
+              )}
+              {(assetCounts.gps > 0 || assetQF === 'gps-missing') && (
+                <button type="button" className={`chip ${assetQF === 'gps-missing' ? 'active' : ''}`} onClick={() => setAssetQF('gps-missing')}>
+                  GPS 미설치{assetCounts.gps > 0 && <span className="chip-count">{assetCounts.gps}</span>}
+                </button>
+              )}
             </>
           }
         />
@@ -530,7 +550,34 @@ export default function AssetPage() {
               </button>
             </>
           }
-          right={null}
+          right={
+            <>
+            <button
+              className="btn"
+              type="button"
+              title="차량번호 기반 자동 결정 — 정상 plate → 휴차 / 임판 → 등록대기 / 빈값 → 구매대기 (사용자가 명시 설정한 운행·정비·사고·매각 등은 보존)"
+              onClick={async () => {
+                const targets = rawVehicles.filter((v) => AUTO_CALCULABLE_STATUS.has(v.status));
+                if (targets.length === 0) {
+                  alert('자동 결정 대상 없음 — 모든 차량이 사용자 명시 상태(운행/정비/사고/매각 등)임');
+                  return;
+                }
+                if (!confirm(`자동 결정 대상 ${targets.length}대 — 차량번호로 휴차/등록대기/구매대기 재계산.\n사용자 명시 상태(운행/정비/사고/매각 등)는 보존.\n계속?`)) return;
+                let changed = 0;
+                for (const v of targets) {
+                  const next = deriveVehicleStatusFromContract(v.plate);
+                  if (next !== v.status) {
+                    try { await updateVehicle({ ...v, status: next }); changed++; }
+                    catch (e) { console.error('status auto failed', v.id, e); }
+                  }
+                }
+                toast.success(`${changed}대 상태 자동 결정 완료 (대상 ${targets.length}대 중)`);
+              }}
+            >
+              상태 자동 결정
+            </button>
+            </>
+          }
         />
 
         {openId && (

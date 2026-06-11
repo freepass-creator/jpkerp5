@@ -24,7 +24,7 @@ import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { todayKr } from '@/lib/mock-data';
-import { Plus, FileXls } from '@phosphor-icons/react';
+import { Plus, FileXls, Trash } from '@phosphor-icons/react';
 
 type QF = 'all' | 'missing' | 'expire' | 'expired';
 
@@ -36,7 +36,7 @@ export default function AssetInsurancePage() {
   const { vehicles } = useMergedVehicles();
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
-  const { policies } = useInsurances();
+  const { policies, remove: removePolicy } = useInsurances();
   const { update: updateVehicle } = useVehicles();
 
   /** 차량 plate → 활성 계약 (insuranceAge 비교용) */
@@ -283,6 +283,34 @@ export default function AssetInsurancePage() {
                 }}
               >
                 <FileXls size={14} weight="bold" /> 엑셀
+              </button>
+              <button
+                className="btn"
+                type="button"
+                disabled={selectedIds.size === 0}
+                title="체크박스로 선택한 차량의 보험증권 일괄 삭제 (감사로그 남음)"
+                style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
+                onClick={async () => {
+                  if (selectedIds.size === 0) return;
+                  // 선택된 vehicle id → 매칭된 policy 추출
+                  const targets = filtered
+                    .filter(({ v }) => selectedIds.has(v.id) && !!v.id)
+                    .map(({ v, policy }) => ({ v, policy }))
+                    .filter((t) => !!t.policy);
+                  if (targets.length === 0) {
+                    alert('선택한 차량 중 매칭된 보험증권이 없습니다');
+                    return;
+                  }
+                  if (!confirm(`선택한 ${targets.length}건의 보험증권을 삭제하시겠습니까? (감사로그 남음)`)) return;
+                  for (const { policy } of targets) {
+                    if (!policy) continue;
+                    try { await removePolicy(policy.id); }
+                    catch (e) { console.error('policy delete failed', policy.id, e); }
+                  }
+                  setSelectedIds(new Set());
+                }}
+              >
+                <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
               </button>
             </>
           }

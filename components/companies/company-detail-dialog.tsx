@@ -57,10 +57,14 @@ export function CompanyDetailDialog({
 
   // 운영 KPI — 해당 회사의 보유 차량 + 진행 계약 + 누적 미수
   const companyKey = company.code || company.name;
-  const vehicleCount = vehicles.filter((v) => v.company === companyKey).length;
+  const companyVehicles = vehicles.filter((v) => v.company === companyKey);
+  const vehicleCount = companyVehicles.length;
+  const idleCount = companyVehicles.filter((v) => v.status === '휴차').length;
+  const runningCount = companyVehicles.filter((v) => v.status === '운행').length;
   const companyContracts = contracts.filter((c) => c.company === companyKey);
   const contractCount = companyContracts.length;
   const activeCount = companyContracts.filter((c) => c.status === '운행' || c.status === '대기').length;
+  const overdueCount = companyContracts.filter((c) => (c.unpaidAmount ?? 0) > 0).length;
   const totalUnpaid = companyContracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
 
   async function handleSave() {
@@ -106,12 +110,17 @@ export function CompanyDetailDialog({
       onCancel={handleCancel}
     >
       <Stack>
-        {/* 운영 요약 KPI — 보유 차량/진행 계약/미수 합계 */}
-        <KpiGrid>
-          <KpiCard label="보유 차량" value={`${vehicleCount}대`} hint={vehicleCount === 0 ? '미배정' : undefined} />
-          <KpiCard label="진행 계약" value={`${activeCount}건`} hint={contractCount > activeCount ? `종결 ${contractCount - activeCount}` : undefined} />
-          <KpiCard label="누적 미수" value={`₩${totalUnpaid.toLocaleString()}`} positive={totalUnpaid === 0 ? undefined : false} />
-        </KpiGrid>
+        {/* 회사 현황 — 보유/운행/휴차/계약/미수 한눈에 (Section 규격 통일) */}
+        <Section title="회사 현황">
+          <KpiGrid>
+            <KpiCard label="보유 차량" value={`${vehicleCount}대`} hint={vehicleCount === 0 ? '미배정' : undefined} />
+            <KpiCard label="운행 중" value={`${runningCount}대`} hint={vehicleCount > 0 ? `${Math.round((runningCount / vehicleCount) * 100)}%` : undefined} />
+            <KpiCard label="휴차" value={`${idleCount}대`} hint={idleCount > 0 ? '미배정' : undefined} positive={idleCount === 0 ? undefined : false} />
+            <KpiCard label="진행 계약" value={`${activeCount}건`} hint={contractCount > activeCount ? `종결 ${contractCount - activeCount}` : undefined} />
+            <KpiCard label="미수 건수" value={`${overdueCount}건`} positive={overdueCount === 0 ? undefined : false} />
+            <KpiCard label="누적 미수" value={`₩${totalUnpaid.toLocaleString()}`} positive={totalUnpaid === 0 ? undefined : false} />
+          </KpiGrid>
+        </Section>
 
         {/* 사업자등록 정보 — 사업자등록증에서 나오는 내용 */}
         <Section title="사업자등록 정보">

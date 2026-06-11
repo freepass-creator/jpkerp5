@@ -26,6 +26,8 @@ import { getFirebaseAuth } from '@/lib/firebase/client';
 import { toast } from '@/lib/toast';
 import type { Vehicle, CompanyCode } from '@/lib/types';
 import { normPlate, findCompanyByRegNo } from '@/lib/entity-sync';
+import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
+import { displayCompanyName } from '@/lib/company-display';
 
 const OCR_CONCURRENCY = 30;
 const PLATE_RE = /^\d{2,3}[가-힣]\d{4}$/;
@@ -204,19 +206,13 @@ export function VehicleRegRegisterDialog({
     let updated = 0, added = 0, fail = 0;
     for (const item of registerableItems) {
       try {
-        const { _status: _s, _error: _e, _existingId, _fileName: fn, _fileDataUrl: fileUrl, id: _id, ...rest } = item;
-        // OCR 원본 등록증 첨부 — 자산 상세 다이얼로그에서 미리보기 가능 (보험증권 패턴)
-        const certPatch = fileUrl
-          ? {
-              registrationCertUrl: fileUrl,
-              registrationCertFileName: fn,
-              registrationCertUploadedAt: new Date().toISOString(),
-            }
-          : {};
+        const { _status: _s, _error: _e, _existingId, _fileName: _fn, _fileDataUrl: _fileUrl, id: _id, ...rest } = item;
+        // OCR 원본 base64 는 vehicle 레코드에 저장 X — vehicles 노드 가벼움 (옛 방식 회복)
+        // 첨부 미리보기 필요 시 별도 vehicle_attachments 노드로 분리 작업 필요 (오픈 후)
         if (_existingId) {
           const existing = vehicles.find((v) => v.id === _existingId);
           if (existing) {
-            const merged = { ...existing, ...rest, ...certPatch, id: existing.id } as Vehicle;
+            const merged = { ...existing, ...rest, id: existing.id } as Vehicle;
             await updateVehicle(merged);
             updated++;
             onSaved?.(merged);
@@ -226,10 +222,10 @@ export function VehicleRegRegisterDialog({
             plate: rest.plate ?? '',
             model: rest.model ?? '',
             company: (rest.company ?? '기타') as CompanyCode,
-            status: rest.status ?? '등록대기',
+            // 정상 plate → 휴차 / 임판 → 등록대기 / 빈 → 구매대기 (사용자 명시 도메인 룰)
+            status: rest.status ?? deriveVehicleStatusFromContract(rest.plate),
             createdAt: new Date().toISOString(),
             ...rest,
-            ...certPatch,
           } as Omit<Vehicle, 'id'>;
           const newId = await addVehicle(newVehicle);
           added++;
@@ -320,20 +316,38 @@ export function VehicleRegRegisterDialog({
               onChange={(e) => { if (e.target.files && e.target.files.length > 0) void handleFiles(e.target.files); }}
             />
             <div style={{ textAlign: 'center' }}>
-              <Upload size={24} weight="duotone" style={{ color: 'var(--text-weak)' }} />
-              <div style={{ fontSize: 13, marginTop: 8, fontWeight: 500 }}>자동차등록증 파일 여러 장 한 번에</div>
-              <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>
-                PDF / JPG / PNG 다중 선택 · 드래그&드롭 OK — Gemini OCR 병렬 처리 (동시 {OCR_CONCURRENCY}건)
-                <br />같은 차량번호 기존 자산 있으면 <strong>업데이트</strong>, 없으면 <strong>신규 등록</strong>
-              </div>
+              {progress && progress.done < progress.total ? (
+                <>
+                  <CircleNotch size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--brand)' }} />
+                  <div style={{ fontSize: 13, marginTop: 8, fontWeight: 500, color: 'var(--brand)' }}>
+                    OCR 진행 중… <strong>{progress.done}</strong> / {progress.total}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>
+                    Gemini 가 자동차등록증을 읽고 있습니다 (동시 {OCR_CONCURRENCY}건)
+                  </div>
+                </>
+              ) : progress && progress.done >= progress.total && progress.total > 0 ? (
+                <>
+                  <CheckCircle size={24} weight="duotone" style={{ color: 'var(--green-text)' }} />
+                  <div style={{ fontSize: 13, marginTop: 8, fontWeight: 500, color: 'var(--green-text)' }}>
+                    OCR 완료 <strong>{progress.done}</strong> / {progress.total}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>
+                    아래 표에서 확인 후 [모두 등록] 클릭
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Upload size={24} weight="duotone" style={{ color: 'var(--text-weak)' }} />
+                  <div style={{ fontSize: 13, marginTop: 8, fontWeight: 500 }}>자동차등록증 파일 여러 장 한 번에</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>
+                    PDF / JPG / PNG 다중 선택 · 드래그&드롭 OK — Gemini OCR 병렬 처리 (동시 {OCR_CONCURRENCY}건)
+                    <br />같은 차량번호 기존 자산 있으면 <strong>업데이트</strong>, 없으면 <strong>신규 등록</strong>
+                  </div>
+                </>
+              )}
             </div>
           </label>
-
-          {progress && (
-            <div style={{ padding: '8px 12px', background: 'var(--brand-bg)', color: 'var(--brand)', fontSize: 12, borderRadius: 'var(--radius)', marginBottom: 8 }}>
-              OCR 진행: {progress.done} / {progress.total}
-            </div>
-          )}
 
           {items.length > 0 && (
             <>
@@ -390,11 +404,11 @@ export function VehicleRegRegisterDialog({
                           {it._status === 'done' && !plateOk && <Warning size={14} weight="duotone" style={{ color: 'var(--orange-text)' }} />}
                           {it._status === 'failed' && <X size={14} weight="bold" style={{ color: 'var(--red-text)' }} />}
                         </td>
-                        {/* 회사 매칭 */}
+                        {/* 회사 매칭 — 코드 아닌 표기명(displayName ?? 회사명) 표시 */}
                         <td>
                           {it._status === 'done' ? (
                             it.company
-                              ? <span className="mono" style={{ background: 'var(--green-bg)', color: 'var(--green-text)', padding: '1px 6px', borderRadius: 'var(--radius-sm)', fontSize: 10 }}>{it.company}</span>
+                              ? <span style={{ background: 'var(--green-bg)', color: 'var(--green-text)', padding: '1px 6px', borderRadius: 'var(--radius-sm)', fontSize: 10 }}>{displayCompanyName(it.company, companies)}</span>
                               : <span style={{ color: 'var(--orange-text)', fontSize: 10 }}>매칭 안됨</span>
                           ) : <span className="dim">-</span>}
                         </td>

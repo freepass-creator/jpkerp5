@@ -1414,21 +1414,21 @@ input[type="radio"]:disabled {
 .table td.muted { color: var(--text-weak); }
 .table td.dim { color: var(--text-sub); }
 
-/* 체크박스 열 — 좌측 첫 칸, 폭 28px 고정, 좌우 가운데 정렬.
+/* 체크박스 열 — 좌측 첫 칸, 폭 32px 고정, 절대 가운데 정렬 (텍스트 아닌 고정 위치).
    sticky 로 좌우 스크롤 시에도 맨 앞 고정. 우측 border 제거. */
 .table th.checkbox-col,
 .table td.checkbox-col {
-  width: 28px;
-  min-width: 28px;
-  max-width: 28px;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
   padding: 0;
-  text-align: center;
   vertical-align: middle;
   border-right: none;
   position: sticky;
   left: 0;
   z-index: 5;
   background: var(--bg-card);
+  /* 체크박스를 절대 가운데 — 텍스트로 취급되지 않도록 inner box 사용 */
 }
 .table thead th.checkbox-col {
   z-index: 11; /* sticky thead 보다 위 */
@@ -1440,10 +1440,21 @@ input[type="radio"]:disabled {
 .table tbody tr:nth-child(even) td.checkbox-col {
   background: var(--bg-stripe);
 }
+/* input 을 셀 정중앙에 절대 고정 — 행 높이/내용에 관계없이 항상 같은 위치 */
+.table .checkbox-col {
+  position: sticky; /* 위에서 이미 sticky 지정됨, 다시 명시 */
+}
 .table .checkbox-col input[type="checkbox"] {
   display: block;
+  width: 14px;
+  height: 14px;
   margin: 0 auto;
   vertical-align: middle;
+  /* 행 vertical-align: middle 와 cell padding: 0 으로 항상 가운데 */
+}
+/* tbody td 의 일반 padding 이 적용되지 않도록 강제 */
+.table tbody td.checkbox-col {
+  padding: 0 !important;
 }
 /* 체크박스 — 전역 input[type=checkbox] 규격 사용 */
 .table tbody tr.selected-row { background: var(--brand-bg); }
@@ -2138,10 +2149,10 @@ input[type="radio"]:disabled {
   font-size: 11.5px;
 }
 .dialog-content .table thead th {
-  background: var(--bg-soft, #f1f5f9);
-  color: var(--text-main);
-  font-weight: 700;
-  border-bottom: 2px solid var(--brand);
+  background: var(--bg-header);
+  color: var(--text-sub);
+  font-weight: var(--font-weight-medium);
+  border-bottom: 1px solid var(--border-strong);
   padding: 7px 8px;
   font-size: 11px;
   letter-spacing: 0;
