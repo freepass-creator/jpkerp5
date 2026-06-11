@@ -140,6 +140,7 @@ export default function RepairPage() {
                 className="btn"
                 type="button"
                 disabled={filtered.length === 0}
+                title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
                 onClick={() => {
                   const rows = filtered.map((v) => {
                     const r = v.plate ? repairByPlate.get(v.plate.replace(/\s/g, '')) : undefined;
@@ -172,7 +173,7 @@ export default function RepairPage() {
                   });
                 }}
               >
-                <FileXls size={14} weight="bold" /> 엑셀
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
               </button>
             </>
           }

@@ -115,6 +115,7 @@ export default function AssetLoanPage() {
                 className="btn"
                 type="button"
                 disabled={filtered.length === 0}
+                title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
                 onClick={() => {
                   exportToExcel({
                     title: `구매방식 (할부) 현황${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
@@ -143,7 +144,7 @@ export default function AssetLoanPage() {
                   });
                 }}
               >
-                <FileXls size={14} weight="bold" /> 엑셀
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
               </button>
             </>
           }

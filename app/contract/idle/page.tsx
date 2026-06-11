@@ -117,9 +117,10 @@ export default function ContractIdlePage() {
               className="btn"
               type="button"
               disabled={rows.length === 0}
+              title={`현재 페이지 목록 (${rows.length}건) 엑셀 다운로드`}
               onClick={() => downloadContractsExcel(rows, companyMaster, { title: '휴차 차량', fileName: '휴차차량', sheetName: '휴차', filter: `${rows.length}건` })}
             >
-              <FileXls size={14} weight="bold" /> 엑셀
+              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{rows.length}</span>
             </button>
           }
           right={null}

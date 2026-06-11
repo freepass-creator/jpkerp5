@@ -59,6 +59,7 @@ export default function PurchasePage() {
               className="btn"
               type="button"
               disabled={pending.length + purchased.length === 0}
+              title={`현재 페이지 목록 (${pending.length + purchased.length}건) 엑셀 다운로드`}
               onClick={() => {
                 const rows = [...pending, ...purchased].map((v) => ({
                   회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
@@ -88,7 +89,7 @@ export default function PurchasePage() {
                 });
               }}
             >
-              <FileXls size={14} weight="bold" /> 엑셀
+              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{pending.length + purchased.length}</span>
             </button>
           }
         />

@@ -273,7 +273,8 @@ export default function AssetInsurancePage() {
               <button
                 className="btn"
                 type="button"
-                title="보험증권 전체 정보 엑셀 — JPK 네이비 헤더 + 1~6회차·담보·자동이체 모두 포함"
+                title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드 — 1~6회차·담보·자동이체 모두 포함`}
+                disabled={filtered.length === 0}
                 onClick={() => {
                   downloadInsuranceExcel(
                     filtered.map(({ v, policy }) => ({ v, policy })),
@@ -282,7 +283,7 @@ export default function AssetInsurancePage() {
                   );
                 }}
               >
-                <FileXls size={14} weight="bold" /> 엑셀
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
               </button>
               <button
                 className="btn"

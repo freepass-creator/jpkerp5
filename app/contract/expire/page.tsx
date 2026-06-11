@@ -73,6 +73,7 @@ export default function ExpirePage() {
               className="btn"
               type="button"
               disabled={rows.length === 0}
+              title={`현재 페이지 목록 (${rows.length}건) 엑셀 다운로드`}
               onClick={() => downloadContractsExcel(rows.map((r) => r.contract), companyMaster, {
                 title: `만기 임박 — ${bucket === 'all' ? '전체' : bucket === 'expired' ? '만기 경과' : bucket === 'd30' ? 'D-30' : 'D-31~90'}`,
                 fileName: `만기임박-${bucket === 'all' ? '전체' : bucket === 'expired' ? '경과' : bucket === 'd30' ? 'D30' : 'D90'}`,
@@ -80,7 +81,7 @@ export default function ExpirePage() {
                 filter: `${rows.length}건`,
               })}
             >
-              <FileXls size={14} weight="bold" /> 엑셀
+              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{rows.length}</span>
             </button>
           }
           right={null}

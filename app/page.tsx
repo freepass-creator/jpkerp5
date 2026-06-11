@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, DownloadSimple, Car, Upload } from '@phosphor-icons/react';
+import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, DownloadSimple, Car, Upload, FileXls } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import {
@@ -945,7 +945,7 @@ export default function Page() {
               title={`현재 페이지 목록 (${filteredContracts.length}건) 엑셀 다운로드`}
               disabled={filteredContracts.length === 0}
             >
-              <DownloadSimple size={14} /> 엑셀 <span className="chip-count">{filteredContracts.length}</span>
+              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filteredContracts.length}</span>
             </button>
             {superAdmin && (
               <>

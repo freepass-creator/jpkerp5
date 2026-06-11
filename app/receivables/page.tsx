@@ -674,10 +674,10 @@ export default function ReceivablesPage() {
                 className="btn"
                 type="button"
                 onClick={() => downloadOverdueExcel(contracts, companyMaster)}
-                title="미수 있는 계약만 엑셀로 내려받기"
-                disabled={contracts.every((c) => (c.unpaidAmount ?? 0) === 0)}
+                title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
+                disabled={filtered.length === 0}
               >
-                <DownloadSimple size={14} /> 미수 엑셀
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
               </button>
             </>
           }

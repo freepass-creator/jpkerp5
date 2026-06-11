@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileText, MagnifyingGlass, ArrowLeft } from '@phosphor-icons/react';
+import { FileText, MagnifyingGlass, ArrowLeft, FileXls } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -65,12 +65,18 @@ export default function ContractPage() {
 
   function handleExcelAll() {
     if (filtered.length === 0) { toast.info('내보낼 계약 없음'); return; }
-    downloadContractsExcel(filtered, companyMaster, { title: '계약 리스트', filter: `검색결과 ${filtered.length}건` });
+    downloadContractsExcel(filtered, companyMaster, {
+      title: '계약 리스트', fileName: '계약리스트', sheetName: '계약',
+      filter: `검색결과 ${filtered.length}건`,
+    });
   }
   function handleExcelSelected() {
     const targets = filtered.filter((c) => selectedIds.has(c.id));
     if (targets.length === 0) { toast.info('선택된 계약 없음'); return; }
-    downloadContractsExcel(targets, companyMaster, { title: '계약 리스트 (선택)', filter: `선택 ${targets.length}건` });
+    downloadContractsExcel(targets, companyMaster, {
+      title: '계약 리스트 (선택)', fileName: '계약리스트-선택', sheetName: '계약',
+      filter: `선택 ${targets.length}건`,
+    });
   }
   function handleExpireGuide() {
     const targets = filtered.filter((c) => selectedIds.has(c.id));
@@ -179,7 +185,15 @@ export default function ContractPage() {
         <>
           <button className="btn btn-primary" type="button" onClick={() => setCreateOpen(true)}>+ 신규 계약</button>
           <span className="btn-sep" />
-          <button className="btn" type="button" onClick={handleExcelAll} title="현재 필터된 계약 전체 엑셀">엑셀</button>
+          <button
+            className="btn"
+            type="button"
+            onClick={handleExcelAll}
+            disabled={filtered.length === 0}
+            title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
+          >
+            <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
+          </button>
           <span className="btn-sep" />
           <span className="dim" style={{ fontSize: 11 }}>
             {selectedIds.size > 0 ? `선택 ${selectedIds.size}건` : '체크박스로 선택'}

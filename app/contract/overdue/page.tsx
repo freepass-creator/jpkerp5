@@ -71,6 +71,7 @@ export default function ContractOverduePage() {
                 className="btn"
                 type="button"
                 disabled={overdue.length === 0}
+                title={`현재 페이지 목록 (${overdue.length}건) 엑셀 다운로드`}
                 onClick={() => downloadContractsExcel(overdue, companyMaster, {
                   title: `미수금 — ${bucket === 'all' ? '전체' : bucket === 'high' ? '심각(3회+)' : bucket === 'mid' ? '주의(2회)' : '경증(1회)'}`,
                   fileName: `미수금-${bucket === 'all' ? '전체' : bucket === 'high' ? '심각' : bucket === 'mid' ? '주의' : '경증'}`,
@@ -78,7 +79,7 @@ export default function ContractOverduePage() {
                   filter: bucket === 'all' ? undefined : `${overdue.length}건`,
                 })}
               >
-                <FileXls size={14} weight="bold" /> 엑셀
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{overdue.length}</span>
               </button>
               <span className="btn-sep" />
               <Link href="/receivables" className="btn">→ 리스크 관리로 (액션 중심)</Link>

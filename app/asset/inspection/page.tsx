@@ -65,6 +65,7 @@ export default function AssetInspectionPage() {
               className="btn"
               type="button"
               disabled={upcoming.length === 0 && inspectionEvents.length === 0}
+              title={`현재 페이지 목록 (${upcoming.length + inspectionEvents.length}건) 엑셀 다운로드`}
               onClick={() => {
                 const rows = [
                   ...upcoming.map(({ c, daysLeft }) => ({
@@ -112,7 +113,7 @@ export default function AssetInspectionPage() {
                 });
               }}
             >
-              <FileXls size={14} weight="bold" /> 엑셀
+              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{upcoming.length + inspectionEvents.length}</span>
             </button>
           }
         />
