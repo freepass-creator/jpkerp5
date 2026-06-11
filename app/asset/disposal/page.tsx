@@ -20,6 +20,7 @@ import { useTableSelection } from '@/lib/use-table-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
+import { usePersistentState } from '@/lib/use-persistent-state';
 
 const DISPOSAL_STATUSES = ['매각검토', '매각대기', '매각'] as const;
 
@@ -31,7 +32,7 @@ export default function AssetDisposalPage() {
   const { vehicles } = useMergedVehicles();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('all');
+  const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-disposal:company', 'all');
   const sel = useTableSelection();
 
   const companyOptions = useMemo(() => buildCompanyOptions(vehicles, (v) => v.company), [vehicles]);

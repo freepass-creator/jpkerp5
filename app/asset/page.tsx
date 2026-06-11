@@ -41,6 +41,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
+import { usePersistentState } from '@/lib/use-persistent-state';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 import { VehicleDetailDialog } from '@/components/asset/vehicle-detail-dialog';
 
@@ -86,8 +87,8 @@ export default function AssetPage() {
   }, [rawVehicles, contracts]);
 
   const [search, setSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset:company', 'all');
+  const [statusFilter, setStatusFilter] = usePersistentState('filter:asset:status', 'all');
   const [openId, setOpenId] = useState<string | null>(null);
   const [vehicleRegOpen, setVehicleRegOpen] = useState(false);
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
@@ -199,7 +200,7 @@ export default function AssetPage() {
   }, [contracts]);
 
   type AssetQF = 'all' | 'reg-missing' | 'ins-missing' | 'loan-missing' | 'gps-missing';
-  const [assetQF, setAssetQF] = useState<AssetQF>('all');
+  const [assetQF, setAssetQF] = usePersistentState<AssetQF>('filter:asset:quick', 'all');
 
   const isMissing = useMemo(() => ({
     reg: (v: Vehicle) => v.id.startsWith('contract-derived-') || !v.vin,

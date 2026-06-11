@@ -15,6 +15,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
+import { usePersistentState } from '@/lib/use-persistent-state';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
@@ -29,7 +30,7 @@ export default function AssetGpsPage() {
   const { vehicles } = useMergedVehicles();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('all');
+  const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-gps:company', 'all');
   const sel = useTableSelection();
 
   const companyOptions = useMemo(() => buildCompanyOptions(vehicles, (v) => v.company), [vehicles]);

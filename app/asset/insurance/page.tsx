@@ -19,6 +19,7 @@ import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
 import { InsuranceDetailDialog } from '@/components/insurance/insurance-detail-dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { usePersistentState } from '@/lib/use-persistent-state';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
@@ -72,8 +73,8 @@ export default function AssetInsurancePage() {
     return new Date().getFullYear() - birthYear;
   }
   const [search, setSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [qf, setQf] = useState<QF>('all');
+  const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-insurance:company', 'all');
+  const [qf, setQf] = usePersistentState<QF>('filter:asset-insurance:quick', 'all');
   const [registerOpen, setRegisterOpen] = useState(false);
   const [detailVehicleId, setDetailVehicleId] = useState<string | null>(null);
   const [editPolicyId, setEditPolicyId] = useState<string | null>(null);

@@ -30,6 +30,7 @@ import { downloadContractsExcel } from '@/lib/contract-export';
 import { toast } from '@/lib/toast';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { usePersistentState } from '@/lib/use-persistent-state';
 import { contractStatusTone } from '@/lib/status-tones';
 
 export default function ContractPage() {
@@ -45,9 +46,9 @@ export default function ContractPage() {
 
   type QuickFilter = 'all' | 'active' | 'ended' | 'expire' | 'return' | 'overdue';
   const [search, setSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
-  const [groupBy, setGroupBy] = useState<'list' | 'customer'>('list');
+  const [companyFilter, setCompanyFilter] = usePersistentState('filter:contract:company', 'all');
+  const [quickFilter, setQuickFilter] = usePersistentState<QuickFilter>('filter:contract:quick', 'all');
+  const [groupBy, setGroupBy] = usePersistentState<'list' | 'customer'>('filter:contract:groupBy', 'list');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);

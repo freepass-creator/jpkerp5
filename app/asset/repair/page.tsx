@@ -19,6 +19,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
+import { usePersistentState } from '@/lib/use-persistent-state';
 
 export default function RepairPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function RepairPage() {
   const { vehicles } = useMergedVehicles();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('all');
+  const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-repair:company', 'all');
   const sel = useTableSelection();
 
   /** 차량 plate → 정비/부품교체 이력 집계 */

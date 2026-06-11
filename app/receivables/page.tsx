@@ -26,6 +26,7 @@ import { computeActiveIssues, pickPrimaryIssue, computeLatePayStage, ISSUE_COLOR
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
+import { usePersistentState } from '@/lib/use-persistent-state';
 
 type Filter =
   | '전체'           // 진행중 전체 (종결 제외)
@@ -97,8 +98,8 @@ export default function ReceivablesPage() {
   const { entries: history, add: addHistory } = useHistoryEntries();
   const { user } = useAuth();
   const { isAdmin: admin } = useRole();
-  const [filter, setFilter] = useState<Filter>('미납중');
-  const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [filter, setFilter] = usePersistentState<Filter>('filter:receivables:quick', '미납중');
+  const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:receivables:company', 'all');
   const [search, setSearch] = useState('');
   const [contactOpen, setContactOpen] = useState<Contract | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
