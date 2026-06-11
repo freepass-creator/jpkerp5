@@ -476,8 +476,13 @@ export default function PenaltyPage() {
         )}
         footerRight={
           <>
-            <button className="btn" onClick={handleExcel} disabled={visible.length === 0}>
-              <FileXls size={14} weight="bold" /> 엑셀
+            <button
+              className="btn"
+              onClick={handleExcel}
+              disabled={visible.length === 0}
+              title={`현재 페이지 목록 (${visible.length}건) 엑셀 다운로드`}
+            >
+              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{visible.length}</span>
             </button>
             {phase === 'in-progress' && (
               <>

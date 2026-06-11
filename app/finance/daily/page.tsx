@@ -12,7 +12,7 @@
  */
 
 import { useMemo, useState, Fragment } from 'react';
-import { ChartBar, DownloadSimple, CaretRight } from '@phosphor-icons/react';
+import { ChartBar, DownloadSimple, CaretRight, FileXls } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { FINANCE_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -224,8 +224,14 @@ export default function FinanceDailyPage() {
         <BottomBar
           left={
             <>
-              <button className="btn btn-primary" type="button" onClick={handleExport} title="자금일보 엑셀 (세무사 공유용)">
-                <DownloadSimple size={12} weight="bold" /> 엑셀 다운로드
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={handleExport}
+                disabled={daily.length === 0}
+                title={`현재 페이지 목록 (${daily.length}건) 엑셀 다운로드 — 자금일보`}
+              >
+                <FileXls size={12} weight="bold" /> 엑셀 <span className="chip-count">{daily.length}</span>
               </button>
               <button
                 className="btn"

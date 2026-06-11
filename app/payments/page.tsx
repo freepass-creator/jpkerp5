@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import {
-  CurrencyKrw, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar, DownloadSimple,
+  CurrencyKrw, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar, DownloadSimple, FileXls,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -591,8 +591,14 @@ export default function PaymentsPage() {
                 <span>출금 <strong className="mono">₩{formatCurrency(dailyTotals.outSum)}</strong></span>
                 <span>순증감 <strong className="mono" style={{ color: dailyTotals.inSum - dailyTotals.outSum < 0 ? 'var(--red-text)' : 'var(--text-main)' }}>₩{formatCurrency(dailyTotals.inSum - dailyTotals.outSum)}</strong></span>
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <button className="btn btn-sm" type="button" onClick={handleExportExcel} title="자금일보 엑셀 (세무사 공유용)">
-                  <DownloadSimple size={12} weight="bold" /> 엑셀
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={handleExportExcel}
+                  disabled={daily.length === 0}
+                  title={`현재 페이지 목록 (${daily.length}건) 엑셀 다운로드 — 자금일보`}
+                >
+                  <FileXls size={12} weight="bold" /> 엑셀 <span className="chip-count">{daily.length}</span>
                 </button>
               </>
             ) : tab === 'card' ? (

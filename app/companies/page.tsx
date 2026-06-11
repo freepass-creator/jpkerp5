@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import {
-  Buildings, Plus, CheckCircle, Camera, Trash, CircleNotch, Bank, Pencil, X, Warning, CreditCard,
+  Buildings, Plus, CheckCircle, Camera, Trash, CircleNotch, Bank, Pencil, X, Warning, CreditCard, FileXls,
   MapPin, FileText, Garage, Car, ArrowLeft, FloppyDisk,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -14,6 +14,7 @@ import { fileToDataUrl } from '@/lib/image-compress';
 import type {
   Company, BankAccount, CorporateCard, CompanyLocation, CompanyDocument, LocationKind,
 } from '@/lib/types';
+import { exportToExcel } from '@/lib/excel-export';
 
 type Tab = 'info' | 'finance' | 'locations' | 'documents';
 
@@ -289,6 +290,46 @@ export default function CompaniesPage() {
               <span>법인 <strong>{sortedCompanies.length}</strong>곳</span>
               <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
               <span>계약 <strong>{contracts.length}</strong>건</span>
+              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+              <button
+                className="btn"
+                type="button"
+                disabled={sortedCompanies.length === 0}
+                title={`현재 페이지 목록 (${sortedCompanies.length}건) 엑셀 다운로드`}
+                onClick={() => exportToExcel({
+                  title: '법인 마스터',
+                  fileName: '법인마스터',
+                  sheetName: '법인',
+                  rows: sortedCompanies.map((c) => ({
+                    회사코드: c.code ?? '',
+                    회사명: c.name ?? '',
+                    표기명: c.displayName ?? '',
+                    구분: c.kind ?? '',
+                    법인등록번호: c.corpRegNo ?? '',
+                    사업자번호: c.bizRegNo ?? '',
+                    대표자: c.representative ?? '',
+                    주소: c.address ?? '',
+                    연락처: c.phone ?? '',
+                    업태: c.bizType ?? '',
+                    종목: c.bizCategory ?? '',
+                  })),
+                  columns: [
+                    { key: '회사코드', header: '회사코드', width: 12, type: 'mono' },
+                    { key: '회사명', header: '회사명', width: 22 },
+                    { key: '표기명', header: '표기명', width: 16 },
+                    { key: '구분', header: '구분', width: 10, type: 'center' },
+                    { key: '법인등록번호', header: '법인등록번호', width: 16, type: 'mono' },
+                    { key: '사업자번호', header: '사업자번호', width: 14, type: 'mono' },
+                    { key: '대표자', header: '대표자', width: 12 },
+                    { key: '주소', header: '주소', width: 28 },
+                    { key: '연락처', header: '연락처', width: 14, type: 'mono' },
+                    { key: '업태', header: '업태', width: 14 },
+                    { key: '종목', header: '종목', width: 14 },
+                  ],
+                })}
+              >
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{sortedCompanies.length}</span>
+              </button>
             </>
           }
         />
