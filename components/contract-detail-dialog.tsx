@@ -644,7 +644,21 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
   }
 
   function processReturn() {
-    onUpdate({ ...c, vehicleStatus: '반납', status: '반납', returnedDate: actionDate });
+    onUpdate({ ...c, vehicleStatus: '반납', status: '반납', returnedDate: actionDate, ...deriveEndPatch(c, actionDate) });
+  }
+
+  /** 종료 사유 자동 결정 — unpaid > 0 → 채권보전, returnedDate < returnScheduledDate → 중도해지, 그 외 정상종료 */
+  function deriveEndPatch(curr: Contract, endDate: string): Partial<Contract> {
+    const unpaid = curr.unpaidAmount ?? 0;
+    let endReason: '정상종료' | '중도해지' | '채권보전';
+    if (unpaid > 0) endReason = '채권보전';
+    else if (curr.returnScheduledDate && endDate < curr.returnScheduledDate) endReason = '중도해지';
+    else endReason = '정상종료';
+    return {
+      endReason,
+      endedAt: endDate,
+      unpaidAtEnd: unpaid,
+    };
   }
 
   function commitIdle() {
@@ -1018,7 +1032,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
                 className="btn btn-primary"
                 disabled={!allChecked}
                 onClick={() => {
-                  onUpdate({ ...c, vehicleStatus: '휴차대기', status: '반납', returnedDate: actionDate });
+                  onUpdate({ ...c, vehicleStatus: '휴차대기', status: '반납', returnedDate: actionDate, ...deriveEndPatch(c, actionDate) });
                 }}
                 title={allChecked ? '반납 검수 완료 — 처리 진행' : '체크리스트 모두 완료 후 가능'}
               >
@@ -1052,7 +1066,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
                 className="btn btn-primary"
                 disabled={!allChecked}
                 onClick={() => {
-                  onUpdate({ ...c, vehicleStatus: '휴차대기', status: '반납', returnedDate: actionDate });
+                  onUpdate({ ...c, vehicleStatus: '휴차대기', status: '반납', returnedDate: actionDate, ...deriveEndPatch(c, actionDate) });
                 }}
                 title={allChecked ? '반납 검수 완료 — 처리 진행' : '체크리스트 모두 완료 후 가능'}
               >

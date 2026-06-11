@@ -48,13 +48,12 @@ export default function ContractPage() {
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:contract:company', 'all');
   const [quickFilter, setQuickFilter] = usePersistentState<QuickFilter>('filter:contract:quick', 'active');
-  const [groupBy, setGroupBy] = usePersistentState<'list' | 'customer'>('filter:contract:groupBy', 'list');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
 
   // 필터/뷰 변경 시 선택 해제
-  useEffect(() => setSelectedIds(new Set()), [search, companyFilter, quickFilter, groupBy]);
+  useEffect(() => setSelectedIds(new Set()), [search, companyFilter, quickFilter]);
 
   function toggleRow(id: string) {
     setSelectedIds((prev) => {
@@ -137,17 +136,6 @@ export default function ContractPage() {
     return { all, active, expire, return: ret, overdue, ended };
   }, [contracts, companyFilter, today]);
 
-  // 계약자별 묶음 (customerName 기준)
-  const byCustomer = useMemo(() => {
-    const m = new Map<string, typeof filtered>();
-    for (const c of filtered) {
-      const k = c.customerName || '미상';
-      if (!m.has(k)) m.set(k, []);
-      m.get(k)!.push(c);
-    }
-    return Array.from(m.entries()).sort((a, b) => b[1].length - a[1].length);
-  }, [filtered]);
-
   return (
     <PageShell
       title="계약 관리"
@@ -185,8 +173,6 @@ export default function ContractPage() {
             전체<span className="chip-count">{counts.all}</span>
           </button>
           <span className="filter-divider" />
-          <button type="button" className={`chip ${groupBy === 'list' ? 'active' : ''}`} onClick={() => setGroupBy('list')}>전체 리스트</button>
-          <button type="button" className={`chip ${groupBy === 'customer' ? 'active' : ''}`} onClick={() => setGroupBy('customer')}>계약자별 묶음</button>
         </>
       }
       bottomBarLeft={
@@ -228,7 +214,7 @@ export default function ContractPage() {
         </>
       }
     >
-              {groupBy === 'list' ? (
+              {(
                 <table className="table">
                   <thead>
                     <tr>
@@ -281,43 +267,6 @@ export default function ContractPage() {
                         <td className="center"><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              ) : (
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>계약자</th>
-                      <th className="center" style={{ width: 64 }}>계약수</th>
-                      <th>차량들</th>
-                      <th className="num" style={{ width: 130 }}>총 미수금</th>
-                      <th className="num" style={{ width: 130 }}>월 대여료 합</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {byCustomer.length === 0 ? (
-                      <EmptyRow colSpan={5}>고객별 미수금 집계 없음</EmptyRow>
-                    ) : byCustomer.map(([name, list]) => {
-                      const totalUnpaid = list.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
-                      const totalMonthly = list.reduce((s, c) => s + (c.monthlyRent ?? 0), 0);
-                      return (
-                        <tr key={name}>
-                          <td><strong>{name}</strong></td>
-                          <td className="center">{list.length}</td>
-                          <td>
-                            {list.map((c) => (
-                              <span key={c.id} className="mono" style={{ marginRight: 8, fontSize: 11 }}>
-                                {c.vehiclePlate} <span className="dim">{c.status}</span>
-                              </span>
-                            ))}
-                          </td>
-                          <td className="num mono" style={{ color: totalUnpaid > 0 ? 'var(--red-text)' : undefined }}>
-                            ₩{totalUnpaid.toLocaleString()}
-                          </td>
-                          <td className="num mono">₩{totalMonthly.toLocaleString()}</td>
-                        </tr>
-                      );
-                    })}
                   </tbody>
                 </table>
               )}
