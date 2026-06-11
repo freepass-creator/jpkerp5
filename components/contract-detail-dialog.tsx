@@ -1304,10 +1304,103 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
         </div>
       </Section>
 
+      {/* 종료 정보 — status 가 반납/해지/채권 또는 endReason 있을 때만 */}
+      {(c.status === '반납' || c.status === '해지' || c.status === '채권' || c.endReason) && (
+        <EndInfoSection c={c} onUpdate={onUpdate} />
+      )}
+
       {/* 첨부 파일 — 첨부 상태 + 다운로드 (미리보기 없음) */}
       <AttachmentList c={c} />
 
     </div>
+  );
+}
+
+/**
+ * 종료 정보 — 계약 라이프사이클 끝. status='반납'/'해지'/'채권' 또는 endReason 있을 때 표시.
+ *
+ *   · 종료 사유 (inline select — 정상종료/중도해지/채권보전)
+ *   · 종료일
+ *   · 종료 시 미수 잔액 (자동 캡처 — 수정 가능)
+ *   · 중도해지 위약금 (중도해지 일 때만)
+ *   · 비고 (담당자 메모, 추심 단계 등)
+ */
+function EndInfoSection({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+  const toneFor = (r?: Contract['endReason']) =>
+    r === '정상종료' ? 'green' : r === '중도해지' ? 'amber' : r === '채권보전' ? 'red' : 'gray';
+  return (
+    <Section icon={<ArrowUUpLeft size={12} weight="duotone" />} title="종료 정보">
+      <div className="detail-grid-2">
+        <div>
+          <div className="detail-field">
+            <label className="detail-field-label">종료 사유</label>
+            <select
+              className="input input-compact"
+              value={c.endReason ?? ''}
+              onChange={(e) => onUpdate({ ...c, endReason: (e.target.value || undefined) as Contract['endReason'] })}
+              style={{ width: '100%' }}
+            >
+              <option value="">미지정</option>
+              <option value="정상종료">정상종료</option>
+              <option value="중도해지">중도해지</option>
+              <option value="채권보전">채권보전</option>
+            </select>
+            {c.endReason && (
+              <div style={{ marginTop: 4 }}>
+                <StatusBadge tone={toneFor(c.endReason)}>{c.endReason}</StatusBadge>
+              </div>
+            )}
+          </div>
+          <div className="detail-field">
+            <label className="detail-field-label">종료일</label>
+            <input
+              type="date"
+              className="input input-compact mono"
+              value={c.endedAt ?? ''}
+              onChange={(e) => onUpdate({ ...c, endedAt: e.target.value || undefined })}
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+        <div>
+          <div className="detail-field">
+            <label className="detail-field-label">종료 시 미수 잔액 (채권보전 근거)</label>
+            <input
+              type="number"
+              className="input input-compact mono num"
+              value={c.unpaidAtEnd ?? ''}
+              onChange={(e) => onUpdate({ ...c, unpaidAtEnd: e.target.value === '' ? undefined : Number(e.target.value) })}
+              style={{ width: '100%' }}
+              placeholder="자동 캡처 — 수정 가능"
+            />
+          </div>
+          {c.endReason === '중도해지' && (
+            <div className="detail-field">
+              <label className="detail-field-label">중도해지 위약금</label>
+              <input
+                type="number"
+                className="input input-compact mono num"
+                value={c.earlyTerminationFee ?? ''}
+                onChange={(e) => onUpdate({ ...c, earlyTerminationFee: e.target.value === '' ? undefined : Number(e.target.value) })}
+                style={{ width: '100%' }}
+                placeholder="약정 잔여 회차 × 월대여료 등"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="detail-field" style={{ marginTop: 6 }}>
+        <label className="detail-field-label">비고 (담당자 메모 · 추심 단계 등)</label>
+        <textarea
+          className="input input-compact"
+          rows={2}
+          value={c.endNotes ?? ''}
+          onChange={(e) => onUpdate({ ...c, endNotes: e.target.value || undefined })}
+          style={{ width: '100%', resize: 'vertical' }}
+          placeholder="채권 추심 진행 단계 · 변호사 위임 · 위약금 협상 등"
+        />
+      </div>
+    </Section>
   );
 }
 
