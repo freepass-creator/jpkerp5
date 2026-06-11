@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bank, MagnifyingGlass, ArrowLeft, Plus, Trash } from '@phosphor-icons/react';
+import { Bank, MagnifyingGlass, ArrowLeft, Plus, Trash, FileXls } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
@@ -323,7 +323,9 @@ export default function FinancePage() {
                 <Plus size={14} weight="bold" /> 신규 등록
               </button>
               <span className="btn-sep" />
-              <button className="btn" type="button" title="현재 표시중 거래내역 엑셀 다운로드">엑셀</button>
+              <button className="btn" type="button" disabled title="자금일보 view 에서 엑셀 다운로드 가능 — 우측 [자금일보] 탭 클릭">
+                <FileXls size={14} weight="bold" /> 엑셀
+              </button>
               {viewMode === 'daily' && (
                 <>
                   <span className="btn-sep" />

@@ -592,13 +592,13 @@ export default function PaymentsPage() {
                 <span>순증감 <strong className="mono" style={{ color: dailyTotals.inSum - dailyTotals.outSum < 0 ? 'var(--red-text)' : 'var(--text-main)' }}>₩{formatCurrency(dailyTotals.inSum - dailyTotals.outSum)}</strong></span>
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
                 <button
-                  className="btn btn-sm"
+                  className="btn"
                   type="button"
                   onClick={handleExportExcel}
                   disabled={daily.length === 0}
                   title={`현재 페이지 목록 (${daily.length}건) 엑셀 다운로드 — 자금일보`}
                 >
-                  <FileXls size={12} weight="bold" /> 엑셀 <span className="chip-count">{daily.length}</span>
+                  <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{daily.length}</span>
                 </button>
               </>
             ) : tab === 'card' ? (

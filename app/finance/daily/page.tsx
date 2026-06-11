@@ -225,13 +225,13 @@ export default function FinanceDailyPage() {
           left={
             <>
               <button
-                className="btn btn-primary"
+                className="btn"
                 type="button"
                 onClick={handleExport}
                 disabled={daily.length === 0}
                 title={`현재 페이지 목록 (${daily.length}건) 엑셀 다운로드 — 자금일보`}
               >
-                <FileXls size={12} weight="bold" /> 엑셀 <span className="chip-count">{daily.length}</span>
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{daily.length}</span>
               </button>
               <button
                 className="btn"
@@ -239,7 +239,7 @@ export default function FinanceDailyPage() {
                 onClick={handleTaxInvoiceExport}
                 title={`세금계산서 발행 엑셀 — 전자세금계산서 시스템 (smarttaxinvoice 등) 일괄 업로드용`}
               >
-                <DownloadSimple size={12} weight="bold" /> 세금계산서 엑셀
+                <FileXls size={14} weight="bold" /> 세금계산서 엑셀
               </button>
               <span className="btn-sep" />
               <button
