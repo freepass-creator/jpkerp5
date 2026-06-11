@@ -1157,50 +1157,76 @@ input[type="radio"]:disabled {
   padding: 0 10px;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  /* chip 은 평평한 plate 느낌 (버튼과 구분) — 살짝 어두운 배경 */
-  background: var(--bg-soft);
+  background: var(--bg-card);
   font-size: 12px;
   font-weight: var(--font-weight-medium);
   color: var(--text-sub);
   cursor: pointer;
-  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
   white-space: nowrap;
   letter-spacing: -0.005em;
   font-family: inherit;
   user-select: none;
+  /* 필터 chip — 갈색 톤 그림자 (메뉴=남색 그림자와 색 구분) */
+  box-shadow: 0 1px 3px rgba(146, 64, 14, 0.10);
 }
 .chip > svg { width: 12px; height: 12px; flex-shrink: 0; }
 .chip:hover {
-  background: var(--bg-card);
+  background: var(--bg-soft);
   border-color: var(--border);
   color: var(--text-main);
+  box-shadow: 0 2px 5px rgba(146, 64, 14, 0.18);
+  transform: translateY(-0.5px);
 }
-.chip:active { background: var(--bg-sunken); }
+.chip:active {
+  /* 마우스 누름 — 가라앉는 느낌 */
+  background: var(--bg-sunken);
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+  transform: translateY(0.5px);
+}
 .chip:focus-visible {
   outline: none;
   border-color: var(--brand);
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
+/* 퀵필터 chip active — warm brown (amber-800) 톤. 메뉴(brand 남색)와 색 구분.
+   사용자: \"버튼이 남색이면 퀵필터는 다른 류 갈색이나 이런 거로\". */
 .chip.active {
+  background: #92400e;
+  color: var(--text-inverse);
+  border-color: #92400e;
+  box-shadow: 0 2px 5px rgba(146, 64, 14, 0.30);
+}
+.chip.active:hover {
+  background: #78350f;
+  border-color: #78350f;
+  color: var(--text-inverse);
+  box-shadow: 0 3px 7px rgba(146, 64, 14, 0.36);
+}
+
+/* chip-nav — sub-page 메뉴 전환. 그림자=brand(남색) 톤, active=brand 채움.
+   필터(.chip)는 갈색 톤 그림자 / 메뉴(.chip-nav)는 남색 톤 그림자로 한눈에 구분. */
+.chip.chip-nav {
+  box-shadow: 0 1px 3px rgba(27, 42, 74, 0.10);
+}
+.chip.chip-nav:hover {
+  box-shadow: 0 2px 5px rgba(27, 42, 74, 0.18);
+}
+.chip.chip-nav.active {
   background: var(--brand);
   color: var(--text-inverse);
   border-color: var(--brand);
-  /* 선택된 chip 만 살짝 떠 보임 */
-  box-shadow: 0 1px 2px rgba(27, 42, 74, 0.18);
-}
-.chip.active:hover { background: var(--brand-h); border-color: var(--brand-h); color: var(--text-inverse); }
-
-/* chip-nav — sub-page 이동/메뉴 전환용 (필터 chip 과 색 구분).
-   필터 = brand 채움 / 메뉴(chip-nav) = brand 테두리만 (ghost). 둘 다 의미가 다름. */
-.chip.chip-nav.active {
-  background: var(--bg-card);
-  color: var(--brand);
-  border-color: var(--brand);
+  box-shadow: 0 2px 6px rgba(27, 42, 74, 0.28);
 }
 .chip.chip-nav.active:hover {
-  background: var(--brand-bg);
-  color: var(--brand);
+  background: var(--brand-h);
   border-color: var(--brand-h);
+  box-shadow: 0 3px 7px rgba(27, 42, 74, 0.34);
+}
+.chip.chip-nav:active {
+  /* 마우스 누름 — 가라앉는 느낌 */
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+  transform: translateY(0.5px);
 }
 .chip:disabled,
 .chip[disabled] {
