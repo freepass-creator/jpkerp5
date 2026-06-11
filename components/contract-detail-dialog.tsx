@@ -17,6 +17,7 @@ import { useInsurances } from '@/lib/firebase/insurance-store';
 import { normPlate } from '@/lib/entity-sync';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
 import { Section } from '@/components/ui/detail-primitives';
+import { COL } from '@/lib/table-cols';
 import { toast } from '@/lib/toast';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone, contractStatusTone, scheduleStatusTone } from '@/lib/status-tones';
@@ -1222,6 +1223,7 @@ function AttachmentList({ c }: { c: Contract }) {
   );
 
   const items: { label: string; url?: string; fileName?: string; uploadedAt?: string }[] = [
+    { label: '계약서',           url: c.contractDocUrl,              fileName: c.contractDocFileName,              uploadedAt: c.contractDocUploadedAt },
     { label: '자동차등록증',     url: vehicle?.registrationCertUrl,  fileName: vehicle?.registrationCertFileName,  uploadedAt: vehicle?.registrationCertUploadedAt },
     { label: '보험가입증명서',   url: vehicle?.insuranceCertUrl,     fileName: vehicle?.insuranceCertFileName,     uploadedAt: vehicle?.insuranceCertUploadedAt },
     { label: '할부계약서',       url: vehicle?.loanContractUrl,      fileName: vehicle?.loanContractFileName,      uploadedAt: vehicle?.loanContractUploadedAt },
@@ -1419,6 +1421,42 @@ const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (
             <EditableField label="결제일(1-31)" value={editing ? String(draft.paymentDay ?? '') : `매월 ${c.paymentDay}일`} editing={editing} mono onChange={(v) => set('paymentDay', Number(v) || 0)} />
             <EditableField label="담당자" value={editing ? (draft.manager ?? '') : (c.manager ?? '-')} editing={editing} onChange={(v) => set('manager', v || undefined)} />
           </div>
+        </div>
+      </Section>
+
+      <Section
+        icon={<FileText size={12} weight="duotone" />}
+        title="계약서"
+        action={c.contractDocUrl ? (
+          <a
+            href={c.contractDocUrl}
+            download={c.contractDocFileName ?? 'contract.pdf'}
+            style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--brand)' }}
+          >
+            📎 다운로드
+          </a>
+        ) : null}
+      >
+        <div className="detail-grid-2">
+          <Field
+            label="파일"
+            value={c.contractDocUrl
+              ? <a href={c.contractDocUrl} download={c.contractDocFileName ?? 'contract.pdf'} style={{ color: 'var(--brand)' }}>
+                  {c.contractDocFileName ?? 'contract.pdf'}
+                </a>
+              : <span className="muted">미첨부</span>}
+          />
+          <Field
+            label="업로드"
+            value={c.contractDocUploadedAt ? c.contractDocUploadedAt.slice(0, 10) : <span className="muted">-</span>}
+            mono
+          />
+          <Field
+            label="발송 상태"
+            value={c.documentStatus
+              ? <StatusBadge tone={c.documentStatus === '서명완료' ? 'green' : c.documentStatus === '거절' ? 'red' : c.documentStatus === '미발송' ? 'neutral' : 'blue'}>{c.documentStatus}</StatusBadge>
+              : <span className="muted">-</span>}
+          />
         </div>
       </Section>
 
@@ -1698,11 +1736,11 @@ function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => v
         </div>
       </Section>
 
-      <Section icon={<CurrencyKrw size={12} weight="duotone" />} title="회차별 스케줄">
+      <Section icon={<CurrencyKrw size={12} weight="duotone" />} title="회차별 스케줄" bodyPadding={0}>
         <ScheduleTable c={c} onUpdate={onUpdate} />
       </Section>
 
-      <Section icon={<CurrencyKrw size={12} weight="duotone" />} title={`입금 이력 — ${generatePaymentHistory(c).length}건`}>
+      <Section icon={<CurrencyKrw size={12} weight="duotone" />} title={`입금 이력 — ${generatePaymentHistory(c).length}건`} bodyPadding={0}>
         <PaymentHistoryTable c={c} />
       </Section>
     </div>
@@ -1771,12 +1809,12 @@ function PaymentHistoryTable({ c }: { c: Contract }) {
       <table className="table">
         <thead>
           <tr>
-            <th style={{ width: 110 }}>입금일</th>
-            <th className="center" style={{ width: 60 }}>회차</th>
-            <th className="num" style={{ width: 120 }}>금액</th>
-            <th className="center" style={{ width: 70 }}>출처</th>
+            <th style={{ width: COL.date }}>입금일</th>
+            <th className="center" style={{ width: COL.cycle }}>회차</th>
+            <th className="num" style={{ width: COL.money }}>금액</th>
+            <th className="center" style={{ width: COL.paymentMethod }}>출처</th>
             <th>메모</th>
-            <th className="mono dim" style={{ width: 160 }}>등록자</th>
+            <th className="dim" style={{ width: 160 }}>등록자</th>
           </tr>
         </thead>
         <tbody>
@@ -2032,14 +2070,14 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
       <thead>
         <tr>
           <th className="center" style={{ width: 36 }}></th>
-          <th className="center" style={{ width: 50 }}>회차</th>
-          <th>예정일</th>
-          <th className="num">청구금액</th>
-          <th className="num" style={{ color: 'var(--red-text)' }}>청구할인</th>
-          <th className="num">납부금액</th>
-          <th className="num">잔액</th>
-          <th className="mono" style={{ width: 100 }}>최종입금일</th>
-          <th className="center" style={{ width: 70 }}>상태</th>
+          <th className="center" style={{ width: COL.cycle }}>회차</th>
+          <th style={{ width: COL.date }}>예정일</th>
+          <th className="num" style={{ width: COL.money }}>청구금액</th>
+          <th className="num" style={{ width: COL.money, color: 'var(--red-text)' }}>청구할인</th>
+          <th className="num" style={{ width: COL.money }}>납부금액</th>
+          <th className="num" style={{ width: COL.money }}>잔액</th>
+          <th style={{ width: COL.date }}>최종입금일</th>
+          <th className="center" style={{ width: COL.status }}>상태</th>
           <th className="center" style={{ width: 200 }}>액션</th>
         </tr>
       </thead>
