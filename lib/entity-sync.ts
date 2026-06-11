@@ -186,14 +186,19 @@ export async function upsertVehicleFromContract(
   const plate = contract.vehiclePlate;
   if (!plate || plate === '미정') return null;
 
-  // plate 정규성 기반 자동 status — 빈/임판/정상 → 구매대기/등록대기/운행
+  // plate 정규성 기반 자동 status — 빈/임판/정상 → 구매대기/등록대기/휴차
   const autoStatus = deriveVehicleStatusFromContract(plate);
   const isActive = contract.status === '운행' || contract.status === '대기';
   const existing = findVehicleByPlate(ctx.vehicles, plate);
 
+  // 자동 계산 가능한 status (사용자 명시 처리는 보존)
+  const autoCalculable: Vehicle['status'][] = ['구매대기', '등록대기', '휴차'];
+
   if (existing) {
-    // 종료 계약(반납/해지/채권) 시에는 기존 status 보존 (휴차 결정은 사용자 명시)
-    const nextStatus = isActive ? autoStatus : existing.status;
+    // 기존 status 가 자동 계산 가능 (구매대기/등록대기/휴차) 면 plate 변화 따라 갱신.
+    // 사용자가 명시한 status (운행/매각/정비/사고/반납 등) 는 보존.
+    const canAutoUpdate = autoCalculable.includes(existing.status);
+    const nextStatus = isActive && canAutoUpdate ? autoStatus : existing.status;
     const next: Vehicle = {
       ...existing,
       currentContractId: contract.id,

@@ -36,16 +36,16 @@ export function isNormalPlate(plate: string | undefined): boolean {
 /**
  * 계약을 통해 차량이 자동 등록될 때 status 결정.
  *
- *  · 빈값      → 구매대기
- *  · 임판      → 등록대기
- *  · 정상 plate → 운행
+ *  · 빈값      → 구매대기 (차량번호 아예 없음)
+ *  · 임판      → 등록대기 (임시번호판, 정식 번호 안 받음)
+ *  · 정상 plate → 휴차    (정식 번호 받아 등록 완료, 인도 전까지 휴차)
  *
- * 휴차는 자동 결정 안 함 — 사용자가 직접 휴차 처리할 때만.
+ * 운행/매각은 자동 결정 안 함 — 사용자가 명시적으로 인도/처분 처리할 때만.
  */
 export function deriveVehicleStatusFromContract(plate: string | undefined): VehicleStatus {
   if (!plate?.trim()) return '구매대기';
   if (!isNormalPlate(plate)) return '등록대기';
-  return '운행';
+  return '휴차';
 }
 
 /** 사용자 친화 라벨 — UI 에서 plate 종류 표시 */

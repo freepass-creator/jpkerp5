@@ -27,6 +27,7 @@ import { DailyLedgerView } from '@/components/finance/daily-ledger-view';
 import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
 import { toast } from '@/lib/toast';
 import { downloadTaxInvoiceExcel } from '@/lib/tax-invoice-export';
+import { usePersistentState } from '@/lib/use-persistent-state';
 
 type DailyRow = {
   key: string; companyCode: string; date: string;
@@ -44,8 +45,8 @@ export default function FinanceDailyPage() {
 
   // 회사 + 기간 + 검색 필터
   const [search, setSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [periodMode, setPeriodMode] = useState<'month' | 'quarter' | 'year'>('month');
+  const [companyFilter, setCompanyFilter] = usePersistentState('filter:finance-daily:company', 'all');
+  const [periodMode, setPeriodMode] = usePersistentState<'month' | 'quarter' | 'year'>('filter:finance-daily:period', 'month');
   const [periodAnchor, setPeriodAnchor] = useState<{ y: number; m: number }>(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() + 1 };

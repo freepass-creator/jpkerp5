@@ -25,6 +25,7 @@ import { downloadTaxInvoiceExcel } from '@/lib/tax-invoice-export';
 import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
 import { PageShell } from '@/components/ui/page-shell';
 import { CompanyFilter } from '@/components/ui/filter-bar';
+import { usePersistentState } from '@/lib/use-persistent-state';
 
 const fmtNum = (v: number) => v ? v.toLocaleString('ko-KR') : '';
 
@@ -83,9 +84,9 @@ export default function FinancePage() {
   const { companies: companyMaster } = useCompanies();
 
   const [search, setSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [directionFilter, setDirectionFilter] = useState<'all' | 'deposit' | 'withdraw'>('all');
-  const [viewMode, setViewMode] = useState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily'>('account');
+  const [companyFilter, setCompanyFilter] = usePersistentState('filter:finance:company', 'all');
+  const [directionFilter, setDirectionFilter] = usePersistentState<'all' | 'deposit' | 'withdraw'>('filter:finance:direction', 'all');
+  const [viewMode, setViewMode] = usePersistentState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily'>('filter:finance:view', 'account');
   const [createOpen, setCreateOpen] = useState(false);
   const [periodMode, setPeriodMode] = useState<'month' | 'quarter' | 'year'>('month');
   const [periodAnchor, setPeriodAnchor] = useState<{ y: number; m: number }>(() => {

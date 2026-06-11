@@ -22,6 +22,7 @@ import { audit } from '@/lib/firebase/audit-store';
 import { todayKr } from '@/lib/mock-data';
 import type { BankTransaction, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { usePersistentState } from '@/lib/use-persistent-state';
 
 type Tab = 'all' | 'autodebit' | 'summary' | 'card' | 'corpcard';
 
@@ -69,13 +70,13 @@ function formatAccountLabel(
 }
 
 export default function PaymentsPage() {
-  const [tab, setTab] = useState<Tab>('all');
+  const [tab, setTab] = usePersistentState<Tab>('filter:payments:tab', 'all');
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unposted' | 'posted' | 'closed'>('all');
+  const [filter, setFilter] = usePersistentState<'all' | 'unposted' | 'posted' | 'closed'>('filter:payments:quick', 'all');
   /** 계좌내역(all) 탭에서의 입출금 방향 퀵필터 — 다른 탭에서는 무시 */
-  const [direction, setDirection] = useState<'all' | 'deposit' | 'withdraw'>('all');
-  const [companyFilter, setCompanyFilter] = useState<string>('all');
-  const [subjectFilter, setSubjectFilter] = useState<string>('all');
+  const [direction, setDirection] = usePersistentState<'all' | 'deposit' | 'withdraw'>('filter:payments:direction', 'all');
+  const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:payments:company', 'all');
+  const [subjectFilter, setSubjectFilter] = usePersistentState<string>('filter:payments:subject', 'all');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
