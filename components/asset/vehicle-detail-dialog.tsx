@@ -26,6 +26,58 @@ function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boo
   return <Field label={k} value={v == null || v === '' ? '-' : v} mono={mono} muted={v == null || v === ''} />;
 }
 
+/* ─── 탭0: 현재 상태 — 위치 + 작업 상태 (가장 자주 보는 정보 = 첫 탭) ─── */
+function StatusTab({ vehicle, contracts }: { vehicle: Vehicle; contracts: Contract[] }) {
+  // 활성 계약 (운행/대기) 우선, 없으면 가장 최근 계약
+  const active = contracts.find((c) => c.status === '운행' || c.status === '대기') ?? contracts[0];
+
+  const today = new Date();
+  const daysSinceIdle = active?.idleSince
+    ? Math.floor((today.getTime() - new Date(active.idleSince).getTime()) / 86400000)
+    : null;
+  const daysToUntil = active?.idleUntil
+    ? Math.floor((new Date(active.idleUntil).getTime() - today.getTime()) / 86400000)
+    : null;
+
+  const isRunning = active?.status === '운행' && !active.idleLocation;
+  const locationDisplay = isRunning && active?.customerName
+    ? `운행 중 — ${active.customerName} 인도`
+    : active?.idleLocation || '-';
+
+  return (
+    <Stack>
+      <Section title="현재 상태">
+        <Grid2>
+          <KV k="차량 상태" v={<StatusBadge tone={vehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusBadge>} />
+          <KV k="계약 상태" v={active ? <StatusBadge tone={contractStatusTone(active.status)}>{active.status}</StatusBadge> : '-'} />
+          <KV k="차량번호" v={vehicle.plate} mono />
+          <KV k="차종" v={vehicle.vehicleModelLine || vehicle.model} />
+        </Grid2>
+      </Section>
+
+      <Section title="현재 위치">
+        <Grid2>
+          <KV k="위치" v={locationDisplay} />
+          <KV k="담당 연락처" v={active?.idleContact} mono />
+        </Grid2>
+      </Section>
+
+      <Section title="작업 상태">
+        <Grid2>
+          <KV k="사유" v={active?.idleReason} />
+          <KV k="시작일" v={active?.idleSince} mono />
+          <KV k="종료 예정" v={active?.idleUntil} mono />
+          <KV
+            k="경과"
+            v={daysSinceIdle != null ? `D+${daysSinceIdle}일${daysToUntil != null ? ` (종료 D-${daysToUntil})` : ''}` : undefined}
+            mono
+          />
+        </Grid2>
+      </Section>
+    </Stack>
+  );
+}
+
 /* ─── 탭1: 요약 — 자산정보 + 등록증정보 ─── */
 function SummaryTab({
   vehicle, onUpdate, showAttachment = true,
@@ -494,6 +546,7 @@ export function VehicleDetailDialog({
             { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={true} /> },
           ]
         : [
+            { value: 'status', label: '현재 상태', content: <StatusTab vehicle={vehicle} contracts={sortedContracts} /> },
             { value: 'summary', label: '요약', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={false} /> },
             { value: 'loan', label: '할부스케줄', content: <LoanScheduleTab vehicle={vehicle} /> },
             { value: 'compliance', label: '보험·검사', content: <ComplianceTab vehicle={vehicle} contracts={sortedContracts} /> },
