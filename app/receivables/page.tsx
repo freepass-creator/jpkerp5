@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple, PaperPlaneTilt, FileText } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -193,6 +193,11 @@ export default function ReceivablesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, today, noticeSentIds]);
 
+  // 현재 선택 chip 의 count 가 0 되면 [전체] 로 자동 전환
+  useEffect(() => {
+    if (filter !== '전체' && (counts[filter] ?? 0) === 0) setFilter('전체');
+  }, [filter, counts]);
+
   /** 채권화 토글 — 회수 어려운 미수금 분류 (수동) */
   async function toggleDebtFlag(c: Contract) {
     if (!admin) { toast.error('관리자만 채권 변경 가능'); return; }
@@ -277,17 +282,20 @@ export default function ReceivablesPage() {
               ))}
             </select>
             <span className="filter-divider" />
-            {/* 자주 보는 4개 — chip */}
-            {QUICK_FILTERS.map((f) => (
-              <button
-                key={f}
-                className={`chip chip-tone-${filterTone(f)} ${filter === f ? 'active' : ''}`}
-                onClick={() => setFilter(f)}
-              >
-                {f}
-                {counts[f] > 0 && <span className="chip-count">{counts[f]}</span>}
-              </button>
-            ))}
+            {/* 반응형 chip — 전체만 항상, 나머지는 count > 0 일 때만 (있는 거만 표시) */}
+            {QUICK_FILTERS.map((f) => {
+              if (f !== '전체' && (counts[f] ?? 0) === 0) return null;
+              return (
+                <button
+                  key={f}
+                  className={`chip chip-tone-${filterTone(f)} ${filter === f ? 'active' : ''}`}
+                  onClick={() => setFilter(f)}
+                >
+                  {f}
+                  <span className="chip-count">{counts[f] ?? 0}</span>
+                </button>
+              );
+            })}
             {/* 나머지 상태 — dropdown */}
             <select
               className="input-compact"
