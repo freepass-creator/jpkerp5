@@ -40,7 +40,7 @@ import { toast } from '@/lib/toast';
 import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { upsertVehicleFromContract } from '@/lib/entity-sync';
+import { upsertVehicleFromContract, normPlate } from '@/lib/entity-sync';
 
 type Mode = '현황' | '차량' | '계약' | '입출금' | '자동이체' | '카드매출' | '법인카드' | '이력';
 
@@ -1015,7 +1015,7 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
     setSaving(true);
     try {
       await addVehicle({
-        plate: plate.trim() || '미정',
+        plate: normPlate(plate.trim()) || '미정',
         model: fullName,
         company: (company || '기타') as import('@/lib/types').CompanyCode,
         status: vehicleStatus as import('@/lib/types').VehicleStatus,
@@ -2155,7 +2155,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
         driverName: customerKind === '법인' ? driverName.trim() || undefined : undefined,
         customerLicenseNo: licenseNo.trim() || undefined,
         customerLicenseType: licenseType,
-        vehiclePlate: plate.trim() || '미정',
+        vehiclePlate: normPlate(plate.trim()) || '미정',
         vehicleModel: buildVehicleFullName({
           maker: vehicleMaker, model: vehicleModelLine, subModel: vehicleSubModel,
           variant: vehicleVariant, trim: vehicleTrim,
@@ -2191,7 +2191,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
           id: newContractId,
           contractNo,
           company: (company || '기타') as import('@/lib/types').CompanyCode,
-          vehiclePlate: plate.trim() || '미정',
+          vehiclePlate: normPlate(plate.trim()) || '미정',
           vehicleModel: buildVehicleFullName({
             maker: vehicleMaker, model: vehicleModelLine, subModel: vehicleSubModel,
             variant: vehicleVariant, trim: vehicleTrim,

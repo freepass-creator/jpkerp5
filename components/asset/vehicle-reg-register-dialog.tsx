@@ -219,7 +219,7 @@ export function VehicleRegRegisterDialog({
           }
         } else {
           const newVehicle: Omit<Vehicle, 'id'> = {
-            plate: rest.plate ?? '',
+            plate: normPlate(rest.plate ?? ''),
             model: rest.model ?? '',
             company: (rest.company ?? '기타') as CompanyCode,
             // 정상 plate → 휴차 / 임판 → 등록대기 / 빈 → 구매대기 (사용자 명시 도메인 룰)

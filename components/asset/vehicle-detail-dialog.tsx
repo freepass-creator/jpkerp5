@@ -117,9 +117,29 @@ function OperationOverviewTab({
         <Grid2>
           <KV k="현재 상태" v={<StatusBadge tone={vehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusBadge>} />
           <KV k="회사" v={vehicle.company ? displayCompanyName(vehicle.company, companies) : undefined} />
-          <KV k="활성 계약" v={activeContract ? `${activeContract.contractNo ?? ''} · ${activeContract.customerName ?? ''}` : <span className="dim">없음</span>} />
-          <KV k="누적 미수" v={unpaid > 0 ? <span style={{ color: 'var(--red-text)' }}>₩{unpaid.toLocaleString()}</span> : <span className="dim">없음</span>} mono />
+          <KV k="활성 계약" v={activeContract ? (
+            <a href={`/?q=${encodeURIComponent(vehicle.plate ?? '')}`} style={{ color: 'var(--brand)', textDecoration: 'none' }} title="운영현황에서 이 차량 계약 보기">
+              {activeContract.contractNo ?? ''} · {activeContract.customerName ?? ''} →
+            </a>
+          ) : <span className="dim">없음</span>} />
+          <KV k="누적 미수" v={unpaid > 0 ? (
+            <a href={`/receivables?q=${encodeURIComponent(vehicle.plate ?? '')}`} style={{ color: 'var(--red-text)', textDecoration: 'none' }} title="미수 관리에서 이 차량 처리">
+              ₩{unpaid.toLocaleString()} →
+            </a>
+          ) : <span className="dim">없음</span>} mono />
         </Grid2>
+      </Section>
+
+      {/* 관련 페이지 바로가기 — 직원이 다른 페이지로 즉시 점프 (실무자 워크플로우) */}
+      <Section title="관련 페이지 바로가기">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
+          <a href={`/asset/insurance?q=${encodeURIComponent(vehicle.plate ?? '')}`} className="btn" style={{ textDecoration: 'none' }}>보험증권 →</a>
+          <a href={`/asset/loan?q=${encodeURIComponent(vehicle.plate ?? '')}`} className="btn" style={{ textDecoration: 'none' }}>구매방식 →</a>
+          <a href={`/asset/gps?q=${encodeURIComponent(vehicle.plate ?? '')}`} className="btn" style={{ textDecoration: 'none' }}>GPS 설치 →</a>
+          <a href={`/asset/repair?q=${encodeURIComponent(vehicle.plate ?? '')}`} className="btn" style={{ textDecoration: 'none' }}>수선 내역 →</a>
+          <a href={`/asset/inspection?q=${encodeURIComponent(vehicle.plate ?? '')}`} className="btn" style={{ textDecoration: 'none' }}>검사 내역 →</a>
+          <a href={`/contract?q=${encodeURIComponent(vehicle.plate ?? '')}`} className="btn" style={{ textDecoration: 'none' }}>계약 이력 →</a>
+        </div>
       </Section>
 
       {/* 첨부 파일 — 자산 전체 등록 서류 일괄 (자등증/보험/할부/검사/GPS/매도증) */}
