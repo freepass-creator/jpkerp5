@@ -1189,19 +1189,18 @@ input[type="radio"]:disabled {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
-/* 퀵필터 chip active — warm brown (amber-800) 톤. 메뉴(brand 남색)와 색 구분.
-   사용자: \"버튼이 남색이면 퀵필터는 다른 류 갈색이나 이런 거로\". */
+/* 퀵필터 chip active — 차분한 dark taupe brown (덜 쨍한, 무게감 있는 톤). */
 .chip.active {
-  background: #92400e;
+  background: #5d4037;
   color: var(--text-inverse);
-  border-color: #92400e;
-  box-shadow: 0 2px 5px rgba(146, 64, 14, 0.30);
+  border-color: #5d4037;
+  box-shadow: 0 2px 6px rgba(62, 39, 35, 0.32);
 }
 .chip.active:hover {
-  background: #78350f;
-  border-color: #78350f;
+  background: #4e342e;
+  border-color: #4e342e;
   color: var(--text-inverse);
-  box-shadow: 0 3px 7px rgba(146, 64, 14, 0.36);
+  box-shadow: 0 3px 8px rgba(62, 39, 35, 0.40);
 }
 
 /* chip-nav — sub-page 메뉴 전환. 그림자=brand(남색) 톤, active=brand 채움.
@@ -2287,7 +2286,7 @@ input[type="radio"]:disabled {
   padding: 10px 16px 4px 16px;
   border-bottom: none;
   display: flex;
-  gap: 8px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
