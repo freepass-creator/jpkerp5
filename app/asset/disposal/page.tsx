@@ -139,7 +139,7 @@ export default function AssetDisposalPage() {
                   const targets = vehicles.filter((v) => sel.selectedIds.has(v.id) && !v.id.startsWith('contract-derived-'));
                   const synthetic = sel.size - targets.length;
                   if (targets.length === 0) {
-                    alert('선택된 자산 중 처리 가능한 자산이 없습니다 (계약 자동 인식 자산 제외)');
+                    toast.info('선택된 자산 중 처리 가능한 자산 없음 (계약 자동 인식 자산 제외)');
                     return;
                   }
                   const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
@@ -175,7 +175,7 @@ export default function AssetDisposalPage() {
                   if (sel.size === 0) return;
                   const realIds = Array.from(sel.selectedIds).filter((id) => !id.startsWith('contract-derived-'));
                   if (realIds.length === 0) {
-                    alert('선택한 자산이 모두 계약 자동 인식 자산입니다 (삭제 불가)');
+                    toast.info('선택한 자산이 모두 계약 자동 인식 자산 (삭제 불가)');
                     return;
                   }
                   const note = sel.size - realIds.length > 0 ? `\n(자동 인식 ${sel.size - realIds.length}건은 제외됨)` : '';

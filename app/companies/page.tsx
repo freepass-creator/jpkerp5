@@ -15,6 +15,7 @@ import type {
   Company, BankAccount, CorporateCard, CompanyLocation, CompanyDocument, LocationKind,
 } from '@/lib/types';
 import { exportToExcel } from '@/lib/excel-export';
+import { toast } from '@/lib/toast';
 
 type Tab = 'info' | 'finance' | 'locations' | 'documents';
 
@@ -91,14 +92,14 @@ export default function CompaniesPage() {
     if (dCorp) {
       const dup = sortedCompanies.find((c) => c.id !== draft.id && normDup(c.corpRegNo ?? '') === dCorp);
       if (dup) {
-        alert(`같은 법인등록번호로 이미 "${dup.name || dup.corpRegNo}" 법인이 등록되어 있습니다.`);
+        toast.error(`같은 법인등록번호로 이미 "${dup.name || dup.corpRegNo}" 법인 등록됨`);
         return;
       }
     }
     if (dBiz) {
       const dup = sortedCompanies.find((c) => c.id !== draft.id && normDup(c.bizRegNo ?? '') === dBiz);
       if (dup) {
-        alert(`같은 사업자등록번호로 이미 "${dup.name || dup.bizRegNo}" 법인이 등록되어 있습니다.`);
+        toast.error(`같은 사업자등록번호로 이미 "${dup.name || dup.bizRegNo}" 법인 등록됨`);
         return;
       }
     }

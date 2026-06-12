@@ -221,7 +221,7 @@ export default function PaymentsPage() {
 
   function handleExportExcel() {
     if (daily.length === 0 && bankTx.length === 0) {
-      alert('내보낼 거래가 없습니다.');
+      toast.info('내보낼 거래 없음');
       return;
     }
     downloadDailyLedgerExcel(

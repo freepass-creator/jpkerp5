@@ -37,7 +37,7 @@ export default function PurchasePage() {
     if (busy) return;
     const promotable = pending.filter((v) => v.plate && v.plate !== '미정');
     if (promotable.length === 0) {
-      alert('차량번호가 등록된 구매대기 자산이 없습니다 (먼저 차량번호 입력 필요)');
+      toast.info('차량번호가 등록된 구매대기 자산 없음 (먼저 차량번호 입력 필요)');
       return;
     }
     if (!confirm(`구매대기 ${promotable.length}건을 상품대기로 일괄 전환합니다.\n같은 plate 활성 계약 vehicleStatus 도 sync 됩니다.\n계속?`)) return;

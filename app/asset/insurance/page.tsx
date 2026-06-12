@@ -27,6 +27,7 @@ import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { Plus, FileXls, Trash, MagnifyingGlass, Copy, ArrowSquareOut } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
+import { toast } from '@/lib/toast';
 import type { Vehicle } from '@/lib/types';
 
 type QF = 'all' | 'missing' | 'expire' | 'expired';
@@ -310,7 +311,7 @@ export default function AssetInsurancePage() {
                     .map(({ v, policy }) => ({ v, policy }))
                     .filter((t) => !!t.policy);
                   if (targets.length === 0) {
-                    alert('선택한 차량 중 매칭된 보험증권이 없습니다');
+                    toast.info('선택한 차량 중 매칭된 보험증권 없음');
                     return;
                   }
                   if (!confirm(`선택한 ${targets.length}건의 보험증권을 삭제하시겠습니까? (감사로그 남음)`)) return;

@@ -79,7 +79,7 @@ export default function AdminUsersPage() {
 
   const toggleDisabled = useCallback(async (u: UserRow) => {
     if (!user) return;
-    if (u.uid === user.uid) { alert('자기 자신은 비활성화할 수 없습니다.'); return; }
+    if (u.uid === user.uid) { toast.error('자기 자신은 비활성화 불가'); return; }
     const next = !u.disabled;
     if (!confirm(`${u.email} 계정을 ${next ? '비활성화' : '활성화'} 할까요?`)) return;
     setBusyUid(u.uid);
@@ -108,7 +108,7 @@ export default function AdminUsersPage() {
       const auth = getFirebaseAuth();
       if (!auth) throw new Error('Firebase 미설정');
       await sendPasswordResetEmail(auth, u.email);
-      alert(`재설정 메일을 ${u.email} 으로 발송했습니다.`);
+      toast.success(`재설정 메일 발송 — ${u.email}`);
     } catch (e) {
       toast.error('발송 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
@@ -118,7 +118,7 @@ export default function AdminUsersPage() {
 
   const toggleRole = useCallback(async (u: UserRow) => {
     if (!user || !isMaster) return;
-    if (u.role === 'master') { alert('마스터 권한은 코드(SUPER_ADMIN_EMAILS) 변경 후에 가능합니다.'); return; }
+    if (u.role === 'master') { toast.error('마스터 권한은 코드(SUPER_ADMIN_EMAILS) 변경 후 가능'); return; }
     const next: 'admin' | 'staff' = u.role === 'admin' ? 'staff' : 'admin';
     if (!confirm(`${u.email} 의 권한을 ${next === 'admin' ? '관리자' : '일반 직원'} 으로 변경할까요?`)) return;
     setBusyUid(u.uid);
@@ -141,7 +141,7 @@ export default function AdminUsersPage() {
 
   const deleteUser = useCallback(async (u: UserRow) => {
     if (!user) return;
-    if (u.uid === user.uid) { alert('자기 자신은 삭제할 수 없습니다.'); return; }
+    if (u.uid === user.uid) { toast.error('자기 자신은 삭제 불가'); return; }
     if (!confirm(`${u.email} 계정을 영구 삭제할까요?\n복구 불가능합니다.`)) return;
     setBusyUid(u.uid);
     try {

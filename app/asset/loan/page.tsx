@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, FileXls, MagnifyingGlass, Copy, Trash } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
+import { toast } from '@/lib/toast';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -131,7 +132,7 @@ export default function AssetLoanPage() {
                   if (sel.size === 0) return;
                   const realIds = Array.from(sel.selectedIds).filter((id) => !id.startsWith('contract-derived-'));
                   if (realIds.length === 0) {
-                    alert('선택한 자산이 모두 계약 자동 인식 자산입니다 (삭제 불가)');
+                    toast.info('선택한 자산이 모두 계약 자동 인식 자산 (삭제 불가)');
                     return;
                   }
                   const note = sel.size - realIds.length > 0 ? `\n(자동 인식 ${sel.size - realIds.length}건은 제외됨)` : '';
