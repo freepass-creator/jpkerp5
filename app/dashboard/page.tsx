@@ -1332,7 +1332,15 @@ function RecentActivityPanel() {
           };
           if (href) {
             return (
-              <a key={r.id} href={href} target="_blank" rel="noopener noreferrer" style={{ ...rowStyle, cursor: 'pointer' }} title="새 탭으로 점프">
+              <a
+                key={r.id}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="activity-row-link"
+                style={{ ...rowStyle, cursor: 'pointer' }}
+                title="새 탭으로 점프"
+              >
                 {inner}
               </a>
             );

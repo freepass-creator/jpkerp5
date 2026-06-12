@@ -1317,6 +1317,14 @@ input[type="radio"]:disabled {
   background: transparent;
 }
 
+/* 대시보드 — 최근 활동 행 hover (감사로그 → entity 점프 시그널) */
+.activity-row-link {
+  transition: background 0.1s;
+}
+.activity-row-link:hover {
+  background: var(--bg-hover);
+}
+
 /* ────────────── Table ────────────── */
 .table-wrap {
   width: 100%;
