@@ -80,7 +80,7 @@ export function ReceiptMatchDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent title={alreadyMatched ? '매칭 해제' : isWithdraw ? '출금 — 계약 매칭 불필요' : '입금 매칭'}>
+      <DialogContent title={alreadyMatched ? '매칭 해제' : isWithdraw ? '출금 — 계약 매칭 불필요' : '입금 매칭'} mode={isWithdraw ? 'view' : 'edit'}>
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
           {/* 거래 정보 */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-card)' }}>

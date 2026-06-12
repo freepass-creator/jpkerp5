@@ -106,6 +106,7 @@ export function HistoryAddDialog({
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size={category === '사고' ? 'lg' : 'md'}
+        mode="new"
         title={isVehicle ? `차량 이력 추가 — ${contract.vehiclePlate}` : `계약 이력 추가 — ${contract.customerName}`}
       >
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>

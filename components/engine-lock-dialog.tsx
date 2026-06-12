@@ -66,6 +66,7 @@ export function EngineLockDialog({
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="sm"
+        mode="edit"
         title={
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <Power size={14} weight="fill" style={{ color: willEnable ? 'var(--red-text)' : 'var(--text-sub)' }} />

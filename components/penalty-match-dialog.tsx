@@ -46,7 +46,7 @@ export function PenaltyMatchDialog({
 
   return (
     <DialogRoot open={!!penalty} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent title="과태료 매칭 — 임차인 식별">
+      <DialogContent title="과태료 매칭 — 임차인 식별" mode="edit">
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
           {/* 과태료 정보 헤더 */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>

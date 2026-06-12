@@ -75,6 +75,7 @@ export function IdleLocationDialog({
     <DialogRoot open={true} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         size="sm"
+        mode={oldLocation ? 'edit' : 'new'}
         title={
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <MapPin size={14} weight="fill" style={{ color: 'var(--brand)' }} />
