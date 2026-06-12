@@ -19,6 +19,8 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import { MoneyInput } from '@/components/ui/money-input';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { useContracts } from '@/lib/firebase/contracts-store';
+import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
 import { runWithConcurrency } from '@/lib/parallel';
 import { fileToDataUrl } from '@/lib/image-compress';
@@ -53,6 +55,7 @@ export function VehicleRegRegisterDialog({
 }) {
   const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
   const { companies } = useCompanies();
+  const { contracts, update: updateContract } = useContracts();
 
   /** 법인등록번호로 회사 매칭 → company 코드 (공용 entity-sync 헬퍼 사용) */
   function matchCompanyByRegNo(rawRegNo?: string): string | undefined {
@@ -214,6 +217,9 @@ export function VehicleRegRegisterDialog({
           if (existing) {
             const merged = { ...existing, ...rest, id: existing.id } as Vehicle;
             await updateVehicle(merged);
+            if (merged.status !== existing.status) {
+              await syncContractStatusFromVehicle(merged, contracts, updateContract);
+            }
             updated++;
             onSaved?.(merged);
           }
@@ -256,6 +262,9 @@ export function VehicleRegRegisterDialog({
       if (existing) {
         const merged: Vehicle = { ...existing, ...manualDraft, id: existing.id } as Vehicle;
         await updateVehicle(merged);
+        if (merged.status !== existing.status) {
+          await syncContractStatusFromVehicle(merged, contracts, updateContract);
+        }
         toast.success(`자산 업데이트 — ${manualDraft.plate}`);
         onSaved?.(merged);
       } else {
