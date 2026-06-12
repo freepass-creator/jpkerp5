@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import { useContracts } from './firebase/contracts-store';
 import type { Contract as JpkContract } from './types';
 import { contractIdentMasked } from './ident';
+import { normPlate } from './entity-sync';
 
 export type Contract = {
   contractNo: string;
@@ -64,10 +65,8 @@ export function useContractStoreStatus(): { loading: boolean; count: number } {
   return { loading, count: contracts.length };
 }
 
-/** 차량번호 정규화 — 공백/하이픈/점/괄호 등 모든 비-한글·숫자 제거. */
-function normalizePlate(p: string): string {
-  return (p ?? '').replace(/[^0-9가-힣]/g, '');
-}
+/** 차량번호 정규화 — entity-sync 의 normPlate 와 동일 (공백/하이픈/점/괄호 + OCR O→0/I→1 보정) */
+const normalizePlate = normPlate;
 
 /**
  * 차량번호 + 위반일로 책임 계약 찾기.

@@ -5,6 +5,8 @@ import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'fire
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import { useDataContext } from '@/lib/data-context';
+import { recalcContract } from '@/lib/payment-schedule';
+import { todayKr } from '@/lib/mock-data';
 import type { Contract } from '@/lib/types';
 
 const CONTRACTS_PATH = dbPath('contracts');
@@ -36,7 +38,9 @@ export function useContracts(): {
       await ensureAuth();
       const db = getRtdb();
       if (!db) return;
-      await rtdbUpdate(ref(db, `${CONTRACTS_PATH}/${c.id}`), pruneUndefined(c) as unknown as Record<string, unknown>);
+      // write 시점 recalc — 캐시(unpaidAmount/currentSeq) 즉시 정확. UX 깜빡임 차단.
+      const recalced = recalcContract(c, todayKr());
+      await rtdbUpdate(ref(db, `${CONTRACTS_PATH}/${c.id}`), pruneUndefined(recalced) as unknown as Record<string, unknown>);
       void audit.update('contract', c.id, `계약 수정 ${c.contractNo ?? ''} ${c.vehiclePlate} ${c.customerName}`);
     },
     remove: async (id: string) => {
@@ -56,7 +60,7 @@ export function useContracts(): {
       const newRef = push(ref(db, CONTRACTS_PATH));
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-      const full = { ...c, id } as Contract;
+      const full = recalcContract({ ...c, id } as Contract, todayKr());
       await set(newRef, pruneUndefined(full));
       void audit.create('contract', id, `계약 등록 ${full.contractNo ?? ''} ${full.vehiclePlate} ${full.customerName}`);
       return id;
@@ -68,11 +72,12 @@ export function useContracts(): {
       const db = getRtdb();
       if (!db) return 0;
       const batch: Record<string, Contract> = {};
+      const today = todayKr();
       for (const row of rows) {
         const newRef = push(ref(db, CONTRACTS_PATH));
         const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-        batch[id] = pruneUndefined({ ...row, id } as Contract);
+        batch[id] = pruneUndefined(recalcContract({ ...row, id } as Contract, today));
       }
       await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
       void audit.import('contract', `계약 일괄 등록 ${rows.length}건`, { count: rows.length });
@@ -85,7 +90,8 @@ export function useContracts(): {
       const db = getRtdb();
       if (!db) return;
       const batch: Record<string, Contract> = {};
-      for (const r of rows) batch[r.id] = pruneUndefined(r);
+      const today = todayKr();
+      for (const r of rows) batch[r.id] = pruneUndefined(recalcContract(r, today));
       await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
       void audit.update('contract', 'batch', `계약 일괄 수정 ${rows.length}건`);
     },

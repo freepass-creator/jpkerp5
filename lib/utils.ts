@@ -5,9 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * 금액 포맷 — n=undefined/null → '', n=0 → '0' (0과 미입력 구분).
+ * 호출 시 ₩ 접두사 추가 권장: `₩${formatCurrency(n) || '-'}` (빈값 시 '-' fallback)
+ * 또는 `formatMoney(n)` 헬퍼 (₩ + 빈값 처리 자동) 사용 권장.
+ */
 export function formatCurrency(n?: number | null): string {
-  if (n == null || n === 0) return '';
+  if (n == null) return '';
   return n.toLocaleString('ko-KR');
+}
+
+/** ₩ 접두사 + 빈값 처리 — formatCurrency wrapper. 빈값 시 '-' 반환. */
+export function formatMoney(n?: number | null, fallback: string = '-'): string {
+  if (n == null) return fallback;
+  return `₩${n.toLocaleString('ko-KR')}`;
 }
 
 export function formatDate(d?: string | null): string {
