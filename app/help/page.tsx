@@ -457,8 +457,73 @@ export default function HelpPage() {
               <Hint>필터를 적용한 상태에서 다운받으면 그 필터된 결과만 들어갑니다. 회사·상태·검색어 모두 적용됨.</Hint>
             </Section>
 
-            {/* 12. 문의 */}
-            <Section icon={<Phone weight="bold" />} title="17. 문의 · 오류 신고" id="contact">
+            {/* 17. 결제 선불/후불 (신규) */}
+            <Section icon={<CurrencyKrw weight="bold" />} title="17. 결제 선불/후불 — 자동 결제일 조정" id="payment-timing">
+              <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
+                계약 등록 시 결제시기를 선불/후불 중 선택. 변경 시 모든 회차 결제일 자동 조정.
+              </div>
+              <SubSection title="선불 vs 후불">
+                · <Chip>선불</Chip> (default): 계약 시작 당일 첫 결제. 예 5/5 계약 → 5/5 1회차.<br />
+                · <Chip color="red">후불</Chip>: 계약 시작 + 1개월 첫 결제. 예 5/5 계약 → 6/5 1회차.
+              </SubSection>
+              <SubSection title="변경 흐름">
+                1. 운영현황 행 더블클릭 → [수정] → 결제시기 선택 → [저장]<br />
+                2. recalcContract 자동 호출 → 모든 회차 dueDate 자동 +1개월 (선불→후불) 또는 -1개월 (후불→선불)<br />
+                3. 이미 입금된 회차 (paidAmount &gt; 0) 의 status 보존 — 데이터 손실 X
+              </SubSection>
+              <SubSection title="엑셀 일괄 등록">
+                · 운영현황 업로드 엑셀 템플릿 컬럼: <strong>결제시기</strong><br />
+                · 값: <span className="mono">선불</span> 또는 <span className="mono">후불</span><br />
+                · 빈 값 → 선불 (안전 default)
+              </SubSection>
+              <Hint>운영현황 표의 결제일 칸 아래에 [선불]/[후불] 라벨 표시. 후불은 오렌지 색 — 회수 시점 차이 인지.</Hint>
+            </Section>
+
+            {/* 18. 작업 우선순위 자동 정렬 (신규) */}
+            <Section icon={<ChartBar weight="bold" />} title="18. 페이지마다 작업 우선순위 자동 정렬" id="auto-sort">
+              <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
+                각 페이지 진입 시 직원이 즉시 처리할 행이 위로 자동 정렬됩니다.
+              </div>
+              <Row icon={<CurrencyKrw size={14} />} title="미수금">
+                미수금 큰 순 → 시급한 회수 대상 위
+              </Row>
+              <Row icon={<ShieldStar size={14} />} title="보험증권">
+                만료 → 만기임박 → 미입력 → 일반 (직원 작업 순서)
+              </Row>
+              <Row icon={<Wrench size={14} />} title="수선 내역">
+                최근 정비일 최신 위
+              </Row>
+              <Row icon={<MagnifyingGlass size={14} />} title="GPS 설치">
+                미설치 위 → 설치 (작업 대상 우선)
+              </Row>
+              <Row icon={<CurrencyKrw size={14} />} title="구매방식">
+                잔여 원금 큰 순 (관리 우선순위)
+              </Row>
+              <Row icon={<ClipboardText size={14} />} title="검사 내역">
+                만기 임박 위 (D-N asc)
+              </Row>
+              <Row icon={<FileText size={14} />} title="계약 관리">
+                계약일 최신 위
+              </Row>
+              <Hint>컬럼 헤더 클릭으로 다른 컬럼 기준 수동 정렬도 가능 (운영현황). 필터·검색은 정렬과 독립.</Hint>
+            </Section>
+
+            {/* 19. 관련 페이지 바로가기 (신규) */}
+            <Section icon={<ArrowRight weight="bold" />} title="19. 한 화면에서 다른 페이지로 점프" id="jump-link">
+              <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
+                상세 다이얼로그 안에 [관련 페이지 바로가기] Section. 차량번호 자동 검색 적용.
+              </div>
+              <SubSection title="자산현황 상세 → 운영 요약 탭 끝">
+                보험증권 / 구매방식 / GPS 설치 / 수선 내역 / 검사 내역 / 계약 이력 — 6 버튼
+              </SubSection>
+              <SubSection title="계약 상세 → 차량정보 탭 최상단">
+                자산 상세 / 보험증권 / 구매방식 / GPS / 수선 / 미수 (red 강조) / 과태료 — 7 버튼
+              </SubSection>
+              <Hint>점프 후 검색창에 차량번호 자동 입력됨. 같은 차량의 다른 도메인 자료 즉시 확인.</Hint>
+            </Section>
+
+            {/* 20. 문의 */}
+            <Section icon={<Phone weight="bold" />} title="20. 문의 · 오류 신고" id="contact">
               <div style={{ padding: '14px 16px', background: 'var(--bg-sunken)', borderRadius: 6, fontSize: 13, lineHeight: 1.7 }}>
                 사용 중 막히면 <strong>화면 캡쳐 + 어떤 작업 중이었는지</strong>를 같이 보내주세요. 빠르게 조치합니다.
                 <br />
