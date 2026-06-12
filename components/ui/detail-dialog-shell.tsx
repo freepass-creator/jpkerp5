@@ -84,13 +84,23 @@ export function DetailDialogShell({
     open: !!open && !!editing,
     onSave: editing ? onSave : undefined,
   });
+  // 닫기 가드 — 편집 중 X/Esc/overlay 클릭 시 확인 (실수 닫기 방지)
+  const guardedOnOpenChange = (next: boolean) => {
+    if (!next && editing) {
+      const ok = window.confirm('편집 중인 내용이 있습니다. 저장하지 않고 닫을까요?');
+      if (!ok) return;
+      // 사용자가 OK 누른 경우 — 자식 탭의 draft 도 cancel 해서 잔류 방지
+      onCancel?.();
+    }
+    onOpenChange(next);
+  };
   // 공용 [수정/저장/취소] 자동 footer — footer prop 명시 시 X
   const autoFooter = !footer && (onEdit || editing) ? (
     <EditButtons editing={!!editing} onEdit={onEdit} onSave={onSave} onCancel={onCancel} variant="footer" />
   ) : null;
   const resolvedFooter = footer ?? autoFooter;
   return (
-    <DialogRoot open={open} onOpenChange={onOpenChange}>
+    <DialogRoot open={open} onOpenChange={guardedOnOpenChange}>
       <DialogContent title={title} mode={mode}>
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
           {/* HERO */}
