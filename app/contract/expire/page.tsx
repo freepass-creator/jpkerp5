@@ -20,7 +20,7 @@ import { usePersistentState } from '@/lib/use-persistent-state';
 import { downloadContractsExcel } from '@/lib/contract-export';
 
 export default function ExpirePage() {
-  const { contracts } = useContracts();
+  const { contracts, loading: contractsLoading } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const today = useLiveTodayKr();
   const [bucket, setBucket] = usePersistentState<'all' | 'expired' | 'd30' | 'd90'>('filter:contract-expire:quick', 'all');
@@ -106,7 +106,7 @@ export default function ExpirePage() {
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr><td colSpan={8} className="muted center" style={{ padding: 32 }}>만기 임박 계약 없음 (D-90 내)</td></tr>
+            <tr><td colSpan={8} className="muted center" style={{ padding: 32 }}>{contractsLoading ? '데이터 불러오는 중…' : '만기 임박 계약 없음 (D-90 내)'}</td></tr>
           ) : rows.map(({ contract: c, daysLeft }) => {
             const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
             const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;

@@ -32,7 +32,7 @@ export default function ContractIdlePage() {
     if (!roleLoading && !master) router.replace('/');
   }, [master, roleLoading, router]);
 
-  const { contracts, update: updateContract } = useContracts();
+  const { contracts, loading: contractsLoading, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const today = useLiveTodayKr();
 
@@ -146,7 +146,7 @@ export default function ContractIdlePage() {
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>휴차 차량 없음</td></tr>
+            <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>{contractsLoading ? '데이터 불러오는 중…' : '휴차 차량 없음'}</td></tr>
           ) : rows.map((c) => {
             const days = daysIdle(c.idleSince);
             const noLocation = !c.idleLocation?.trim();

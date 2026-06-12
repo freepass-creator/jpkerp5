@@ -21,7 +21,7 @@ import { contractStatusTone } from '@/lib/status-tones';
 import { downloadContractsExcel } from '@/lib/contract-export';
 
 export default function ContractOverduePage() {
-  const { contracts } = useContracts();
+  const { contracts, loading: contractsLoading } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const [bucket, setBucket] = useState<'all' | 'high' | 'mid' | 'low'>('all');
   const [companyFilter, setCompanyFilter] = useState<string | null>(null);
@@ -125,7 +125,7 @@ export default function ContractOverduePage() {
         </thead>
         <tbody>
           {overdue.length === 0 ? (
-            <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>미수금 계약 없음</td></tr>
+            <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>{contractsLoading ? '데이터 불러오는 중…' : '미수금 계약 없음'}</td></tr>
           ) : overdue.map((c) => (
             <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'context-menu' }}>
               <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
