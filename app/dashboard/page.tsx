@@ -165,6 +165,11 @@ export default function DashboardPage() {
             </div>
           </Section>
 
+          {/* D-Day 임박 알림 — 정기검사·보험만기·자동차세·면허만기·반납임박 (D-30 이내) */}
+          <Section title="D-Day 임박 알림">
+            <AlertsPanel contracts={contracts} />
+          </Section>
+
           {/* 법인별 운영 현황 — 관리 법인 단위 카드 */}
           <Section title="법인별 운영 현황">
             <CompanyKpiGrid contracts={contracts} vehicles={vehicles} bankTx={bankTx} cardTx={cardTx} />
@@ -1311,10 +1316,10 @@ function AlertsPanel({ contracts }: { contracts: import('@/lib/types').Contract[
   const soon = alerts.filter((a) => a.severity === 'soon').length;
 
   return (
-    <div className="panel" style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column' }}>
+    <div className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
       <div className="detail-section-header" style={{ background: 'var(--bg-card)' }}>
         <Warning size={12} weight="duotone" />
-        <span className="title">D-Day 임박 알림 — D-30 이내</span>
+        <span className="title">D-30 이내 임박 (만기·반납·검사)</span>
         <span style={{ fontSize: 11, color: 'var(--text-weak)' }}>
           {overdue > 0 && <span style={{ color: 'var(--red-text)', marginRight: 8 }}><strong>경과 {overdue}</strong></span>}
           {urgent > 0 && <span style={{ color: 'var(--red-text)', marginRight: 8 }}>긴급 {urgent}</span>}
