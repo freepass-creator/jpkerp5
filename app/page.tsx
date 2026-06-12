@@ -585,7 +585,7 @@ export default function Page() {
     <PageShell
       title="운영 현황"
       icon={<Car size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
-      topbarSearch={{ placeholder: '고객 / 차량 / 차종 / 담당', value: search, onChange: setSearch }}
+      topbarSearch={{ placeholder: '고객 / 차량 / 차종 / 담당 / 연락처', value: search, onChange: setSearch }}
       topbarFilter={
         <>
           {visibleViews.map((v) => {

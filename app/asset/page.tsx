@@ -276,7 +276,7 @@ export default function AssetPage() {
       if (assetQF === 'loan-missing' && !isMissing.loan(v)) return false;
       if (assetQF === 'gps-missing' && !isMissing.gps(v)) return false;
       if (q) {
-        const hay = `${v.plate} ${v.model} ${v.vehicleMaker ?? ''} ${v.vehicleModelLine ?? ''} ${v.vehicleSubModel ?? ''} ${v.vehicleVariant ?? ''} ${v.vehicleTrim ?? ''}`.toLowerCase();
+        const hay = `${v.plate} ${v.model} ${v.vehicleMaker ?? ''} ${v.vehicleModelLine ?? ''} ${v.vehicleSubModel ?? ''} ${v.vehicleVariant ?? ''} ${v.vehicleTrim ?? ''} ${v.vin ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -291,6 +291,7 @@ export default function AssetPage() {
           currentPage={assetView}
           search={search}
           onSearchChange={setSearch}
+          searchPlaceholder="차량번호 / 차종 / 제조사 / VIN"
           companyFilter={companyFilter}
           onCompanyFilterChange={setCompanyFilter}
           companyOptions={companyOptions}
