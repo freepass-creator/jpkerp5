@@ -367,7 +367,7 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
             onClick={() => {
               const url = `${window.location.origin}/customer`;
               navigator.clipboard.writeText(url).then(
-                () => alert(`✓ 손님 페이지 링크 복사됨\n${url}\n\n손님에게 카톡/SMS 로 전송. 손님은 차량번호 + 주민번호로 본인 인증 후 자기 계약만 조회 가능.`),
+                () => toast.success('손님 페이지 링크 복사됨 — 카톡/SMS 로 전송'),
                 () => prompt('수동 복사', url),
               );
             }}

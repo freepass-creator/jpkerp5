@@ -9,6 +9,7 @@ import {
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useAuth, logout } from '@/lib/use-auth';
+import { toast } from '@/lib/toast';
 import { useRole } from '@/lib/use-role';
 import { useSettings, type Theme, type FontFamily, type FontSize, type Density, type Radius, type Accent } from '@/lib/use-settings';
 import { MENU_LABELS, DEFAULT_VISIBILITY, loadVisibility, saveVisibility, type MenuKey } from '@/components/layout/sidebar';
@@ -316,7 +317,7 @@ function AccountSettings() {
               className="btn btn-sm btn-primary"
               onClick={() => {
                 navigator.clipboard.writeText(customerUrl).then(
-                  () => alert(`✓ 손님 페이지 링크 복사됨\n${customerUrl}\n\n손님에게 카톡/SMS/이메일 로 전송하세요.`),
+                  () => toast.success('손님 페이지 링크 복사됨 — 카톡/SMS/이메일 로 전송'),
                   () => prompt('수동 복사', customerUrl),
                 );
               }}
