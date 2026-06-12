@@ -7,7 +7,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileXls } from '@phosphor-icons/react';
+import { Plus, FileXls, MagnifyingGlass, Copy, ArrowSquareOut } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -33,6 +34,7 @@ export default function RepairPage() {
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-repair:company', 'all');
   const sel = useTableSelection();
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: { id: string; plate?: string } | null }>({ open: false, x: 0, y: 0, row: null });
 
   /** 차량 plate → 정비/부품교체 이력 집계 */
   const repairByPlate = useMemo(() => {
@@ -118,7 +120,13 @@ export default function RepairPage() {
                   ) : filtered.map((v) => {
                     const r = v.plate ? repairByPlate.get(v.plate.replace(/\s/g, '')) : undefined;
                     return (
-                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => router.push(`/asset?view=registered&plate=${encodeURIComponent(v.plate ?? '')}`)} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
+                      <tr
+                        key={v.id}
+                        style={{ verticalAlign: 'middle', cursor: 'pointer' }}
+                        onDoubleClick={() => router.push(`/asset?view=registered&plate=${encodeURIComponent(v.plate ?? '')}`)}
+                        onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }}
+                        className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}
+                      >
                         <TableRowCheckbox id={v.id} selection={sel} />
                         <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                         <td className="mono">{v.plate || '-'}</td>
@@ -184,6 +192,19 @@ export default function RepairPage() {
             </>
           }
           right={null}
+        />
+        <ContextMenu
+          open={ctxMenu.open}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+          items={ctxMenu.row ? ([
+            { label: '자산 상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) router.push(`/asset?q=${encodeURIComponent(ctxMenu.row.plate)}`); } },
+            { type: 'separator' },
+            { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); } },
+            { type: 'separator' },
+            { label: '계약 이력', icon: <ArrowSquareOut size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) router.push(`/contract?q=${encodeURIComponent(ctxMenu.row.plate)}`); } },
+          ] satisfies ContextMenuItem[]) : []}
         />
       </div>
     </div>
