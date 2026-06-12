@@ -1686,14 +1686,29 @@ input[type="radio"]:disabled {
 }
 .dialog-title { font-weight: var(--font-weight-medium); font-size: 14px; display: flex; align-items: center; gap: 10px; }
 /* 모드 태그 — dialog-title 옆에서도 동일 룩 (.detail-mode-tag 와 같은 클래스 재사용) */
-.dialog-header.mode-edit { border-bottom: 2px solid var(--orange-text, #c2410c); }
-.dialog-header.mode-new  { border-bottom: 2px solid var(--green-text); }
+.dialog-header.mode-edit {
+  border-bottom: 2px solid var(--orange-text, #c2410c);
+  background: var(--orange-bg, #fff7ed);
+}
+.dialog-header.mode-new {
+  border-bottom: 2px solid var(--green-text);
+  background: var(--green-bg);
+}
 .dialog-body { flex: 1; overflow: auto; padding: 18px; }
 .dialog-footer {
   display: flex; gap: 8px; justify-content: flex-end;
   padding: 12px 18px;
   border-top: 1px solid var(--border);
   background: var(--bg-card);
+}
+/* 모드별 footer 강조 — 편집 중·신규일 때 footer 도 톤 통일 */
+.dialog-content.mode-edit .dialog-footer {
+  background: var(--orange-bg, #fff7ed);
+  border-top: 2px solid var(--orange-text, #c2410c);
+}
+.dialog-content.mode-new .dialog-footer {
+  background: var(--green-bg);
+  border-top: 2px solid var(--green-text);
 }
 .dialog-close {
   background: transparent; border: none; cursor: pointer;
@@ -2445,21 +2460,21 @@ input[type="radio"]:disabled {
 .detail-field .value.muted { color: var(--text-weak); font-weight: 400; }
 .detail-field .value.wrap { white-space: normal; overflow: visible; }   /* 다줄 허용용 modifier */
 
-/* 편집용 input — .value 와 정확히 같은 위치·폰트·사이즈로 렌더.
- * border 는 bottom 만 살짝 (filled 박스보다 자연스러움).
- * 뷰 ⟷ 수정 토글 시 텍스트가 같은 좌표에 머무름. */
+/* 편집용 input — 명확히 '입력 가능' 시그널.
+ * 뷰 모드 대비 시각 차이를 키워서 '수정 누르면 어디 바뀌는지 딱 보이게'.
+ * 같은 라인에 머무르되 input 박스 + 배경 + 색상으로 식별. */
 .detail-field .detail-field-input {
-  border: none;
-  border-bottom: 1px solid var(--border);
-  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fff;
   font-family: inherit;
   font-size: 12px;
   font-weight: var(--font-weight-medium);
   color: var(--text-main);
-  padding: 0 2px;
+  padding: 3px 6px;
   width: 100%;
   outline: none;
-  line-height: 1.45;
+  line-height: 1.4;
   min-width: 0;
 }
 .detail-field .detail-field-input.mono {
@@ -2467,9 +2482,24 @@ input[type="radio"]:disabled {
   letter-spacing: -0.01em;
 }
 .detail-field .detail-field-input:focus {
-  border-bottom-color: var(--brand);
+  border-color: var(--orange-text, #c2410c);
+  box-shadow: 0 0 0 2px rgba(194,65,12,0.15);
 }
-.detail-field.is-editing { background: rgba(27,42,74,0.025); }
+.detail-field .detail-field-input:hover:not(:focus) {
+  border-color: var(--text-sub);
+}
+/* 편집 중 필드 — 좌측 accent 바 + 옅은 배경 + 라벨 강조 (한 눈에 'X자리 수정 가능' 식별) */
+.detail-field.is-editing {
+  background: rgba(194,65,12,0.05);
+  border-left: 3px solid var(--orange-text, #c2410c);
+  padding-left: 9px;
+  margin-left: -12px;
+  border-radius: 0 3px 3px 0;
+}
+.detail-field.is-editing .label {
+  color: var(--orange-text, #c2410c);
+  font-weight: 600;
+}
 
 /* ────────────── Utility ────────────── */
 .empty-state {
