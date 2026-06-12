@@ -489,7 +489,7 @@ export default function Page() {
   /** 상태 칩 카운트 — 회사 필터를 적용한 상태에서 각 view 별 수 (양방향 연동) */
   const viewCounts = useMemo<Record<View, number>>(() => {
     const scoped = contracts.filter((c) => matchesCompany(c, companyFilter));
-    const result = {
+    return {
       전체: scoped.length,
       계약중: scoped.filter((c) => matchesView(c, '계약중')).length,
       만기경과: scoped.filter((c) => matchesView(c, '만기경과')).length,
@@ -499,22 +499,7 @@ export default function Page() {
       휴차: scoped.filter((c) => matchesView(c, '휴차')).length,
       미수: scoped.filter((c) => matchesView(c, '미수')).length,
     };
-    // 진단 로그 — 직원이 콘솔 캡처 시 데이터 흐름 즉시 확인 (임시)
-    console.log('[운영현황 진단]', {
-      vehicles_받아옴: vehicles.length,
-      contracts_원본: rawContracts.length,
-      contracts_orphan포함: contracts.length,
-      회사필터: companyFilter,
-      회사필터적용후: scoped.length,
-      viewCounts: result,
-      orphan_샘플: contracts.filter((c) => c.id.startsWith('vehicle-orphan-')).slice(0, 3).map((c) => ({
-        plate: c.vehiclePlate,
-        vehicleStatus: c.vehicleStatus,
-        company: c.company,
-      })),
-    });
-    return result;
-  }, [contracts, companyFilter, vehicles, rawContracts]);
+  }, [contracts, companyFilter]);
 
   /** 화면에 표시할 view 칩 목록 — 사용자 룰: 전체만 항상, 나머지는 count > 0 일 때만 (반응형 필터) */
   const visibleViews = useMemo<View[]>(() => {
@@ -642,6 +627,9 @@ export default function Page() {
       }
       topbarRight={
         <>
+          <span style={{ fontSize: 11, color: 'var(--text-weak)' }} title={`자산 ${vehicles.length}대 / 계약 ${rawContracts.length}건 / 휴차 노출 ${contracts.filter((c) => c.id.startsWith('vehicle-orphan-')).length}대`}>
+            자산 <strong>{vehicles.length}</strong> · 계약 <strong>{rawContracts.length}</strong>
+          </span>
           <span className="topbar-sort" title={manualSort ? '컬럼 헤더 다시 클릭으로 변경/해제' : '필터별 자동 정렬'}>
             <span className="arrow">{manualSort?.dir === 'asc' ? '▲' : '▼'}</span>
             {manualSort
