@@ -243,3 +243,31 @@ export async function upsertVehicleFromContract(
   const id = await ctx.addVehicle(draft);
   return { vehicleId: id, created: true };
 }
+
+/**
+ * 자산 마스터 status 변경 후 호출 — 같은 plate 의 모든 계약 vehicleStatus 갱신.
+ *
+ * SoT 는 Vehicle.status. 사용자가 /asset 에서 status 를 바꿔도
+ * 운영현황(계약 기준 화면)에 즉시 반영되어야 한다.
+ *
+ * 호출:
+ *   await syncContractStatusFromVehicle(vehicle, contracts, updateContract)
+ *
+ * 반환: 갱신된 계약 수 (toast 노출용)
+ */
+export async function syncContractStatusFromVehicle(
+  vehicle: Vehicle,
+  contracts: Contract[],
+  updateContract: (c: Contract) => Promise<void>,
+): Promise<{ updatedCount: number }> {
+  const plate = (vehicle.plate ?? '').trim();
+  if (!plate || !vehicle.status) return { updatedCount: 0 };
+  const targets = contracts.filter((c) =>
+    (c.vehiclePlate ?? '').trim() === plate &&
+    c.vehicleStatus !== vehicle.status,
+  );
+  for (const c of targets) {
+    await updateContract({ ...c, vehicleStatus: vehicle.status });
+  }
+  return { updatedCount: targets.length };
+}

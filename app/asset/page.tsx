@@ -45,6 +45,7 @@ import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
+import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
 import { setVehicleAttachments } from '@/lib/firebase/vehicle-attachments-store';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 import { VehicleDetailDialog } from '@/components/asset/vehicle-detail-dialog';
@@ -68,7 +69,7 @@ export default function AssetPage() {
   }, [master, roleLoading, router]);
 
   const { vehicles: rawVehicles, update: updateVehicle, remove: removeVehicle, add: addVehicle } = useVehicles();
-  const { contracts } = useContracts();
+  const { contracts, update: updateContract } = useContracts();
   const { entries: history } = useHistoryEntries();
   const { companies: companyMaster } = useCompanies();
 
@@ -606,14 +607,20 @@ export default function AssetPage() {
                 }
                 if (!confirm(`자동 결정 대상 ${targets.length}대 — 차량번호로 휴차/등록대기/구매대기 재계산.\n사용자 명시 상태(운행/정비/사고/매각 등)는 보존.\n계속?`)) return;
                 let changed = 0;
+                let syncedContracts = 0;
                 for (const v of targets) {
                   const next = deriveVehicleStatusFromContract(v.plate);
                   if (next !== v.status) {
-                    try { await updateVehicle({ ...v, status: next }); changed++; }
-                    catch (e) { console.error('status auto failed', v.id, e); }
+                    const merged = { ...v, status: next };
+                    try {
+                      await updateVehicle(merged);
+                      changed++;
+                      const r = await syncContractStatusFromVehicle(merged, contracts, updateContract);
+                      syncedContracts += r.updatedCount;
+                    } catch (e) { console.error('status auto failed', v.id, e); }
                   }
                 }
-                toast.success(`${changed}대 상태 자동 결정 완료 (대상 ${targets.length}대 중)`);
+                toast.success(`${changed}대 상태 자동 결정 완료 (대상 ${targets.length}대 중)${syncedContracts > 0 ? ` · 계약 ${syncedContracts}건 sync` : ''}`);
               }}
             >
               상태 자동 결정
@@ -628,7 +635,10 @@ export default function AssetPage() {
             history={history.filter((h) => h.scope === 'vehicle' && h.vehiclePlate === vehicles.find((v) => v.id === openId)?.plate)}
             contracts={contracts.filter((c) => c.vehiclePlate === vehicles.find((v) => v.id === openId)?.plate)}
             view={assetView}
-            onUpdate={(v) => { void updateVehicle(v); }}
+            onUpdate={async (v) => {
+              await updateVehicle(v);
+              await syncContractStatusFromVehicle(v, contracts, updateContract);
+            }}
             onClose={() => setOpenId(null)}
             onEdit={(v) => setEditVehicle(v)}
           />
