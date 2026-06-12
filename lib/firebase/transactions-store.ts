@@ -110,7 +110,12 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
         stamped.push(full);
       }
       await rtdbUpdate(ref(db, path), pruneUndefined(batch as unknown as Record<string, unknown>));
-      void audit.import(auditType, `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 등록 ${items.length}건`, { count: items.length });
+      const txIds = Object.keys(batch);
+      void audit.import(auditType, `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 등록 ${items.length}건`, {
+        count: items.length,
+        ids: txIds.slice(0, 100),
+        truncated: txIds.length > 100,
+      });
       return stamped;
     },
     remove: async (id: string) => {
