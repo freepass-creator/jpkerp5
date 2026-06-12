@@ -139,7 +139,14 @@ export default function AssetInsurancePage() {
         if (!hay.includes(q)) return false;
       }
       return true;
-    }).sort((a, b) => (a.v.plate ?? '').localeCompare(b.v.plate ?? ''));
+    }).sort((a, b) => {
+      // 기본 정렬: 만기 임박/만료 위 → 미입력 → 일반 (plate 보조 정렬)
+      const statusOrder: Record<string, number> = { expired: 0, expire: 1, missing: 2 };
+      const aOrder = statusOrder[a.status as string] ?? 3;
+      const bOrder = statusOrder[b.status as string] ?? 3;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return (a.v.plate ?? '').localeCompare(b.v.plate ?? '');
+    });
   }, [allRows, search, companyFilter, qf]);
 
   if (roleLoading || !master) {
