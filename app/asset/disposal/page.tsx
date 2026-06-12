@@ -44,7 +44,7 @@ export default function AssetDisposalPage() {
       if (!DISPOSAL_STATUSES.includes(v.status as typeof DISPOSAL_STATUSES[number])) return false;
       if (!matchesCompanyFilter(v.company, companyFilter)) return false;
       if (q) {
-        const hay = `${v.plate ?? ''} ${v.model ?? ''} ${v.assetCode ?? ''}`.toLowerCase();
+        const hay = `${v.plate ?? ''} ${v.model ?? ''} ${v.vin ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -69,7 +69,7 @@ export default function AssetDisposalPage() {
           currentPage="disposal"
           search={search}
           onSearchChange={setSearch}
-          searchPlaceholder="차량번호 / 차종 / 자산코드"
+          searchPlaceholder="차량번호 / 차종 / VIN"
           companyFilter={companyFilter}
           onCompanyFilterChange={setCompanyFilter}
           companyOptions={companyOptions}
