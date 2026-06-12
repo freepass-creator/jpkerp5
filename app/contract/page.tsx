@@ -43,7 +43,7 @@ export default function ContractPage() {
     if (!roleLoading && !master) router.replace('/');
   }, [master, roleLoading, router]);
 
-  const { contracts, update: updateContract, remove: removeContract } = useContracts();
+  const { contracts, loading: contractsLoading, update: updateContract, remove: removeContract } = useContracts();
   const { vehicles, update: updateVehicleMaster } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -296,7 +296,9 @@ export default function ContractPage() {
                   </thead>
                   <tbody>
                     {filtered.length === 0 ? (
-                      <EmptyRow colSpan={11}>계약 없음 — 좌측 하단 [+ 신규 계약] 으로 시작하세요</EmptyRow>
+                      <EmptyRow colSpan={11}>
+                        {contractsLoading ? '데이터 불러오는 중…' : '계약 없음 — 좌측 하단 [+ 신규 계약] 으로 시작하세요'}
+                      </EmptyRow>
                     ) : filtered.map((c) => (
                       <tr
                         key={c.id}
