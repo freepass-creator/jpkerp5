@@ -1305,16 +1305,34 @@ function RecentActivityPanel() {
     );
   }
 
+  // 상대 시간 — 활동의 신선도 한 눈에 (방금/5분 전/오늘/어제/...).
+  // 같은 today 의존이라 useLiveTodayKr 와 별개 — 활동은 분 단위 변화라 nowTick 사용.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 60 * 1000);  // 1분 마다 refresh
+    return () => clearInterval(t);
+  }, []);
+  function relTime(atIso: string): string {
+    const diffMin = Math.round((nowTick - new Date(atIso).getTime()) / 60000);
+    if (diffMin < 1) return '방금';
+    if (diffMin < 60) return `${diffMin}분 전`;
+    if (diffMin < 60 * 24) return `${Math.floor(diffMin / 60)}시간 전`;
+    const days = Math.floor(diffMin / (60 * 24));
+    if (days === 1) return '어제';
+    if (days < 7) return `${days}일 전`;
+    return atIso.slice(5, 10);   // 일주일 넘으면 MM-DD
+  }
+
   return (
     <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ maxHeight: 320, overflow: 'auto' }}>
         {rows.slice(0, 20).map((r) => {
           const href = activityHref(r.entityType, r.entityId);
-          const time = r.at.slice(11, 16);   // HH:MM
-          const date = r.at.slice(5, 10);    // MM-DD
+          const rel = relTime(r.at);
+          const absTime = r.at.slice(0, 16).replace('T', ' ');
           const inner = (
             <>
-              <span className="mono dim" style={{ fontSize: 10, minWidth: 64 }}>{date} {time}</span>
+              <span className="mono dim" style={{ fontSize: 10, minWidth: 64 }} title={absTime}>{rel}</span>
               <span className="dim" style={{ fontSize: 11, minWidth: 70, maxWidth: 70, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.by ?? '시스템'}</span>
               <span style={{ fontSize: 11, fontWeight: 600, minWidth: 50, color: r.action === 'delete' ? 'var(--red-text)' : r.action === 'create' ? 'var(--green-text)' : 'var(--brand)' }}>
                 {ACTIVITY_LABEL[r.action] ?? r.action}
