@@ -571,6 +571,8 @@ export default function ReceivablesPage() {
                     {list.map((c) => {
                       const days = maxOverdueDays(c, today);
                       const reason = c.status === '채권' ? '채권화' : '내용증명 D+' + (days - 10);
+                      const lastC = lastContactDate(c.id, history);
+                      const lastCDays = lastC ? Math.max(0, Math.round((new Date(today).getTime() - new Date(lastC).getTime()) / 86400000)) : null;
                       return (
                         <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
                           <span className="tag over" style={{ background: '#fef2f2', color: '#7f1d1d' }}>{reason}</span>
@@ -583,6 +585,10 @@ export default function ReceivablesPage() {
                               <span className="plate">{c.vehiclePlate}</span>
                               <span className="text-weak">·</span>
                               <span className="danger mono">₩{(c.unpaidAmount ?? 0).toLocaleString()}</span>
+                              <span className="text-weak">·</span>
+                              <span style={{ color: lastC ? 'var(--text-weak)' : 'var(--red-text)', fontSize: 10 }} title={lastC ? `마지막 연락 ${lastC}` : '연락기록 없음'}>
+                                {lastC ? `연락 ${lastCDays === 0 ? '오늘' : lastCDays === 1 ? '어제' : `${lastCDays}일 전`}` : '미연락'}
+                              </span>
                             </div>
                           </div>
                           <div className="list-item-right">
@@ -629,6 +635,8 @@ export default function ReceivablesPage() {
                         : 0;
                       const reason = (c.engineDisabledReason || '').trim();
                       const reasonKey = ['미납', '검사지연'].find((k) => reason.includes(k)) ?? (reason || '기타');
+                      const lastC = lastContactDate(c.id, history);
+                      const lastCDays = lastC ? Math.max(0, Math.round((new Date(today).getTime() - new Date(lastC).getTime()) / 86400000)) : null;
                       return (
                         <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
                           <span className="tag over">{reasonKey}</span>
@@ -641,6 +649,10 @@ export default function ReceivablesPage() {
                               <span className="plate">{c.vehiclePlate}</span>
                               <span className="text-weak">·</span>
                               <span className="danger mono">₩{(c.unpaidAmount ?? 0).toLocaleString()}</span>
+                              <span className="text-weak">·</span>
+                              <span style={{ color: lastC ? 'var(--text-weak)' : 'var(--red-text)', fontSize: 10 }} title={lastC ? `마지막 연락 ${lastC}` : '연락기록 없음'}>
+                                {lastC ? `연락 ${lastCDays === 0 ? '오늘' : lastCDays === 1 ? '어제' : `${lastCDays}일 전`}` : '미연락'}
+                              </span>
                             </div>
                           </div>
                           <div className="list-item-right">
