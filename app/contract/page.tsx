@@ -16,6 +16,7 @@ import { FileText, MagnifyingGlass, ArrowLeft, FileXls, Trash } from '@phosphor-
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { CreateDialog } from '@/components/create-dialog';
@@ -41,6 +42,7 @@ export default function ContractPage() {
   }, [master, roleLoading, router]);
 
   const { contracts, update: updateContract, remove: removeContract } = useContracts();
+  const { vehicles, update: updateVehicleMaster } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -308,7 +310,16 @@ export default function ContractPage() {
         contract={openId ? contracts.find((c) => c.id === openId) ?? null : null}
         open={openId != null}
         onOpenChange={(v) => !v && setOpenId(null)}
-        onUpdate={(updated) => { void updateContract(updated); }}
+        onUpdate={(updated) => {
+          void updateContract(updated);
+          // Vehicle.status 자동 동기 — 운영현황 패턴과 동일 (양방향 동기)
+          if (updated.vehiclePlate && updated.vehicleStatus) {
+            const v = vehicles.find((x) => (x.plate ?? '').trim() === updated.vehiclePlate.trim());
+            if (v && v.status !== updated.vehicleStatus) {
+              void updateVehicleMaster({ ...v, status: updated.vehicleStatus });
+            }
+          }
+        }}
       />
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['계약']} initialMode="계약" />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filtered} selectedIds={selectedIds} />
