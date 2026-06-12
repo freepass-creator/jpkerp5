@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ChartBar, Car, ClipboardText, CurrencyKrw, Warning, ArrowRight,
@@ -32,9 +32,12 @@ export default function DashboardPage() {
   const { rows: cardTx } = useCardTx();
   const { penalties } = usePenalties();
   const detailContract = detailContractId ? contracts.find((c) => c.id === detailContractId) ?? null : null;
+  // 시간 의존 KPI(가동률·미수율·D-Day 등) 자동 refresh —
+  // 자정 통과 또는 탭 복귀 시점에 새로 계산되도록 dependency 로 사용.
+  // 5 분 tick + 탭 visible 전환 + window focus 트리거.
+  const today = useLiveTodayKr();
 
   const kpi = useMemo(() => {
-    const today = todayKr();
     const thisMonth = today.slice(0, 7);          // YYYY-MM
     const lastMonth = (() => {
       const d = new Date(today);
@@ -102,7 +105,7 @@ export default function DashboardPage() {
       collectedThisMonth, collectedLastMonth, collectionProgress, momGrowth, collectedTotal,
       expiringNextMonth, newThisMonth,
     };
-  }, [contracts, vehicles, bankTx, cardTx, penalties]);
+  }, [contracts, vehicles, bankTx, cardTx, penalties, today]);
 
   return (
     <div className="layout">
@@ -115,15 +118,15 @@ export default function DashboardPage() {
           </div>
           <span style={{ fontSize: 12, color: 'var(--text-weak)' }}>지표 카드 → 클릭 시 해당 페이지로 이동</span>
           <div style={{ flex: 1 }} />
-          <span className="topbar-date">{dateWithDow(todayKr())}</span>
+          <span className="topbar-date">{dateWithDow(today)}</span>
         </header>
 
         <div style={{ padding: 16, overflow: 'auto', background: 'var(--bg-page)', display: 'flex', flexDirection: 'column', gap: 18 }}>
           {/* 최상단 — 좌 달력 + 우 할 일 칠판. panel 박스로 공간 분리 + 좌우 높이 stretch */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
             <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column' }}>
-              <Section fill title="일자별 스케줄" right={<span className="dim" style={{ fontSize: 11 }}>{todayKr().slice(0, 7)} · 더블클릭 → 상세</span>}>
-                <ScheduleCalendar contracts={contracts} onSelectContract={setDetailContractId} />
+              <Section fill title="일자별 스케줄" right={<span className="dim" style={{ fontSize: 11 }}>{today.slice(0, 7)} · 더블클릭 → 상세</span>}>
+                <ScheduleCalendar contracts={contracts} today={today} onSelectContract={setDetailContractId} />
               </Section>
             </div>
             <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column' }}>
@@ -199,7 +202,7 @@ export default function DashboardPage() {
 
           {/* D-Day 임박 알림 — 정기검사·보험만기·자동차세·면허만기·반납임박 (D-30 이내) */}
           <Section title="D-Day 임박 알림">
-            <AlertsPanel contracts={contracts} />
+            <AlertsPanel contracts={contracts} today={today} />
           </Section>
 
           {/* 법인별 운영 현황 — 관리 법인 단위 카드 */}
@@ -607,8 +610,7 @@ const KIND_COLOR: Record<ScheduleDayItem['kind'], string> = {
   '신규': 'var(--green-text)',
 };
 
-function ScheduleCalendar({ contracts, onSelectContract }: { contracts: import('@/lib/types').Contract[]; onSelectContract: (id: string) => void }) {
-  const today = todayKr();
+function ScheduleCalendar({ contracts, today, onSelectContract }: { contracts: import('@/lib/types').Contract[]; today: string; onSelectContract: (id: string) => void }) {
   const [year, month] = today.split('-').map(Number);
   const [dialogYmd, setDialogYmd] = useState<string | null>(null);
   const { schedules } = useSchedules();
@@ -1193,8 +1195,8 @@ const KIND_BADGE: Record<AlertItem['kind'], string> = {
   '반납임박': '반납',
 };
 
-function AlertsPanel({ contracts }: { contracts: import('@/lib/types').Contract[] }) {
-  const alerts = useMemo(() => buildAllAlerts(contracts), [contracts]);
+function AlertsPanel({ contracts, today }: { contracts: import('@/lib/types').Contract[]; today: string }) {
+  const alerts = useMemo(() => buildAllAlerts(contracts, today), [contracts, today]);
   const overdue = alerts.filter((a) => a.severity === 'overdue').length;
   const urgent = alerts.filter((a) => a.severity === 'urgent').length;
   const soon = alerts.filter((a) => a.severity === 'soon').length;
@@ -1339,4 +1341,34 @@ function RecentActivityPanel() {
       </div>
     </div>
   );
+}
+
+/**
+ * 오늘 날짜 (한국 기준) — 자동 refresh.
+ *
+ *  · 5분마다 tick
+ *  · 탭 visibility / 윈도우 focus 전환 시 즉시 갱신
+ *  · 자정 통과 + 사용자 복귀 시 그날 KPI 자동 새로계산
+ *
+ * 사용: const today = useLiveTodayKr(); → 같은 day 면 같은 string,
+ *       다음날이면 새 string → 의존 useMemo 자동 invalidate.
+ */
+function useLiveTodayKr(): string {
+  const [today, setToday] = useState<string>(() => todayKr());
+  useEffect(() => {
+    const refresh = () => {
+      const next = todayKr();
+      setToday((cur) => (cur === next ? cur : next));
+    };
+    const tick = setInterval(refresh, 5 * 60 * 1000);   // 5분
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(tick);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
+  return today;
 }
