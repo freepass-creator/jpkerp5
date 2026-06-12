@@ -36,7 +36,7 @@ export default function FinancePage() {
     if (!roleLoading && !master) router.replace('/');
   }, [master, roleLoading, router]);
 
-  const { rows: bankTx, removeMany: removeManyBank, update: updateBank } = useBankTx();
+  const { rows: bankTx, loading: bankTxLoading, removeMany: removeManyBank, update: updateBank } = useBankTx();
   const { rows: cardTx, removeMany: removeManyCard, update: updateCard } = useCardTx();
 
   function handleTaxInvoiceExport() {
@@ -261,7 +261,7 @@ export default function FinancePage() {
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan={12} className="muted center" style={{ padding: 32 }}>
-                        거래 내역 없음 — 입출금 관리에서 등록
+                        {bankTxLoading ? '데이터 불러오는 중…' : '거래 내역 없음 — 입출금 관리에서 등록'}
                       </td>
                     </tr>
                   ) : filtered.map((t) => {
