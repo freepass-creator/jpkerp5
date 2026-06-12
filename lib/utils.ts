@@ -21,6 +21,19 @@ export function formatMoney(n?: number | null, fallback: string = '-'): string {
   return `₩${n.toLocaleString('ko-KR')}`;
 }
 
+/** 빈값 통일 — 모든 페이지 동일 fallback '-'. (사용자 명시 룰: '-' 통일) */
+export function displayValue<T>(v: T | undefined | null, fallback: string = '-'): T | string {
+  if (v == null) return fallback;
+  if (typeof v === 'string' && v.trim() === '') return fallback;
+  return v;
+}
+
+/** 날짜 통일 — YYYY-MM-DD 포맷 + 빈값 fallback '-'. */
+export function displayDate(d?: string | null, fallback: string = '-'): string {
+  if (!d) return fallback;
+  return d.slice(0, 10);
+}
+
 export function formatDate(d?: string | null): string {
   if (!d) return '';
   // YYYY-MM-DD → MM/DD
