@@ -5,8 +5,10 @@
  * Contract.inspectionDueDate 기반 만기 임박/경과 자산 노출 + 검사 이력 (HistoryEntry category='검사').
  */
 
-import { useMemo } from 'react';
-import { ClipboardText, FileXls } from '@phosphor-icons/react';
+import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ClipboardText, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { exportToExcel } from '@/lib/excel-export';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
@@ -20,11 +22,13 @@ import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
 
 export default function AssetInspectionPage() {
+  const router = useRouter();
   const { contracts } = useContracts();
   const { entries: history } = useHistoryEntries();
   const { vehicles } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const today = todayKr();
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; plate?: string; phone?: string; due?: string; customerName?: string } | null>(null);
 
   const upcoming = useMemo(() => {
     return contracts
@@ -139,7 +143,7 @@ export default function AssetInspectionPage() {
               const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
               const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
               return (
-                <tr key={c.id}>
+                <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }); }} style={{ cursor: 'context-menu' }}>
                   <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                   <td className="mono">{c.vehiclePlate}</td>
                   <td className="dim">{c.vehicleModel || vehicles.find((v) => v.plate === c.vehiclePlate)?.model || '-'}</td>
@@ -170,7 +174,7 @@ export default function AssetInspectionPage() {
             {inspectionEvents.length === 0 ? (
               <EmptyRow colSpan={6}>검사 이력 없음</EmptyRow>
             ) : inspectionEvents.map((h) => (
-              <tr key={h.id}>
+              <tr key={h.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: h.vehiclePlate }); }} style={{ cursor: 'context-menu' }}>
                 <td className="mono">{h.date}</td>
                 <td className="mono">{h.vehiclePlate || '-'}</td>
                 <td>{h.title}</td>
@@ -182,6 +186,23 @@ export default function AssetInspectionPage() {
           </tbody>
         </table>
       </section>
+
+      <ContextMenu
+        open={!!ctxMenu}
+        x={ctxMenu?.x ?? 0}
+        y={ctxMenu?.y ?? 0}
+        onClose={() => setCtxMenu(null)}
+        items={ctxMenu ? (() => {
+          const it: ContextMenuItem[] = [
+            { label: '자산 상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.plate) router.push(`/asset?q=${encodeURIComponent(ctxMenu.plate)}`); }, disabled: !ctxMenu.plate },
+            { type: 'separator' },
+          ];
+          if (ctxMenu.plate) it.push({ label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => navigator.clipboard.writeText(ctxMenu.plate!) });
+          if (ctxMenu.phone) it.push({ label: '계약자 연락처 복사', icon: <Copy size={12} weight="bold" />, onClick: () => navigator.clipboard.writeText(ctxMenu.phone!) });
+          if (ctxMenu.due) it.push({ label: '검사 안내 복사', icon: <Copy size={12} weight="bold" />, onClick: () => navigator.clipboard.writeText(`${ctxMenu.customerName ?? '계약자'} 님, ${ctxMenu.plate ?? ''} 차량 정기검사 만기 ${ctxMenu.due} 입니다. 검사 협의 부탁드립니다.`) });
+          return it;
+        })() : []}
+      />
     </MasterPageShell>
   );
 }

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Trash, X, PencilSimple, CheckCircle, Warning, FileXls, Eye, FileZip, CircleNotch, FileText, User, Receipt } from '@phosphor-icons/react';
+import { Trash, X, PencilSimple, CheckCircle, Warning, FileXls, Eye, FileZip, CircleNotch, FileText, User, Receipt, Copy } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { downloadPenaltyZip, previewPenaltyItem, type PenaltyWorkItem } from '@/lib/penalty-pdf';
@@ -86,6 +87,8 @@ export default function PenaltyPage() {
   const [periodBy, setPeriodBy] = useState<'processed' | 'violation'>('processed');
   /** 고지서 등록 다이얼로그 — 빈 상태 텍스트에서도 열 수 있도록 lift */
   const [registerOpen, setRegisterOpen] = useState(false);
+  /** 우클릭 컨텍스트 메뉴 */
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: PenaltyWorkItem | null }>({ open: false, x: 0, y: 0, row: null });
 
   function handleCreate(newItems: PenaltyWorkItem[]) {
     setItems((prev) => {
@@ -636,7 +639,7 @@ export default function PenaltyPage() {
                     : null;
                   const violClass = inRange === false ? 'text-red' : 'mono';
                   return (
-                    <tr key={it.id}>
+                    <tr key={it.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: it }); }} style={{ cursor: 'context-menu' }}>
                       <td className="checkbox-col sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH, background: 'var(--bg-card)' }}>
                         <input
                           type="checkbox"
@@ -742,6 +745,35 @@ export default function PenaltyPage() {
       </PageShellInline>
       </div>
       </div>
+
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+        items={ctxMenu.row ? (() => {
+          const r = ctxMenu.row;
+          const isInProg = (r._phase ?? 'in-progress') === 'in-progress';
+          const matched = isMatched(r);
+          const it: ContextMenuItem[] = [
+            { label: '미리보기', icon: <Eye size={12} weight="bold" />, onClick: () => handlePreview(r) },
+          ];
+          if (isInProg && matched) {
+            it.push({ label: '처리완료로 이동', icon: <CheckCircle size={12} weight="bold" />, onClick: () => markCompleted(r.id) });
+          }
+          if (isInProg) {
+            it.push({ label: '수정', icon: <PencilSimple size={12} weight="bold" />, onClick: () => setEditingId(r.id) });
+          }
+          it.push({ type: 'separator' });
+          if (r.car_number) it.push({ label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => navigator.clipboard.writeText(r.car_number) });
+          if (r.notice_no) it.push({ label: '고지서번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => navigator.clipboard.writeText(r.notice_no) });
+          if (r._contract?.contractor_name) it.push({ label: '임차인명 복사', icon: <Copy size={12} weight="bold" />, onClick: () => navigator.clipboard.writeText(r._contract!.contractor_name!) });
+          if (r._contract?.contractor_phone) it.push({ label: '임차인 연락처 복사', icon: <Copy size={12} weight="bold" />, onClick: () => navigator.clipboard.writeText(r._contract!.contractor_phone!) });
+          it.push({ type: 'separator' });
+          it.push({ label: '삭제', icon: <X size={12} weight="bold" />, onClick: () => removeItem(r.id), danger: true });
+          return it;
+        })() : []}
+      />
 
       <EntityFormDialog
         open={editingId !== null}

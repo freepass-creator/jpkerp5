@@ -8,7 +8,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pause, MagnifyingGlass, MapPin, FileXls } from '@phosphor-icons/react';
+import { Pause, MagnifyingGlass, MapPin, FileXls, Copy } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -38,6 +39,7 @@ export default function ContractIdlePage() {
   const [editing, setEditing] = useState<Contract | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<'all' | '휴차' | '휴차대기' | '매각검토' | '__noloc'>('all');
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Contract | null }>({ open: false, x: 0, y: 0, row: null });
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -148,7 +150,7 @@ export default function ContractIdlePage() {
             const days = daysIdle(c.idleSince);
             const noLocation = !c.idleLocation?.trim();
             return (
-              <tr key={c.id} onClick={() => setEditing(c)} style={{ cursor: 'pointer' }}>
+              <tr key={c.id} onClick={() => setEditing(c)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
                 <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                 <td className="mono">{c.vehiclePlate}</td>
                 <td className="dim">{c.vehicleModel || '-'}</td>
@@ -188,6 +190,27 @@ export default function ContractIdlePage() {
           }}
         />
       )}
+
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+        items={ctxMenu.row ? ([
+          { label: '위치/사유 편집', icon: <MapPin size={12} weight="bold" />, onClick: () => { if (ctxMenu.row) setEditing(ctxMenu.row); } },
+          { type: 'separator' },
+          { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vehiclePlate) navigator.clipboard.writeText(ctxMenu.row.vehiclePlate); } },
+          { label: '휴차 정보 복사', icon: <Copy size={12} weight="bold" />, onClick: () => {
+            const r = ctxMenu.row;
+            if (!r) return;
+            const since = r.idleSince ?? '미정';
+            const days = daysIdle(r.idleSince);
+            navigator.clipboard.writeText(`${r.vehiclePlate} · ${r.vehicleStatus} · ${since}부터${days != null ? ` (D+${days})` : ''} · ${r.idleLocation ?? '위치미정'}${r.idleReason ? ` · ${r.idleReason}` : ''}`);
+          } },
+          { type: 'separator' },
+          { label: '운영현황에서 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vehiclePlate) window.location.href = `/?q=${encodeURIComponent(ctxMenu.row.vehiclePlate)}`; } },
+        ] satisfies ContextMenuItem[]) : []}
+      />
     </MasterPageShell>
   );
 }

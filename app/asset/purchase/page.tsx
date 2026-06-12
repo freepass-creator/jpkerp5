@@ -6,8 +6,10 @@
  * status='구매대기' (입고 예정) 와 매입 완료된 차량 분리 노출.
  */
 
-import { useMemo } from 'react';
-import { ShoppingCart, FileXls } from '@phosphor-icons/react';
+import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ShoppingCart, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { exportToExcel } from '@/lib/excel-export';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -20,8 +22,10 @@ import { vehicleStatusTone } from '@/lib/status-tones';
 import { BottomBar } from '@/components/layout/bottom-bar';
 
 export default function PurchasePage() {
+  const router = useRouter();
   const { vehicles } = useVehicles();
   const { companies: companyMaster } = useCompanies();
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: { id: string; plate?: string; vin?: string } | null }>({ open: false, x: 0, y: 0, row: null });
 
   const pending = useMemo(
     () => vehicles.filter((v) => v.status === '구매대기').sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '')),
@@ -115,7 +119,7 @@ export default function PurchasePage() {
             {pending.length === 0 ? (
               <EmptyRow colSpan={6}>구매대기 차량 없음</EmptyRow>
             ) : pending.map((v) => (
-              <tr key={v.id}>
+              <tr key={v.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'context-menu' }}>
                 <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                 <td className="mono">{v.plate || '미정'}</td>
                 <td>{v.model || '-'}</td>
@@ -149,7 +153,7 @@ export default function PurchasePage() {
             {purchased.length === 0 ? (
               <EmptyRow colSpan={7}>매입 완료 차량 없음</EmptyRow>
             ) : purchased.map((v) => (
-              <tr key={v.id}>
+              <tr key={v.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'context-menu' }}>
                 <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                 <td className="mono">{v.plate}</td>
                 <td>{v.model}</td>
@@ -162,6 +166,19 @@ export default function PurchasePage() {
           </tbody>
         </table>
       </section>
+
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+        items={ctxMenu.row ? ([
+          { label: '자산 상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) router.push(`/asset?q=${encodeURIComponent(ctxMenu.row.plate)}`); }, disabled: !ctxMenu.row.plate || ctxMenu.row.plate === '미정' },
+          { type: 'separator' },
+          { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); }, disabled: !ctxMenu.row.plate },
+          { label: 'VIN 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vin) navigator.clipboard.writeText(ctxMenu.row.vin); }, disabled: !ctxMenu.row.vin },
+        ] satisfies ContextMenuItem[]) : []}
+      />
     </MasterPageShell>
   );
 }
