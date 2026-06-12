@@ -139,6 +139,9 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
   }
 
   function handleClose(o: boolean) {
+    if (!o && ocr.items.length > 0) {
+      if (!window.confirm('OCR 결과 또는 입력 중인 고지서 정보가 있습니다. 저장하지 않고 닫을까요?')) return;
+    }
     setOpen(o);
     if (!o) { ocr.reset(); setSelected(new Set()); }
   }

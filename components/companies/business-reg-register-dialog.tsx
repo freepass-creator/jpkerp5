@@ -83,6 +83,9 @@ export function BusinessRegRegisterDialog({
     setMode('ocr');
   }
   function handleClose(o: boolean) {
+    if (!o && items.length > 0) {
+      if (!window.confirm('OCR 결과 또는 입력 중인 법인 정보가 있습니다. 저장하지 않고 닫을까요?')) return;
+    }
     if (!o) reset();
     onOpenChange(o);
   }

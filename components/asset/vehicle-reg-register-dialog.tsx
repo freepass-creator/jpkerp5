@@ -86,6 +86,11 @@ export function VehicleRegRegisterDialog({
   }
 
   function handleClose(o: boolean) {
+    if (!o) {
+      // 미저장 OCR 결과·수동 입력 보존 가드
+      const dirty = items.length > 0 || !!manualDraft.plate?.trim() || !!manualDraft.model?.trim();
+      if (dirty && !window.confirm('OCR 결과 또는 입력 중인 차량 정보가 있습니다. 저장하지 않고 닫을까요?')) return;
+    }
     onOpenChange(o);
     if (!o) reset();
   }

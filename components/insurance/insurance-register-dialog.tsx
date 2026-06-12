@@ -93,6 +93,9 @@ export function InsuranceRegisterDialog({
   }
 
   function handleClose(o: boolean) {
+    if (!o && items.length > 0) {
+      if (!window.confirm('OCR 결과 또는 입력 중인 보험증권 정보가 있습니다. 저장하지 않고 닫을까요?')) return;
+    }
     onOpenChange(o);
     if (!o) reset();
   }
