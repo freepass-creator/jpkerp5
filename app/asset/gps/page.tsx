@@ -7,8 +7,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileXls, MagnifyingGlass, Copy, ArrowSquareOut } from '@phosphor-icons/react';
+import { Plus, FileXls, MagnifyingGlass, Copy, ArrowSquareOut, Trash } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -30,6 +31,7 @@ export default function AssetGpsPage() {
   useEffect(() => { if (!roleLoading && !master) router.replace('/'); }, [master, roleLoading, router]);
 
   const { vehicles } = useMergedVehicles();
+  const { remove: removeVehicle } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-gps:company', 'all');
@@ -129,14 +131,41 @@ export default function AssetGpsPage() {
               <button
                 className="btn"
                 type="button"
+                disabled={sel.size === 0}
+                title="선택한 자산 삭제 (감사로그 남음)"
+                style={{ color: sel.size > 0 ? 'var(--red-text)' : undefined }}
+                onClick={async () => {
+                  if (sel.size === 0) return;
+                  const realIds = Array.from(sel.selectedIds).filter((id) => !id.startsWith('contract-derived-'));
+                  if (realIds.length === 0) {
+                    alert('선택한 자산이 모두 계약 자동 인식 자산입니다 (삭제 불가)');
+                    return;
+                  }
+                  const note = sel.size - realIds.length > 0 ? `\n(자동 인식 ${sel.size - realIds.length}건은 제외됨)` : '';
+                  if (!confirm(`선택한 ${realIds.length}건의 자산을 삭제하시겠습니까?${note}`)) return;
+                  for (const id of realIds) {
+                    try { await removeVehicle(id); } catch (err) { console.error('vehicle delete failed', id, err); }
+                  }
+                  sel.clear();
+                }}
+              >
+                <Trash size={14} weight="bold" /> 선택 {sel.size}건 삭제
+              </button>
+              <button
+                className="btn"
+                type="button"
                 disabled={filtered.length === 0}
-                title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
+                title={sel.size > 0
+                  ? `선택한 ${sel.size}건만 엑셀 다운로드 (체크 해제 시 전체 ${filtered.length}건)`
+                  : `현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
                 onClick={() => {
+                  const targetRows = sel.size > 0 ? filtered.filter((v) => sel.selectedIds.has(v.id)) : filtered;
+                  const scope = sel.size > 0 ? `선택 ${sel.size}건` : `${filtered.length}건`;
                   exportToExcel({
-                    title: `GPS 설치 현황${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
-                    fileName: 'GPS설치',
+                    title: `GPS 설치 현황${companyFilter !== 'all' ? ` (${companyFilter})` : ''} — ${scope}`,
+                    fileName: `GPS설치${sel.size > 0 ? '-선택' : ''}`,
                     sheetName: 'GPS',
-                    rows: filtered.map((v) => ({
+                    rows: targetRows.map((v) => ({
                       회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
                       차량번호: v.plate ?? '',
                       차종: v.model ?? '',
@@ -159,7 +188,7 @@ export default function AssetGpsPage() {
                   });
                 }}
               >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{sel.size > 0 ? sel.size : filtered.length}</span>
               </button>
             </>
           }
