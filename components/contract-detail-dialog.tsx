@@ -64,6 +64,57 @@ export function ContractDetailDialog({
   );
 }
 
+/** 가장 임박한 (가장 작은, 또는 가장 음수인) D-day. 모두 비어있거나 30 초과 면 null. */
+function earliestDday(c: Contract, fields: Array<'insuranceExpiryDate' | 'inspectionDueDate' | 'returnScheduledDate'>): number | null {
+  const today = new Date().toISOString().slice(0, 10);
+  const tT = new Date(today).getTime();
+  let best: number | null = null;
+  for (const f of fields) {
+    const v = c[f] as string | undefined;
+    if (!v) continue;
+    const d = Math.round((new Date(v).getTime() - tT) / 86400000);
+    if (d > 30) continue;        // D-30 초과는 배지 X (위험 임박만)
+    if (best === null || d < best) best = d;
+  }
+  return best;
+}
+
+/** 탭 라벨에 D-N 배지 (만기 임박/경과 강조). */
+function tabLabelWithDday(label: string, dday: number | null) {
+  if (dday === null) return label;
+  const isOverdue = dday < 0;
+  const isUrgent = dday >= 0 && dday <= 7;
+  const bg = isOverdue ? 'var(--red-bg)' : isUrgent ? 'var(--orange-bg, #fff7ed)' : 'var(--brand-bg)';
+  const color = isOverdue ? 'var(--red-text)' : isUrgent ? 'var(--orange-text, #c2410c)' : 'var(--brand)';
+  const text = isOverdue ? `D+${-dday}` : dday === 0 ? '오늘' : `D-${dday}`;
+  return (
+    <>
+      {label}
+      <span style={{
+        display: 'inline-block', marginLeft: 6, padding: '0 6px',
+        background: bg, color, fontSize: 10, fontWeight: 700,
+        borderRadius: 'var(--radius-sm)', border: `1px solid ${color}`,
+      }}>{text}</span>
+    </>
+  );
+}
+
+/** 탭 라벨에 미납 회차 배지. */
+function tabLabelWithUnpaid(label: string, unpaidSeq: number) {
+  if (unpaidSeq === 0) return label;
+  return (
+    <>
+      {label}
+      <span style={{
+        display: 'inline-block', marginLeft: 6, padding: '0 6px',
+        background: 'var(--red-bg)', color: 'var(--red-text)',
+        fontSize: 10, fontWeight: 700, borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--red-text)',
+      }}>{unpaidSeq}</span>
+    </>
+  );
+}
+
 /** Shell wrapping — DetailDialogShell 에 props 전달. */
 function ContractDetailShell({
   contract, open, onOpenChange, onUpdate,
@@ -147,26 +198,20 @@ function ContractDetailShell({
       onCancel={handleCancel}
       tabs={[
         { value: 'status', label: '상태', content: <VehicleStatusTab c={contract} onUpdate={onUpdate} /> },
-        { value: 'asset', label: '자산', content: <VehicleSpecTab ref={assetRef} c={contract} onUpdate={onUpdate} onEditingChange={(e) => setEditingTab(e ? 'asset' : null)} /> },
-        { value: 'contract', label: '계약', content: <ContractInfoTab ref={contractRef} c={contract} onUpdate={onUpdate} onEditingChange={(e) => setEditingTab(e ? 'contract' : null)} /> },
+        {
+          value: 'asset',
+          label: tabLabelWithDday('자산', earliestDday(contract, ['insuranceExpiryDate', 'inspectionDueDate'])),
+          content: <VehicleSpecTab ref={assetRef} c={contract} onUpdate={onUpdate} onEditingChange={(e) => setEditingTab(e ? 'asset' : null)} />,
+        },
+        {
+          value: 'contract',
+          label: tabLabelWithDday('계약', earliestDday(contract, ['returnScheduledDate'])),
+          content: <ContractInfoTab ref={contractRef} c={contract} onUpdate={onUpdate} onEditingChange={(e) => setEditingTab(e ? 'contract' : null)} />,
+        },
         {
           value: 'payment',
           // 수납 탭 라벨에 미납 회차 수 배지 — 한눈에 위험 식별
-          label: (() => {
-            const unpaidSeq = contract.unpaidSeqCount ?? 0;
-            if (unpaidSeq === 0) return '수납';
-            return (
-              <>
-                수납
-                <span style={{
-                  display: 'inline-block', marginLeft: 6, padding: '0 6px',
-                  background: 'var(--red-bg)', color: 'var(--red-text)',
-                  fontSize: 10, fontWeight: 700, borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--red-text)',
-                }}>{unpaidSeq}</span>
-              </>
-            );
-          })(),
+          label: tabLabelWithUnpaid('수납', contract.unpaidSeqCount ?? 0),
           content: <PaymentTab c={contract} onUpdate={onUpdate} />,
         },
       ]}
