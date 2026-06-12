@@ -30,7 +30,7 @@ export default function RepairPage() {
   useEffect(() => { if (!roleLoading && !master) router.replace('/'); }, [master, roleLoading, router]);
 
   const { entries: history } = useHistoryEntries();
-  const { vehicles } = useMergedVehicles();
+  const { vehicles, loading: vehiclesLoading } = useMergedVehicles();
   const { remove: removeVehicle } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
@@ -118,7 +118,7 @@ export default function RepairPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td></tr>
+                    <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</td></tr>
                   ) : filtered.map((v) => {
                     const r = v.plate ? repairByPlate.get(v.plate.replace(/\s/g, '')) : undefined;
                     return (

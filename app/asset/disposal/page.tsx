@@ -36,7 +36,7 @@ export default function AssetDisposalPage() {
   const { isMaster: master, loading: roleLoading } = useRole();
   useEffect(() => { if (!roleLoading && !master) router.replace('/'); }, [master, roleLoading, router]);
 
-  const { vehicles } = useMergedVehicles();
+  const { vehicles, loading: vehiclesLoading } = useMergedVehicles();
   const { update: updateVehicle, remove: removeVehicle } = useVehicles();
   const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
@@ -102,7 +102,7 @@ export default function AssetDisposalPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={7} className="muted center" style={{ padding: 32 }}>처분 대상 차량 없음</td></tr>
+                    <tr><td colSpan={7} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '처분 대상 차량 없음'}</td></tr>
                   ) : filtered.map((v) => (
                     <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => router.push(`/asset?view=registered&plate=${encodeURIComponent(v.plate ?? '')}`)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                       <TableRowCheckbox id={v.id} selection={sel} />

@@ -26,7 +26,7 @@ import { useLiveTodayKr } from '@/lib/use-live-today';
 
 export default function AssetInspectionPage() {
   const router = useRouter();
-  const { contracts } = useContracts();
+  const { contracts, loading: contractsLoading } = useContracts();
   const { entries: history } = useHistoryEntries();
   const { vehicles } = useVehicles();
   const { companies: companyMaster } = useCompanies();
@@ -150,7 +150,7 @@ export default function AssetInspectionPage() {
           </thead>
           <tbody>
             {upcoming.length === 0 ? (
-              <EmptyRow colSpan={7}>등록된 검사 만기 없음</EmptyRow>
+              <EmptyRow colSpan={7}>{contractsLoading ? '데이터 불러오는 중…' : '등록된 검사 만기 없음'}</EmptyRow>
             ) : upcoming.map(({ c, daysLeft }) => {
               const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
               const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;

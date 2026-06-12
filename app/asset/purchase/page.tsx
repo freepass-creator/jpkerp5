@@ -26,7 +26,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 
 export default function PurchasePage() {
   const router = useRouter();
-  const { vehicles, update: updateVehicle } = useVehicles();
+  const { vehicles, loading: vehiclesLoading, update: updateVehicle } = useVehicles();
   const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const [busy, setBusy] = useState(false);
@@ -163,7 +163,7 @@ export default function PurchasePage() {
           </thead>
           <tbody>
             {pending.length === 0 ? (
-              <EmptyRow colSpan={6}>구매대기 차량 없음</EmptyRow>
+              <EmptyRow colSpan={6}>{vehiclesLoading ? '데이터 불러오는 중…' : '구매대기 차량 없음'}</EmptyRow>
             ) : pending.map((v) => (
               <tr key={v.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'context-menu' }}>
                 <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
@@ -197,7 +197,7 @@ export default function PurchasePage() {
           </thead>
           <tbody>
             {purchased.length === 0 ? (
-              <EmptyRow colSpan={7}>매입 완료 차량 없음</EmptyRow>
+              <EmptyRow colSpan={7}>{vehiclesLoading ? '데이터 불러오는 중…' : '매입 완료 차량 없음'}</EmptyRow>
             ) : purchased.map((v) => (
               <tr key={v.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'context-menu' }}>
                 <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>

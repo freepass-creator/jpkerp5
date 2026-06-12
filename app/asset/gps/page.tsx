@@ -30,7 +30,7 @@ export default function AssetGpsPage() {
   const { isMaster: master, loading: roleLoading } = useRole();
   useEffect(() => { if (!roleLoading && !master) router.replace('/'); }, [master, roleLoading, router]);
 
-  const { vehicles } = useMergedVehicles();
+  const { vehicles, loading: vehiclesLoading } = useMergedVehicles();
   const { remove: removeVehicle } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
@@ -96,7 +96,7 @@ export default function AssetGpsPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td></tr>
+                    <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</td></tr>
                   ) : filtered.map((v) => {
                     const installed = !!(v.gpsProvider || v.gpsDeviceId);
                     return (

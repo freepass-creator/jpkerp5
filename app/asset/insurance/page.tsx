@@ -36,7 +36,7 @@ export default function AssetInsurancePage() {
   const { isMaster: master, loading: roleLoading } = useRole();
   useEffect(() => { if (!roleLoading && !master) router.replace('/'); }, [master, roleLoading, router]);
 
-  const { vehicles } = useMergedVehicles();
+  const { vehicles, loading: vehiclesLoading } = useMergedVehicles();
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const { policies, remove: removePolicy } = useInsurances();
@@ -227,7 +227,7 @@ export default function AssetInsurancePage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={13} className="muted center" style={{ padding: 32 }}>해당 차량 없음</td></tr>
+                    <tr><td colSpan={13} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '해당 차량 없음'}</td></tr>
                   ) : filtered.map(({ v, insurer, policy, startDate, endDate, totalPremium, installmentCount, days, status }) => {
                     const tone = status === 'expired' ? 'red' : status === 'expire' ? 'orange' : status === 'missing' ? 'red' : '';
                     return (

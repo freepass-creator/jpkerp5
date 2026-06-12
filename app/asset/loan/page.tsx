@@ -28,7 +28,7 @@ export default function AssetLoanPage() {
   const { isMaster: master, loading: roleLoading } = useRole();
   useEffect(() => { if (!roleLoading && !master) router.replace('/'); }, [master, roleLoading, router]);
 
-  const { vehicles } = useMergedVehicles();
+  const { vehicles, loading: vehiclesLoading } = useMergedVehicles();
   const { remove: removeVehicle } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
@@ -95,7 +95,7 @@ export default function AssetLoanPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={10} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td></tr>
+                    <tr><td colSpan={10} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</td></tr>
                   ) : filtered.map((v) => (
                     <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => router.push(`/asset?view=registered&plate=${encodeURIComponent(v.plate ?? '')}`)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                       <TableRowCheckbox id={v.id} selection={sel} />
