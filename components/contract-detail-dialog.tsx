@@ -17,6 +17,7 @@ import { useInsurances } from '@/lib/firebase/insurance-store';
 import { normPlate } from '@/lib/entity-sync';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
 import { Section } from '@/components/ui/detail-primitives';
+import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { COL } from '@/lib/table-cols';
 import { toast } from '@/lib/toast';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -318,6 +319,14 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
 
   return (
     <div className="detail-stack">
+{/* KPI — 계약 한 화면 핵심 수치 */}
+      <KpiGrid>
+        <KpiCard label="월 대여료" value={`₩${(c.monthlyRent ?? 0).toLocaleString()}`} />
+        <KpiCard label="보증금" value={`₩${(c.deposit ?? 0).toLocaleString()}`} hint={c.deposit ? undefined : '미입력'} />
+        <KpiCard label="누적 미수" value={`₩${(c.unpaidAmount ?? 0).toLocaleString()}`} positive={(c.unpaidAmount ?? 0) === 0 ? undefined : false} hint={c.unpaidSeqCount ? `${c.unpaidSeqCount}회차` : undefined} />
+        <KpiCard label="회차" value={`${c.currentSeq ?? 0}/${c.totalSeq ?? 0}`} />
+      </KpiGrid>
+
 {/* 기본 식별 */}
       <Section icon={<Car size={12} weight="duotone" />} title="차량 식별">
         <div className="detail-grid-2">
