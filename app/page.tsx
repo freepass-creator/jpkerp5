@@ -83,9 +83,9 @@ function matchesView(c: Contract, v: View): boolean {
   // 종료된 계약은 운영현황에서 제외 (리스크관리 → 종료 탭에서 확인)
   if (isClosed(c)) return false;
   if (v === '전체') return true;
-  // '계약중' = 반납/해지 안 된 모든 계약 (휴차·상품화·매각 포함).
-  // vehicleStatus 변경해도 운영현황에서 사라지지 않음 (직원 피드백 6,7 반영).
-  if (v === '계약중') return isActiveContract(c);
+  // '계약중' = 실제 운행 중인 계약만 (휴차/매각/상품화 제외 — 사용자 명시).
+  // 휴차 chip 과 mutually exclusive. 합집합 = 전체.
+  if (v === '계약중') return isRunning(c);
   if (v === '만기경과') return getContractState(c).name === '만기경과';
   if (v === '만기임박') return getContractState(c).name === '만기임박';
   if (v === '연장대기') return c.vehicleStatus === '연장대기';
