@@ -14,11 +14,12 @@ import { useRole } from '@/lib/use-role';
 import { useSettings, type Theme, type FontFamily, type FontSize, type Density, type Radius, type Accent } from '@/lib/use-settings';
 import { MENU_LABELS, DEFAULT_VISIBILITY, loadVisibility, saveVisibility, type MenuKey } from '@/components/layout/sidebar';
 import { useEffect as useEffectMenu } from 'react';
+import { usePersistentState } from '@/lib/use-persistent-state';
 
 type Tab = 'display' | 'menu' | 'account' | 'admin';
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<Tab>('display');
+  const [tab, setTab] = usePersistentState<Tab>('filter:settings:tab', 'display');
   const { user } = useAuth();
   const { isAdmin: admin } = useRole();
 

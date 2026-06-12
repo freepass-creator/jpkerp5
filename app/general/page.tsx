@@ -23,6 +23,7 @@ import { audit } from '@/lib/firebase/audit-store';
 import { useStaffList } from '@/lib/use-staff-list';
 import { displayCompanyShort } from '@/lib/company-display';
 import type { Company } from '@/lib/types';
+import { usePersistentState } from '@/lib/use-persistent-state';
 
 type GeneralView =
   | 'staff' | 'company'
@@ -45,7 +46,7 @@ const VIEW_LABEL: Record<GeneralView, string> = {
 };
 
 export default function GeneralPage() {
-  const [view, setView] = useState<GeneralView>('company');
+  const [view, setView] = usePersistentState<GeneralView>('filter:general:view', 'company');
   const [companyRegisterOpen, setCompanyRegisterOpen] = useState(false);
   const [editCompanyId, setEditCompanyId] = useState<string | null>(null);
   const [companySelectedIds, setCompanySelectedIds] = useState<Set<string>>(new Set());
