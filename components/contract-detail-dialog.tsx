@@ -348,7 +348,7 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
 
       {/* 관련 페이지 바로가기 — 다른 도메인으로 즉시 점프 (실무자 워크플로우) */}
       <Section icon={<Car size={12} weight="duotone" />} title="관련 페이지 바로가기">
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12, marginBottom: 6 }}>
           <a href={`/asset?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>자산 상세 →</a>
           <a href={`/asset/insurance?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>보험증권 →</a>
           <a href={`/asset/loan?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>구매방식 →</a>
@@ -356,6 +356,34 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
           <a href={`/asset/repair?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>수선 →</a>
           <a href={`/receivables?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none', color: (c.unpaidAmount ?? 0) > 0 ? 'var(--red-text)' : undefined }}>미수 →</a>
           <a href={`/penalty?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>과태료 →</a>
+        </div>
+        {/* 손님 자가조회 페이지 링크 복사 — 직원이 카톡/SMS 로 손님에게 전달 */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, paddingTop: 6, borderTop: '1px dashed var(--border-soft)' }}>
+          <span className="dim" style={{ fontSize: 11 }}>손님 자가조회 페이지:</span>
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={() => {
+              const url = `${window.location.origin}/customer?plate=${encodeURIComponent(c.vehiclePlate ?? '')}`;
+              navigator.clipboard.writeText(url).then(
+                () => alert(`✓ 손님 페이지 링크 복사됨\n${url}\n\n손님에게 카톡/SMS 로 전송하세요. 손님은 주민번호로 본인 인증 후 자기 계약만 조회 가능.`),
+                () => prompt('수동 복사', url),
+              );
+            }}
+            title="손님이 차량번호 + 주민번호로 본인 인증 후 자기 계약 + 회차·수납 내역 조회. 차량번호 자동 prefill."
+          >
+            📋 손님 페이지 링크 복사
+          </button>
+          <a
+            href={`/customer?plate=${encodeURIComponent(c.vehiclePlate ?? '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm"
+            style={{ textDecoration: 'none' }}
+            title="직원이 손님 화면 미리보기 (새 탭)"
+          >
+            미리보기 →
+          </a>
         </div>
       </Section>
 

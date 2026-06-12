@@ -19,8 +19,8 @@
  *   · RTDB Rules → contracts 노드에 ".indexOn": ["vehiclePlate"]
  */
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ref, query, orderByChild, equalTo, get } from 'firebase/database';
 import { signInAnonymously } from 'firebase/auth';
 import { ShieldCheck, ArrowRight, CircleNotch, MagnifyingGlass } from '@phosphor-icons/react';
@@ -128,8 +128,15 @@ function sanitizeCompany(c: Company | undefined) {
 
 export default function CustomerLookupEntry() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [plate, setPlate] = useState('');
   const [ident, setIdent] = useState('');
+
+  // 직원이 공유한 링크에 차량번호 prefill 가능 — /customer?plate=12가3456
+  useEffect(() => {
+    const p = searchParams.get('plate');
+    if (p) setPlate(p);
+  }, [searchParams]);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
