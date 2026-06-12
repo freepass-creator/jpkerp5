@@ -8,11 +8,14 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
+import { ShoppingCart, FileXls, MagnifyingGlass, Copy, ArrowRight } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { exportToExcel } from '@/lib/excel-export';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { useContracts } from '@/lib/firebase/contracts-store';
+import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
+import { toast } from '@/lib/toast';
 import { displayCompanyName } from '@/lib/company-display';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
@@ -23,9 +26,38 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 
 export default function PurchasePage() {
   const router = useRouter();
-  const { vehicles } = useVehicles();
+  const { vehicles, update: updateVehicle } = useVehicles();
+  const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
+  const [busy, setBusy] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: { id: string; plate?: string; vin?: string } | null }>({ open: false, x: 0, y: 0, row: null });
+
+  /** 구매대기 → 상품대기 일괄 전환 (plate 가 있고 정상 형식인 것만) */
+  async function bulkPromotePending() {
+    if (busy) return;
+    const promotable = pending.filter((v) => v.plate && v.plate !== '미정');
+    if (promotable.length === 0) {
+      alert('차량번호가 등록된 구매대기 자산이 없습니다 (먼저 차량번호 입력 필요)');
+      return;
+    }
+    if (!confirm(`구매대기 ${promotable.length}건을 상품대기로 일괄 전환합니다.\n같은 plate 활성 계약 vehicleStatus 도 sync 됩니다.\n계속?`)) return;
+    setBusy(true);
+    let changed = 0, synced = 0;
+    try {
+      for (const v of promotable) {
+        const merged = { ...v, status: '상품대기' as const };
+        try {
+          await updateVehicle(merged);
+          changed++;
+          const r = await syncContractStatusFromVehicle(merged, contracts, updateContract);
+          synced += r.updatedCount;
+        } catch (err) { console.error('promote failed', v.id, err); }
+      }
+      toast.success(`${changed}대 → 상품대기${synced > 0 ? ` · 계약 ${synced}건 sync` : ''}`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const pending = useMemo(
     () => vehicles.filter((v) => v.status === '구매대기').sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '')),
@@ -101,9 +133,23 @@ export default function PurchasePage() {
     >
       {/* 구매대기 */}
       <section style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: 13, fontWeight: 700, margin: '0 0 8px', color: 'var(--orange-text, #c2410c)' }}>
-          구매대기 — 입고 예정 차량 ({pending.length})
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 8, gap: 8 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0, color: 'var(--orange-text, #c2410c)' }}>
+            구매대기 — 입고 예정 차량 ({pending.length})
+          </h3>
+          {pending.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => void bulkPromotePending()}
+              disabled={busy}
+              style={{ marginLeft: 'auto', fontSize: 11 }}
+              title="차량번호가 등록된 구매대기 자산을 상품대기로 일괄 전환 (입고 완료 처리). 동일 plate 계약 vehicleStatus 도 sync."
+            >
+              <ArrowRight size={11} weight="bold" /> 일괄 상품대기 전환
+            </button>
+          )}
+        </div>
         <table className="table">
           <thead>
             <tr>

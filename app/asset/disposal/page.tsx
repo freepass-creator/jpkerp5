@@ -7,8 +7,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
+import { Plus, FileXls, MagnifyingGlass, Copy, Trash } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { useContracts } from '@/lib/firebase/contracts-store';
+import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
+import { toast } from '@/lib/toast';
+import type { Vehicle } from '@/lib/types';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
@@ -32,6 +37,8 @@ export default function AssetDisposalPage() {
   useEffect(() => { if (!roleLoading && !master) router.replace('/'); }, [master, roleLoading, router]);
 
   const { vehicles } = useMergedVehicles();
+  const { update: updateVehicle, remove: removeVehicle } = useVehicles();
+  const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-disposal:company', 'all');
@@ -118,17 +125,84 @@ export default function AssetDisposalPage() {
             <>
               <button className="btn btn-primary" type="button"><Plus size={14} weight="bold" /> 처분 등록</button>
               <span className="btn-sep" />
+              {/* 일괄 다음 단계 — 매각검토 → 매각대기 → 매각 progression */}
+              <select
+                className="input input-compact"
+                disabled={sel.size === 0}
+                value=""
+                title={sel.size === 0 ? '체크박스로 자산 선택 후 일괄 다음 단계' : `선택 ${sel.size}건 → 일괄 상태 변경`}
+                style={{ fontSize: 12, minWidth: 130 }}
+                onChange={async (e) => {
+                  const next = e.target.value as Vehicle['status'];
+                  e.currentTarget.value = '';
+                  if (!next || sel.size === 0) return;
+                  const targets = vehicles.filter((v) => sel.selectedIds.has(v.id) && !v.id.startsWith('contract-derived-'));
+                  const synthetic = sel.size - targets.length;
+                  if (targets.length === 0) {
+                    alert('선택된 자산 중 처리 가능한 자산이 없습니다 (계약 자동 인식 자산 제외)');
+                    return;
+                  }
+                  const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
+                  if (!confirm(`선택한 ${targets.length}건의 자산 상태를 '${next}' 로 변경합니다.\n같은 plate 활성 계약 vehicleStatus 도 sync 됩니다.${note}\n계속?`)) return;
+                  let changed = 0, syncedContracts = 0;
+                  for (const v of targets) {
+                    if (v.status === next) continue;
+                    const merged = { ...v, status: next };
+                    try {
+                      await updateVehicle(merged);
+                      changed++;
+                      const r = await syncContractStatusFromVehicle(merged, contracts, updateContract);
+                      syncedContracts += r.updatedCount;
+                    } catch (err) { console.error('disposal bulk failed', v.id, err); }
+                  }
+                  toast.success(`${changed}대 → ${next}${syncedContracts > 0 ? ` · 계약 ${syncedContracts}건 sync` : ''}`);
+                  sel.clear();
+                }}
+              >
+                <option value="">선택 상태 변경…</option>
+                <option value="매각검토">매각검토</option>
+                <option value="매각대기">매각대기 (다음 단계)</option>
+                <option value="매각">매각 완료</option>
+                <option value="휴차대기">↩ 휴차대기로 복귀</option>
+              </select>
+              <button
+                className="btn"
+                type="button"
+                disabled={sel.size === 0}
+                title="체크박스로 선택한 자산 일괄 삭제 (감사로그 남음)"
+                style={{ color: sel.size > 0 ? 'var(--red-text)' : undefined }}
+                onClick={async () => {
+                  if (sel.size === 0) return;
+                  const realIds = Array.from(sel.selectedIds).filter((id) => !id.startsWith('contract-derived-'));
+                  if (realIds.length === 0) {
+                    alert('선택한 자산이 모두 계약 자동 인식 자산입니다 (삭제 불가)');
+                    return;
+                  }
+                  const note = sel.size - realIds.length > 0 ? `\n(자동 인식 ${sel.size - realIds.length}건은 제외됨)` : '';
+                  if (!confirm(`선택한 ${realIds.length}건의 자산을 삭제하시겠습니까?${note}`)) return;
+                  for (const id of realIds) {
+                    try { await removeVehicle(id); } catch (err) { console.error('vehicle delete failed', id, err); }
+                  }
+                  sel.clear();
+                }}
+              >
+                <Trash size={14} weight="bold" /> 선택 {sel.size}건 삭제
+              </button>
               <button
                 className="btn"
                 type="button"
                 disabled={filtered.length === 0}
-                title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
+                title={sel.size > 0
+                  ? `선택한 ${sel.size}건만 엑셀 다운로드 (체크 해제 시 전체 ${filtered.length}건)`
+                  : `현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
                 onClick={() => {
+                  const targetRows = sel.size > 0 ? filtered.filter((v) => sel.selectedIds.has(v.id)) : filtered;
+                  const scope = sel.size > 0 ? `선택 ${sel.size}건` : `${filtered.length}건`;
                   exportToExcel({
-                    title: `처분 자산${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
-                    fileName: '처분자산',
+                    title: `처분 자산${companyFilter !== 'all' ? ` (${companyFilter})` : ''} — ${scope}`,
+                    fileName: `처분자산${sel.size > 0 ? '-선택' : ''}`,
                     sheetName: '처분',
-                    rows: filtered.map((v) => ({
+                    rows: targetRows.map((v) => ({
                       회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
                       차량번호: v.plate ?? '',
                       차종: v.model ?? '',
