@@ -163,6 +163,38 @@ export default function DashboardPage() {
                 ]}
               />
             </div>
+            {/* 보조 KPI 4종 — 이번달 운영 흐름 한 줄 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 8 }}>
+              <SubKpi
+                label="이번달 수금률"
+                value={`${kpi.collectionProgress}%`}
+                sub={`${formatCurrency(kpi.collectedThisMonth)} / ${formatCurrency(kpi.monthlyTarget)}`}
+                tone={kpi.collectionProgress >= 90 ? 'green' : kpi.collectionProgress >= 70 ? 'brand' : 'orange'}
+                href="/payments"
+                trendPct={kpi.momGrowth}
+              />
+              <SubKpi
+                label="반납 지연"
+                value={`${kpi.overdueReturns}건`}
+                sub="운행 중 · 만기 경과"
+                tone={kpi.overdueReturns === 0 ? 'green' : 'red'}
+                href="/contract/expire"
+              />
+              <SubKpi
+                label="이번달 신규"
+                value={`${kpi.newThisMonth}건`}
+                sub={`다음달 만기 ${kpi.expiringNextMonth}건`}
+                tone="brand"
+                href="/contract"
+              />
+              <SubKpi
+                label="과태료 미처리"
+                value={`${kpi.penaltyOpen}건`}
+                sub="고지서·매칭·통지"
+                tone={kpi.penaltyOpen === 0 ? 'green' : 'orange'}
+                href="/penalty"
+              />
+            </div>
           </Section>
 
           {/* D-Day 임박 알림 — 정기검사·보험만기·자동차세·면허만기·반납임박 (D-30 이내) */}
@@ -1249,6 +1281,50 @@ function MainKpi({
     );
   }
   return <div className="panel" style={baseStyle}>{body}</div>;
+}
+
+/** SubKpi — 보조 KPI 카드 (운영 흐름 mini 4개 한 줄). */
+function SubKpi({
+  label, value, sub, tone, href, trendPct,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone: 'brand' | 'red' | 'orange' | 'green' | 'zinc';
+  href?: string;
+  /** 전월대비 증감 (%, null = 비교 불가) */
+  trendPct?: number | null;
+}) {
+  const colorMap = {
+    brand: 'var(--brand)', red: 'var(--red-text)', orange: 'var(--orange-text)',
+    green: 'var(--green-text)', zinc: 'var(--text-sub)',
+  };
+  const style: React.CSSProperties = {
+    padding: '10px 14px',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-soft)',
+    borderLeft: `3px solid ${colorMap[tone]}`,
+    borderRadius: 'var(--radius-sm)',
+    display: 'flex', flexDirection: 'column', gap: 4,
+    textDecoration: 'none', color: 'inherit',
+    cursor: href ? 'pointer' : 'default',
+  };
+  const body = (
+    <>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-sub)', fontWeight: 500 }}>{label}</span>
+        {trendPct != null && (
+          <span className="mono" style={{ fontSize: 10, marginLeft: 'auto', color: trendPct >= 0 ? 'var(--green-text)' : 'var(--red-text)', fontWeight: 600 }}>
+            {trendPct >= 0 ? '↑' : '↓'} {Math.abs(trendPct)}%
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: colorMap[tone], fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</div>
+      {sub && <div className="mono" style={{ fontSize: 10, color: 'var(--text-weak)', fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>}
+    </>
+  );
+  if (href) return <Link href={href} style={style} title={`${label} → 상세`}>{body}</Link>;
+  return <div style={style}>{body}</div>;
 }
 
 function KpiCard({
