@@ -7,6 +7,7 @@ import { DialogRoot, DialogContent, DialogBody } from '@/components/ui/dialog';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useBankTx } from '@/lib/firebase/transactions-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { formatCurrency } from '@/lib/utils';
 import { matchesSearch } from '@/lib/filter-helpers';
@@ -30,6 +31,7 @@ export function GlobalSearch() {
   const { contracts } = useContracts();
   const { companies } = useCompanies();
   const { rows: bankTx } = useBankTx();
+  const { vehicles } = useVehicles();
 
   // Ctrl/Cmd+K 단축키
   useEffect(() => {
@@ -50,11 +52,20 @@ export function GlobalSearch() {
   }, [open]);
 
   const results = useMemo(() => {
-    if (!q.trim()) return { contracts: [], companies: [], txs: [] };
+    if (!q.trim()) return { contracts: [], vehicles: [], companies: [], txs: [] };
+    // 계약 있는 차량 plate set — 차량 결과에서 중복 제외 (계약 행이 이미 있음)
+    const contractsByPlate = new Set<string>();
+    for (const c of contracts) {
+      if (c.vehiclePlate) contractsByPlate.add(c.vehiclePlate.replace(/\s/g, ''));
+    }
     return {
       contracts: contracts.filter((c) =>
         matchesSearch(q, [c.vehiclePlate, c.customerName, c.contractNo, c.driverName, c.customerLicenseNo, c.customerPhone1])
       ).slice(0, 20),
+      vehicles: vehicles.filter((v) =>
+        v.plate && !contractsByPlate.has(v.plate.replace(/\s/g, '')) &&
+        matchesSearch(q, [v.plate, v.model, v.vin, v.vehicleMaker, v.vehicleSubModel])
+      ).slice(0, 10),
       companies: companies.filter((co) =>
         matchesSearch(q, [co.name, co.code, co.bizRegNo, co.corpRegNo, co.ceo])
       ).slice(0, 10),
@@ -62,9 +73,9 @@ export function GlobalSearch() {
         matchesSearch(q, [t.counterparty, t.memo, t.note, t.account])
       ).slice(0, 10),
     };
-  }, [q, contracts, companies, bankTx]);
+  }, [q, contracts, vehicles, companies, bankTx]);
 
-  const totalCount = results.contracts.length + results.companies.length + results.txs.length;
+  const totalCount = results.contracts.length + results.vehicles.length + results.companies.length + results.txs.length;
 
   return (
     <DialogRoot open={open} onOpenChange={setOpen}>
@@ -75,7 +86,7 @@ export function GlobalSearch() {
             <input
               ref={inputRef}
               className="input"
-              placeholder="차량번호 / 계약자 / 면허번호 / 회사명 / 사업자번호 / 거래상대"
+              placeholder="차량번호 / VIN / 계약자 / 면허번호 / 회사명 / 사업자번호 / 거래상대"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               style={{ flex: 1, border: 'none', fontSize: 14, padding: 0, background: 'transparent' }}
@@ -122,6 +133,30 @@ export function GlobalSearch() {
                           </>
                         }
                         onClick={() => { setOpen(false); router.push(`/contract?id=${c.id}`); }}
+                      />
+                    ))}
+                  </Section>
+                )}
+
+                {results.vehicles.length > 0 && (
+                  <Section title={`차량 — 계약 없음 (${results.vehicles.length})`}>
+                    {results.vehicles.map((v) => (
+                      <ResultRow
+                        key={v.id}
+                        icon={<Car size={12} weight="duotone" />}
+                        title={
+                          <>
+                            <span className="plate">{v.plate}</span>
+                            <span style={{ marginLeft: 8 }}>{v.model || '-'}</span>
+                          </>
+                        }
+                        meta={
+                          <>
+                            <span className="dim">{v.status}</span>
+                            {v.vin && <span style={{ marginLeft: 8 }} className="mono dim">{v.vin}</span>}
+                          </>
+                        }
+                        onClick={() => { setOpen(false); router.push(`/asset?id=${v.id}`); }}
                       />
                     ))}
                   </Section>
