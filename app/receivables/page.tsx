@@ -96,7 +96,7 @@ function lastContactDate(contractId: string, history: ReturnType<typeof useHisto
 }
 
 export default function ReceivablesPage() {
-  const { contracts, update: updateContract } = useContracts();
+  const { contracts, loading: contractsLoading, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const { entries: history, add: addHistory } = useHistoryEntries();
   const { user } = useAuth();
@@ -372,7 +372,7 @@ export default function ReceivablesPage() {
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan={16} className="muted center" style={{ padding: 32 }}>
-                        {filter} 해당 계약 없음
+                        {contractsLoading ? '데이터 불러오는 중…' : `${filter} 해당 계약 없음`}
                       </td>
                     </tr>
                   ) : (

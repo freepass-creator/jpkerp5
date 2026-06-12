@@ -68,7 +68,7 @@ export default function AssetPage() {
     if (!roleLoading && !master) router.replace('/');
   }, [master, roleLoading, router]);
 
-  const { vehicles: rawVehicles, update: updateVehicle, remove: removeVehicle, add: addVehicle } = useVehicles();
+  const { vehicles: rawVehicles, loading: vehiclesLoading, update: updateVehicle, remove: removeVehicle, add: addVehicle } = useVehicles();
   const { contracts, update: updateContract } = useContracts();
   const { entries: history } = useHistoryEntries();
   const { companies: companyMaster } = useCompanies();
@@ -367,7 +367,7 @@ export default function AssetPage() {
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan={11} className="muted center" style={{ padding: 32 }}>
-                        등록된 차량 없음 — 좌측 하단 [+ 차량 등록] 으로 시작하세요
+                        {vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음 — 좌측 하단 [+ 차량 등록] 으로 시작하세요'}
                       </td>
                     </tr>
                   ) : filtered.map((v) => {
@@ -508,7 +508,7 @@ export default function AssetPage() {
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan={14} className="muted center" style={{ padding: 32 }}>
-                        등록된 차량 없음 — 좌측 하단 [+ 차량 등록] 으로 시작하세요
+                        {vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음 — 좌측 하단 [+ 차량 등록] 으로 시작하세요'}
                       </td>
                     </tr>
                   ) : filtered.map((v) => (
