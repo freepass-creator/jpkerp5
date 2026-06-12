@@ -337,6 +337,19 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
         </div>
       </Section>
 
+      {/* 관련 페이지 바로가기 — 다른 도메인으로 즉시 점프 (실무자 워크플로우) */}
+      <Section icon={<Car size={12} weight="duotone" />} title="관련 페이지 바로가기">
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12 }}>
+          <a href={`/asset?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>자산 상세 →</a>
+          <a href={`/asset/insurance?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>보험증권 →</a>
+          <a href={`/asset/loan?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>구매방식 →</a>
+          <a href={`/asset/gps?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>GPS →</a>
+          <a href={`/asset/repair?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>수선 →</a>
+          <a href={`/receivables?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none', color: (c.unpaidAmount ?? 0) > 0 ? 'var(--red-text)' : undefined }}>미수 →</a>
+          <a href={`/penalty?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>과태료 →</a>
+        </div>
+      </Section>
+
       {/* 라이프사이클 일자 — vehicles 마스터에서 가져옴 */}
       <Section icon={<Car size={12} weight="duotone" />} title="차량 라이프사이클">
         <div className="detail-grid-2">
