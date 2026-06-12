@@ -490,23 +490,38 @@ export default function ReceivablesPage() {
                             </button>
                           </td>
                           <td>
-                            <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-                              <button
-                                type="button"
-                                className="btn btn-sm"
-                                onClick={() => setContactOpen(c)}
-                                title="연락기록 추가"
-                              >
-                                <ChatCircleDots /> 연락
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm"
-                                onClick={() => window.open(`/notice/cert/${c.id}`, '_blank')}
-                                title="내용증명 (최고서) — 새 탭"
-                              >
-                                <FileText /> 내용증명
-                              </button>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+                              <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm"
+                                  onClick={() => setContactOpen(c)}
+                                  title={lastC ? `최근 연락 ${lastC} (마지막 기록일)` : '연락기록 없음 — 추가'}
+                                  style={lastC && lastC >= today ? { borderColor: 'var(--green-text)', color: 'var(--green-text)' } : undefined}
+                                >
+                                  <ChatCircleDots /> 연락
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm"
+                                  onClick={() => window.open(`/notice/cert/${c.id}`, '_blank')}
+                                  title="내용증명 (최고서) — 새 탭"
+                                >
+                                  <FileText /> 내용증명
+                                </button>
+                              </div>
+                              {lastC ? (
+                                <span className="dim mono" style={{ fontSize: 10 }} title={`마지막 연락 ${lastC}`}>
+                                  최근 연락 {(() => {
+                                    const d = Math.round((new Date(today).getTime() - new Date(lastC).getTime()) / 86400000);
+                                    return d <= 0 ? '오늘' : d === 1 ? '어제' : `${d}일 전`;
+                                  })()}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 10, color: 'var(--red-text)' }} title="연락기록 없음">
+                                  연락기록 없음
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="dim" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.notes || ''}>
