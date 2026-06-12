@@ -778,7 +778,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
   function commitTemp() {
     if (!tempPlate || !tempReason) {
-      alert('대체 차량번호와 사유를 입력해주세요.');
+      toast.error('대체 차량번호와 사유를 입력해주세요');
       return;
     }
     onUpdate({
@@ -811,8 +811,8 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
   /** 연장 처리 — 새 반납예정일 + (선택) 월대여료 갱신, 운행 복귀 */
   function commitRenewal() {
-    if (!renewNewReturn) { alert('새 반납예정일을 입력하세요.'); return; }
-    if (renewNewReturn <= c.contractDate) { alert('반납예정일은 계약일 이후여야 합니다.'); return; }
+    if (!renewNewReturn) { toast.error('새 반납예정일을 입력하세요'); return; }
+    if (renewNewReturn <= c.contractDate) { toast.error('반납예정일은 계약일 이후여야 합니다'); return; }
     const newRent = renewNewRent ? parseInt(renewNewRent.replace(/[^0-9]/g, ''), 10) || c.monthlyRent : c.monthlyRent;
     // 새 종료일까지 약정개월 재계산
     const start = new Date(c.contractDate);
@@ -832,7 +832,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
   /** 종료 결정 — 반납 약속일 기록, 종료대기 전환 */
   function commitEndPromise() {
-    if (!endPromisedDate) { alert('반납 약속일을 입력하세요.'); return; }
+    if (!endPromisedDate) { toast.error('반납 약속일을 입력하세요'); return; }
     onUpdate({
       ...c,
       vehicleStatus: '종료대기',
@@ -2322,7 +2322,7 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
   function commitAdd() {
     if (addOpenSeq == null) return;
     const amt = parseInt(addAmount.replace(/[^0-9]/g, ''), 10);
-    if (!amt || amt <= 0) { alert('금액을 입력하세요.'); return; }
+    if (!amt || amt <= 0) { toast.error('금액을 입력하세요'); return; }
     const today = todayKr();
 
     if (addMode === 'discount') {
@@ -2433,11 +2433,14 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
             className="btn btn-sm"
             onClick={() => {
               const dueDate = window.prompt('새 회차 결제일 (YYYY-MM-DD)\n예: 2026-06-20', todayKr());
-              if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return;
+              if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+                if (dueDate) toast.error('날짜 형식 오류 — YYYY-MM-DD');
+                return;
+              }
               const amountStr = window.prompt(`새 회차 금액 (원)\n월 대여료: ${c.monthlyRent.toLocaleString()}\n일할계산은 직접 산정해서 입력`, '');
               if (!amountStr) return;
               const amount = Number(amountStr.replace(/[,\s]/g, ''));
-              if (!amount || amount <= 0) { alert('금액 오류'); return; }
+              if (!amount || amount <= 0) { toast.error('금액 오류'); return; }
               // schedules dueDate 기준 정렬해서 끼워넣기 + seq 재할당
               const current = c.schedules ?? [];
               const next = [...current, { seq: 0, dueDate, amount, status: '예정' as const, paidAmount: 0, payments: [] }];
@@ -2449,7 +2452,7 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
                 last.amount = Math.max(0, last.amount - amount);
               }
               onUpdate({ ...c, schedules: next, totalSeq: next.length });
-              alert(`✓ ${dueDate} 회차 (₩${amount.toLocaleString()}) 추가\n마지막 회차에서 ₩${amount.toLocaleString()} 자동 차감 (총합 보존)`);
+              toast.success(`${dueDate} 회차 ₩${amount.toLocaleString()} 추가 — 마지막 회차에서 자동 차감 (총합 보존)`);
             }}
             title="결제일 변경 시 중간에 가변 회차 수동 추가. 일할계산은 직원이 직접. 마지막 회차에서 자동 차감 → 총합 보존."
           >
@@ -3177,7 +3180,7 @@ function DocumentsTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =>
         onUpdate({ ...c, contractDocUrl: undefined, contractDocFileName: undefined, contractDocUploadedAt: undefined });
       }
     } catch (e) {
-      alert('삭제 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('삭제 실패: ' + ((e as Error).message ?? String(e)));
     }
   }
 
