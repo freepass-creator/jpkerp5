@@ -197,7 +197,7 @@ export default function PaymentsPage() {
   async function handleAutoMatchCardAll() {
     const results = autoMatchCardAll(cardTx, contracts);
     if (results.length === 0) {
-      alert('자동 매칭 가능한 카드 매출이 없습니다.\n(고객명·금액 모두 일치하는 미매칭 카드 매출이 없음)');
+      toast.info('자동 매칭 가능한 카드 매출이 없습니다 (고객명·금액 일치 미매칭 없음)');
       return;
     }
     if (!confirm(`카드 매출 자동 매칭 ${results.length}건 일괄 적용하시겠습니까?`)) return;
@@ -248,7 +248,7 @@ export default function PaymentsPage() {
   async function handleAutoMatchAll() {
     const results = autoMatchAll(bankTx, contracts);
     if (results.length === 0) {
-      alert('자동 매칭 가능한 입금이 없습니다.\n(거래상대명·금액 모두 일치하는 미매칭 입금이 없음)');
+      toast.info('자동 매칭 가능한 입금이 없습니다 (거래상대명·금액 일치 미매칭 없음)');
       return;
     }
     const preview = results.slice(0, 10).map((r) =>

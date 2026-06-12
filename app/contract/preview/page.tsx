@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Printer, FilePdf, FloppyDisk } from '@phosphor-icons/react';
 import { todayKr } from '@/lib/mock-data';
 import { stripCorpSuffix } from '@/lib/company-display';
+import { toast } from '@/lib/toast';
 
 /* ─── PDF 생성 (freepasserp3 패턴 차용) ─── */
 const CDN = {
@@ -193,7 +194,7 @@ export default function ContractPreviewPage() {
       await paperToPdf(paperRef.current, fname);
     } catch (err) {
       console.error('[contract/preview] PDF 생성 실패', err);
-      alert('PDF 생성에 실패했습니다. 콘솔을 확인해주세요.');
+      toast.error('PDF 생성 실패 — 콘솔 확인');
     } finally {
       setPdfBusy(false);
     }

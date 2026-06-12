@@ -685,7 +685,7 @@ export default function AssetPage() {
               onClick={async () => {
                 const targets = rawVehicles.filter((v) => AUTO_CALCULABLE_STATUS.has(v.status));
                 if (targets.length === 0) {
-                  alert('자동 결정 대상 없음 — 모든 차량이 사용자 명시 상태(운행/정비/사고/매각 등)임');
+                  toast.info('자동 결정 대상 없음 — 모든 차량이 사용자 명시 상태');
                   return;
                 }
                 if (!confirm(`자동 결정 대상 ${targets.length}대 — 차량번호로 휴차/등록대기/구매대기 재계산.\n사용자 명시 상태(운행/정비/사고/매각 등)는 보존.\n계속?`)) return;

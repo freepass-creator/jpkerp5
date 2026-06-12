@@ -77,7 +77,7 @@ export default function FinancePage() {
       await removeManyBank(Array.from(selectedIds));
       setSelectedIds(new Set());
     } catch (e) {
-      alert(`삭제 실패: ${(e as Error).message ?? String(e)}`);
+      toast.error(`삭제 실패: ${(e as Error).message ?? String(e)}`);
     }
   }
   const { contracts } = useContracts();

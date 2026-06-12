@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import { getFirebaseAuth } from '@/lib/firebase/client';
+import { toast } from '@/lib/toast';
 
 type UserRow = {
   uid: string;
@@ -93,14 +94,14 @@ export default function AdminUsersPage() {
       if (!data.ok) throw new Error(data.error);
       await load();
     } catch (e) {
-      alert('실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setBusyUid(null);
     }
   }, [user, load]);
 
   const sendReset = useCallback(async (u: UserRow) => {
-    if (!u.email) { alert('이메일 없음'); return; }
+    if (!u.email) { toast.error('이메일 없음'); return; }
     if (!confirm(`${u.email} 으로 비밀번호 재설정 메일을 보낼까요?`)) return;
     setBusyUid(u.uid);
     try {
@@ -109,7 +110,7 @@ export default function AdminUsersPage() {
       await sendPasswordResetEmail(auth, u.email);
       alert(`재설정 메일을 ${u.email} 으로 발송했습니다.`);
     } catch (e) {
-      alert('발송 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('발송 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setBusyUid(null);
     }
@@ -132,7 +133,7 @@ export default function AdminUsersPage() {
       if (!data.ok) throw new Error(data.error);
       await load();
     } catch (e) {
-      alert('권한 변경 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('권한 변경 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setBusyUid(null);
     }
@@ -153,7 +154,7 @@ export default function AdminUsersPage() {
       if (!data.ok) throw new Error(data.error);
       await load();
     } catch (e) {
-      alert('삭제 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('삭제 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setBusyUid(null);
     }
