@@ -52,7 +52,12 @@ export function useVehicles(): {
         batch[id] = { ...row, id } as Vehicle;
       }
       await rtdbUpdate(ref(db, VEHICLES_PATH), pruneUndefined(batch as unknown as Record<string, unknown>));
-      void audit.import('vehicle', `차량 일괄 등록 ${rows.length}대`, { count: rows.length });
+      const vIds = Object.keys(batch);
+      void audit.import('vehicle', `차량 일괄 등록 ${rows.length}대`, {
+        count: rows.length,
+        ids: vIds.slice(0, 100),
+        truncated: vIds.length > 100,
+      });
       return rows.length;
     },
     update: async (v) => {

@@ -39,11 +39,15 @@ const BASE_VIEWS: View[] = ['전체', '계약중', '휴차', '미수'];
 /** 데이터 있을 때만 표시되는 조건부 필터 */
 const CONDITIONAL_VIEWS: View[] = ['만기경과', '만기임박', '연장대기', '종료대기'];
 
-/** 계약중 = 아직 반납·해지 안된 진행 계약 (운행·대기·휴차·채권 포함) */
+/**
+ * (구) 계약중 — 반납·해지 안 됨. 사용 안 함 (matchesView 가 isRunning 사용).
+ * 다른 페이지/모듈에서 사용 시 참조 가능 — 미삭제.
+ */
 function isActiveContract(c: Contract): boolean {
   if (c.returnedDate) return false;
   return c.status !== '반납' && c.status !== '해지';
 }
+void isActiveContract; // 미사용 경고 회피 (export 안 함)
 
 /**
  * 계약중(고객 있음) — 인도일 / 손님이름 / 운행 vehicleStatus 중 하나라도 있으면 계약중.
