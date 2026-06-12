@@ -28,6 +28,7 @@ import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
+import { useLiveTodayKr } from '@/lib/use-live-today';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { toast } from '@/lib/toast';
 import { EmptyRow } from '@/components/ui/empty-row';
@@ -98,7 +99,7 @@ export default function ContractPage() {
     navigator.clipboard.writeText(lines).then(() => toast.success(`만기 안내 ${targets.length}건 클립보드 복사`)).catch(() => toast.error('복사 실패'));
   }
 
-  const today = todayKr();
+  const today = useLiveTodayKr();
 
   const companyOptions = useMemo(
     () => buildCompanyOptions(contracts, (c) => c.company),

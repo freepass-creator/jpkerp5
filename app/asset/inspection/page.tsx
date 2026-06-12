@@ -22,6 +22,7 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
+import { useLiveTodayKr } from '@/lib/use-live-today';
 
 export default function AssetInspectionPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function AssetInspectionPage() {
   const { entries: history } = useHistoryEntries();
   const { vehicles } = useVehicles();
   const { companies: companyMaster } = useCompanies();
-  const today = todayKr();
+  const today = useLiveTodayKr();
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; plate?: string; phone?: string; due?: string; customerName?: string } | null>(null);
   const sel = useTableSelection();
 

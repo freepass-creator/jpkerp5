@@ -24,6 +24,7 @@ import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { todayKr } from '@/lib/mock-data';
+import { useLiveTodayKr } from '@/lib/use-live-today';
 import { Plus, FileXls, Trash, MagnifyingGlass, Copy, ArrowSquareOut } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import type { Vehicle } from '@/lib/types';
@@ -86,7 +87,7 @@ export default function AssetInsurancePage() {
     setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }
 
-  const today = todayKr();
+  const today = useLiveTodayKr();
 
   /** 차량 plate → 가장 최근 활성 보험증권 */
   const policyByPlate = useMemo(() => {
