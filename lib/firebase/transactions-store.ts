@@ -139,7 +139,11 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       const updates: Record<string, null> = {};
       for (const id of ids) updates[id] = null;
       await rtdbUpdate(ref(db, path), updates);
-      void audit.delete(auditType, '', `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 삭제 ${ids.length}건`);
+      void audit.delete(auditType, '', `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 삭제 ${ids.length}건`, {
+        count: ids.length,
+        ids: ids.slice(0, 100),
+        truncated: ids.length > 100,
+      });
       return ids.length;
     },
   };

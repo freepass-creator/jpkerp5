@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { Upload, Bank, CreditCard, CheckCircle, MagnifyingGlass, X, Link as LinkIcon, CaretLeft, ArrowsCounterClockwise, Warning } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
+import { useCompanies } from '@/lib/firebase/companies-store';
+import { displayCompanyName } from '@/lib/company-display';
 import { formatCurrency, formatDateFull } from '@/lib/utils';
 import type { Contract } from '@/lib/types';
 import { matchesSearch } from '@/lib/filter-helpers';
@@ -41,6 +43,7 @@ export function PaymentLedgerDialog({
   const [matchingTx, setMatchingTx] = useState<LedgerRow | null>(null);
   const { rows: bankTx } = useBankTx();
   const { rows: cardTx } = useCardTx();
+  const { companies } = useCompanies();
 
   const ledger: LedgerRow[] = useMemo(() => {
     const bank = bankTx
@@ -405,7 +408,7 @@ function MatchPane({
                 <span>·</span>
                 <span>{picked.vehicleModel}</span>
                 <span>·</span>
-                <span>{picked.company}</span>
+                <span>{picked.company ? displayCompanyName(picked.company, companies) : '-'}</span>
                 <span>·</span>
                 <span>{picked.contractNo}</span>
                 {picked.unpaidAmount > 0 && (
@@ -485,7 +488,7 @@ function MatchPane({
               <span className="plate" style={{ minWidth: 92 }}>{c.vehiclePlate}</span>
               <span style={{ flex: 1, fontWeight: 500 }}>{c.customerName}</span>
               <span className="text-sub" style={{ fontSize: 11 }}>{c.vehicleModel}</span>
-              <span className="text-weak" style={{ fontSize: 11 }}>{c.company}</span>
+              <span className="text-weak" style={{ fontSize: 11 }}>{c.company ? displayCompanyName(c.company, companies) : '-'}</span>
               <span className="text-weak mono" style={{ fontSize: 11 }}>{c.customerPhone1}</span>
               <span className="mono" style={{ fontSize: 11, color: c.unpaidAmount > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>
                 {c.unpaidAmount > 0 ? `미수 ₩${formatCurrency(c.unpaidAmount)}` : '정상'}
