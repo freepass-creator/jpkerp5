@@ -81,8 +81,8 @@ export default function PaymentsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
 
-  const { rows: bankTx, update: updateBankTx, updateMany: updateManyBankTx } = useBankTx();
-  const { rows: cardTx, updateMany: updateManyCardTx } = useCardTx();
+  const { rows: bankTx, loading: bankTxLoading, update: updateBankTx, updateMany: updateManyBankTx } = useBankTx();
+  const { rows: cardTx, loading: cardTxLoading, updateMany: updateManyCardTx } = useCardTx();
   const { contracts, update: updateContract, updateMany: updateManyContracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
 
@@ -543,16 +543,17 @@ export default function PaymentsPage() {
                   onSubjectChange={handleSubjectChange}
                   onNoteChange={handleNoteChange}
                   onOpenMatch={setMatchTarget}
+                  loading={bankTxLoading}
                 />
               )}
               {tab === 'summary' && (
                 <SummaryTable rows={daily} companyMaster={companyMaster} />
               )}
               {tab === 'card' && (
-                <CardTable rows={cardRows} />
+                <CardTable rows={cardRows} loading={cardTxLoading} />
               )}
               {tab === 'corpcard' && (
-                <CorpCardTable rows={corpCardRows} />
+                <CorpCardTable rows={corpCardRows} loading={cardTxLoading} />
               )}
             </div>
           </div>
@@ -654,7 +655,7 @@ export default function PaymentsPage() {
 /* ─────────────────── 자금일보 — 분개 테이블 ─────────────────── */
 
 function LedgerTable({
-  rows, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange, onNoteChange, onOpenMatch,
+  rows, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange, onNoteChange, onOpenMatch, loading,
 }: {
   rows: BankTransaction[];
   contractById: Map<string, Contract>;
@@ -665,6 +666,7 @@ function LedgerTable({
   onSubjectChange: (tx: BankTransaction, subject: string) => void;
   onNoteChange: (tx: BankTransaction, note: string) => void;
   onOpenMatch: (tx: BankTransaction) => void;
+  loading?: boolean;
 }) {
   return (
     <table className="table">
@@ -705,7 +707,9 @@ function LedgerTable({
         {rows.length === 0 ? (
           <tr>
             <td colSpan={13} className="muted center" style={{ padding: '32px 10px' }}>
-              표시할 거래가 없습니다. 사이드바 → 신규 등록 → 입출금 등록 으로 계좌 엑셀 업로드.
+              {loading
+                ? '데이터 불러오는 중…'
+                : '표시할 거래가 없습니다. 사이드바 → 신규 등록 → 입출금 등록 으로 계좌 엑셀 업로드.'}
             </td>
           </tr>
         ) : rows.map((t) => {
@@ -841,7 +845,7 @@ function SummaryTable({
 
 /* ─────────────────── 카드 매출 ─────────────────── */
 
-function CardTable({ rows }: { rows: Array<import('@/lib/types').CardTransaction & { contract?: Contract }> }) {
+function CardTable({ rows, loading }: { rows: Array<import('@/lib/types').CardTransaction & { contract?: Contract }>; loading?: boolean }) {
   return (
     <table className="table">
       <thead>
@@ -859,7 +863,7 @@ function CardTable({ rows }: { rows: Array<import('@/lib/types').CardTransaction
         {rows.length === 0 ? (
           <tr>
             <td colSpan={7} className="muted center" style={{ padding: '32px 10px' }}>
-              표시할 카드 매출이 없습니다.
+              {loading ? '데이터 불러오는 중…' : '표시할 카드 매출이 없습니다.'}
             </td>
           </tr>
         ) : rows.map((r) => (
@@ -897,7 +901,7 @@ function CardTable({ rows }: { rows: Array<import('@/lib/types').CardTransaction
 
 /* ─────────────────── 법인카드 (직원 지출) ─────────────────── */
 
-function CorpCardTable({ rows }: { rows: import('@/lib/types').CardTransaction[] }) {
+function CorpCardTable({ rows, loading }: { rows: import('@/lib/types').CardTransaction[]; loading?: boolean }) {
   return (
     <table className="table">
       <thead>
@@ -917,7 +921,9 @@ function CorpCardTable({ rows }: { rows: import('@/lib/types').CardTransaction[]
         {rows.length === 0 ? (
           <tr>
             <td colSpan={9} className="muted center" style={{ padding: '32px 10px' }}>
-              등록된 법인카드 사용 내역이 없습니다. 사이드바 → 신규 등록 → 법인카드 등록.
+              {loading
+                ? '데이터 불러오는 중…'
+                : '등록된 법인카드 사용 내역이 없습니다. 사이드바 → 신규 등록 → 법인카드 등록.'}
             </td>
           </tr>
         ) : rows.map((r) => (
