@@ -20,6 +20,7 @@ import { ReceiptMatchDialog } from '@/components/receipt-match-dialog';
 import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { audit } from '@/lib/firebase/audit-store';
 import { todayKr } from '@/lib/mock-data';
+import { toast } from '@/lib/toast';
 import type { BankTransaction, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { usePersistentState } from '@/lib/use-persistent-state';
@@ -189,7 +190,7 @@ export default function PaymentsPage() {
       contractId: contract.id, amount: tx.amount, leftover,
     });
     if (leftover > 0) {
-      alert(`선입선출 적용 완료 — 잉여 ₩${formatCurrency(leftover)} 원은 추가 매칭 필요`);
+      toast.info(`선입선출 적용 — 잉여 ₩${formatCurrency(leftover)} 원 추가 매칭 필요`);
     }
   }
 
@@ -215,7 +216,7 @@ export default function PaymentsPage() {
       count: results.length,
       total: results.reduce((s, r) => s + r.tx.amount, 0),
     });
-    alert(`${results.length}건 자동 매칭 완료`);
+    toast.success(`${results.length}건 자동 매칭 완료`);
   }
 
   function handleExportExcel() {
@@ -274,7 +275,7 @@ export default function PaymentsPage() {
       count: results.length,
       total: results.reduce((s, r) => s + r.tx.amount, 0),
     });
-    alert(`${results.length}건 자동 매칭 완료`);
+    toast.success(`${results.length}건 자동 매칭 완료`);
   }
 
   /** CMS·카드 집금 정산 자동매칭 — 1 입금 ↔ N 묶음 + 수수료 산출 */
@@ -308,7 +309,7 @@ export default function PaymentsPage() {
       count: matches.length,
       totalFee: matches.reduce((s, m) => s + m.feeAmount, 0),
     });
-    alert(`${matches.length}건 정산 매칭 완료 — 수수료 총 ₩${matches.reduce((s, m) => s + m.feeAmount, 0).toLocaleString('ko-KR')}`);
+    toast.success(`${matches.length}건 정산 매칭 완료 — 수수료 총 ₩${matches.reduce((s, m) => s + m.feeAmount, 0).toLocaleString('ko-KR')}`);
   }
 
   /* ─── 집계 뷰 ─── */

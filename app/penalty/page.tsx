@@ -18,6 +18,7 @@ const PenaltyRegisterDialog = dynamic(
 import { exportToExcel } from '@/lib/excel-export';
 import { PERIODS, type Period, periodRange, isInRange } from '@/lib/period-filter';
 import { useAuth } from '@/lib/use-auth';
+import { toast } from '@/lib/toast';
 
 /**
  * 과태료 변경부과 — 처리중 / 처리완료 두 단계로 분리.
@@ -172,7 +173,7 @@ export default function PenaltyPage() {
       isMatched(i),
     );
     if (targets.length === 0) {
-      alert('처리완료 가능한 매칭 항목이 선택되지 않았습니다.');
+      toast.info('처리완료 가능한 매칭 항목이 선택되지 않았습니다');
       return;
     }
     if (!confirm(`매칭 완료된 ${targets.length}건을 처리완료로 이동할까요?`)) return;

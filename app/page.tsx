@@ -25,6 +25,7 @@ import { SmsDialog } from '@/components/sms-dialog';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { useAuth } from '@/lib/use-auth';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { toast } from '@/lib/toast';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { ageFromIdent } from '@/lib/ident';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -393,7 +394,7 @@ export default function Page() {
   }
   function ctxAction_markDelivered(c: Contract) {
     if (c.deliveredDate) {
-      alert(`${c.vehiclePlate} 는 이미 인도 완료 (${c.deliveredDate})`);
+      toast.info(`${c.vehiclePlate} 는 이미 인도 완료 (${c.deliveredDate})`);
       return;
     }
     const today = new Date().toISOString().slice(0, 10);
@@ -401,7 +402,7 @@ export default function Page() {
   }
   function ctxAction_markReturned(c: Contract) {
     if (c.returnedDate) {
-      alert(`${c.vehiclePlate} 는 이미 반납 완료 (${c.returnedDate})`);
+      toast.info(`${c.vehiclePlate} 는 이미 반납 완료 (${c.returnedDate})`);
       return;
     }
     if (!confirm(`${c.vehiclePlate} ${c.customerName} 을 오늘 반납 처리하시겠습니까?`)) return;
@@ -430,7 +431,7 @@ export default function Page() {
       await rtdbRemove(c.id);
     }
     setSelectedIds(new Set());
-    alert(`${list.length}건 삭제 완료`);
+    toast.success(`${list.length}건 삭제 완료`);
   }
 
   // 선택된 계약 일괄 인도완료 (계약시작일=인도일) — SUPER_ADMIN 만
@@ -439,7 +440,7 @@ export default function Page() {
     const list = Array.from(selectedIds).map((id) => contracts.find((c) => c.id === id)).filter(Boolean) as Contract[];
     const targets = list.filter((c) => !c.deliveredDate);
     if (targets.length === 0) {
-      alert('선택 항목 모두 이미 인도 완료됨');
+      toast.info('선택 항목 모두 이미 인도 완료됨');
       return;
     }
     if (!confirm(`${targets.length}건을 일괄 인도완료 처리하시겠습니까?\n(deliveredDate = 계약시작일, status = '운행')`)) return;
@@ -450,7 +451,7 @@ export default function Page() {
       vehicleStatus: '운행' as const,
     }));
     await rtdbUpdateMany(updated);
-    alert(`${targets.length}건 일괄 인도완료 처리`);
+    toast.success(`${targets.length}건 일괄 인도완료 처리`);
   }
 
   const toggleRow = useCallback((id: string) => {

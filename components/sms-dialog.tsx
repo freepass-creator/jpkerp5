@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ChatCircleDots, PaperPlaneTilt } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import type { Contract } from '@/lib/types';
+import { toast } from '@/lib/toast';
 
 type Recipient = {
   contractId: string;
@@ -115,9 +116,11 @@ export function SmsDialog({
       }
     }
     if (mocked > 0 && sent === 0 && failed === 0) {
-      alert(`Aligo 환경변수 미설정 — mock 응답으로 ${mocked}건 처리됨.\n실제 발송하려면 .env.local 에 ALIGO_API_KEY / ALIGO_USER_ID / ALIGO_SENDER_TEL 등록 필요.`);
+      toast.warning(`Aligo 환경변수 미설정 — mock ${mocked}건 처리. .env.local 등록 필요.`);
+    } else if (failed > 0) {
+      toast.error(`발송 완료 — 성공 ${sent} · 실패 ${failed}${mocked > 0 ? ` · mock ${mocked}` : ''}`);
     } else {
-      alert(`발송 완료 — 성공 ${sent}건 · 실패 ${failed}건${mocked > 0 ? ` · mock ${mocked}건` : ''}`);
+      toast.success(`발송 완료 — ${sent}건${mocked > 0 ? ` (+ mock ${mocked})` : ''}`);
     }
     onOpenChange(false);
   }
