@@ -489,7 +489,7 @@ export default function Page() {
   /** 상태 칩 카운트 — 회사 필터를 적용한 상태에서 각 view 별 수 (양방향 연동) */
   const viewCounts = useMemo<Record<View, number>>(() => {
     const scoped = contracts.filter((c) => matchesCompany(c, companyFilter));
-    return {
+    const result = {
       전체: scoped.length,
       계약중: scoped.filter((c) => matchesView(c, '계약중')).length,
       만기경과: scoped.filter((c) => matchesView(c, '만기경과')).length,
@@ -499,7 +499,22 @@ export default function Page() {
       휴차: scoped.filter((c) => matchesView(c, '휴차')).length,
       미수: scoped.filter((c) => matchesView(c, '미수')).length,
     };
-  }, [contracts, companyFilter]);
+    // 진단 로그 — 직원이 콘솔 캡처 시 데이터 흐름 즉시 확인 (임시)
+    console.log('[운영현황 진단]', {
+      vehicles_받아옴: vehicles.length,
+      contracts_원본: rawContracts.length,
+      contracts_orphan포함: contracts.length,
+      회사필터: companyFilter,
+      회사필터적용후: scoped.length,
+      viewCounts: result,
+      orphan_샘플: contracts.filter((c) => c.id.startsWith('vehicle-orphan-')).slice(0, 3).map((c) => ({
+        plate: c.vehiclePlate,
+        vehicleStatus: c.vehicleStatus,
+        company: c.company,
+      })),
+    });
+    return result;
+  }, [contracts, companyFilter, vehicles, rawContracts]);
 
   /** 화면에 표시할 view 칩 목록 — 사용자 룰: 전체만 항상, 나머지는 count > 0 일 때만 (반응형 필터) */
   const visibleViews = useMemo<View[]>(() => {
