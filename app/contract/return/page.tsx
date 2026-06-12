@@ -5,7 +5,9 @@
  */
 
 import { useMemo } from 'react';
-import { ArrowUUpLeft, FileXls } from '@phosphor-icons/react';
+import { useState } from 'react';
+import { ArrowUUpLeft, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -19,6 +21,7 @@ import { downloadContractsExcel } from '@/lib/contract-export';
 export default function ContractReturnPage() {
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: typeof contracts[number] | null }>({ open: false, x: 0, y: 0, row: null });
   const rows = useMemo(() => {
     return contracts
       .filter((c) => c.status === '반납' || !!c.returnedDate)
@@ -64,7 +67,7 @@ export default function ContractReturnPage() {
           {rows.length === 0 ? (
             <tr><td colSpan={8} className="muted center" style={{ padding: 32 }}>반납 계약 없음</td></tr>
           ) : rows.map((c) => (
-            <tr key={c.id}>
+            <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'context-menu' }}>
               <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
               <td className="mono">{c.vehiclePlate}</td>
               <td>{c.customerName}</td>
@@ -79,6 +82,22 @@ export default function ContractReturnPage() {
           ))}
         </tbody>
       </table>
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+        items={ctxMenu.row ? ([
+          { label: '운영현황에서 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vehiclePlate) window.location.href = `/?q=${encodeURIComponent(ctxMenu.row.vehiclePlate)}`; } },
+          { type: 'separator' },
+          { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vehiclePlate) navigator.clipboard.writeText(ctxMenu.row.vehiclePlate); } },
+          { label: '계약 정보 복사', icon: <Copy size={12} weight="bold" />, onClick: () => {
+            const r = ctxMenu.row;
+            if (!r) return;
+            navigator.clipboard.writeText(`${r.contractNo} · ${r.customerName} · ${r.vehiclePlate} · 반납 ${r.returnedDate ?? '미정'}`);
+          } },
+        ] satisfies ContextMenuItem[]) : []}
+      />
     </MasterPageShell>
   );
 }

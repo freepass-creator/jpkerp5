@@ -6,7 +6,8 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Calendar, FileXls } from '@phosphor-icons/react';
+import { Calendar, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -22,6 +23,7 @@ export default function ExpirePage() {
   const { companies: companyMaster } = useCompanies();
   const today = todayKr();
   const [bucket, setBucket] = usePersistentState<'all' | 'expired' | 'd30' | 'd90'>('filter:contract-expire:quick', 'all');
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: typeof contracts[number] | null }>({ open: false, x: 0, y: 0, row: null });
 
   const all = useMemo(() => {
     return contracts
@@ -108,7 +110,7 @@ export default function ExpirePage() {
             const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
             const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
             return (
-              <tr key={c.id}>
+              <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'context-menu' }}>
                 <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                 <td className="mono">{c.vehiclePlate}</td>
                 <td>{c.customerName}</td>
@@ -124,6 +126,22 @@ export default function ExpirePage() {
           })}
         </tbody>
       </table>
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+        items={ctxMenu.row ? ([
+          { label: '운영현황에서 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vehiclePlate) window.location.href = `/?q=${encodeURIComponent(ctxMenu.row.vehiclePlate)}`; } },
+          { type: 'separator' },
+          { label: '연락처 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.customerPhone1) navigator.clipboard.writeText(ctxMenu.row.customerPhone1); }, disabled: !ctxMenu.row.customerPhone1 },
+          { label: '만기 안내 복사', icon: <Copy size={12} weight="bold" />, onClick: () => {
+            const r = ctxMenu.row;
+            if (!r) return;
+            navigator.clipboard.writeText(`${r.customerName} 님, ${r.vehiclePlate} 차량 약정만기 ${r.returnScheduledDate ?? '미정'} 입니다. 연장/반납 협의 부탁드립니다.`);
+          } },
+        ] satisfies ContextMenuItem[]) : []}
+      />
     </MasterPageShell>
   );
 }

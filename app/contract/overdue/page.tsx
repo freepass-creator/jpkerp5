@@ -7,7 +7,8 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Warning, FileXls } from '@phosphor-icons/react';
+import { Warning, FileXls, MagnifyingGlass, Copy, PaperPlaneTilt } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import Link from 'next/link';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
@@ -23,6 +24,7 @@ export default function ContractOverduePage() {
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const [bucket, setBucket] = useState<'all' | 'high' | 'mid' | 'low'>('all');
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: typeof contracts[number] | null }>({ open: false, x: 0, y: 0, row: null });
 
   const allOverdue = useMemo(() => {
     return contracts
@@ -107,7 +109,7 @@ export default function ContractOverduePage() {
           {overdue.length === 0 ? (
             <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>미수금 계약 없음</td></tr>
           ) : overdue.map((c) => (
-            <tr key={c.id}>
+            <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'context-menu' }}>
               <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
               <td className="mono">{c.vehiclePlate}</td>
               <td>{c.customerName}</td>
@@ -123,6 +125,24 @@ export default function ContractOverduePage() {
           ))}
         </tbody>
       </table>
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+        items={ctxMenu.row ? ([
+          { label: '운영현황에서 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vehiclePlate) window.location.href = `/?q=${encodeURIComponent(ctxMenu.row.vehiclePlate)}`; } },
+          { type: 'separator' },
+          { label: '연락처 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.customerPhone1) navigator.clipboard.writeText(ctxMenu.row.customerPhone1); }, disabled: !ctxMenu.row.customerPhone1 },
+          { label: '미수 정보 복사', icon: <Copy size={12} weight="bold" />, onClick: () => {
+            const r = ctxMenu.row;
+            if (!r) return;
+            navigator.clipboard.writeText(`${r.vehiclePlate} · ${r.customerName} · 미수 ₩${(r.unpaidAmount ?? 0).toLocaleString()} (${r.unpaidSeqCount ?? 0}회차)`);
+          } },
+          { type: 'separator' },
+          { label: '미수 관리 (액션 중심)', icon: <PaperPlaneTilt size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vehiclePlate) window.location.href = `/receivables?q=${encodeURIComponent(ctxMenu.row.vehiclePlate)}`; } },
+        ] satisfies ContextMenuItem[]) : []}
+      />
     </MasterPageShell>
   );
 }
