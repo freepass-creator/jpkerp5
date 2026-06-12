@@ -103,6 +103,13 @@ export default function AssetPage() {
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset:company', 'all');
   const [statusFilter, setStatusFilter] = usePersistentState('filter:asset:status', 'all');
+  // URL ?company=CODE 진입 시 회사 필터 prefill (대시보드 drill-down)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const c = sp.get('company');
+    if (c) setCompanyFilter(c);
+  }, [setCompanyFilter]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Vehicle | null }>({ open: false, x: 0, y: 0, row: null });
   const [vehicleRegOpen, setVehicleRegOpen] = useState(false);

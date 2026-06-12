@@ -6,7 +6,7 @@
  * /receivables 는 리스크 액션 중심, 여기는 계약 마스터 관점에서 미수액 정렬.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Warning, FileXls, MagnifyingGlass, Copy, PaperPlaneTilt } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import Link from 'next/link';
@@ -24,13 +24,23 @@ export default function ContractOverduePage() {
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const [bucket, setBucket] = useState<'all' | 'high' | 'mid' | 'low'>('all');
+  const [companyFilter, setCompanyFilter] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: typeof contracts[number] | null }>({ open: false, x: 0, y: 0, row: null });
+
+  // URL ?company=CODE 로 진입 시 회사 필터 prefill (대시보드 drill-down)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const c = sp.get('company');
+    if (c) setCompanyFilter(c);
+  }, []);
 
   const allOverdue = useMemo(() => {
     return contracts
       .filter((c) => (c.unpaidAmount ?? 0) > 0 || (c.unpaidSeqCount ?? 0) > 0)
+      .filter((c) => !companyFilter || c.company === companyFilter)
       .sort((a, b) => (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0));
-  }, [contracts]);
+  }, [contracts, companyFilter]);
 
   const high = allOverdue.filter((c) => (c.unpaidSeqCount ?? 0) >= 3);
   const mid = allOverdue.filter((c) => (c.unpaidSeqCount ?? 0) === 2);
@@ -58,6 +68,14 @@ export default function ContractOverduePage() {
           <button type="button" className={`chip chip-tone-amber ${bucket === 'low' ? 'active' : ''}`} onClick={() => setBucket('low')}>
             1회<span className="chip-count">{low.length}</span>
           </button>
+          {companyFilter && (
+            <>
+              <span className="filter-divider" />
+              <button type="button" className="chip chip-tone-brand active" onClick={() => setCompanyFilter(null)} title="대시보드 회사 필터 해제 (클릭)">
+                {displayCompanyName(companyFilter, companyMaster)} ×
+              </button>
+            </>
+          )}
         </>
       }
       stats={

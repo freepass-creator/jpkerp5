@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
-  ChartBar, Car, ClipboardText, CurrencyKrw, Warning,
+  ChartBar, Car, ClipboardText, CurrencyKrw, Warning, ArrowRight,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -110,7 +111,7 @@ export default function DashboardPage() {
             <ChartBar size={16} weight="fill" style={{ color: 'var(--brand)' }} />
             <span>대시보드</span>
           </div>
-          <span style={{ fontSize: 12, color: 'var(--text-weak)' }}>지표 관리 — Phase 2 (준비중)</span>
+          <span style={{ fontSize: 12, color: 'var(--text-weak)' }}>지표 카드 → 클릭 시 해당 페이지로 이동</span>
           <div style={{ flex: 1 }} />
           <span className="topbar-date">{dateWithDow(todayKr())}</span>
         </header>
@@ -138,6 +139,8 @@ export default function DashboardPage() {
                 label="가동률"
                 value={`${kpi.utilization}%`}
                 tone="green"
+                href="/asset"
+                hrefHint="자산현황"
                 details={[
                   { k: '총 차량', v: `${kpi.operatingFleet}대` },
                   { k: '운행', v: `${kpi.runningVehicles}대` },
@@ -149,6 +152,8 @@ export default function DashboardPage() {
                 label="미수율"
                 value={`${kpi.unpaidRate}%`}
                 tone="red"
+                href="/contract/overdue"
+                hrefHint="미수금 관리"
                 details={[
                   { k: '월매출', v: formatCurrency(kpi.monthlyTarget) },
                   { k: '미수금', v: formatCurrency(kpi.totalUnpaid) },
@@ -1113,6 +1118,7 @@ function CompanyKpiCard({ row }: { row: {
   // 톤 산정 — 메인 카드와 동일 thresholds
   const utilTone = row.utilization >= 80 ? 'green' : row.utilization >= 60 ? 'brand' : 'orange';
   const unpaidTone = row.unpaidRate <= 5 ? 'green' : row.unpaidRate <= 15 ? 'brand' : row.unpaidRate <= 30 ? 'orange' : 'red';
+  const codeQ = encodeURIComponent(row.code);
 
   return (
     <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1128,12 +1134,14 @@ function CompanyKpiCard({ row }: { row: {
           value={`${row.utilization}%`}
           tone={utilTone}
           sub={`총 ${row.operatingFleet} · 휴차 ${row.idle}`}
+          href={`/asset?company=${codeQ}`}
         />
         <CompanyMiniKpi
           label="미수율"
           value={`${row.unpaidRate}%`}
           tone={unpaidTone}
           sub={`월매출 ${row.monthlyTarget.toLocaleString('ko-KR')} · 미수 ${row.unpaid.toLocaleString('ko-KR')}`}
+          href={`/contract/overdue?company=${codeQ}`}
         />
       </div>
     </div>
@@ -1141,35 +1149,42 @@ function CompanyKpiCard({ row }: { row: {
 }
 
 function CompanyMiniKpi({
-  label, value, tone, sub,
+  label, value, tone, sub, href,
 }: {
   label: string;
   value: string;
   tone: 'brand' | 'red' | 'orange' | 'green' | 'zinc';
   sub?: string;
+  href?: string;
 }) {
   const colorMap = {
     brand: 'var(--brand)', red: 'var(--red-text)', orange: 'var(--orange-text)',
     green: 'var(--green-text)', zinc: 'var(--text-sub)',
   };
-  return (
-    <div style={{
-      padding: '6px 10px',
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border-soft)',
-      borderLeft: `3px solid ${colorMap[tone]}`,
-      borderRadius: 'var(--radius-sm)',
-      display: 'flex', flexDirection: 'column', gap: 2,
-    }}>
+  const style: React.CSSProperties = {
+    padding: '6px 10px',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-soft)',
+    borderLeft: `3px solid ${colorMap[tone]}`,
+    borderRadius: 'var(--radius-sm)',
+    display: 'flex', flexDirection: 'column', gap: 2,
+    textDecoration: 'none', color: 'inherit',
+  };
+  const body = (
+    <>
       <div style={{ fontSize: 10, color: 'var(--text-sub)' }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 700, color: colorMap[tone], fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</div>
       {sub && <div className="mono" style={{ fontSize: 9, color: 'var(--text-weak)', fontVariantNumeric: 'tabular-nums' }}>{sub}</div>}
-    </div>
+    </>
   );
+  if (href) {
+    return <Link href={href} style={style} title="클릭 — 해당 페이지로 이동 (회사 필터 적용)">{body}</Link>;
+  }
+  return <div style={style}>{body}</div>;
 }
 
 function MainKpi({
-  icon, label, value, details, tone,
+  icon, label, value, details, tone, href, hrefHint,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -1177,20 +1192,17 @@ function MainKpi({
   /** 우측 세부 라인 — 한 줄 / 한 항목 */
   details?: Array<{ k: string; v: string }>;
   tone: 'brand' | 'red' | 'orange' | 'green' | 'zinc';
+  /** 클릭 시 이동 경로 — drill-down */
+  href?: string;
+  /** href 우측 끝 표시 안내 — '자산현황' / '미수금 관리' */
+  hrefHint?: string;
 }) {
   const colorMap = {
     brand: 'var(--brand)', red: 'var(--red-text)', orange: 'var(--orange-text)',
     green: 'var(--green-text)', zinc: 'var(--text-sub)',
   };
-  const bgMap = {
-    brand: 'var(--brand-bg)', red: 'var(--red-bg)', orange: 'var(--orange-bg)',
-    green: 'var(--green-bg)', zinc: 'var(--bg-sunken)',
-  };
-  return (
-    <div className="panel" style={{
-      padding: '14px 20px',
-      display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: 20,
-    }}>
+  const body = (
+    <>
       <span style={{ color: colorMap[tone], display: 'inline-flex', alignSelf: 'center' }}>{icon}</span>
       <span style={{ fontSize: 13, color: 'var(--text-sub)', fontWeight: 600, letterSpacing: '-0.01em' }}>{label}</span>
       <span style={{
@@ -1206,8 +1218,25 @@ function MainKpi({
           }}>{d.v}</span>
         </span>
       ))}
-    </div>
+      {href && hrefHint && (
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-weak)' }}>
+          {hrefHint} <ArrowRight size={11} weight="bold" />
+        </span>
+      )}
+    </>
   );
+  const baseStyle: React.CSSProperties = {
+    padding: '14px 20px',
+    display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: 20,
+  };
+  if (href) {
+    return (
+      <Link href={href} className="panel" style={{ ...baseStyle, textDecoration: 'none', color: 'inherit' }} title={hrefHint ? `${hrefHint} 페이지로 이동` : undefined}>
+        {body}
+      </Link>
+    );
+  }
+  return <div className="panel" style={baseStyle}>{body}</div>;
 }
 
 function KpiCard({
