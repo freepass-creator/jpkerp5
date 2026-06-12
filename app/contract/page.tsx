@@ -214,6 +214,16 @@ export default function ContractPage() {
           <span className="dim" style={{ fontSize: 11 }}>
             {selectedIds.size > 0 ? `선택 ${selectedIds.size}건` : '체크박스로 선택'}
           </span>
+          {selectedIds.size > 0 && (
+            <button
+              className="btn btn-sm btn-ghost"
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              title="선택 모두 해제"
+            >
+              <X size={11} /> 해제
+            </button>
+          )}
           <button
             className="btn"
             type="button"

@@ -669,6 +669,15 @@ export default function AssetPage() {
           }
           right={
             <>
+            {selectedIds.size > 0 && (
+              <>
+                <span className="dim" style={{ fontSize: 11 }}>선택 <strong>{selectedIds.size}</strong></span>
+                <button className="btn btn-sm btn-ghost" type="button" onClick={() => setSelectedIds(new Set())} title="선택 모두 해제">
+                  <Trash size={11} weight="bold" style={{ display: 'none' }} /><span style={{ fontSize: 11 }}>× 해제</span>
+                </button>
+                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+              </>
+            )}
             <button
               className="btn"
               type="button"

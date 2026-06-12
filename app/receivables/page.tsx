@@ -716,6 +716,15 @@ export default function ReceivablesPage() {
           right={
             <>
               <span>표시 <strong>{filtered.length}</strong>건</span>
+              {selectedIds.size > 0 && (
+                <>
+                  <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                  <span>선택 <strong>{selectedIds.size}</strong>건</span>
+                  <button className="btn btn-sm btn-ghost" type="button" onClick={() => setSelectedIds(new Set())} title="선택 모두 해제">
+                    <X size={11} /> 해제
+                  </button>
+                </>
+              )}
               <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
               <span>미수 <strong className="mono" style={{ color: 'var(--red-text)' }}>₩{filtered.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0).toLocaleString()}</strong></span>
               {counts['시동제어'] > 0 && (
