@@ -71,7 +71,7 @@ export default function PenaltyPage() {
     email: user?.email ?? '',
   }), [user?.displayName, user?.email]);
 
-  const [allItems, setItems] = usePenaltyStore();
+  const [allItems, setItems, itemsReady] = usePenaltyStore();
   const [companies] = useCompanyStore();
   const items = useMemo(() => allItems.filter((p) => !p.deletedAt), [allItems]);
   const findCompany = (code?: string) => code ? companies.find((c) => c.code === code) : undefined;
@@ -599,7 +599,11 @@ export default function PenaltyPage() {
               {visible.length === 0 ? (
                 <tr>
                   <td colSpan={50} style={{ padding: 0 }}>
-                    {phase === 'in-progress' ? (
+                    {!itemsReady ? (
+                      <div className="empty-row" style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-weak)' }}>
+                        데이터 불러오는 중…
+                      </div>
+                    ) : phase === 'in-progress' ? (
                       <button
                         type="button"
                         onClick={() => setRegisterOpen(true)}
