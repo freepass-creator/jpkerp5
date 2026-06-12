@@ -1230,7 +1230,12 @@ function AlertsPanel({ contracts }: { contracts: import('@/lib/types').Contract[
             </thead>
             <tbody>
               {alerts.map((a) => (
-                <tr key={a.id}>
+                <tr
+                  key={a.id}
+                  style={{ cursor: 'pointer' }}
+                  title={`${a.customerName} ${a.vehiclePlate} ${KIND_BADGE[a.kind]} 상세 — 새 탭`}
+                  onClick={() => window.open(`/contract?id=${encodeURIComponent(a.contractId)}`, '_blank')}
+                >
                   <td className="center mono" style={{ color: alertColor(a.severity), fontWeight: 600 }}>
                     {dDayLabel(a.daysLeft)}
                   </td>
