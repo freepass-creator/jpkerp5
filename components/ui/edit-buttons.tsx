@@ -43,12 +43,12 @@ export function EditButtons({ editing, onEdit, onSave, onCancel, variant = 'foot
     return (
       <>
         {onCancel && (
-          <button className={btnCls} type="button" onClick={onCancel}>
+          <button className={btnCls} type="button" onClick={onCancel} aria-label="편집 취소">
             <XIcon size={iconSize} weight="bold" /> 취소
           </button>
         )}
         {onSave && (
-          <button className={primaryCls} type="button" onClick={onSave}>
+          <button className={primaryCls} type="button" onClick={onSave} aria-label="변경사항 저장">
             <FloppyDisk size={iconSize} weight="bold" /> 저장
           </button>
         )}
@@ -57,7 +57,7 @@ export function EditButtons({ editing, onEdit, onSave, onCancel, variant = 'foot
   }
   if (!onEdit) return null;
   return (
-    <button className={primaryCls} type="button" onClick={onEdit}>
+    <button className={primaryCls} type="button" onClick={onEdit} aria-label="편집 시작">
       <Pencil size={iconSize} weight="bold" /> 수정
     </button>
   );

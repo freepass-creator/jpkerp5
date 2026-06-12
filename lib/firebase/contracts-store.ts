@@ -80,7 +80,13 @@ export function useContracts(): {
         batch[id] = pruneUndefined(recalcContract({ ...row, id } as Contract, today));
       }
       await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
-      void audit.import('contract', `계약 일괄 등록 ${rows.length}건`, { count: rows.length });
+      // batch import — 요약 + 세부 ID 목록 (감사 추적용)
+      const ids = Object.keys(batch);
+      void audit.import('contract', `계약 일괄 등록 ${rows.length}건`, {
+        count: rows.length,
+        ids: ids.slice(0, 100), // 100건 초과 시 처음 100개만 (RTDB 부담 방지)
+        truncated: ids.length > 100,
+      });
       return rows.length;
     },
     updateMany: async (rows: Contract[]) => {
@@ -93,7 +99,12 @@ export function useContracts(): {
       const today = todayKr();
       for (const r of rows) batch[r.id] = pruneUndefined(recalcContract(r, today));
       await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
-      void audit.update('contract', 'batch', `계약 일괄 수정 ${rows.length}건`);
+      // batch update — 요약 + 세부 ID 목록 (감사 추적용, after 슬롯에 기록)
+      void audit.update('contract', 'batch', `계약 일괄 수정 ${rows.length}건`, undefined, {
+        count: rows.length,
+        ids: rows.map((r) => r.id).slice(0, 100),
+        truncated: rows.length > 100,
+      });
     },
   };
 }

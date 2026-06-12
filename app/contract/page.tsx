@@ -120,7 +120,9 @@ export default function ContractPage() {
         if (!hay.includes(q)) return false;
       }
       return true;
-    });
+    })
+    // 기본 정렬: 계약일 최신 우선 (직원이 가장 자주 보고 싶은 순)
+    .sort((a, b) => (b.contractDate ?? '').localeCompare(a.contractDate ?? ''));
   }, [contracts, search, quickFilter, companyFilter, today]);
 
   // 각 퀵필터 카운트 — chip 라벨에 표시
