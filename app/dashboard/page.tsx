@@ -11,6 +11,8 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { usePenalties } from '@/lib/firebase/penalty-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { useAuditLogs } from '@/lib/firebase/audit-store';
+import type { AuditEntityType } from '@/lib/types';
 import { displayCompanyName } from '@/lib/company-display';
 import { useTodos, isTodoAllDone } from '@/lib/firebase/todos-store';
 import { useSchedules } from '@/lib/firebase/schedules-store';
@@ -166,6 +168,11 @@ export default function DashboardPage() {
           {/* 법인별 운영 현황 — 관리 법인 단위 카드 */}
           <Section title="법인별 운영 현황">
             <CompanyKpiGrid contracts={contracts} vehicles={vehicles} bankTx={bankTx} cardTx={cardTx} />
+          </Section>
+
+          {/* 최근 활동 — 감사로그 최근 20건 (점프 가능) */}
+          <Section title="최근 활동" right={<Link href="/admin/audit" className="dim" style={{ fontSize: 11 }}>전체 보기 →</Link>}>
+            <RecentActivityPanel />
           </Section>
         </div>
 
@@ -1351,6 +1358,91 @@ function AlertsPanel({ contracts }: { contracts: import('@/lib/types').Contract[
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────── 최근 활동 패널 (감사로그) ─────────────────── */
+
+const ACTIVITY_LABEL: Partial<Record<string, string>> = {
+  create: '생성', update: '수정', delete: '삭제',
+  restore: '복원', match: '매칭', unmatch: '매칭해제',
+  import: '업로드', export: '내보내기',
+  login: '로그인', logout: '로그아웃',
+};
+
+const ACTIVITY_ENTITY: Partial<Record<AuditEntityType, string>> = {
+  contract: '계약', company: '법인', vehicle: '차량',
+  bank_tx: '계좌', card_tx: '카드', schedule: '회차',
+  penalty: '과태료', license: '면허', document: '서류', system: '시스템',
+};
+
+function activityHref(t: AuditEntityType, id?: string): string | null {
+  if (!id || id === 'batch') return null;
+  switch (t) {
+    case 'contract':  return `/contract?id=${encodeURIComponent(id)}`;
+    case 'vehicle':   return `/asset?id=${encodeURIComponent(id)}`;
+    case 'company':   return `/companies?id=${encodeURIComponent(id)}`;
+    case 'penalty':   return `/penalty`;
+    case 'bank_tx':
+    case 'card_tx':   return `/payments`;
+    default: return null;
+  }
+}
+
+function RecentActivityPanel() {
+  const { rows, loading } = useAuditLogs(20);
+
+  if (loading) {
+    return (
+      <div className="panel" style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)' }}>
+        활동 로드 중…
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="panel" style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)' }}>
+        활동 기록 없음
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ maxHeight: 320, overflow: 'auto' }}>
+        {rows.slice(0, 20).map((r) => {
+          const href = activityHref(r.entityType, r.entityId);
+          const time = r.at.slice(11, 16);   // HH:MM
+          const date = r.at.slice(5, 10);    // MM-DD
+          const inner = (
+            <>
+              <span className="mono dim" style={{ fontSize: 10, minWidth: 64 }}>{date} {time}</span>
+              <span className="dim" style={{ fontSize: 11, minWidth: 70, maxWidth: 70, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.by ?? '시스템'}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, minWidth: 50, color: r.action === 'delete' ? 'var(--red-text)' : r.action === 'create' ? 'var(--green-text)' : 'var(--brand)' }}>
+                {ACTIVITY_LABEL[r.action] ?? r.action}
+              </span>
+              <span className="dim" style={{ fontSize: 11, minWidth: 40 }}>{ACTIVITY_ENTITY[r.entityType] ?? r.entityType}</span>
+              <span style={{ fontSize: 11, flex: 1, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+            </>
+          );
+          const rowStyle: React.CSSProperties = {
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '6px 12px',
+            borderTop: '1px solid var(--border-soft)',
+            textDecoration: 'none',
+            color: 'inherit',
+          };
+          if (href) {
+            return (
+              <a key={r.id} href={href} target="_blank" rel="noopener noreferrer" style={{ ...rowStyle, cursor: 'pointer' }} title="새 탭으로 점프">
+                {inner}
+              </a>
+            );
+          }
+          return <div key={r.id} style={rowStyle}>{inner}</div>;
+        })}
+      </div>
     </div>
   );
 }
