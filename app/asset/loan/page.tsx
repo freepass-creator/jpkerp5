@@ -7,7 +7,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileXls } from '@phosphor-icons/react';
+import { Plus, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -31,6 +32,7 @@ export default function AssetLoanPage() {
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-loan:company', 'all');
   const sel = useTableSelection();
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: { id: string; plate?: string; loanCompany?: string } | null }>({ open: false, x: 0, y: 0, row: null });
 
   const companyOptions = useMemo(() => buildCompanyOptions(vehicles, (v) => v.company), [vehicles]);
 
@@ -93,7 +95,7 @@ export default function AssetLoanPage() {
                   {filtered.length === 0 ? (
                     <tr><td colSpan={10} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td></tr>
                   ) : filtered.map((v) => (
-                    <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => router.push(`/asset?view=registered&plate=${encodeURIComponent(v.plate ?? '')}`)} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
+                    <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => router.push(`/asset?view=registered&plate=${encodeURIComponent(v.plate ?? '')}`)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                       <TableRowCheckbox id={v.id} selection={sel} />
                       <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                       <td className="mono">{v.plate || '-'}</td>
@@ -155,6 +157,18 @@ export default function AssetLoanPage() {
             </>
           }
           right={null}
+        />
+        <ContextMenu
+          open={ctxMenu.open}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+          items={ctxMenu.row ? ([
+            { label: '자산 상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) router.push(`/asset?q=${encodeURIComponent(ctxMenu.row.plate)}`); } },
+            { type: 'separator' },
+            { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); } },
+            { label: '할부사 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.loanCompany) navigator.clipboard.writeText(ctxMenu.row.loanCompany); }, disabled: !ctxMenu.row.loanCompany },
+          ] satisfies ContextMenuItem[]) : []}
         />
       </div>
     </div>
