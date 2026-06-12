@@ -2370,6 +2370,33 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
           <button
             type="button"
+            className="btn btn-sm"
+            onClick={() => {
+              const dueDate = window.prompt('새 회차 결제일 (YYYY-MM-DD)\n예: 2026-06-20', todayKr());
+              if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return;
+              const amountStr = window.prompt(`새 회차 금액 (원)\n월 대여료: ${c.monthlyRent.toLocaleString()}\n일할계산은 직접 산정해서 입력`, '');
+              if (!amountStr) return;
+              const amount = Number(amountStr.replace(/[,\s]/g, ''));
+              if (!amount || amount <= 0) { alert('금액 오류'); return; }
+              // schedules dueDate 기준 정렬해서 끼워넣기 + seq 재할당
+              const current = c.schedules ?? [];
+              const next = [...current, { seq: 0, dueDate, amount, status: '예정' as const, paidAmount: 0, payments: [] }];
+              next.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+              next.forEach((s, i) => { s.seq = i + 1; });
+              // 마지막 회차 amount 자동 차감 (총합 보존)
+              if (next.length > 1) {
+                const last = next[next.length - 1];
+                last.amount = Math.max(0, last.amount - amount);
+              }
+              onUpdate({ ...c, schedules: next, totalSeq: next.length });
+              alert(`✓ ${dueDate} 회차 (₩${amount.toLocaleString()}) 추가\n마지막 회차에서 ₩${amount.toLocaleString()} 자동 차감 (총합 보존)`);
+            }}
+            title="결제일 변경 시 중간에 가변 회차 수동 추가. 일할계산은 직원이 직접. 마지막 회차에서 자동 차감 → 총합 보존."
+          >
+            <Plus size={11} weight="bold" /> 회차 추가 (수동)
+          </button>
+          <button
+            type="button"
             className="btn btn-primary btn-sm"
             onClick={() => startAdd(nextOpenSeq, 'payment')}
             title={`${nextOpenSeq}회차에 입금 추가 — 초과분은 다음 회차로 자동 선납`}
