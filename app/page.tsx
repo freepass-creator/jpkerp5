@@ -24,6 +24,7 @@ import { ExtendPopover } from '@/components/extend-popover';
 import { SmsDialog } from '@/components/sms-dialog';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { useAuth } from '@/lib/use-auth';
+import { usePersistentState } from '@/lib/use-persistent-state';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { ageFromIdent } from '@/lib/ident';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -307,8 +308,8 @@ function resolveUsage(c: Contract): string {
 export default function Page() {
   const today = useLiveTodayKr();
   const [search, setSearch] = useState('');
-  const [view, setView] = useState<View>('전체');
-  const [companyFilter, setCompanyFilter] = useState<string>('전체');
+  const [view, setView] = usePersistentState<View>('filter:operation:view', '전체');
+  const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:operation:company', '전체');
   const [manualSort, setManualSort] = useState<{ col: SortCol; dir: SortDir } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
