@@ -121,7 +121,7 @@ export function GlobalSearch() {
                             )}
                           </>
                         }
-                        onClick={() => { setOpen(false); router.push(`/?cid=${c.id}`); }}
+                        onClick={() => { setOpen(false); router.push(`/contract?id=${c.id}`); }}
                       />
                     ))}
                   </Section>
@@ -145,7 +145,7 @@ export function GlobalSearch() {
                             {co.ceo && <span style={{ marginLeft: 8 }} className="dim">대표 {co.ceo}</span>}
                           </>
                         }
-                        onClick={() => { setOpen(false); router.push(`/companies`); }}
+                        onClick={() => { setOpen(false); router.push(`/companies?id=${co.id}`); }}
                       />
                     ))}
                   </Section>
