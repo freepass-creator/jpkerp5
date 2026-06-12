@@ -281,15 +281,57 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function AccountSettings() {
   const { user } = useAuth();
+  const [customerUrl, setCustomerUrl] = useState('');
+  useEffectMenu(() => {
+    if (typeof window !== 'undefined') setCustomerUrl(`${window.location.origin}/customer`);
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 560 }}>
       <header className="page-header">
         <div className="page-header-title-group">
           <h1 className="page-header-title">계정</h1>
-          <div className="page-header-title-sub">로그인 정보 · 세션 관리</div>
+          <div className="page-header-title-sub">로그인 정보 · 세션 관리 · 손님 페이지 공유</div>
         </div>
       </header>
+
+      {/* 손님 자가조회 페이지 — 직원이 한 링크로 모든 손님에게 공유 */}
+      <section className="detail-section">
+        <div className="detail-section-header">손님 자가조회 페이지</div>
+        <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-sub)', lineHeight: 1.6 }}>
+            모든 손님에게 같은 링크 공유. 손님이 차량번호 + 주민번호로 본인 인증 후 자기 계약·회차·수납 내역만 조회.
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input
+              type="text"
+              readOnly
+              value={customerUrl}
+              className="input input-compact mono"
+              style={{ flex: 1, fontSize: 11 }}
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+            />
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={() => {
+                navigator.clipboard.writeText(customerUrl).then(
+                  () => alert(`✓ 손님 페이지 링크 복사됨\n${customerUrl}\n\n손님에게 카톡/SMS/이메일 로 전송하세요.`),
+                  () => prompt('수동 복사', customerUrl),
+                );
+              }}
+            >
+              📋 복사
+            </button>
+            <a href="/customer" target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{ textDecoration: 'none' }}>
+              미리보기 →
+            </a>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
+            ↳ 보안: Firebase Anonymous Auth + 차량번호 인덱스 쿼리 + 주민번호 클라이언트 매칭. 손님이 다른 손님 정보 조회 불가.
+          </div>
+        </div>
+      </section>
 
       <section className="detail-section">
         <div className="detail-section-header">로그인 정보</div>

@@ -357,31 +357,24 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
           <a href={`/receivables?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none', color: (c.unpaidAmount ?? 0) > 0 ? 'var(--red-text)' : undefined }}>미수 →</a>
           <a href={`/penalty?q=${encodeURIComponent(c.vehiclePlate ?? '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}>과태료 →</a>
         </div>
-        {/* 손님 자가조회 페이지 링크 복사 — 직원이 카톡/SMS 로 손님에게 전달 */}
+        {/* 손님 자가조회 페이지 링크 복사 — 한 링크 (모든 손님 공용, 설정 페이지에서도 복사 가능) */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, paddingTop: 6, borderTop: '1px dashed var(--border-soft)' }}>
           <span className="dim" style={{ fontSize: 11 }}>손님 자가조회 페이지:</span>
           <button
             type="button"
             className="btn btn-sm btn-primary"
             onClick={() => {
-              const url = `${window.location.origin}/customer?plate=${encodeURIComponent(c.vehiclePlate ?? '')}`;
+              const url = `${window.location.origin}/customer`;
               navigator.clipboard.writeText(url).then(
-                () => alert(`✓ 손님 페이지 링크 복사됨\n${url}\n\n손님에게 카톡/SMS 로 전송하세요. 손님은 주민번호로 본인 인증 후 자기 계약만 조회 가능.`),
+                () => alert(`✓ 손님 페이지 링크 복사됨\n${url}\n\n손님에게 카톡/SMS 로 전송. 손님은 차량번호 + 주민번호로 본인 인증 후 자기 계약만 조회 가능.`),
                 () => prompt('수동 복사', url),
               );
             }}
-            title="손님이 차량번호 + 주민번호로 본인 인증 후 자기 계약 + 회차·수납 내역 조회. 차량번호 자동 prefill."
+            title="모든 손님이 같은 링크 사용. 손님이 차량번호 + 주민번호 입력 후 본인 계약 조회."
           >
             📋 손님 페이지 링크 복사
           </button>
-          <a
-            href={`/customer?plate=${encodeURIComponent(c.vehiclePlate ?? '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-sm"
-            style={{ textDecoration: 'none' }}
-            title="직원이 손님 화면 미리보기 (새 탭)"
-          >
+          <a href={`/customer`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{ textDecoration: 'none' }}>
             미리보기 →
           </a>
         </div>

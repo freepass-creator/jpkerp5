@@ -477,7 +477,6 @@ export default function AssetPage() {
                         aria-label="전체 선택"
                       />
                     </th>
-                    <th style={{ width: 88 }}>자산코드</th>
                     <th style={{ width: 56 }}>회사</th>
                     <th style={{ width: 96 }}>차량번호</th>
                     <th style={{ width: 80 }}>제조사</th>
@@ -496,12 +495,11 @@ export default function AssetPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={15} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td>
+                      <td colSpan={14} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td>
                     </tr>
                   ) : filtered.map((v) => (
                     <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => setOpenId(v.id)} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
-                      <td className="mono dim">{v.assetCode || '-'}</td>
                       <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleMaker || '-'}</td>
