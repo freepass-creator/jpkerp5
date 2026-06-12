@@ -1692,6 +1692,23 @@ const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (
             <EditableField label="월 대여료" value={editing ? String(draft.monthlyRent ?? 0) : `₩${formatCurrency(c.monthlyRent)}`} editing={editing} mono onChange={(v) => set('monthlyRent', Number(v.replace(/[,\s]/g, '')) || 0)} />
             <EditableField label="보증금" value={editing ? String(draft.deposit ?? 0) : `₩${formatCurrency(c.deposit)}`} editing={editing} mono onChange={(v) => set('deposit', Number(v.replace(/[,\s]/g, '')) || 0)} />
             <Field label="결제방법" value={c.paymentMethod} />
+            {/* 결제시기 — 선불(1일 인출) vs 후불(말일 결제). 사용자 명시 요구. */}
+            {editing ? (
+              <div className="detail-field">
+                <label className="detail-field-label">결제시기</label>
+                <select
+                  className="input input-compact"
+                  value={draft.paymentTiming ?? '선불'}
+                  onChange={(e) => set('paymentTiming', e.target.value as '선불' | '후불')}
+                  style={{ width: '100%' }}
+                >
+                  <option value="선불">선불</option>
+                  <option value="후불">후불</option>
+                </select>
+              </div>
+            ) : (
+              <Field label="결제시기" value={c.paymentTiming ?? '선불'} />
+            )}
             <EditableField label="결제일(1-31)" value={editing ? String(draft.paymentDay ?? '') : `매월 ${c.paymentDay}일`} editing={editing} mono onChange={(v) => set('paymentDay', Number(v) || 0)} />
             <EditableField label="담당자" value={editing ? (draft.manager ?? '') : (c.manager ?? '-')} editing={editing} onChange={(v) => set('manager', v || undefined)} />
           </div>

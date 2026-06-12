@@ -84,12 +84,19 @@ export function recalcContract<T extends Contract>(c: T, today: string): T {
   if (!c.schedules || c.schedules.length === 0) return c;
   // 반납완료된 계약은 returnedDate 이후 회차 = 자동 면제 처리 (미수 0)
   const returnedCutoff = c.returnedDate;
+  // 선불/후불 정책 반영 — 1회차 dueDate 자동 재계산.
+  // 선불: 1회차 = 계약일. 후불: 1회차 = 계약일 + 1개월.
+  // paidAmount/status 보존 (이미 입금된 회차 보호) — dueDate 만 갱신.
+  const isPostpaid = c.paymentTiming === '후불';
   const recalcedSchedules = c.schedules.map((s) => {
-    if (returnedCutoff && s.dueDate > returnedCutoff) {
-      // 반납일 이후 → 면제 처리 (위약금 0 가정)
-      return { ...s, status: '면제' as const, paidAmount: s.amount, paidAt: s.paidAt };
+    const expectedDueDate = c.contractDate
+      ? addMonths(c.contractDate, isPostpaid ? s.seq : s.seq - 1, c.paymentDay)
+      : s.dueDate;
+    const withDueDate = s.dueDate !== expectedDueDate ? { ...s, dueDate: expectedDueDate } : s;
+    if (returnedCutoff && withDueDate.dueDate > returnedCutoff) {
+      return { ...withDueDate, status: '면제' as const, paidAmount: withDueDate.amount, paidAt: withDueDate.paidAt };
     }
-    return recalcSchedule(s, today);
+    return recalcSchedule(withDueDate, today);
   });
   // 미수 = sum(연체·부분납 회차의 잔액). 면제는 제외.
   let unpaidAmount = 0;
@@ -193,7 +200,9 @@ function addMonths(iso: string, months: number, day: number): string {
 
 /**
  * 계약 정보로 회차 N개 생성.
- *  - dueDate: 계약일 + (seq-1) 개월, paymentDay 적용
+ *  - 선불 (default): dueDate = 계약일 + (seq-1) 개월 (1회차 = 계약일)
+ *  - 후불: dueDate = 계약일 + seq 개월 (1회차 = 계약일 + 1개월)
+ *    예: 2026-05-05 계약 + 후불 → 1회차 2026-06-05
  *  - 모든 회차 status='예정', paidAmount=0
  */
 export function generateSchedules(c: {
@@ -201,13 +210,16 @@ export function generateSchedules(c: {
   termMonths: number;
   monthlyRent: number;
   paymentDay: number;
+  paymentTiming?: '선불' | '후불';
 }): Array<Omit<PaymentSchedule, 'id' | 'contractId'>> {
   const out: Array<Omit<PaymentSchedule, 'id' | 'contractId'>> = [];
   const total = Math.max(0, c.termMonths | 0);
+  const isPostpaid = c.paymentTiming === '후불';
   for (let i = 0; i < total; i++) {
+    const offset = isPostpaid ? i + 1 : i;
     out.push({
       seq: i + 1,
-      dueDate: addMonths(c.contractDate, i, c.paymentDay),
+      dueDate: addMonths(c.contractDate, offset, c.paymentDay),
       amount: c.monthlyRent,
       status: '예정',
       paidAmount: 0,

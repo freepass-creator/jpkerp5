@@ -167,13 +167,14 @@ export default function ReceivablesPage() {
     if (companyFilter !== 'all') list = list.filter((c) => c.company === companyFilter);
 
     const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((c) =>
+    const searched = !q ? list : list.filter((c) =>
       (c.customerName ?? '').toLowerCase().includes(q)
       || (c.vehiclePlate ?? '').toLowerCase().includes(q)
       || (c.vehicleModel ?? '').toLowerCase().includes(q)
       || (c.manager ?? '').toLowerCase().includes(q),
     );
+    // 기본 정렬: 미수금 큰 순 (가장 시급한 회수 대상 위로)
+    return [...searched].sort((a, b) => (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, filter, companyFilter, search, noticeSentIds]);
 

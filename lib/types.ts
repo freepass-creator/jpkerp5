@@ -86,6 +86,11 @@ export type Contract = {
   deposit: number;
   paymentDay: number;          // 매월 결제일 (1~31)
   paymentMethod: PaymentMethod;
+  /**
+   * 결제 시기 — 선불(당월 1일 인출) vs 후불(말일 결제)
+   * default = '선불' (입력 안 했을 때 안전 가정)
+   */
+  paymentTiming?: '선불' | '후불';
   // 옵션
   insuranceAge?: number;
   selfInsured?: boolean;
