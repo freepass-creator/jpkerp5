@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple, PaperPlaneTilt, FileText, Copy } from '@phosphor-icons/react';
+import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple, PaperPlaneTilt, FileText, Copy, FloppyDisk } from '@phosphor-icons/react';
+import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -833,61 +834,75 @@ function ContactLogDialog({
   const [saving, setSaving] = useState(false);
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      <div style={{
-        background: 'var(--bg-main)', borderRadius: 8, width: 480, maxWidth: '90vw',
-        padding: 20, display: 'flex', flexDirection: 'column', gap: 12,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>
-            연락기록 — {contract.vehiclePlate} {contract.customerName}
+    <DialogRoot open={true} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent
+        size="sm"
+        mode="new"
+        title={
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <ChatCircleDots size={14} weight="fill" style={{ color: 'var(--brand)' }} />
+            연락기록 — <span className="mono">{contract.vehiclePlate}</span>
+            <span className="dim" style={{ fontSize: 11, fontWeight: 400 }}>{contract.customerName}</span>
+          </span>
+        }
+      >
+        <DialogBody style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="form-grid-2" style={{ gridTemplateColumns: '90px minmax(0, 1fr)' }}>
+            <label className="form-label">연락일</label>
+            <input
+              type="date"
+              className="input input-compact mono"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+
+            <label className="form-label">방법</label>
+            <select
+              className="input input-compact"
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+            >
+              <option>전화</option>
+              <option>문자</option>
+              <option>카톡</option>
+              <option>방문</option>
+              <option>이메일</option>
+            </select>
+
+            <label className="form-label" style={{ alignSelf: 'flex-start', paddingTop: 6 }}>
+              고객반응 <span style={{ color: 'var(--red-text)' }}>*</span>
+            </label>
+            <textarea
+              className="input"
+              value={response}
+              onChange={(e) => setResponse(e.target.value)}
+              placeholder="예) 5/30 입금 약속, 통화 안 됨, 연체이유 등"
+              rows={3}
+              autoFocus
+              style={{ resize: 'vertical', fontFamily: 'inherit', padding: 8 }}
+            />
+
+            <label className="form-label">다음 약속일</label>
+            <input
+              type="date"
+              className="input input-compact mono"
+              value={nextPromise}
+              onChange={(e) => setNextPromise(e.target.value)}
+            />
+
+            <label className="form-label" style={{ alignSelf: 'flex-start', paddingTop: 6 }}>비고</label>
+            <textarea
+              className="input"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="필요시 추가 메모"
+              style={{ resize: 'vertical', fontFamily: 'inherit', padding: 8 }}
+            />
           </div>
-          <button type="button" className="btn" onClick={onClose} style={{ height: 26, padding: '0 8px' }}>
-            <X size={12} />
-          </button>
-        </div>
+        </DialogBody>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 8, fontSize: 12 }}>
-          <label style={{ alignSelf: 'center' }}>연락일</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ height: 28, padding: '0 8px' }} />
-
-          <label style={{ alignSelf: 'center' }}>방법</label>
-          <select value={method} onChange={(e) => setMethod(e.target.value)} style={{ height: 28, padding: '0 8px' }}>
-            <option>전화</option>
-            <option>문자</option>
-            <option>카톡</option>
-            <option>방문</option>
-            <option>이메일</option>
-          </select>
-
-          <label style={{ alignSelf: 'flex-start', paddingTop: 6 }}>고객반응</label>
-          <textarea
-            value={response}
-            onChange={(e) => setResponse(e.target.value)}
-            placeholder="예) 5/30 입금 약속, 통화 안 됨, 연체이유 등"
-            rows={3}
-            style={{ padding: 8, resize: 'vertical', fontFamily: 'inherit' }}
-          />
-
-          <label style={{ alignSelf: 'center' }}>다음 약속일</label>
-          <input type="date" value={nextPromise} onChange={(e) => setNextPromise(e.target.value)} style={{ height: 28, padding: '0 8px' }} />
-
-          <label style={{ alignSelf: 'flex-start', paddingTop: 6 }}>비고</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            style={{ padding: 8, resize: 'vertical', fontFamily: 'inherit' }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-          <button type="button" className="btn" onClick={onClose} disabled={saving} style={{ height: 30 }}>
-            취소
-          </button>
+        <DialogFooter>
           <button
             type="button"
             className="btn btn-primary"
@@ -900,13 +915,16 @@ function ContactLogDialog({
                 setSaving(false);
               }
             }}
-            style={{ height: 30 }}
+            title={!response.trim() ? '고객반응 입력 필요' : '연락기록 저장'}
           >
-            <FileXls size={12} weight="bold" /> 저장
+            <FloppyDisk size={12} weight="bold" /> 저장
           </button>
-        </div>
-      </div>
-    </div>
+          <DialogClose asChild>
+            <button type="button" className="btn" disabled={saving}>닫기</button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </DialogRoot>
   );
 }
 
