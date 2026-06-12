@@ -290,7 +290,16 @@ export default function ContractPage() {
                     {filtered.length === 0 ? (
                       <EmptyRow colSpan={11}>계약 없음</EmptyRow>
                     ) : filtered.map((c) => (
-                      <tr key={c.id} onDoubleClick={() => setOpenId(c.id)} style={{ cursor: 'pointer' }} className={selectedIds.has(c.id) ? 'selected-row' : undefined}>
+                      <tr
+                        key={c.id}
+                        onDoubleClick={() => setOpenId(c.id)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c });
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        className={selectedIds.has(c.id) ? 'selected-row' : undefined}
+                      >
                         <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleRow(c.id)} aria-label="행 선택" />
                         </td>
@@ -327,6 +336,63 @@ export default function ContractPage() {
       />
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['계약']} initialMode="계약" />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filtered} selectedIds={selectedIds} />
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+        items={ctxMenu.row ? ([
+          {
+            label: '상세 보기',
+            icon: <MagnifyingGlass size={12} weight="bold" />,
+            onClick: () => { if (ctxMenu.row) setOpenId(ctxMenu.row.id); },
+          },
+          { type: 'separator' },
+          {
+            label: 'SMS 발송',
+            icon: <PaperPlaneTilt size={12} weight="bold" />,
+            onClick: () => {
+              if (!ctxMenu.row) return;
+              setSelectedIds(new Set([ctxMenu.row.id]));
+              setSmsOpen(true);
+            },
+          },
+          {
+            label: '계약 정보 복사',
+            icon: <Copy size={12} weight="bold" />,
+            onClick: () => {
+              const r = ctxMenu.row;
+              if (!r) return;
+              const text = `${r.contractNo} · ${r.customerName} · ${r.vehiclePlate} · 만기 ${r.returnScheduledDate ?? '미정'}`;
+              navigator.clipboard.writeText(text);
+            },
+          },
+          { type: 'separator' },
+          {
+            label: '반납 처리 (오늘)',
+            icon: <ArrowUDownLeft size={12} weight="bold" />,
+            onClick: () => {
+              const r = ctxMenu.row;
+              if (!r) return;
+              if (!confirm(`${r.contractNo} 반납 처리하시겠습니까? (반납일=오늘)`)) return;
+              void updateContract({ ...r, returnedDate: new Date().toISOString().slice(0, 10), status: '반납' });
+            },
+            disabled: !!ctxMenu.row.returnedDate,
+          },
+          { type: 'separator' },
+          {
+            label: '계약 삭제',
+            icon: <X size={12} weight="bold" />,
+            onClick: () => {
+              const r = ctxMenu.row;
+              if (!r) return;
+              if (!confirm(`${r.contractNo} 계약을 삭제하시겠습니까? (감사로그 남음)`)) return;
+              void removeContract(r.id);
+            },
+            danger: true,
+          },
+        ] satisfies ContextMenuItem[]) : []}
+      />
     </PageShell>
   );
 }

@@ -12,7 +12,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Plus, Trash, FileXls } from '@phosphor-icons/react';
+import { Plus, Trash, FileXls, MagnifyingGlass, Copy, ArrowSquareOut, X } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { exportToExcel } from '@/lib/excel-export';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -102,6 +103,7 @@ export default function AssetPage() {
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset:company', 'all');
   const [statusFilter, setStatusFilter] = usePersistentState('filter:asset:status', 'all');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Vehicle | null }>({ open: false, x: 0, y: 0, row: null });
   const [vehicleRegOpen, setVehicleRegOpen] = useState(false);
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [assetView, setAssetView] = useState<'status' | 'registered'>(initialView);
@@ -369,7 +371,7 @@ export default function AssetPage() {
                     if (loanMissing) missing.push('구매방식');
                     if (gpsMissing) missing.push('GPS');
                     return (
-                    <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => setOpenId(v.id)} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
+                    <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => setOpenId(v.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
                       <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                       <td className="mono">{v.plate || '-'}</td>
@@ -498,7 +500,7 @@ export default function AssetPage() {
                       <td colSpan={14} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td>
                     </tr>
                   ) : filtered.map((v) => (
-                    <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => setOpenId(v.id)} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
+                    <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => setOpenId(v.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
                       <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                       <td className="mono">{v.plate || '-'}</td>
@@ -636,6 +638,34 @@ export default function AssetPage() {
           open={vehicleRegOpen || !!editVehicle}
           onOpenChange={(o) => { if (!o) { setVehicleRegOpen(false); setEditVehicle(null); } else setVehicleRegOpen(o); }}
           prefillVehicle={editVehicle}
+        />
+        <ContextMenu
+          open={ctxMenu.open}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+          items={ctxMenu.row ? ([
+            { label: '상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row) setOpenId(ctxMenu.row.id); } },
+            { type: 'separator' },
+            { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); } },
+            { label: 'VIN 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vin) navigator.clipboard.writeText(ctxMenu.row.vin); }, disabled: !ctxMenu.row.vin },
+            { type: 'separator' },
+            { label: '보험증권 페이지', icon: <ArrowSquareOut size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) window.location.href = `/asset/insurance?q=${encodeURIComponent(ctxMenu.row.plate)}`; } },
+            { label: '수선 내역 페이지', icon: <ArrowSquareOut size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) window.location.href = `/asset/repair?q=${encodeURIComponent(ctxMenu.row.plate)}`; } },
+            { label: '계약 이력 페이지', icon: <ArrowSquareOut size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) window.location.href = `/contract?q=${encodeURIComponent(ctxMenu.row.plate)}`; } },
+            { type: 'separator' },
+            {
+              label: '차량 삭제',
+              icon: <X size={12} weight="bold" />,
+              onClick: () => {
+                const r = ctxMenu.row;
+                if (!r) return;
+                if (!confirm(`${r.plate ?? r.id} 차량을 삭제하시겠습니까? (감사로그 남음)`)) return;
+                void removeVehicle(r.id);
+              },
+              danger: true,
+            },
+          ] satisfies ContextMenuItem[]) : []}
         />
       </div>
     </div>
