@@ -67,7 +67,13 @@ export default function RepairPage() {
         if (!hay.includes(q)) return false;
       }
       return true;
-    }).sort((a, b) => (a.plate ?? '').localeCompare(b.plate ?? ''));
+    }).sort((a, b) => {
+      // 기본 정렬: 최근 정비일 desc (최근 작업 위)
+      const aDate = a.plate ? repairByPlate.get(a.plate.replace(/\s/g, ''))?.lastDate ?? '' : '';
+      const bDate = b.plate ? repairByPlate.get(b.plate.replace(/\s/g, ''))?.lastDate ?? '' : '';
+      if (aDate !== bDate) return bDate.localeCompare(aDate);
+      return (a.plate ?? '').localeCompare(b.plate ?? '');
+    });
   }, [vehicles, search, companyFilter, repairByPlate]);
 
   if (roleLoading || !master) {

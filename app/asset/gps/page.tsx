@@ -45,7 +45,13 @@ export default function AssetGpsPage() {
         if (!hay.includes(q)) return false;
       }
       return true;
-    }).sort((a, b) => (a.plate ?? '').localeCompare(b.plate ?? ''));
+    }).sort((a, b) => {
+      // 기본 정렬: 미설치 위 → 설치 (직원 작업 대상 우선)
+      const aInst = !!a.gpsInstalled;
+      const bInst = !!b.gpsInstalled;
+      if (aInst !== bInst) return aInst ? 1 : -1;
+      return (a.plate ?? '').localeCompare(b.plate ?? '');
+    });
   }, [vehicles, search, companyFilter]);
 
   if (roleLoading || !master) {

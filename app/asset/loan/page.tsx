@@ -43,7 +43,13 @@ export default function AssetLoanPage() {
         if (!hay.includes(q)) return false;
       }
       return true;
-    }).sort((a, b) => (a.plate ?? '').localeCompare(b.plate ?? ''));
+    }).sort((a, b) => {
+      // 기본 정렬: 잔여 원금 큰 순 (관리 우선순위)
+      const aRem = a.loanRemainingPrincipal ?? 0;
+      const bRem = b.loanRemainingPrincipal ?? 0;
+      if (aRem !== bRem) return bRem - aRem;
+      return (a.plate ?? '').localeCompare(b.plate ?? '');
+    });
   }, [vehicles, search, companyFilter]);
 
   if (roleLoading || !master) {
