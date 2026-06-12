@@ -149,7 +149,26 @@ function ContractDetailShell({
         { value: 'status', label: '상태', content: <VehicleStatusTab c={contract} onUpdate={onUpdate} /> },
         { value: 'asset', label: '자산', content: <VehicleSpecTab ref={assetRef} c={contract} onUpdate={onUpdate} onEditingChange={(e) => setEditingTab(e ? 'asset' : null)} /> },
         { value: 'contract', label: '계약', content: <ContractInfoTab ref={contractRef} c={contract} onUpdate={onUpdate} onEditingChange={(e) => setEditingTab(e ? 'contract' : null)} /> },
-        { value: 'payment', label: '수납', content: <PaymentTab c={contract} onUpdate={onUpdate} /> },
+        {
+          value: 'payment',
+          // 수납 탭 라벨에 미납 회차 수 배지 — 한눈에 위험 식별
+          label: (() => {
+            const unpaidSeq = contract.unpaidSeqCount ?? 0;
+            if (unpaidSeq === 0) return '수납';
+            return (
+              <>
+                수납
+                <span style={{
+                  display: 'inline-block', marginLeft: 6, padding: '0 6px',
+                  background: 'var(--red-bg)', color: 'var(--red-text)',
+                  fontSize: 10, fontWeight: 700, borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--red-text)',
+                }}>{unpaidSeq}</span>
+              </>
+            );
+          })(),
+          content: <PaymentTab c={contract} onUpdate={onUpdate} />,
+        },
       ]}
     />
   );
