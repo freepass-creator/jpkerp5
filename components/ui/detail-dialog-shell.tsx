@@ -66,13 +66,15 @@ export type DetailDialogShellProps = {
   onCancel?: () => void;
   /** 신규 등록 모드 — true 면 hero 좌측에 brand 띠 + "신규 등록" badge */
   isNew?: boolean;
+  /** 어떤 탭이 편집 중인지 (다중 탭 dialog) — 탭 라벨 옆 dot 표시. null 이면 표시 X */
+  editingTab?: string | null;
 };
 
 export function DetailDialogShell({
   open, onOpenChange, title,
   heroName, heroMeta, heroRight,
   tabs, children, footer, defaultTab, activeTab, onTabChange,
-  onEdit, editing, onSave, onCancel, isNew,
+  onEdit, editing, onSave, onCancel, isNew, editingTab,
 }: DetailDialogShellProps) {
   // 모드 — view / edit / new — hero/footer 시각 차별용
   const mode: 'view' | 'edit' | 'new' = isNew ? 'new' : editing ? 'edit' : 'view';
@@ -106,11 +108,32 @@ export function DetailDialogShell({
               style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, marginTop: 14 }}
             >
               <Tabs.List className="tabs-list">
-                {tabs.map((t) => (
-                  <Tabs.Trigger key={t.value} value={t.value} className="tabs-trigger">
-                    {t.label}
-                  </Tabs.Trigger>
-                ))}
+                {tabs.map((t) => {
+                  const isEditingThisTab = editingTab === t.value;
+                  return (
+                    <Tabs.Trigger
+                      key={t.value}
+                      value={t.value}
+                      className="tabs-trigger"
+                      title={isEditingThisTab ? '이 탭 편집 중 — 저장 또는 취소 안 함' : undefined}
+                    >
+                      {t.label}
+                      {isEditingThisTab && (
+                        <span
+                          aria-label="편집 중"
+                          style={{
+                            display: 'inline-block',
+                            width: 7, height: 7, borderRadius: '50%',
+                            background: 'var(--orange-text, #c2410c)',
+                            marginLeft: 6,
+                            verticalAlign: 'middle',
+                            animation: 'pulse-soft 1.5s ease-in-out infinite',
+                          }}
+                        />
+                      )}
+                    </Tabs.Trigger>
+                  );
+                })}
               </Tabs.List>
               <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
                 {tabs.map((t) => (

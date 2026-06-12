@@ -142,6 +142,7 @@ function ContractDetailShell({
       onTabChange={setActiveTab}
       onEdit={handleEdit}
       editing={isEditing}
+      editingTab={editingTab}
       onSave={handleSave}
       onCancel={handleCancel}
       tabs={[
