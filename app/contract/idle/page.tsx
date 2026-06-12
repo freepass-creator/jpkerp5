@@ -18,6 +18,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { useRole } from '@/lib/use-role';
 import { todayKr } from '@/lib/mock-data';
+import { useLiveTodayKr } from '@/lib/use-live-today';
 import { IdleLocationDialog } from '@/components/idle-location-dialog';
 import type { Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -33,7 +34,7 @@ export default function ContractIdlePage() {
 
   const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
-  const today = todayKr();
+  const today = useLiveTodayKr();
 
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Contract | null>(null);

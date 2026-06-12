@@ -21,6 +21,7 @@ import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { formatCurrency, dateWithDow, formatDate } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
+import { useLiveTodayKr } from '@/lib/use-live-today';
 import { buildAllAlerts, alertColor, dDayLabel, type AlertItem } from '@/lib/alerts';
 import { StatusBadge } from '@/components/ui/status-badge';
 
@@ -1343,32 +1344,3 @@ function RecentActivityPanel() {
   );
 }
 
-/**
- * 오늘 날짜 (한국 기준) — 자동 refresh.
- *
- *  · 5분마다 tick
- *  · 탭 visibility / 윈도우 focus 전환 시 즉시 갱신
- *  · 자정 통과 + 사용자 복귀 시 그날 KPI 자동 새로계산
- *
- * 사용: const today = useLiveTodayKr(); → 같은 day 면 같은 string,
- *       다음날이면 새 string → 의존 useMemo 자동 invalidate.
- */
-function useLiveTodayKr(): string {
-  const [today, setToday] = useState<string>(() => todayKr());
-  useEffect(() => {
-    const refresh = () => {
-      const next = todayKr();
-      setToday((cur) => (cur === next ? cur : next));
-    };
-    const tick = setInterval(refresh, 5 * 60 * 1000);   // 5분
-    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', refresh);
-    return () => {
-      clearInterval(tick);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', refresh);
-    };
-  }, []);
-  return today;
-}

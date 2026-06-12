@@ -15,13 +15,14 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
+import { useLiveTodayKr } from '@/lib/use-live-today';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { downloadContractsExcel } from '@/lib/contract-export';
 
 export default function ExpirePage() {
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
-  const today = todayKr();
+  const today = useLiveTodayKr();
   const [bucket, setBucket] = usePersistentState<'all' | 'expired' | 'd30' | 'd90'>('filter:contract-expire:quick', 'all');
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: typeof contracts[number] | null }>({ open: false, x: 0, y: 0, row: null });
 

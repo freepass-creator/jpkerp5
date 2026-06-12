@@ -9,6 +9,7 @@ import {
   buildDeliveries,
   buildReturns,
 } from '@/lib/mock-data';
+import { useLiveTodayKr } from '@/lib/use-live-today';
 import { formatCurrency, formatDate, daysSince, shortDate, dateWithDow, formatRemainingHuman } from '@/lib/utils';
 import type { Contract } from '@/lib/types';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -304,6 +305,7 @@ function resolveUsage(c: Contract): string {
 // PaymentState / getPaymentState → lib/contract-stage.ts
 
 export default function Page() {
+  const today = useLiveTodayKr();
   const [search, setSearch] = useState('');
   const [view, setView] = useState<View>('전체');
   const [companyFilter, setCompanyFilter] = useState<string>('전체');
@@ -556,8 +558,8 @@ export default function Page() {
     return { totalUnpaid, unpaidCount };
   }, [scopedContracts]);
 
-  const deliveries = useMemo(() => buildDeliveries(scopedContracts, todayKr()), [scopedContracts]);
-  const returns = useMemo(() => buildReturns(scopedContracts, todayKr(), 30), [scopedContracts]);
+  const deliveries = useMemo(() => buildDeliveries(scopedContracts, today), [scopedContracts, today]);
+  const returns = useMemo(() => buildReturns(scopedContracts, today, 30), [scopedContracts, today]);
 
   function handleRowDoubleClick(c: Contract) {
     setSelectedId(c.id);
@@ -640,7 +642,7 @@ export default function Page() {
               ? `${manualSort.col} ${manualSort.dir === 'asc' ? '오름' : '내림'}`
               : sortLabel(view)}
           </span>
-          <span className="topbar-date">{dateWithDow(todayKr())}</span>
+          <span className="topbar-date">{dateWithDow(today)}</span>
         </>
       }
       bare
@@ -696,7 +698,7 @@ export default function Page() {
                 ) : (
                   filteredContracts.map((c) => {
                     const expiryDate = getExpiryDate(c);
-                    const isReturnOverdue = !!(expiryDate && !c.returnedDate && c.status === '운행' && expiryDate < todayKr());
+                    const isReturnOverdue = !!(expiryDate && !c.returnedDate && c.status === '운행' && expiryDate < today);
                     const vs = getVehicleState(c);
                     const cs = getContractState(c);
                     const ps = getPaymentState(c);
@@ -842,7 +844,7 @@ export default function Page() {
                             if (c.contractDate && expiryDate < c.contractDate) {
                               return <span style={{ color: 'var(--red-text)', fontWeight: 600 }} title={`종료(${expiryDate}) < 시작(${c.contractDate})`}>날짜오류</span>;
                             }
-                            return formatRemainingHuman(todayKr(), expiryDate);
+                            return formatRemainingHuman(today, expiryDate);
                           })()}
                         </td>
                         {/* 수납상태 + 미수금 */}

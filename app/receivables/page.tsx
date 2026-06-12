@@ -22,6 +22,7 @@ import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
 import { todayKr } from '@/lib/mock-data';
+import { useLiveTodayKr } from '@/lib/use-live-today';
 import { friendlyError } from '@/lib/friendly-error';
 import type { Contract, RiskIssue } from '@/lib/types';
 import { computeActiveIssues, pickPrimaryIssue, computeLatePayStage, ISSUE_COLOR, ISSUE_LABEL, type LatePayStage, needsEngineLockAction, needsNoticeAction } from '@/lib/risk-issues';
@@ -113,7 +114,7 @@ export default function ReceivablesPage() {
   const [editContract, setEditContract] = useState<Contract | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const today = todayKr();
+  const today = useLiveTodayKr();
 
   // 5개 필터 정의:
   // · 미납중   = unpaidAmount > 0 OR 부분납 (회수해야 할 돈이 있는 경우)
