@@ -113,12 +113,15 @@ export function recalcContract<T extends Contract>(c: T, today: string): T {
   const overdue = recalcedSchedules.filter((s) => s.status === '연체' || s.status === '부분납').sort((a, b) => a.seq - b.seq);
   const upcoming = recalcedSchedules.filter((s) => s.status === '예정' && s.dueDate >= today).sort((a, b) => a.seq - b.seq);
   const currentSeq = overdue[0]?.seq ?? upcoming[0]?.seq ?? recalcedSchedules.length;
+  // 사용자 명시: 계약기간 = 회차 수. totalSeq = termMonths 강제 동기 (불일치 방지)
+  const totalSeq = c.termMonths;
   return {
     ...c,
     schedules: recalcedSchedules,
     unpaidAmount,
     unpaidSeqCount,
     currentSeq,
+    totalSeq,
   };
 }
 

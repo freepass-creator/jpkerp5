@@ -12,7 +12,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileText, MagnifyingGlass, ArrowLeft, FileXls, Trash } from '@phosphor-icons/react';
+import { FileText, MagnifyingGlass, ArrowLeft, FileXls, Trash, PaperPlaneTilt, Copy, ArrowUDownLeft, X } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -45,6 +46,9 @@ export default function ContractPage() {
   const { vehicles, update: updateVehicleMaster } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: typeof contracts[number] | null }>({
+    open: false, x: 0, y: 0, row: null,
+  });
 
   type QuickFilter = 'all' | 'active' | 'ended' | 'expire' | 'return' | 'overdue';
   const [search, setSearch] = useState('');
