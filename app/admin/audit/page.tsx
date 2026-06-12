@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { ClipboardText, MagnifyingGlass, ArrowsClockwise, FileXls } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -55,6 +55,7 @@ export default function AuditPage() {
   const [entityFilter, setEntityFilter] = useState<AuditEntityType | 'all'>('all');
   const [dateFrom, setDateFrom] = useState('');     // YYYY-MM-DD (inclusive)
   const [dateTo, setDateTo] = useState('');         // YYYY-MM-DD (inclusive)
+  const [expandedId, setExpandedId] = useState<string | null>(null);   // 클릭 행 펼침
 
   /** 빠른 기간 프리셋 — chip 클릭 1번으로 from·to 동시 설정 */
   function applyPreset(preset: 'today' | '7d' | '30d' | 'thisMonth' | 'clear') {
@@ -198,20 +199,44 @@ export default function AuditPage() {
                         표시할 감사 로그가 없습니다.
                       </td>
                     </tr>
-                  ) : filtered.map((r) => (
-                    <tr key={r.id}>
-                      <td className="mono">{r.at.slice(0, 19).replace('T', ' ')}</td>
-                      <td className="dim">{r.by ?? '시스템'}</td>
-                      <td className="center">
-                        <span style={{ fontWeight: 600, fontSize: 11, color: ACTION_COLOR[r.action] }}>
-                          {ACTION_LABEL[r.action]}
-                        </span>
-                      </td>
-                      <td className="center dim">{ENTITY_LABEL[r.entityType]}</td>
-                      <td>{r.label}</td>
-                      <td className="mono dim" style={{ fontSize: 11 }}>{r.entityId ?? '-'}</td>
-                    </tr>
-                  ))}
+                  ) : filtered.map((r) => {
+                    const hasDetail = !!(r.before || r.after);
+                    const isExpanded = expandedId === r.id;
+                    return (
+                      <Fragment key={r.id}>
+                        <tr
+                          onClick={() => hasDetail && setExpandedId(isExpanded ? null : r.id)}
+                          style={{ cursor: hasDetail ? 'pointer' : 'default' }}
+                          title={hasDetail ? '클릭 — 변경 상세 펼침/접기' : '변경 상세 없음'}
+                        >
+                          <td className="mono">
+                            {hasDetail && (
+                              <span style={{ marginRight: 4, color: 'var(--text-weak)', fontSize: 10 }}>
+                                {isExpanded ? '▼' : '▶'}
+                              </span>
+                            )}
+                            {r.at.slice(0, 19).replace('T', ' ')}
+                          </td>
+                          <td className="dim">{r.by ?? '시스템'}</td>
+                          <td className="center">
+                            <span style={{ fontWeight: 600, fontSize: 11, color: ACTION_COLOR[r.action] }}>
+                              {ACTION_LABEL[r.action]}
+                            </span>
+                          </td>
+                          <td className="center dim">{ENTITY_LABEL[r.entityType]}</td>
+                          <td>{r.label}</td>
+                          <td className="mono dim" style={{ fontSize: 11 }}>{r.entityId ?? '-'}</td>
+                        </tr>
+                        {isExpanded && hasDetail && (
+                          <tr>
+                            <td colSpan={6} style={{ background: 'var(--bg-sunken)', padding: 0 }}>
+                              <DiffPanel before={r.before} after={r.after} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -265,4 +290,59 @@ export default function AuditPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * 변경 상세 — before/after 키 합치고 row 마다 한 줄로.
+ *
+ *  · 동일값 키: 회색으로 숨기지 않고 표시 (컨텍스트용)
+ *  · 변경된 키: before 빨강 strike + after 초록 강조
+ *  · 신규(after 만): 초록 강조
+ *  · 삭제(before 만): 빨강 strike
+ */
+function DiffPanel({ before, after }: { before?: Record<string, unknown>; after?: Record<string, unknown> }) {
+  const b = before ?? {};
+  const a = after ?? {};
+  const keys = Array.from(new Set([...Object.keys(b), ...Object.keys(a)])).sort();
+  if (keys.length === 0) return <div style={{ padding: 12, fontSize: 11, color: 'var(--text-weak)' }}>변경 상세 없음</div>;
+
+  return (
+    <div style={{ padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono, monospace)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ color: 'var(--text-weak)' }}>
+            <th style={{ width: '24%', textAlign: 'left', padding: '4px 8px', fontWeight: 500 }}>필드</th>
+            <th style={{ width: '38%', textAlign: 'left', padding: '4px 8px', fontWeight: 500 }}>변경 전</th>
+            <th style={{ width: '38%', textAlign: 'left', padding: '4px 8px', fontWeight: 500 }}>변경 후</th>
+          </tr>
+        </thead>
+        <tbody>
+          {keys.map((k) => {
+            const bv = b[k];
+            const av = a[k];
+            const same = JSON.stringify(bv) === JSON.stringify(av);
+            return (
+              <tr key={k} style={{ borderTop: '1px solid var(--border-soft)' }}>
+                <td style={{ padding: '4px 8px', color: 'var(--text-sub)' }}>{k}</td>
+                <td style={{ padding: '4px 8px', color: same ? 'var(--text-weak)' : 'var(--red-text)', textDecoration: !same && bv !== undefined ? 'line-through' : undefined }}>
+                  {bv === undefined ? <span className="dim">—</span> : <DiffValue v={bv} />}
+                </td>
+                <td style={{ padding: '4px 8px', color: same ? 'var(--text-weak)' : 'var(--green-text, #10b981)', fontWeight: same ? 400 : 600 }}>
+                  {av === undefined ? <span className="dim">—</span> : <DiffValue v={av} />}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DiffValue({ v }: { v: unknown }) {
+  if (v === null) return <span className="dim">null</span>;
+  if (typeof v === 'boolean') return <>{v ? 'true' : 'false'}</>;
+  if (typeof v === 'number') return <>{v.toLocaleString()}</>;
+  if (typeof v === 'string') return <>{v.length > 80 ? v.slice(0, 80) + '…' : v}</>;
+  return <>{JSON.stringify(v).slice(0, 80)}</>;
 }
