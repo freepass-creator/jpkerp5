@@ -1268,8 +1268,62 @@ input[type="radio"]:disabled {
 .chip.chip-tone-orange:not(.active) { color: var(--orange-text); }
 .chip.chip-tone-blue:not(.active)   { color: var(--blue-text); }
 
+/* ────────────── Custom scrollbar (slim, subtle) ──────────────
+ *  Windows 기본 스크롤바는 굵어서 테이블 헤더에 시각적으로 가까이 붙어 보임.
+ *  slim 스크롤바 + 옅은 트랙 + scrollbar-gutter: stable 로 헤더 column 정렬 흔들림 방지.
+ */
+.table-wrap,
+.panel-body,
+.dialog-body,
+.settings-main,
+.detail-section-body {
+  scrollbar-width: thin;                      /* Firefox */
+  scrollbar-color: var(--border-strong) transparent;
+}
+.table-wrap::-webkit-scrollbar,
+.panel-body::-webkit-scrollbar,
+.dialog-body::-webkit-scrollbar,
+.settings-main::-webkit-scrollbar,
+.detail-section-body::-webkit-scrollbar {
+  width: 10px; height: 10px;
+}
+.table-wrap::-webkit-scrollbar-track,
+.panel-body::-webkit-scrollbar-track,
+.dialog-body::-webkit-scrollbar-track,
+.settings-main::-webkit-scrollbar-track,
+.detail-section-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.table-wrap::-webkit-scrollbar-thumb,
+.panel-body::-webkit-scrollbar-thumb,
+.dialog-body::-webkit-scrollbar-thumb,
+.settings-main::-webkit-scrollbar-thumb,
+.detail-section-body::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+}
+.table-wrap::-webkit-scrollbar-thumb:hover,
+.panel-body::-webkit-scrollbar-thumb:hover,
+.dialog-body::-webkit-scrollbar-thumb:hover,
+.settings-main::-webkit-scrollbar-thumb:hover,
+.detail-section-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-sub);
+  background-clip: padding-box;
+}
+.table-wrap::-webkit-scrollbar-corner,
+.panel-body::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* ────────────── Table ────────────── */
-.table-wrap { width: 100%; overflow: auto; height: 100%; }
+.table-wrap {
+  width: 100%;
+  overflow: auto;
+  height: 100%;
+  scrollbar-gutter: stable;       /* 스크롤바 공간 미리 예약 → 헤더 column 안 흔들림 */
+}
 
 .table {
   width: 100%;
