@@ -138,5 +138,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useDataContext(): DataState {
-  return useContext(DataContext);
+  const ctx = useContext(DataContext);
+  // dev 에서만 경고 — Provider 외부 호출 시 침묵 X (빈 EMPTY_STATE 반환되어도 디버깅 위해 안내)
+  if (process.env.NODE_ENV !== 'production' && ctx === EMPTY_STATE) {
+    // Provider 안인지 알기 어려움 (EMPTY_STATE 가 default 값이라). 실제로 vehicles 등이 안 채워지면
+    // Provider 외부일 가능성. 디버그 시 console.log 으로만 안내.
+    if (typeof window !== 'undefined' && !(window as unknown as { __jpkerp5_dataprovider?: boolean }).__jpkerp5_dataprovider) {
+      console.warn('[DataProvider] useDataContext called outside Provider. Empty data returned.');
+    }
+  }
+  return ctx;
 }
