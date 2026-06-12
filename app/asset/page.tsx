@@ -556,8 +556,16 @@ export default function AssetPage() {
                 style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
                 onClick={async () => {
                   if (selectedIds.size === 0) return;
-                  if (!confirm(`선택한 ${selectedIds.size}건의 자산을 삭제하시겠습니까? (감사로그 남음)`)) return;
-                  for (const id of selectedIds) {
+                  // 합성 contract-derived 자산 제외 — 실 vehicles 노드에 있는 것만 삭제 가능
+                  const realIds = Array.from(selectedIds).filter((id) => !id.startsWith('contract-derived-'));
+                  const synthetic = selectedIds.size - realIds.length;
+                  if (realIds.length === 0) {
+                    alert(`선택한 ${selectedIds.size}건이 모두 계약 자동 인식 자산입니다.\n등록증 정보가 미입력된 상태이므로 삭제 대상 아님.\n해당 계약에서 처리하세요.`);
+                    return;
+                  }
+                  const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
+                  if (!confirm(`선택한 ${realIds.length}건의 자산을 삭제하시겠습니까? (감사로그 남음)${note}`)) return;
+                  for (const id of realIds) {
                     try { await removeVehicle(id); } catch (e) { console.error('vehicle delete failed', id, e); }
                   }
                   setSelectedIds(new Set());
@@ -576,8 +584,15 @@ export default function AssetPage() {
                   const next = e.target.value as Vehicle['status'];
                   e.currentTarget.value = '';   // reset (select-once UX)
                   if (!next || selectedIds.size === 0) return;
-                  const targets = vehicles.filter((v) => selectedIds.has(v.id));
-                  if (!confirm(`선택한 ${targets.length}건의 자산 상태를 '${next}' 로 변경합니다.\n같은 plate 의 활성 계약 vehicleStatus 도 함께 sync 됩니다.\n계속?`)) return;
+                  // 합성 contract-derived 자산 제외 — 실 vehicles 노드에 있는 것만 업데이트 가능
+                  const targets = vehicles.filter((v) => selectedIds.has(v.id) && !v.id.startsWith('contract-derived-'));
+                  const synthetic = selectedIds.size - targets.length;
+                  if (targets.length === 0) {
+                    alert(`선택한 ${selectedIds.size}건이 모두 계약 자동 인식 자산입니다.\n등록증 정보가 미입력된 상태이므로 상태 변경 대상 아님.\n해당 계약에서 처리하세요.`);
+                    return;
+                  }
+                  const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
+                  if (!confirm(`선택한 ${targets.length}건의 자산 상태를 '${next}' 로 변경합니다.\n같은 plate 의 활성 계약 vehicleStatus 도 함께 sync 됩니다.${note}\n계속?`)) return;
                   let changed = 0, syncedContracts = 0;
                   for (const v of targets) {
                     if (v.status === next) continue;
