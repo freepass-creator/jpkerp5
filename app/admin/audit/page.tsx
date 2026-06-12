@@ -8,6 +8,7 @@ import { useAuditLogs } from '@/lib/firebase/audit-store';
 import { exportToExcel } from '@/lib/excel-export';
 import { todayKr } from '@/lib/mock-data';
 import type { AuditAction, AuditEntityType } from '@/lib/types';
+import { usePersistentState } from '@/lib/use-persistent-state';
 
 const ACTION_LABEL: Record<AuditAction, string> = {
   create: '생성',
@@ -65,8 +66,8 @@ function entityHref(t: AuditEntityType, id?: string): string | null {
 export default function AuditPage() {
   const { rows, loading } = useAuditLogs(1000);
   const [search, setSearch] = useState('');
-  const [actionFilter, setActionFilter] = useState<AuditAction | 'all'>('all');
-  const [entityFilter, setEntityFilter] = useState<AuditEntityType | 'all'>('all');
+  const [actionFilter, setActionFilter] = usePersistentState<AuditAction | 'all'>('filter:audit:action', 'all');
+  const [entityFilter, setEntityFilter] = usePersistentState<AuditEntityType | 'all'>('filter:audit:entity', 'all');
   const [dateFrom, setDateFrom] = useState('');     // YYYY-MM-DD (inclusive)
   const [dateTo, setDateTo] = useState('');         // YYYY-MM-DD (inclusive)
   const [expandedId, setExpandedId] = useState<string | null>(null);   // 클릭 행 펼침

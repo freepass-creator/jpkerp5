@@ -88,7 +88,7 @@ export default function FinancePage() {
   const [directionFilter, setDirectionFilter] = usePersistentState<'all' | 'deposit' | 'withdraw'>('filter:finance:direction', 'all');
   const [viewMode, setViewMode] = usePersistentState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily'>('filter:finance:view', 'account');
   const [createOpen, setCreateOpen] = useState(false);
-  const [periodMode, setPeriodMode] = useState<'month' | 'quarter' | 'year'>('month');
+  const [periodMode, setPeriodMode] = usePersistentState<'month' | 'quarter' | 'year'>('filter:finance:period', 'month');
   const [periodAnchor, setPeriodAnchor] = useState<{ y: number; m: number }>(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() + 1 };
