@@ -37,6 +37,13 @@ const TOOLS: ToolCard[] = [
     variant: 'op',
   },
   {
+    href: '/admin/status-drift',
+    title: '차량상태 drift 진단',
+    desc: '자산 마스터(Vehicle.status) ↔ 계약 사본(Contract.vehicleStatus) 불일치 케이스 가시화 + 수동 정렬. plate 매칭 실패·고립 자산까지 한눈에.',
+    icon: <Warning size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
     href: '/admin/migrate-sheet',
     title: '데이터 초기화 · 진단',
     desc: '☢ 전체 데이터 wipe (테스트 후 처음부터 쓰기) / DB 노드 상태 진단 / 회사 코드 정리 — 관리자 전용 위험 도구. 이중 confirm 거침.',
