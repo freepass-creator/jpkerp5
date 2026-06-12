@@ -34,7 +34,7 @@ export default function AssetGpsPage() {
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-gps:company', 'all');
   const sel = useTableSelection();
-  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: { id: string; plate?: string; gpsDeviceNo?: string } | null }>({ open: false, x: 0, y: 0, row: null });
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: { id: string; plate?: string; gpsDeviceId?: string } | null }>({ open: false, x: 0, y: 0, row: null });
 
   const companyOptions = useMemo(() => buildCompanyOptions(vehicles, (v) => v.company), [vehicles]);
 
@@ -49,8 +49,8 @@ export default function AssetGpsPage() {
       return true;
     }).sort((a, b) => {
       // 기본 정렬: 미설치 위 → 설치 (직원 작업 대상 우선)
-      const aInst = !!a.gpsInstalled;
-      const bInst = !!b.gpsInstalled;
+      const aInst = !!(a.gpsProvider || a.gpsDeviceId);
+      const bInst = !!(b.gpsProvider || b.gpsDeviceId);
       if (aInst !== bInst) return aInst ? 1 : -1;
       return (a.plate ?? '').localeCompare(b.plate ?? '');
     });
@@ -141,10 +141,10 @@ export default function AssetGpsPage() {
                       차량번호: v.plate ?? '',
                       차종: v.model ?? '',
                       상태: v.status ?? '',
-                      GPS공급사: v.gpsVendor ?? '',
-                      단말번호: v.gpsDeviceNo ?? '',
-                      설치일: v.gpsInstalledAt ?? '',
-                      시동제어: v.gpsImmobilizer ? 'O' : '',
+                      GPS공급사: v.gpsProvider ?? '',
+                      단말번호: v.gpsDeviceId ?? '',
+                      설치일: v.gpsInstallUploadedAt?.slice(0, 10) ?? '',
+                      시동제어: '',
                     })),
                     columns: [
                       { key: '회사', header: '회사', width: 14 },
@@ -174,7 +174,7 @@ export default function AssetGpsPage() {
             { label: '자산 상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) router.push(`/asset?q=${encodeURIComponent(ctxMenu.row.plate)}`); } },
             { type: 'separator' },
             { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); } },
-            { label: '단말번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.gpsDeviceNo) navigator.clipboard.writeText(ctxMenu.row.gpsDeviceNo); }, disabled: !ctxMenu.row.gpsDeviceNo },
+            { label: '단말번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.gpsDeviceId) navigator.clipboard.writeText(ctxMenu.row.gpsDeviceId); }, disabled: !ctxMenu.row.gpsDeviceId },
           ] satisfies ContextMenuItem[]) : []}
         />
       </div>

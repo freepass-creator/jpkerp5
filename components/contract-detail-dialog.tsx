@@ -1704,7 +1704,7 @@ const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (
         <div className="detail-grid-2">
           <div>
             <Field label="계약번호" value={c.contractNo} mono />
-            <EditableField label="계약일" value={editing ? (draft.contractDate ?? '') : (formatDateFull(c.contractDate) || '-')} editing={editing} mono onChange={(v) => set('contractDate', v || undefined)} placeholder="YYYY-MM-DD" />
+            <EditableField label="계약일" value={editing ? (draft.contractDate ?? '') : (formatDateFull(c.contractDate) || '-')} editing={editing} mono onChange={(v) => set('contractDate', v || '')} placeholder="YYYY-MM-DD" />
             <EditableField label="인도일" value={editing ? (draft.deliveredDate ?? '') : (formatDateFull(c.deliveredDate) || '-')} editing={editing} mono onChange={(v) => set('deliveredDate', v || undefined)} placeholder="YYYY-MM-DD" />
             <EditableField label="반납예정(종료일)" value={editing ? (draft.returnScheduledDate ?? '') : (formatDateFull(c.returnScheduledDate) || '-')} editing={editing} mono onChange={(v) => set('returnScheduledDate', v || undefined)} placeholder="YYYY-MM-DD" />
             <EditableField label="약정기간(개월)" value={editing ? String(draft.termMonths) : `${c.termMonths}개월 ${c.longTerm ? '(장기)' : '(단기)'}`} editing={editing} mono onChange={(v) => set('termMonths', Number(v) || 0)} />

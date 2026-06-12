@@ -2492,7 +2492,7 @@ type ExtractedRow = {
 
 function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
   const { addMany: addContracts } = useContracts();
-  const { vehicles, addMany: addVehicles } = useVehicles();
+  const { vehicles, add: addVehicle, addMany: addVehicles, update: updateVehicle } = useVehicles();
   const { companies } = useCompanies();
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);

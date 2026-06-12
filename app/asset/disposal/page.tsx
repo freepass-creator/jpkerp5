@@ -136,8 +136,8 @@ export default function AssetDisposalPage() {
                       제작연월: v.manufacturedDate ?? '',
                       매입가: v.purchasePrice ?? '',
                       상태: v.status ?? '',
-                      매각예상가: v.salePrice ?? '',
-                      매각일: v.saleDate ?? '',
+                      매각예상가: '',
+                      매각일: v.disposalCertUploadedAt?.slice(0, 10) ?? '',
                     })),
                     columns: [
                       { key: '회사', header: '회사', width: 14 },

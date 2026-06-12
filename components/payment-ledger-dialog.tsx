@@ -361,6 +361,7 @@ function MatchPane({
   const [picked, setPicked] = useState<Contract | null>(null);
   const [category, setCategory] = useState<PaymentCategory>('대여료');
   const [q, setQ] = useState(tx.counterparty);
+  const { companies } = useCompanies();
 
   const matches = useMemo(() => {
     if (!q.trim()) return contracts.slice(0, 20);

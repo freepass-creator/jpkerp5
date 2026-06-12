@@ -133,7 +133,7 @@ export default function AssetLoanPage() {
                       회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
                       차량번호: v.plate ?? '',
                       차종: v.model ?? '',
-                      할부사: v.loanLender ?? '',
+                      할부사: v.loanCompany ?? '',
                       개시일: v.loanStartDate ?? '',
                       할부개월: v.loanMonths ?? '',
                       매입가: v.purchasePrice ?? '',

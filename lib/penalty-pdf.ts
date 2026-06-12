@@ -47,6 +47,14 @@ export interface PenaltyWorkItem extends PenaltyParsed, AuditFields {
     electronic_contract_doc_no?: string;
     /** 임차인 전자서명 PNG URL (배경 투명) */
     contractor_signature_png?: string;
+    /**
+     * 부과 청구처 — 계약 종료 상태에 따라 분리.
+     *  · '계약자' (default): 활성 계약 또는 정상종료
+     *  · '회사'           : 중도해지·채권보전 등 회사 부담 케이스 (추심 별도)
+     */
+    billing_party?: '계약자' | '회사';
+    /** 계약 종료 사유 — 회사 부담 판단 근거 */
+    end_reason?: '정상종료' | '중도해지' | '채권보전';
   } | null;
   _saving?: boolean;
   _ocrStatus?: 'pending' | 'done' | 'failed';

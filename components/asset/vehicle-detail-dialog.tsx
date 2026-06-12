@@ -69,14 +69,14 @@ function OperationOverviewTab({
 
       <Section title="보험 가입">
         <Grid2>
-          <KV k="보험사" v={vehicle.insurer} />
+          <KV k="보험사" v={vehicle.insuranceCompany} />
           <KV k="만기" v={insExpiry ? (
             <span style={{ color: insDaysLeft != null && insDaysLeft < 30 ? 'var(--red-text)' : insDaysLeft != null && insDaysLeft < 90 ? 'var(--orange-text)' : undefined }}>
               {insExpiry} {insDaysLeft != null && <span className="dim">(D{insDaysLeft >= 0 ? '-' : '+'}{Math.abs(insDaysLeft)})</span>}
             </span>
           ) : undefined} mono />
           <KV k="보험연령" v={activeContract?.insuranceAge ? `${activeContract.insuranceAge}세 이상` : undefined} />
-          <KV k="자차" v={activeContract?.selfInsured === '자차' ? <StatusBadge tone="green">자차</StatusBadge> : activeContract?.selfInsured === '무자차' ? <StatusBadge tone="orange">무자차</StatusBadge> : undefined} />
+          <KV k="자차" v={activeContract?.selfInsured === true ? <StatusBadge tone="green">자차</StatusBadge> : activeContract?.selfInsured === false ? <StatusBadge tone="orange">무자차</StatusBadge> : undefined} />
         </Grid2>
       </Section>
 
@@ -93,10 +93,10 @@ function OperationOverviewTab({
 
       <Section title="GPS 설치">
         <Grid2>
-          <KV k="설치 여부" v={vehicle.gpsInstalled ? <StatusBadge tone="green">설치</StatusBadge> : <StatusBadge tone="orange">미설치</StatusBadge>} />
-          <KV k="GPS 공급사" v={vehicle.gpsVendor} />
-          <KV k="단말번호" v={vehicle.gpsDeviceNo} mono />
-          <KV k="시동제어" v={vehicle.gpsImmobilizer ? <StatusBadge tone="brand">가능</StatusBadge> : undefined} />
+          <KV k="설치 여부" v={(vehicle.gpsProvider || vehicle.gpsDeviceId) ? <StatusBadge tone="green">설치</StatusBadge> : <StatusBadge tone="orange">미설치</StatusBadge>} />
+          <KV k="GPS 공급사" v={vehicle.gpsProvider} />
+          <KV k="단말번호" v={vehicle.gpsDeviceId} mono />
+          <KV k="설치일" v={vehicle.gpsInstallUploadedAt?.slice(0, 10)} mono />
         </Grid2>
       </Section>
 

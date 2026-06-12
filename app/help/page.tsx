@@ -3,7 +3,7 @@
 import {
   BookOpen, Buildings, House, CurrencyKrw, Warning, FileXls, Camera, MagnifyingGlass,
   CheckCircle, ArrowRight, Question, Plus, ChartBar, ClipboardText, Phone, Sparkle,
-  Car, Users, Crown, ShieldStar, Gear, Wrench, Receipt, ShieldCheck,
+  Car, Users, Crown, ShieldStar, Gear, Wrench, Receipt, ShieldCheck, FileText,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';

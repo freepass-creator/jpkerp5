@@ -26,6 +26,7 @@ import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers'
 import { todayKr } from '@/lib/mock-data';
 import { Plus, FileXls, Trash, MagnifyingGlass, Copy, ArrowSquareOut } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
+import type { Vehicle } from '@/lib/types';
 
 type QF = 'all' | 'missing' | 'expire' | 'expired';
 
