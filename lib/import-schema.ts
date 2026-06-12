@@ -48,6 +48,7 @@ export const CONTRACT_COLUMNS: ColumnSpec[] = [
   { label: '장단기',       field: 'longTerm',         required: false, example: '장기', hint: '장기/단기 (12개월 이상 자동 장기)' },
   { label: '보증금',       field: 'deposit',          required: false, example: '2000000' },
   { label: '결제방법',     field: 'paymentMethod',    required: false, example: 'CMS', hint: 'CMS/카드/세금계산서/이체/후불/현금' },
+  { label: '결제시기',     field: 'paymentTiming',    required: false, example: '선불', hint: '선불(default, 계약일 첫 결제) / 후불(계약일+1개월 첫 결제)' },
   { label: '보험연령',     field: 'insuranceAge',     required: false, example: '26' },
   { label: '자차여부',     field: 'selfInsured',      required: false, example: '가입', hint: '가입/미가입' },
   { label: '거리한도Km',   field: 'distanceLimitKm',  required: false, example: '30000' },

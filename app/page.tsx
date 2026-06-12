@@ -809,7 +809,14 @@ export default function Page() {
                               || s === '구매대기' || s === '등록대기'
                               || c.status === '반납' || c.status === '해지';
                             if (inactive) return <span className="muted">-</span>;
-                            return c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>;
+                            const timing = c.paymentTiming ?? '선불';
+                            const timingColor = timing === '후불' ? 'var(--orange-text)' : 'var(--text-sub)';
+                            return (
+                              <>
+                                <div>{c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>}</div>
+                                <div style={{ fontSize: 9, color: timingColor, fontWeight: 600 }}>{timing}</div>
+                              </>
+                            );
                           })()}
                         </td>
                         {/* 회차 — 운행 계약만 의미 있음 */}
