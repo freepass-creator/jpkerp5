@@ -207,7 +207,7 @@ export default function DashboardPage() {
 
           {/* 법인별 운영 현황 — 관리 법인 단위 카드 */}
           <Section title="법인별 운영 현황">
-            <CompanyKpiGrid contracts={contracts} vehicles={vehicles} bankTx={bankTx} cardTx={cardTx} />
+            <CompanyKpiGrid contracts={contracts} vehicles={vehicles} bankTx={bankTx} cardTx={cardTx} today={today} />
           </Section>
 
           {/* 최근 활동 — 감사로그 최근 20건 (점프 가능) */}
@@ -920,17 +920,17 @@ function ScheduleDetailDialog({
 /** 메인 KPI — 가동률·수금률 등 핵심 지표용 큰 카드 (2 col span, 진행률 바 포함) */
 /** 법인별 운영 현황 — 회사 단위로 동일 KPI(가동률/수금률/유휴율/미수율) 4종 카드 그리드 */
 function CompanyKpiGrid({
-  contracts, vehicles, bankTx, cardTx,
+  contracts, vehicles, bankTx, cardTx, today,
 }: {
   contracts: import('@/lib/types').Contract[];
   vehicles: import('@/lib/types').Vehicle[];
   bankTx: readonly { matchedContractId?: string; amount?: number; txDate?: string }[];
   cardTx: readonly { matchedContractId?: string; amount?: number; txDate?: string }[];
+  today: string;
 }) {
   const { companies } = useCompanies();
 
   const rows = useMemo(() => {
-    const today = todayKr();
     const thisMonth = today.slice(0, 7);
     const DISPOSED = new Set(['매각', '매각대기', '매각검토']);
 
@@ -993,7 +993,7 @@ function CompanyKpiGrid({
     // 운영대수 큰 순으로
     out.sort((a, b) => b.operatingFleet - a.operatingFleet);
     return out;
-  }, [contracts, vehicles, bankTx, cardTx, companies]);
+  }, [contracts, vehicles, bankTx, cardTx, companies, today]);
 
   if (rows.length === 0) {
     return (
