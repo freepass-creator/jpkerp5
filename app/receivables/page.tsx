@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple, PaperPlaneTilt, FileText } from '@phosphor-icons/react';
+import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple, PaperPlaneTilt, FileText, Copy } from '@phosphor-icons/react';
+import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { SmsDialog } from '@/components/sms-dialog';
@@ -102,6 +103,7 @@ export default function ReceivablesPage() {
   const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:receivables:company', 'all');
   const [search, setSearch] = useState('');
   const [contactOpen, setContactOpen] = useState<Contract | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Contract | null }>({ open: false, x: 0, y: 0, row: null });
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [engineLockTarget, setEngineLockTarget] = useState<Contract | null>(null);
@@ -385,7 +387,7 @@ export default function ReceivablesPage() {
                       const showLockNeeded = needsLock(c);
                       const showNoticeNeeded = needsNotice(c);
                       return (
-                        <tr key={c.id} onDoubleClick={() => setDetailContract(c)} style={{ cursor: 'pointer' }}>
+                        <tr key={c.id} onDoubleClick={() => setDetailContract(c)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
                           <td className="checkbox-col">
                             <input
                               type="checkbox"
@@ -725,6 +727,36 @@ export default function ReceivablesPage() {
         open={!!engineLockTarget}
         onOpenChange={(v) => { if (!v) setEngineLockTarget(null); }}
         onConfirm={commitEngineLock}
+      />
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
+        items={ctxMenu.row ? ([
+          { label: '상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row) setDetailContract(ctxMenu.row); } },
+          { type: 'separator' },
+          { label: '연락 기록 추가', icon: <ChatCircleDots size={12} weight="bold" />, onClick: () => { if (ctxMenu.row) setContactOpen(ctxMenu.row); } },
+          { label: '연락처 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.customerPhone1) navigator.clipboard.writeText(ctxMenu.row.customerPhone1); }, disabled: !ctxMenu.row.customerPhone1 },
+          {
+            label: '미수 정보 복사',
+            icon: <Copy size={12} weight="bold" />,
+            onClick: () => {
+              const r = ctxMenu.row;
+              if (!r) return;
+              const text = `${r.vehiclePlate} · ${r.customerName} · 미수 ₩${(r.unpaidAmount ?? 0).toLocaleString()} (${r.unpaidSeqCount ?? 0}회차)`;
+              navigator.clipboard.writeText(text);
+            },
+          },
+          { type: 'separator' },
+          { label: '시동 제어 등록', icon: <Power size={12} weight="bold" />, onClick: () => { if (ctxMenu.row) setEngineLockTarget(ctxMenu.row); } },
+          {
+            label: ctxMenu.row.status === '채권' ? '채권 해제' : '채권화 처리',
+            icon: <Gavel size={12} weight="bold" />,
+            onClick: () => { if (ctxMenu.row) void toggleDebtFlag(ctxMenu.row); },
+            danger: ctxMenu.row.status !== '채권',
+          },
+        ] satisfies ContextMenuItem[]) : []}
       />
 
       {/* 연락기록 다이얼로그 */}
