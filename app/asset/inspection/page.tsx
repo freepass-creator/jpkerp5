@@ -9,6 +9,8 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClipboardText, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
+import { useTableSelection } from '@/lib/use-table-selection';
+import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
 import { exportToExcel } from '@/lib/excel-export';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
@@ -29,6 +31,7 @@ export default function AssetInspectionPage() {
   const { companies: companyMaster } = useCompanies();
   const today = todayKr();
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; plate?: string; phone?: string; due?: string; customerName?: string } | null>(null);
+  const sel = useTableSelection();
 
   const upcoming = useMemo(() => {
     return contracts
@@ -69,10 +72,17 @@ export default function AssetInspectionPage() {
               className="btn"
               type="button"
               disabled={upcoming.length === 0 && inspectionEvents.length === 0}
-              title={`현재 페이지 목록 (${upcoming.length + inspectionEvents.length}건) 엑셀 다운로드`}
+              title={sel.size > 0
+                ? `선택한 ${sel.size}건 (만기 추적만) 엑셀 다운로드 — 선택 해제 시 전체`
+                : `현재 페이지 목록 (${upcoming.length + inspectionEvents.length}건) 엑셀 다운로드`}
               onClick={() => {
+                const upcomingFiltered = sel.size > 0
+                  ? upcoming.filter(({ c }) => sel.selectedIds.has(c.id))
+                  : upcoming;
+                const eventsFiltered = sel.size > 0 ? [] : inspectionEvents;   // 선택 모드면 이력은 제외
+                const scope = sel.size > 0 ? `선택 ${sel.size}건` : `${upcoming.length + inspectionEvents.length}건`;
                 const rows = [
-                  ...upcoming.map(({ c, daysLeft }) => ({
+                  ...upcomingFiltered.map(({ c, daysLeft }) => ({
                     구분: '만기 추적',
                     회사: c.company ? displayCompanyName(c.company, companyMaster) : '',
                     차량번호: c.vehiclePlate ?? '',
@@ -84,7 +94,7 @@ export default function AssetInspectionPage() {
                     업체: '',
                     비용: '',
                   })),
-                  ...inspectionEvents.map((h) => ({
+                  ...eventsFiltered.map((h) => ({
                     구분: '검사 이력',
                     회사: '',
                     차량번호: h.vehiclePlate ?? '',
@@ -98,8 +108,8 @@ export default function AssetInspectionPage() {
                   })),
                 ];
                 exportToExcel({
-                  title: '검사 내역',
-                  fileName: '검사내역',
+                  title: `검사 내역 — ${scope}`,
+                  fileName: `검사내역${sel.size > 0 ? '-선택' : ''}`,
                   sheetName: '검사',
                   rows,
                   columns: [
@@ -117,7 +127,7 @@ export default function AssetInspectionPage() {
                 });
               }}
             >
-              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{upcoming.length + inspectionEvents.length}</span>
+              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{sel.size > 0 ? sel.size : upcoming.length + inspectionEvents.length}</span>
             </button>
           }
         />
@@ -128,6 +138,7 @@ export default function AssetInspectionPage() {
         <table className="table">
           <thead>
             <tr>
+              <TableHeaderCheckbox selection={sel} ids={upcoming.map((u) => u.c.id)} />
               <th style={{ width: 60 }}>회사</th>
               <th style={{ width: 96 }}>차량번호</th>
               <th>차종</th>
@@ -138,12 +149,13 @@ export default function AssetInspectionPage() {
           </thead>
           <tbody>
             {upcoming.length === 0 ? (
-              <EmptyRow colSpan={6}>등록된 검사 만기 없음</EmptyRow>
+              <EmptyRow colSpan={7}>등록된 검사 만기 없음</EmptyRow>
             ) : upcoming.map(({ c, daysLeft }) => {
               const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
               const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
               return (
-                <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }); }} style={{ cursor: 'context-menu' }}>
+                <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }); }} style={{ cursor: 'context-menu' }} className={sel.selectedIds.has(c.id) ? 'selected-row' : undefined}>
+                  <TableRowCheckbox id={c.id} selection={sel} />
                   <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                   <td className="mono">{c.vehiclePlate}</td>
                   <td className="dim">{c.vehicleModel || vehicles.find((v) => v.plate === c.vehiclePlate)?.model || '-'}</td>
