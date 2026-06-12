@@ -834,8 +834,14 @@ function ContactLogDialog({
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const isDirty = !!response.trim() || !!nextPromise || !!notes.trim();
+  function tryClose() {
+    if (isDirty && !window.confirm('입력 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
+    onClose();
+  }
+
   return (
-    <DialogRoot open={true} onOpenChange={(v) => !v && onClose()}>
+    <DialogRoot open={true} onOpenChange={(v) => !v && tryClose()}>
       <DialogContent
         size="sm"
         mode="new"

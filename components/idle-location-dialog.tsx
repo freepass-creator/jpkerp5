@@ -39,6 +39,21 @@ export function IdleLocationDialog({
   const newLocation = idleLocation.trim();
   const locationChanged = oldLocation !== newLocation && newLocation.length > 0;
 
+  /** 입력값 중 contract 원본과 다른 게 있는지 — 닫기 가드용 */
+  const isDirty =
+    (idleSince || '') !== (contract.idleSince ?? '') ||
+    (idleUntil || '') !== (contract.idleUntil ?? '') ||
+    newLocation !== oldLocation ||
+    idleContact.trim() !== (contract.idleContact ?? '') ||
+    idleReason.trim() !== (contract.idleReason ?? '');
+
+  function tryClose() {
+    if (isDirty) {
+      if (!window.confirm('편집 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
+    }
+    onClose();
+  }
+
   async function handleSave() {
     if (saving) return;
     setSaving(true);
@@ -72,7 +87,7 @@ export function IdleLocationDialog({
   }
 
   return (
-    <DialogRoot open={true} onOpenChange={(v) => !v && onClose()}>
+    <DialogRoot open={true} onOpenChange={(v) => !v && tryClose()}>
       <DialogContent
         size="sm"
         mode={oldLocation ? 'edit' : 'new'}

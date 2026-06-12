@@ -64,6 +64,18 @@ export function HistoryAddDialog({
     !!title.trim()
   );
 
+  /** 입력값 중 하나라도 채워졌으면 dirty (신규 등록이라 모두 빈값이 깨끗 상태) */
+  const isDirty =
+    !!title.trim() || !!description.trim() || !!cost ||
+    !!vendor.trim() || !!mileage || Object.keys(meta).length > 0;
+
+  function guardedClose(next: boolean) {
+    if (!next && isDirty) {
+      if (!window.confirm('입력 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
+    }
+    onOpenChange(next);
+  }
+
   async function handleSave() {
     if (!valid || saving) return;
     setSaving(true);
@@ -103,7 +115,7 @@ export function HistoryAddDialog({
   }
 
   return (
-    <DialogRoot open={open} onOpenChange={onOpenChange}>
+    <DialogRoot open={open} onOpenChange={guardedClose}>
       <DialogContent
         size={category === '사고' ? 'lg' : 'md'}
         mode="new"
