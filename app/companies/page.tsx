@@ -41,6 +41,14 @@ export default function CompaniesPage() {
     [companies]
   );
 
+  // URL ?id=COMPANY_ID 진입 시 우선 선택 (감사로그 drill-down)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const id = sp.get('id');
+    if (id && companies.some((c) => c.id === id)) setSelectedId(id);
+  }, [companies]);
+
   // 자동 선택 — 첫 번째 회사가 있으면 선택
   useEffect(() => {
     if (!selectedId && sortedCompanies.length > 0) {

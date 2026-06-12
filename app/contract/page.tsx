@@ -46,6 +46,13 @@ export default function ContractPage() {
   const { vehicles, update: updateVehicleMaster } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const [openId, setOpenId] = useState<string | null>(null);
+  // URL ?id=CONTRACT_ID 진입 시 해당 계약 상세 자동 펼침 (감사로그 등 drill-down)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const id = sp.get('id');
+    if (id && contracts.some((c) => c.id === id)) setOpenId(id);
+  }, [contracts]);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: typeof contracts[number] | null }>({
     open: false, x: 0, y: 0, row: null,
   });

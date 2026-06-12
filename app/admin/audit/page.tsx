@@ -48,6 +48,20 @@ const ENTITY_LABEL: Record<AuditEntityType, string> = {
   system: '시스템',
 };
 
+/** entityType + entityId → 해당 페이지 url (drill-down). 없으면 null. */
+function entityHref(t: AuditEntityType, id?: string): string | null {
+  if (!id || id === 'batch') return null;
+  switch (t) {
+    case 'contract':  return `/contract?id=${encodeURIComponent(id)}`;
+    case 'vehicle':   return `/asset?id=${encodeURIComponent(id)}`;
+    case 'company':   return `/companies?id=${encodeURIComponent(id)}`;
+    case 'penalty':   return `/penalty`;
+    case 'bank_tx':
+    case 'card_tx':   return `/payments`;
+    default: return null;
+  }
+}
+
 export default function AuditPage() {
   const { rows, loading } = useAuditLogs(1000);
   const [search, setSearch] = useState('');
@@ -225,7 +239,17 @@ export default function AuditPage() {
                           </td>
                           <td className="center dim">{ENTITY_LABEL[r.entityType]}</td>
                           <td>{r.label}</td>
-                          <td className="mono dim" style={{ fontSize: 11 }}>{r.entityId ?? '-'}</td>
+                          <td className="mono dim" style={{ fontSize: 11 }} onClick={(e) => e.stopPropagation()}>
+                            {(() => {
+                              const href = entityHref(r.entityType, r.entityId);
+                              if (!href) return r.entityId ?? '-';
+                              return (
+                                <a href={href} target="_blank" rel="noopener noreferrer" title="새 탭으로 점프" style={{ color: 'var(--brand)', textDecoration: 'none', borderBottom: '1px dashed currentColor' }}>
+                                  {r.entityId}
+                                </a>
+                              );
+                            })()}
+                          </td>
                         </tr>
                         {isExpanded && hasDetail && (
                           <tr>
