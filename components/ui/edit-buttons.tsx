@@ -48,7 +48,7 @@ export function EditButtons({ editing, onEdit, onSave, onCancel, variant = 'foot
           </button>
         )}
         {onSave && (
-          <button className={primaryCls} type="button" onClick={onSave} aria-label="변경사항 저장">
+          <button className={primaryCls} type="button" onClick={onSave} aria-label="변경사항 저장" title="저장 (Ctrl+S)">
             <FloppyDisk size={iconSize} weight="bold" /> 저장
           </button>
         )}

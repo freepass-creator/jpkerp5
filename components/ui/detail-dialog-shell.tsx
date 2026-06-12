@@ -24,6 +24,7 @@ import {
   DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose,
 } from '@/components/ui/dialog';
 import { EditButtons } from '@/components/ui/edit-buttons';
+import { useDialogShortcuts } from '@/lib/use-dialog-shortcuts';
 
 export type ShellTab = {
   value: string;
@@ -78,6 +79,11 @@ export function DetailDialogShell({
 }: DetailDialogShellProps) {
   // 모드 — view / edit / new — hero/footer 시각 차별용
   const mode: 'view' | 'edit' | 'new' = isNew ? 'new' : editing ? 'edit' : 'view';
+  // Ctrl/Cmd+S — 편집 중일 때만 저장. 보기 모드는 무시.
+  useDialogShortcuts({
+    open: !!open && !!editing,
+    onSave: editing ? onSave : undefined,
+  });
   // 공용 [수정/저장/취소] 자동 footer — footer prop 명시 시 X
   const autoFooter = !footer && (onEdit || editing) ? (
     <EditButtons editing={!!editing} onEdit={onEdit} onSave={onSave} onCancel={onCancel} variant="footer" />
