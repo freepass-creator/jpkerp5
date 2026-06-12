@@ -288,7 +288,7 @@ export default function ContractPage() {
                   </thead>
                   <tbody>
                     {filtered.length === 0 ? (
-                      <EmptyRow colSpan={11}>계약 없음</EmptyRow>
+                      <EmptyRow colSpan={11}>계약 없음 — 좌측 하단 [+ 신규 계약] 으로 시작하세요</EmptyRow>
                     ) : filtered.map((c) => (
                       <tr
                         key={c.id}

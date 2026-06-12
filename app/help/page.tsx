@@ -65,11 +65,14 @@ export default function HelpPage() {
                 <a href="#roles" className="help-link">9. 권한 시스템</a>
                 <a href="#tips" className="help-link">10. 자주 쓰는 작업</a>
                 <a href="#notes" className="help-link">11. 주의사항</a>
-                <a href="#end" className="help-link">13. 계약 종료 처리</a>
-                <a href="#penalty-billing" className="help-link">14. 과태료 부과 근거</a>
-                <a href="#asset-overview" className="help-link">15. 자산현황 운영 요약</a>
-                <a href="#excel" className="help-link">16. 엑셀 다운로드</a>
-                <a href="#contact" className="help-link">17. 문의·오류 신고</a>
+                <a href="#end" className="help-link">12. 계약 종료 처리</a>
+                <a href="#penalty-billing" className="help-link">13. 과태료 부과 근거</a>
+                <a href="#asset-overview" className="help-link">14. 자산현황 운영 요약</a>
+                <a href="#excel" className="help-link">15. 엑셀 다운로드</a>
+                <a href="#payment-timing" className="help-link">16. 결제 선불/후불</a>
+                <a href="#auto-sort" className="help-link">17. 작업 우선순위 자동 정렬</a>
+                <a href="#jump-link" className="help-link">18. 페이지 간 점프</a>
+                <a href="#contact" className="help-link">19. 문의·오류 신고</a>
               </div>
             </Section>
 
@@ -377,7 +380,7 @@ export default function HelpPage() {
             </Section>
 
             {/* 13. 계약 종료 처리 (신규) */}
-            <Section icon={<ArrowRight weight="bold" />} title="13. 계약 종료 처리 (정상·중도·채권)" id="end">
+            <Section icon={<ArrowRight weight="bold" />} title="12. 계약 종료 처리 (정상·중도·채권)" id="end">
               <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
                 계약을 종료할 때 사유를 명시하면 과태료 부과·내용증명·채권 추심 등에 자동 활용됩니다.
               </div>
@@ -397,7 +400,7 @@ export default function HelpPage() {
             </Section>
 
             {/* 14. 과태료 부과 근거 (신규) */}
-            <Section icon={<Receipt weight="bold" />} title="14. 과태료 부과 근거 자동 결정" id="penalty-billing">
+            <Section icon={<Receipt weight="bold" />} title="13. 과태료 부과 근거 자동 결정" id="penalty-billing">
               <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
                 통지서 OCR 등록 시 위반일·차량번호로 계약을 찾고, 종료 사유에 따라 부과 책임자를 자동 결정.
               </div>
@@ -414,7 +417,7 @@ export default function HelpPage() {
             </Section>
 
             {/* 15. 자산현황 운영 요약 detail (신규) */}
-            <Section icon={<Car weight="bold" />} title="15. 자산현황 상세 — 운영 요약 한 화면" id="asset-overview">
+            <Section icon={<Car weight="bold" />} title="14. 자산현황 상세 — 운영 요약 한 화면" id="asset-overview">
               <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
                 자산관리 → 자산현황 view → 행 더블클릭 → 운영 요약 탭 (6 섹션 한눈에).
               </div>
@@ -440,7 +443,7 @@ export default function HelpPage() {
             </Section>
 
             {/* 16. 엑셀 다운로드 통일 패턴 (신규) */}
-            <Section icon={<FileXls weight="bold" />} title="16. 엑셀 다운로드 — 모든 페이지 동일 패턴" id="excel">
+            <Section icon={<FileXls weight="bold" />} title="15. 엑셀 다운로드 — 모든 페이지 동일 패턴" id="excel">
               <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
                 모든 list 페이지 우하단 BottomBar에 [엑셀 N건] 버튼. 현재 필터된 목록만 다운로드.
               </div>
@@ -458,7 +461,7 @@ export default function HelpPage() {
             </Section>
 
             {/* 17. 결제 선불/후불 (신규) */}
-            <Section icon={<CurrencyKrw weight="bold" />} title="17. 결제 선불/후불 — 자동 결제일 조정" id="payment-timing">
+            <Section icon={<CurrencyKrw weight="bold" />} title="16. 결제 선불/후불 — 자동 결제일 조정" id="payment-timing">
               <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
                 계약 등록 시 결제시기를 선불/후불 중 선택. 변경 시 모든 회차 결제일 자동 조정.
               </div>
@@ -480,7 +483,7 @@ export default function HelpPage() {
             </Section>
 
             {/* 18. 작업 우선순위 자동 정렬 (신규) */}
-            <Section icon={<ChartBar weight="bold" />} title="18. 페이지마다 작업 우선순위 자동 정렬" id="auto-sort">
+            <Section icon={<ChartBar weight="bold" />} title="17. 페이지마다 작업 우선순위 자동 정렬" id="auto-sort">
               <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
                 각 페이지 진입 시 직원이 즉시 처리할 행이 위로 자동 정렬됩니다.
               </div>
@@ -509,7 +512,7 @@ export default function HelpPage() {
             </Section>
 
             {/* 19. 관련 페이지 바로가기 (신규) */}
-            <Section icon={<ArrowRight weight="bold" />} title="19. 한 화면에서 다른 페이지로 점프" id="jump-link">
+            <Section icon={<ArrowRight weight="bold" />} title="18. 한 화면에서 다른 페이지로 점프" id="jump-link">
               <div style={{ fontSize: 12, color: 'var(--text-weak)', marginBottom: 6, lineHeight: 1.6 }}>
                 상세 다이얼로그 안에 [관련 페이지 바로가기] Section. 차량번호 자동 검색 적용.
               </div>
@@ -523,7 +526,7 @@ export default function HelpPage() {
             </Section>
 
             {/* 20. 문의 */}
-            <Section icon={<Phone weight="bold" />} title="20. 문의 · 오류 신고" id="contact">
+            <Section icon={<Phone weight="bold" />} title="19. 문의 · 오류 신고" id="contact">
               <div style={{ padding: '14px 16px', background: 'var(--bg-sunken)', borderRadius: 6, fontSize: 13, lineHeight: 1.7 }}>
                 사용 중 막히면 <strong>화면 캡쳐 + 어떤 작업 중이었는지</strong>를 같이 보내주세요. 빠르게 조치합니다.
                 <br />

@@ -366,7 +366,9 @@ export default function AssetPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td>
+                      <td colSpan={11} className="muted center" style={{ padding: 32 }}>
+                        등록된 차량 없음 — 좌측 하단 [+ 차량 등록] 으로 시작하세요
+                      </td>
                     </tr>
                   ) : filtered.map((v) => {
                     const regMissing = v.id.startsWith('contract-derived-') || !v.vin;
@@ -505,7 +507,9 @@ export default function AssetPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="muted center" style={{ padding: 32 }}>등록된 차량 없음</td>
+                      <td colSpan={14} className="muted center" style={{ padding: 32 }}>
+                        등록된 차량 없음 — 좌측 하단 [+ 차량 등록] 으로 시작하세요
+                      </td>
                     </tr>
                   ) : filtered.map((v) => (
                     <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => setOpenId(v.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
