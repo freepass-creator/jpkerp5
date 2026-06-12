@@ -565,17 +565,64 @@ export default function AssetPage() {
               >
                 <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
               </button>
+              {/* 일괄 상태 변경 — 선택된 자산의 status 를 한 번에 변경 + 같은 plate 계약 sync */}
+              <select
+                className="input input-compact"
+                disabled={selectedIds.size === 0}
+                value=""
+                title={selectedIds.size === 0 ? '체크박스로 자산 선택 후 일괄 상태 변경' : `선택 ${selectedIds.size}건 → 상태 일괄 변경`}
+                style={{ fontSize: 12, minWidth: 130 }}
+                onChange={async (e) => {
+                  const next = e.target.value as Vehicle['status'];
+                  e.currentTarget.value = '';   // reset (select-once UX)
+                  if (!next || selectedIds.size === 0) return;
+                  const targets = vehicles.filter((v) => selectedIds.has(v.id));
+                  if (!confirm(`선택한 ${targets.length}건의 자산 상태를 '${next}' 로 변경합니다.\n같은 plate 의 활성 계약 vehicleStatus 도 함께 sync 됩니다.\n계속?`)) return;
+                  let changed = 0, syncedContracts = 0;
+                  for (const v of targets) {
+                    if (v.status === next) continue;
+                    const merged = { ...v, status: next };
+                    try {
+                      await updateVehicle(merged);
+                      changed++;
+                      const r = await syncContractStatusFromVehicle(merged, contracts, updateContract);
+                      syncedContracts += r.updatedCount;
+                    } catch (err) { console.error('bulk status failed', v.id, err); }
+                  }
+                  toast.success(`${changed}대 → ${next}${syncedContracts > 0 ? ` · 계약 ${syncedContracts}건 sync` : ''}`);
+                  setSelectedIds(new Set());
+                }}
+              >
+                <option value="">선택 상태 변경…</option>
+                <option value="구매대기">구매대기</option>
+                <option value="등록대기">등록대기</option>
+                <option value="상품대기">상품대기</option>
+                <option value="운행">운행</option>
+                <option value="휴차대기">휴차대기</option>
+                <option value="휴차">휴차</option>
+                <option value="정비">정비</option>
+                <option value="사고">사고</option>
+                <option value="매각검토">매각검토</option>
+                <option value="매각대기">매각대기</option>
+                <option value="매각">매각</option>
+              </select>
               <button
                 className="btn"
                 type="button"
                 disabled={filtered.length === 0}
-                title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
+                title={selectedIds.size > 0
+                  ? `선택한 ${selectedIds.size}건만 엑셀 다운로드 (체크 해제 시 전체 ${filtered.length}건)`
+                  : `현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
                 onClick={() => {
+                  const targetRows = selectedIds.size > 0
+                    ? filtered.filter((v) => selectedIds.has(v.id))
+                    : filtered;
+                  const scope = selectedIds.size > 0 ? `선택 ${selectedIds.size}건` : `${filtered.length}건`;
                   exportToExcel({
-                    title: `자산 ${assetView === 'registered' ? '등록차량' : '자산현황'}${companyFilter !== 'all' ? ` (${companyFilter})` : ''}`,
-                    fileName: `자산-${assetView === 'registered' ? '등록차량' : '자산현황'}`,
+                    title: `자산 ${assetView === 'registered' ? '등록차량' : '자산현황'}${companyFilter !== 'all' ? ` (${companyFilter})` : ''} — ${scope}`,
+                    fileName: `자산-${assetView === 'registered' ? '등록차량' : '자산현황'}${selectedIds.size > 0 ? '-선택' : ''}`,
                     sheetName: '자산',
-                    rows: filtered.map((v) => ({
+                    rows: targetRows.map((v) => ({
                       회사: v.company ? displayCompanyName(v.company, companyMaster) : '',
                       차량번호: v.plate ?? '',
                       차종: v.model ?? '',
@@ -596,7 +643,7 @@ export default function AssetPage() {
                   });
                 }}
               >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
+                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{selectedIds.size > 0 ? selectedIds.size : filtered.length}</span>
               </button>
             </>
           }
