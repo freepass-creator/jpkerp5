@@ -420,12 +420,12 @@ const VehicleSpecTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u
           <div>
             <EditableField label="보험연령(세)" value={editing ? String(draft.insuranceAge ?? '') : (c.insuranceAge ? `${c.insuranceAge}세 이상` : '-')} editing={editing} mono onChange={(v) => set('insuranceAge', Number(v) || undefined)} />
             {editing ? (
-              <div className="detail-field" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <span className="detail-field-label" style={{ minWidth: 70, fontSize: 11, color: 'var(--text-weak)' }}>자차여부</span>
+              <div className="detail-field is-editing">
+                <div className="label">자차여부</div>
                 <select
                   value={draft.selfInsured === undefined ? '' : draft.selfInsured ? 'true' : 'false'}
                   onChange={(e) => set('selfInsured', e.target.value === '' ? undefined : e.target.value === 'true')}
-                  style={{ flex: 1, fontSize: 12, padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 4 }}
+                  className="detail-field-input"
                 >
                   <option value="">-</option>
                   <option value="true">가입</option>
@@ -1439,13 +1439,12 @@ function EndInfoSection({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) 
         <>
           <div className="detail-grid-2">
             <div>
-              <div className="detail-field">
-                <label className="detail-field-label">종료 사유</label>
+              <div className="detail-field is-editing">
+                <div className="label">종료 사유</div>
                 <select
-                  className="input input-compact"
+                  className="detail-field-input"
                   value={(curEndReason ?? '')}
                   onChange={(e) => set('endReason', e.target.value || undefined)}
-                  style={{ width: '100%' }}
                 >
                   <option value="">미지정</option>
                   <option value="정상종료">정상종료</option>
@@ -1453,52 +1452,49 @@ function EndInfoSection({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) 
                   <option value="채권보전">채권보전</option>
                 </select>
               </div>
-              <div className="detail-field">
-                <label className="detail-field-label">종료일</label>
+              <div className="detail-field is-editing">
+                <div className="label">종료일</div>
                 <input
                   type="date"
-                  className="input input-compact mono"
+                  className="detail-field-input mono"
                   value={(v('endedAt') as string | undefined) ?? ''}
                   onChange={(e) => set('endedAt', e.target.value || undefined)}
-                  style={{ width: '100%' }}
                 />
               </div>
             </div>
             <div>
-              <div className="detail-field">
-                <label className="detail-field-label">종료 시 미수 잔액 (채권보전 근거)</label>
+              <div className="detail-field is-editing">
+                <div className="label">종료 시 미수 잔액 (채권보전 근거)</div>
                 <input
                   type="number"
-                  className="input input-compact mono num"
+                  className="detail-field-input mono"
                   value={(v('unpaidAtEnd') as number | undefined) ?? ''}
                   onChange={(e) => set('unpaidAtEnd', e.target.value === '' ? undefined : Number(e.target.value))}
-                  style={{ width: '100%' }}
                   placeholder="자동 캡처 — 수정 가능"
                 />
               </div>
               {curEndReason === '중도해지' && (
-                <div className="detail-field">
-                  <label className="detail-field-label">중도해지 위약금</label>
+                <div className="detail-field is-editing">
+                  <div className="label">중도해지 위약금</div>
                   <input
                     type="number"
-                    className="input input-compact mono num"
+                    className="detail-field-input mono"
                     value={(v('earlyTerminationFee') as number | undefined) ?? ''}
                     onChange={(e) => set('earlyTerminationFee', e.target.value === '' ? undefined : Number(e.target.value))}
-                    style={{ width: '100%' }}
                     placeholder="약정 잔여 회차 × 월대여료 등"
                   />
                 </div>
               )}
             </div>
           </div>
-          <div className="detail-field" style={{ marginTop: 6 }}>
-            <label className="detail-field-label">비고 (담당자 메모 · 추심 단계 등)</label>
+          <div className="detail-field is-editing" style={{ marginTop: 6 }}>
+            <div className="label">비고 (담당자 메모 · 추심 단계 등)</div>
             <textarea
-              className="input input-compact"
+              className="detail-field-input"
               rows={2}
               value={(v('endNotes') as string | undefined) ?? ''}
               onChange={(e) => set('endNotes', e.target.value || undefined)}
-              style={{ width: '100%', resize: 'vertical' }}
+              style={{ resize: 'vertical' }}
               placeholder="채권 추심 진행 단계 · 변호사 위임 · 위약금 협상 등"
             />
           </div>
@@ -1715,13 +1711,12 @@ const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (
             <Field label="결제방법" value={c.paymentMethod} />
             {/* 결제시기 — 선불(1일 인출) vs 후불(말일 결제). 사용자 명시 요구. */}
             {editing ? (
-              <div className="detail-field">
-                <label className="detail-field-label">결제시기</label>
+              <div className="detail-field is-editing">
+                <div className="label">결제시기</div>
                 <select
-                  className="input input-compact"
+                  className="detail-field-input"
                   value={draft.paymentTiming ?? '선불'}
                   onChange={(e) => set('paymentTiming', e.target.value as '선불' | '후불')}
-                  style={{ width: '100%' }}
                 >
                   <option value="선불">선불</option>
                   <option value="후불">후불</option>
