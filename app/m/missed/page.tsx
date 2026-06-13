@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useAuth } from '@/lib/use-auth';
 import { useMyDispatchOrders, DISPATCH_LABEL, type DispatchOrder } from '@/lib/firebase/dispatch-store';
-import { Warning, Megaphone, Truck, ArrowUUpLeft, CaretRight, CheckCircle } from '@phosphor-icons/react';
+import { Clock, Megaphone, Truck, ArrowUUpLeft, CaretRight, CheckCircle } from '@phosphor-icons/react';
 import { todayKr } from '@/lib/mock-data';
 
 export default function MobileBacklog() {
@@ -58,7 +58,7 @@ export default function MobileBacklog() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Warning size={20} weight="regular" />
+          <Clock size={20} weight="regular" />
           밀린 업무
         </h1>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub)' }}>{total}건</span>
