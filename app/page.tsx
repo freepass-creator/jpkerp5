@@ -759,7 +759,7 @@ export default function Page() {
                           {(() => {
                             const a = driverAge(c);
                             const ia = c.insuranceAge ?? 0;
-                            // 운전자 미입력 — 보험연령 있으면 빨강 경고 (보험은 누가 운전?)
+                            // 운전자 미입력 — 보험연령 있으면 빨강 경고, 없으면 회색 (의도 없음)
                             if (a == null) {
                               if (ia > 0) {
                                 return (
@@ -769,7 +769,7 @@ export default function Page() {
                                   >미입력 ⚠</span>
                                 );
                               }
-                              return <span className="muted">-</span>;
+                              return <span className="muted" style={{ fontSize: 11 }}>미입력</span>;
                             }
                             // 운전연령 < 보험연령 — 보험 미커버 (운전 불가)
                             const blocked = ia > 0 && a < ia;
