@@ -804,7 +804,7 @@ export default function Page() {
                             return (
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                 {c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>}
-                                <StatusBadge tone={timing === '후불' ? 'orange' : 'blue'}>{timing}</StatusBadge>
+                                <StatusBadge tone={timing === '후불' ? 'orange' : 'blue'} title={timing}>{timing === '후불' ? '후' : '선'}</StatusBadge>
                               </span>
                             );
                           })()}
