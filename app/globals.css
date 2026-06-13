@@ -2832,9 +2832,11 @@ kbd {
 }
 .badge-red    { background: var(--red-bg);   color: var(--red-text);   border-color: var(--red-border); }
 .badge-green  { background: var(--green-bg); color: var(--green-text); border-color: var(--green-border, rgba(22,101,52,0.25)); }
-.badge-orange,
-.badge-amber  { background: var(--orange-bg, var(--warn-bg, #fff7ed)); color: var(--orange-text, var(--warn-text, #c2410c)); border-color: rgba(194,65,12,0.25); }
+.badge-orange { background: var(--orange-bg, var(--warn-bg, #fff7ed)); color: var(--orange-text, var(--warn-text, #c2410c)); border-color: var(--orange-border, rgba(194,65,12,0.25)); }
+.badge-amber  { background: var(--amber-bg); color: var(--amber-text); border-color: var(--amber-border); }
 .badge-blue   { background: var(--blue-bg);  color: var(--blue-text);  border-color: var(--blue-border, rgba(30,64,175,0.25)); }
+.badge-indigo { background: var(--indigo-bg); color: var(--indigo-text); border-color: var(--indigo-border); }
+.badge-purple { background: var(--purple-bg); color: var(--purple-text); border-color: var(--purple-border); }
 .badge-brand  { background: rgba(27,42,74,0.08); color: var(--brand);  border-color: rgba(27,42,74,0.25); }
 .badge-neutral,
 .badge-gray   { background: var(--bg-sunken); color: var(--text-main); border-color: var(--border); }

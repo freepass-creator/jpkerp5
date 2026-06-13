@@ -130,13 +130,16 @@ function driverAge(c: Contract): number | undefined {
   return undefined;
 }
 
-/** 약정개월별 뱃지 색상 — 단기→파랑, 중기→초록/앰버, 장기→오렌지/빨강 */
+/**
+ * 약정개월별 뱃지 색상 — status 색(green/blue/orange/red/gray)과 비충돌 팔레트 사용.
+ * indigo(짧음) → blue → purple → amber → red(긺) 그라데이션.
+ */
 function termTone(months: number): BadgeTone {
-  if (months <= 12) return 'blue';
-  if (months <= 24) return 'green';
-  if (months <= 36) return 'amber';
-  if (months <= 48) return 'orange';
-  return 'red'; // 60+
+  if (months <= 12) return 'indigo';
+  if (months <= 24) return 'blue';
+  if (months <= 36) return 'purple';
+  if (months <= 48) return 'amber';
+  return 'red'; // 60+ (매우 드묾)
 }
 
 function compareForCol(a: Contract, b: Contract, col: SortCol): number {
@@ -804,7 +807,7 @@ export default function Page() {
                             return (
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                 {c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>}
-                                <StatusBadge tone={timing === '후불' ? 'orange' : 'blue'} title={timing}>{timing === '후불' ? '후' : '선'}</StatusBadge>
+                                <StatusBadge tone={timing === '후불' ? 'orange' : 'gray'} title={timing}>{timing === '후불' ? '후' : '선'}</StatusBadge>
                               </span>
                             );
                           })()}
@@ -835,14 +838,12 @@ export default function Page() {
                             return formatRemainingHuman(today, expiryDate);
                           })()}
                         </td>
-                        {/* 수납상태 + 미수금 */}
+                        {/* 수납상태 + 미수금 — 미납일수는 뱃지 밖 텍스트로 (색 연동) */}
                         <td className="center">
-                          <StatusBadge tone={paymentStateTone(ps.name)}>
-                            {ps.name}
-                            {ps.name === '미납' && ps.days > 0 && (
-                              <span style={{ marginLeft: 4, fontWeight: 600 }}>+{ps.days}</span>
-                            )}
-                          </StatusBadge>
+                          <StatusBadge tone={paymentStateTone(ps.name)}>{ps.name}</StatusBadge>
+                          {ps.name === '미납' && ps.days > 0 && (
+                            <span className="mono" style={{ marginLeft: 4, fontWeight: 600, color: 'var(--red-text)', fontSize: 11 }}>+{ps.days}</span>
+                          )}
                         </td>
                         <td className={`num mono ${c.unpaidAmount > 0 ? 'danger' : ''}`}>
                           {c.unpaidAmount > 0 ? formatCurrency(c.unpaidAmount) : <span className="muted">없음</span>}

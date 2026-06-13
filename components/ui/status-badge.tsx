@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
  * 시스템 표준 — radius 0 / 10px 폰트 / soft tint + 동일톤 border.
  * 인라인 스타일 직접 사용 금지 — 이 컴포넌트로 통일.
  */
-export type BadgeTone = 'neutral' | 'red' | 'orange' | 'amber' | 'green' | 'blue' | 'brand' | 'gray';
+export type BadgeTone = 'neutral' | 'red' | 'orange' | 'amber' | 'green' | 'blue' | 'indigo' | 'purple' | 'brand' | 'gray';
 
 type Props = {
   tone?: BadgeTone;
