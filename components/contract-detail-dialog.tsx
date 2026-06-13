@@ -6,7 +6,7 @@ import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
   Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch,
   Upload, Warning as WarningIcon, X as XIcon, X, CaretRight,
-  Pencil, Camera,
+  Pencil,
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
@@ -215,6 +215,11 @@ function ContractDetailShell({
           label: tabLabelWithUnpaid('수납', contract.unpaidSeqCount ?? 0),
           content: <PaymentTab c={contract} onUpdate={onUpdate} />,
         },
+        {
+          value: 'photos',
+          label: '사진',
+          content: <VehiclePhotosTab c={contract} />,
+        },
       ]}
     />
   );
@@ -337,6 +342,22 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
     items: ['매각 가격 산정', '매각처 확정', '대금 입금 확인', '명의 이전 서류', '말소 등록'],
   },
 };
+
+/* ─────────────── 사진 — 별도 탭 (상품화/출고/반납) ─────────────── */
+
+function VehiclePhotosTab({ c }: { c: Contract }) {
+  // 계약 vehiclePlate → vehicles 마스터에서 vehicleId 매칭 (plate trim 기준)
+  const { vehicles } = useVehicles();
+  const matchedVehicleId = useMemo(
+    () => vehicles.find((v) => (v.plate ?? '').trim() === (c.vehiclePlate ?? '').trim())?.id ?? null,
+    [vehicles, c.vehiclePlate],
+  );
+  // 현재 계약 단계에 맞춰 디폴트 카테고리 선택 — 인도 후 = 출고, 반납 후 = 반납, 그 외 = 상품화
+  const defaultKind = c.deliveredDate && !c.returnedDate ? 'delivery' : c.returnedDate ? 'return' : 'product';
+  return (
+    <VehiclePhotosSection vehicleId={matchedVehicleId} contractId={c.id} defaultKind={defaultKind} />
+  );
+}
 
 /* ─────────────── 차량정보 (스펙) — 별도 탭 ─────────────── */
 
@@ -689,12 +710,6 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
   const vs = getVehicleState(c);
   const cs = getContractState(c);
   const ps = getPaymentState(c);
-  // 사진 섹션용 vehicle id 매칭 (plate trim 기준)
-  const { vehicles: allVehicles } = useVehicles();
-  const matchedVehicleId = useMemo(
-    () => allVehicles.find((v) => (v.plate ?? '').trim() === (c.vehiclePlate ?? '').trim())?.id ?? null,
-    [allVehicles, c.vehiclePlate],
-  );
 
   // 현재 작업 상태 — 위치 + stage 기반 합성 문장
   const workingContext = (() => {
@@ -930,14 +945,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
         </div>
       </Section>
 
-      {/* 차량 사진 — 상품화/출고/반납 (vehicle_attachments 노드 공유 → 자산에서도 즉시 보임) */}
-      <Section icon={<Camera size={12} weight="duotone" />} title="차량 사진">
-        <VehiclePhotosSection
-          vehicleId={matchedVehicleId}
-          contractId={c.id}
-          defaultKind={c.deliveredDate && !c.returnedDate ? 'delivery' : c.returnedDate ? 'return' : 'product'}
-        />
-      </Section>
+      {/* 차량 사진은 별도 '사진' 탭으로 분리됨 (상태 탭에서 제거) */}
 
       {/* 처리·진행 — 단계별 액션 + 체크리스트 + picker (현재 상태 바로 밑) */}
       <Section
