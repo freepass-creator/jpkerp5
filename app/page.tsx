@@ -750,7 +750,7 @@ export default function Page() {
                             if (isIdle) {
                               return c.idleLocation?.trim()
                                 ? <span title={`현재 위치 — ${c.idleLocation}`}>{c.idleLocation}</span>
-                                : <span className="muted" style={{ fontSize: 11 }}>위치 미입력</span>;
+                                : <span className="muted">위치 미입력</span>;
                             }
                             return c.customerName || <span className="muted">-</span>;
                           })()}

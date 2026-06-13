@@ -1496,18 +1496,8 @@ input[type="radio"]:disabled {
   z-index: 11; /* sticky thead 보다 위 */
   background: var(--bg-header);
 }
-.table tbody tr.selected-row td.checkbox-col {
-  background: var(--brand-bg);
-}
-.table tbody tr:nth-child(even) td.checkbox-col {
-  background: var(--bg-stripe);
-}
-/* hover 가 selected/stripe 보다 우선 (사용자 룰 — 커서 댄 곳이 맨 위) */
-.table tbody tr:hover td.checkbox-col,
-.table tbody tr.selected-row:hover td.checkbox-col,
-.table tbody tr:nth-child(even):hover td.checkbox-col {
-  background: var(--bg-hover);
-}
+/* checkbox-col 은 별도 배경 X — 같은 행의 다른 td 와 자연 통합
+ * (위 .table tbody tr:hover td 등 일반 규칙이 자동 적용됨) */
 /* input 을 셀 정중앙에 절대 고정 — 행 높이/내용에 관계없이 항상 같은 위치 */
 .table .checkbox-col {
   position: sticky; /* 위에서 이미 sticky 지정됨, 다시 명시 */
@@ -1525,9 +1515,10 @@ input[type="radio"]:disabled {
   padding: 0 !important;
 }
 /* 체크박스 — 전역 input[type=checkbox] 규격 사용 */
-.table tbody tr.selected-row { background: var(--brand-bg); }
-/* selected-row hover 시 hover 색 우선 (커서 댄 곳이 맨 위) */
-.table tbody tr.selected-row:hover { background: var(--bg-hover); }
+/* selected-row — 전 셀 일관 배경 + 좌측 brand accent 로 선택 표시 */
+.table tbody tr.selected-row td { background: var(--bg-selected); }
+.table tbody tr.selected-row td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+/* hover 우선 (사용자 룰 — 커서 댄 곳이 맨 위) */
 .table tbody tr.selected-row:hover td { background: var(--bg-hover); }
 
 /* Customer name with avatar */
