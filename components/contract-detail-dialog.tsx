@@ -6,13 +6,14 @@ import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
   Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch,
   Upload, Warning as WarningIcon, X as XIcon, X, CaretRight,
-  Pencil,
+  Pencil, Camera,
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
+import { VehiclePhotosSection } from '@/components/vehicle-photos-section';
 import { useInsurances } from '@/lib/firebase/insurance-store';
 import { normPlate } from '@/lib/entity-sync';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
@@ -688,6 +689,12 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
   const vs = getVehicleState(c);
   const cs = getContractState(c);
   const ps = getPaymentState(c);
+  // 사진 섹션용 vehicle id 매칭 (plate trim 기준)
+  const { vehicles: allVehicles } = useVehicles();
+  const matchedVehicleId = useMemo(
+    () => allVehicles.find((v) => (v.plate ?? '').trim() === (c.vehiclePlate ?? '').trim())?.id ?? null,
+    [allVehicles, c.vehiclePlate],
+  );
 
   // 현재 작업 상태 — 위치 + stage 기반 합성 문장
   const workingContext = (() => {
@@ -1416,6 +1423,15 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
       {(c.status === '반납' || c.status === '해지' || c.status === '채권' || c.endReason) && (
         <EndInfoSection c={c} onUpdate={onUpdate} />
       )}
+
+      {/* 차량 사진 — 상품화/출고/반납 (vehicle_attachments 노드 공유 → 자산에서도 즉시 보임) */}
+      <Section icon={<Camera size={12} weight="duotone" />} title="차량 사진">
+        <VehiclePhotosSection
+          vehicleId={matchedVehicleId}
+          contractId={c.id}
+          defaultKind={c.deliveredDate && !c.returnedDate ? 'delivery' : c.returnedDate ? 'return' : 'product'}
+        />
+      </Section>
 
       {/* 첨부 파일 — 첨부 상태 + 다운로드 (미리보기 없음) */}
       <AttachmentList c={c} />

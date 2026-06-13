@@ -10,9 +10,27 @@
  */
 
 import { ref, onValue, get, set, update as rtdbUpdate, remove } from 'firebase/database';
+import { useEffect, useState } from 'react';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from './client';
 
 const PATH = dbPath('vehicle_attachments');
+
+/** 차량 사진 종류 — 상품화(출고 전 상품 상태) / 출고(고객 인도 시) / 반납(고객 반납 시) */
+export type VehiclePhotoKind = 'product' | 'delivery' | 'return';
+
+export type VehiclePhoto = {
+  id: string;            // 'vp-<ts>-<rand>'
+  kind: VehiclePhotoKind;
+  url: string;           // base64 data URL (fileToDataUrl)
+  fileName?: string;
+  uploadedAt: string;    // ISO
+  uploadedBy?: string;   // user email
+  /** delivery/return 만 — 어느 계약 시점인지 */
+  contractId?: string;
+  /** delivery/return 일자 YYYY-MM-DD (없으면 uploadedAt 시점) */
+  eventDate?: string;
+  note?: string;
+};
 
 export type VehicleAttachments = {
   registrationCertUrl?: string;
@@ -24,6 +42,19 @@ export type VehicleAttachments = {
   loanContractUrl?: string;
   loanContractFileName?: string;
   loanContractUploadedAt?: string;
+  /** 차량 사진 — 상품화/출고/반납 단일 어레이로 보존, kind 로 분류 */
+  photos?: VehiclePhoto[];
+};
+
+export const PHOTO_KIND_LABEL: Record<VehiclePhotoKind, string> = {
+  product: '상품화',
+  delivery: '출고',
+  return: '반납',
+};
+export const PHOTO_KIND_TONE: Record<VehiclePhotoKind, string> = {
+  product: 'brand',
+  delivery: 'green',
+  return: 'orange',
 };
 
 /** vehicleId 1건의 첨부 묶음 fetch (detail dialog 진입 시) */
@@ -50,4 +81,54 @@ export async function removeVehicleAttachments(vehicleId: string): Promise<void>
   const db = getRtdb();
   if (!db) return;
   await remove(ref(db, `${PATH}/${vehicleId}`));
+}
+
+/** 차량 사진 1장 추가 — vehicle_attachments/{vehicleId}/photos 어레이에 append. */
+export async function addVehiclePhoto(vehicleId: string, photo: VehiclePhoto): Promise<void> {
+  await ensureAuth();
+  const db = getRtdb();
+  if (!db) return;
+  const existing = (await fetchVehicleAttachments(vehicleId)) ?? {};
+  const next: VehicleAttachments = {
+    ...existing,
+    photos: [...(existing.photos ?? []), photo],
+  };
+  await set(ref(db, `${PATH}/${vehicleId}`), pruneUndefined(next as unknown as Record<string, unknown>));
+}
+
+/** 차량 사진 1장 삭제 — photo.id 기준. */
+export async function removeVehiclePhoto(vehicleId: string, photoId: string): Promise<void> {
+  await ensureAuth();
+  const db = getRtdb();
+  if (!db) return;
+  const existing = (await fetchVehicleAttachments(vehicleId)) ?? {};
+  const next: VehicleAttachments = {
+    ...existing,
+    photos: (existing.photos ?? []).filter((p) => p.id !== photoId),
+  };
+  await set(ref(db, `${PATH}/${vehicleId}`), pruneUndefined(next as unknown as Record<string, unknown>));
+}
+
+/**
+ * 차량 첨부 묶음 live 구독 — vehicle 상세/사진 탭에서 사용.
+ * vehicleId 변경 시 자동 unsubscribe + 재구독.
+ */
+export function useVehicleAttachments(vehicleId: string | null | undefined): VehicleAttachments | null {
+  const [data, setData] = useState<VehicleAttachments | null>(null);
+  useEffect(() => {
+    if (!vehicleId) { setData(null); return; }
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      try { await ensureAuth(); } catch { /* silent */ }
+      if (cancelled) return;
+      const db = getRtdb();
+      if (!db) return;
+      unsub = onValue(ref(db, `${PATH}/${vehicleId}`), (snap) => {
+        setData((snap.val() as VehicleAttachments | null) ?? null);
+      });
+    })();
+    return () => { cancelled = true; if (unsub) unsub(); };
+  }, [vehicleId]);
+  return data;
 }

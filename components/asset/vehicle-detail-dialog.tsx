@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Field } from '@/components/ui/editable-field';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { Section, Stack, Grid2 } from '@/components/ui/detail-primitives';
+import { VehiclePhotosSection } from '@/components/vehicle-photos-section';
 import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
 import { COL, COL_FLEX } from '@/lib/table-cols';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -650,10 +651,12 @@ export function VehicleDetailDialog({
       tabs={view === 'registered'
         ? [
             { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={true} /> },
+            { value: 'photos', label: '사진', content: <VehiclePhotosSection vehicleId={vehicle.id} readonly /> },
           ]
         : [
             // 자산현황 view 첫 탭 — 운영 요약 (한 화면 KV 그리드: 등록상태/보험/구매방식/GPS/검사정비/운영현황)
             { value: 'overview', label: '운영 요약', content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} /> },
+            { value: 'photos', label: '사진', content: <VehiclePhotosSection vehicleId={vehicle.id} readonly /> },
             { value: 'loan', label: '할부스케줄', content: <LoanScheduleTab vehicle={vehicle} /> },
             { value: 'compliance', label: '보험·검사', content: <ComplianceTab vehicle={vehicle} contracts={sortedContracts} /> },
             { value: 'contract', label: `계약이력 (${sortedContracts.length})`, content: <ContractListTab contracts={sortedContracts} /> },
