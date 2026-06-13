@@ -30,7 +30,7 @@ import {
 } from '@/lib/firebase/pending-uploads-store';
 import { addFieldLog } from '@/lib/firebase/field-logs-store';
 import { addVehiclePhoto, type VehiclePhotoKind } from '@/lib/firebase/vehicle-attachments-store';
-import { tryAutoMatch } from '@/lib/firebase/upload-auto-match';
+import { tryAutoMatch, extractOcrHints, findCustomerByLicenseNo } from '@/lib/firebase/upload-auto-match';
 import { toast } from '@/lib/toast';
 
 type DraftFile = {
@@ -80,15 +80,36 @@ export default function MobileUpload() {
 
   /**
    * 1건 업로드 — 자동 매칭 시도 → 매칭되면 즉시 destination 으로 / 실패면 pending.
+   *
+   * Phase B-2: image + 분류(license/registration/insurance) → OCR 자동 호출 → 차량번호/면허번호 추출.
    */
   async function uploadOne(draft: DraftFile): Promise<{ matched: boolean }> {
     const dataUrl = await fileToDataUrl(draft.file);
-    const autoMatch = tryAutoMatch({
+
+    // OCR 자동 추출 (image + 분류가 OCR 지원 종류일 때만)
+    let ocrPlate: string | undefined;
+    let ocrLicenseNo: string | undefined;
+    if (draft.kind === 'image' && ['license', 'registration', 'insurance'].includes(draft.subCategory)) {
+      const ocr = await extractOcrHints(dataUrl, draft.file.type, draft.subCategory);
+      if (ocr) {
+        ocrPlate = ocr.plate;
+        ocrLicenseNo = ocr.licenseNo;
+      }
+    }
+
+    // 1차: 전화번호 / 차량번호 매칭
+    let autoMatch = tryAutoMatch({
       kind: draft.kind,
       detectedPhone: draft.detectedPhone,
+      detectedPlate: ocrPlate,
       contracts,
       vehicles,
     });
+
+    // 2차: 면허번호 매칭 (Phase B-2)
+    if (!autoMatch && ocrLicenseNo) {
+      autoMatch = findCustomerByLicenseNo(ocrLicenseNo, contracts, vehicles);
+    }
 
     if (autoMatch && autoMatch.confidence === 'high') {
       // 자동 매칭 성공 → 분류별 destination 으로 직접 저장 (pending 안 거침)
