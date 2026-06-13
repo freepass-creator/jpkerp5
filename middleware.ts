@@ -46,7 +46,10 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  // HTML 응답은 캐시 금지 — 사용자가 매번 새 빌드를 즉시 받게 (캐시 비우기 안내 없이)
+  const res = NextResponse.next();
+  res.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
+  return res;
 }
 
 export const config = {
