@@ -10,7 +10,7 @@ import {
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth';
-import { ref, get, update as rtdbUpdate } from 'firebase/database';
+import { ref, get, update as rtdbUpdate, onValue } from 'firebase/database';
 import { getFirebaseAuth, getRtdb, dbPath, ensureAuth, pruneUndefined } from './firebase/client';
 
 /**
@@ -104,6 +104,40 @@ export async function signup(input: SignupInput): Promise<void> {
     department: input.department,
     phone: input.phone,
   });
+}
+
+export type UserProfile = {
+  uid: string;
+  email: string;
+  displayName?: string;
+  department?: string;
+  phone?: string;
+  createdAt?: string;
+  lastSeenAt?: string;
+};
+
+/** users/ 라이브 구독 — 디스패치 받을 사람 selector 등에서 사용 */
+export function useUsers(): UserProfile[] {
+  const [list, setList] = useState<UserProfile[]>([]);
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      try { await ensureAuth(); } catch { /* silent */ }
+      if (cancelled) return;
+      const db = getRtdb();
+      if (!db) return;
+      unsub = onValue(ref(db, dbPath('users')), (snap) => {
+        const val = (snap.val() ?? {}) as Record<string, UserProfile>;
+        const users = Object.values(val).sort((a, b) =>
+          (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email),
+        );
+        setList(users);
+      });
+    })();
+    return () => { cancelled = true; if (unsub) unsub(); };
+  }, []);
+  return list;
 }
 
 /** RTDB users/{uid} upsert — 가입/첫 로그인 시 호출. 기존 role 등 필드는 보존. */

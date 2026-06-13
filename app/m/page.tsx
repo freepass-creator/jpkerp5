@@ -158,11 +158,11 @@ export default function MobileHome() {
             <span style={{ color: 'var(--text-weak)' }}>날씨 ...</span>
           ) : weather.am && weather.pm ? (
             <>
-              <span title={weather.am.label}>
+              <span title={weather.am.label} style={{ color: 'var(--blue-text)' }}>
                 <span style={{ fontSize: 16, marginRight: 3 }}>{weather.am.icon}</span>
                 오전 <strong>{weather.am.temp}°</strong>
               </span>
-              <span title={weather.pm.label}>
+              <span title={weather.pm.label} style={{ color: 'var(--orange-text)' }}>
                 <span style={{ fontSize: 16, marginRight: 3 }}>{weather.pm.icon}</span>
                 오후 <strong>{weather.pm.temp}°</strong>
               </span>

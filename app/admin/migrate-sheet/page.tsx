@@ -272,6 +272,65 @@ export default function MigrateSheetPage() {
     }
   }
 
+  /**
+   * 계약자 있는데 인도일 없는 contracts — 일괄 인도완료 처리.
+   * 사용자 정책: '계약자 있는 차들은 다 인도완료됐다고 봐야하는데 업로드하면서 정보가 안 갔나봐'
+   *
+   * 처리:
+   *  · customerName 있고 deliveredDate 비어있는 활성 계약 검출
+   *  · deliveredDate = contractDate, status='운행', vehicleStatus='운행' 일괄 update
+   */
+  async function backfillDeliveredDate() {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    if (!window.confirm('계약자가 있는데 인도일이 비어있는 계약을 일괄 인도완료(deliveredDate=contractDate, status/vehicleStatus=운행) 처리합니다.\n\n진행할까요?')) return;
+    setRunning(true);
+    setLog([]);
+    try {
+      await ensureAuth();
+      const db = getRtdb();
+      if (!db) throw new Error('Firebase 미설정');
+
+      append('═══ 인도일 없는 계약 일괄 인도완료 ═══');
+      const cSnap = await get(ref(db, dbPath('contracts')));
+      const contracts = (cSnap.val() ?? {}) as Record<string, Contract>;
+      const candidates = Object.values(contracts).filter((c) => {
+        if (!c.customerName?.trim()) return false;
+        if (c.deliveredDate) return false;
+        // 반납/해지/매각 등은 제외 — 이미 종료 상태
+        if (c.status === '반납' || c.status === '해지') return false;
+        if (c.vehicleStatus === '매각' || c.vehicleStatus === '매각대기' || c.vehicleStatus === '매각검토') return false;
+        return true;
+      });
+      append(`대상: ${candidates.length}건`);
+
+      const batch: Record<string, Partial<Contract>> = {};
+      let count = 0;
+      for (const c of candidates) {
+        const deliveredDate = c.contractDate || new Date().toISOString().slice(0, 10);
+        batch[`${c.id}/deliveredDate`] = deliveredDate as unknown as Partial<Contract>;
+        batch[`${c.id}/status`] = '운행' as unknown as Partial<Contract>;
+        batch[`${c.id}/vehicleStatus`] = '운행' as unknown as Partial<Contract>;
+        append(`✓ ${c.vehiclePlate ?? '?'} | ${c.customerName} | 인도일 → ${deliveredDate}`);
+        count++;
+      }
+
+      if (Object.keys(batch).length === 0) {
+        append('처리할 대상 없음');
+        toast.info('대상 없음');
+      } else {
+        await rtdbUpdate(ref(db, dbPath('contracts')), batch as unknown as Record<string, unknown>);
+        append('');
+        append(`═══ ${count}건 인도완료 처리 ═══`);
+        toast.success(`${count}건 인도완료 처리`);
+      }
+    } catch (e) {
+      append(`✗ 실패: ${friendlyError(e)}`);
+      toast.error(friendlyError(e));
+    } finally {
+      setRunning(false);
+    }
+  }
+
   /** 강제 wipe — root 통째로 삭제 (companies/audit_logs 포함 모든 것) */
   async function nukeEverything() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
@@ -862,6 +921,15 @@ export default function MigrateSheetPage() {
                 style={{ height: 36, fontSize: 12 }}
               >
                 📷 사진 plate-키 → 자체코드 일괄 이관
+              </button>
+              <button
+                className="btn"
+                type="button"
+                disabled={running || !superAdmin}
+                onClick={backfillDeliveredDate}
+                style={{ height: 36, fontSize: 12 }}
+              >
+                🚚 인도일 없는 계약 일괄 인도완료 (계약자 있는 거)
               </button>
               <button
                 className="btn btn-danger"
