@@ -7,9 +7,9 @@
  */
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { MagnifyingGlass, CaretRight, X, FunnelSimple } from '@phosphor-icons/react';
+import { MagnifyingGlass, X, FunnelSimple } from '@phosphor-icons/react';
+import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
 
 type Filter = 'all' | 'delivering' | 'running' | 'returning' | 'idle';
@@ -107,31 +107,15 @@ export default function MobileOps() {
         <div style={{ fontSize: 11, color: 'var(--text-sub)' }}>{filtered.length}건</div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {filtered.map((c) => (
-          <Link key={c.id} href={`/m/contract/${c.id}`} style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 14px', background: 'var(--bg-card)',
-            border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
-            textDecoration: 'none', color: 'inherit', touchAction: 'manipulation',
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{c.vehiclePlate ?? '?'}</span>
-                <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>{c.customerName ?? '?'}</span>
-                <span style={{ fontSize: 10, padding: '1px 6px', background: 'var(--bg-sunken)', color: 'var(--text-sub)', borderRadius: 'var(--radius-sm)' }}>
-                  {c.vehicleStatus}
-                </span>
-              </div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-weak)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {c.vehicleModel ?? ''} · {c.company ?? ''}
-                {c.unpaidAmount > 0 && (
-                  <> · <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>미수 ₩{formatCurrency(c.unpaidAmount)}</span></>
-                )}
-              </div>
-            </div>
-            <CaretRight size={14} weight="bold" style={{ color: 'var(--text-weak)', flexShrink: 0 }} />
-          </Link>
-        ))}
+          {filtered.map((c) => (
+            <ContractListItem
+              key={c.id}
+              contract={c}
+              extra={c.unpaidAmount > 0
+                ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>미수 ₩{formatCurrency(c.unpaidAmount)}</span>
+                : undefined}
+            />
+          ))}
           {filtered.length === 0 && (
             <div style={{
               padding: 32, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)',

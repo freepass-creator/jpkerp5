@@ -7,9 +7,9 @@
  */
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, CaretRight, FunnelSimple } from '@phosphor-icons/react';
+import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, FunnelSimple } from '@phosphor-icons/react';
+import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
 import { ageFromIdent } from '@/lib/ident';
 
@@ -104,49 +104,38 @@ export default function MobileRisk() {
         const items = groups[kind.key];
         if (items.length === 0) return null;
         return (
-          <section key={kind.key} style={{
-            background: 'var(--bg-card)', border: '1px solid var(--border-soft)',
-            borderRadius: 'var(--radius-lg)', overflow: 'hidden',
-          }}>
+          <section key={kind.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <header style={{
-              padding: '10px 14px', background: `var(--${kind.tone}-bg)`, color: `var(--${kind.tone}-text)`,
-              borderBottom: `1px solid var(--${kind.tone}-border, ${kind.tone === 'red' ? 'rgba(220,38,38,0.25)' : 'rgba(194,65,12,0.25)'})`,
+              padding: '8px 12px', background: `var(--${kind.tone}-bg)`, color: `var(--${kind.tone}-text)`,
+              border: `1px solid var(--${kind.tone}-border, ${kind.tone === 'red' ? 'rgba(220,38,38,0.25)' : 'rgba(194,65,12,0.25)'})`,
+              borderRadius: 'var(--radius)',
               fontSize: 12, fontWeight: 700,
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
               {kind.icon}
               {kind.label} ({items.length})
             </header>
-            <div>
-              {items.slice(0, 30).map((c) => (
-                <Link key={c.id} href={`/m/contract/${c.id}?risk=${kind.key}`} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 14px', borderBottom: '1px solid var(--border-soft)',
-                  textDecoration: 'none', color: 'inherit', touchAction: 'manipulation',
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: 13 }}>{c.vehiclePlate ?? '?'}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>{c.customerName ?? '?'}</span>
-                    </div>
-                    <div style={{ fontSize: 10.5, color: 'var(--text-weak)', marginTop: 2 }}>
-                      {kind.key === 'unpaid' && c.unpaidAmount > 0 && (
-                        <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>₩{formatCurrency(c.unpaidAmount)}</span>
-                      )}
-                      {kind.key === 'overdue-return' && c.returnScheduledDate && (
-                        <span>예정 {c.returnScheduledDate}</span>
-                      )}
-                      {kind.key === 'insurance-gap' && (
-                        <span>보험연령 {c.insuranceAge ?? '-'}세</span>
-                      )}
-                      {kind.key === 'missing-ident' && (
-                        <span>등록번호 결손</span>
-                      )}
-                    </div>
-                  </div>
-                  <CaretRight size={14} weight="bold" style={{ color: 'var(--text-weak)' }} />
-                </Link>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {items.slice(0, 30).map((c) => {
+                const extraText =
+                  kind.key === 'unpaid' && c.unpaidAmount > 0
+                    ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>₩{formatCurrency(c.unpaidAmount)}</span>
+                  : kind.key === 'overdue-return' && c.returnScheduledDate
+                    ? <span style={{ color: 'var(--orange-text)' }}>반납예정 {c.returnScheduledDate}</span>
+                  : kind.key === 'insurance-gap'
+                    ? <span>보험연령 {c.insuranceAge ?? '-'}세</span>
+                  : kind.key === 'missing-ident'
+                    ? <span style={{ color: 'var(--amber-text)' }}>등록번호 결손</span>
+                  : null;
+                return (
+                  <ContractListItem
+                    key={c.id}
+                    contract={c}
+                    hrefSuffix={`?risk=${kind.key}`}
+                    extra={extraText ?? undefined}
+                  />
+                );
+              })}
               {items.length > 30 && (
                 <div style={{ padding: 10, textAlign: 'center', fontSize: 11, color: 'var(--text-weak)' }}>
                   ... 외 {items.length - 30}건

@@ -132,17 +132,8 @@ export default function MobileHome() {
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* 검색 */}
-      <Link href="/m/ops" style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '14px 16px', background: 'var(--bg-card)',
-        border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
-        textDecoration: 'none', color: 'var(--text-sub)',
-        touchAction: 'manipulation',
-      }}>
-        <MagnifyingGlass size={18} weight="duotone" />
-        <span style={{ fontSize: 14 }}>차량번호 · 고객명 조회</span>
-      </Link>
+      {/* 인라인 검색 (C 안) — 타이핑 시 드롭다운 즉시 표시 */}
+      <InlineSearch contracts={contracts} />
 
       {/* 오늘 헤더 */}
       <header style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -251,6 +242,101 @@ export default function MobileHome() {
           ? data.idleList.slice(0, 3).map((c) => c.vehiclePlate).filter(Boolean).join(' · ')
           : '휴차 차량 없음'}
       />
+    </div>
+  );
+}
+
+/* ─────────── 인라인 검색 (드롭다운) ─────────── */
+
+function InlineSearch({ contracts }: { contracts: ReturnType<typeof useContracts>['contracts'] }) {
+  const [q, setQ] = useState('');
+  const [focused, setFocused] = useState(false);
+
+  const matches = useMemo(() => {
+    const query = q.trim().toLowerCase().replace(/[^\w가-힣]/g, '');
+    if (!query) return [];
+    return contracts
+      .filter((c) => `${c.vehiclePlate ?? ''}${c.customerName ?? ''}${c.customerPhone1 ?? ''}`
+        .toLowerCase().replace(/[^\w가-힣]/g, '').includes(query))
+      .slice(0, 7);
+  }, [contracts, q]);
+
+  const showDropdown = focused && q.trim().length > 0;
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '12px 14px', background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderRadius: showDropdown ? 'var(--radius-lg) var(--radius-lg) 0 0' : 'var(--radius-lg)',
+      }}>
+        <MagnifyingGlass size={18} weight="duotone" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 150)}
+          placeholder="차량번호 · 고객명 조회"
+          style={{
+            flex: 1, border: 'none', outline: 'none', background: 'transparent',
+            fontSize: 14, fontFamily: 'inherit', color: 'var(--text-main)',
+          }}
+        />
+        {q && (
+          <button type="button" onClick={() => setQ('')} style={{
+            padding: 4, background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'var(--text-sub)',
+          }} aria-label="지우기">✕</button>
+        )}
+      </div>
+
+      {showDropdown && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0,
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)', borderTop: 'none',
+          borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
+          boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
+          zIndex: 60, overflow: 'hidden',
+        }}>
+          {matches.length === 0 ? (
+            <div style={{ padding: 14, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)' }}>
+              결과 없음
+            </div>
+          ) : (
+            <>
+              {matches.map((c) => (
+                <Link key={c.id} href={`/m/contract/${c.id}`} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  borderBottom: '1px solid var(--border-soft)',
+                  textDecoration: 'none', color: 'inherit',
+                  touchAction: 'manipulation',
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: 13 }}>{c.vehiclePlate ?? '?'}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>{c.customerName ?? '?'}</span>
+                    </div>
+                    <div style={{ fontSize: 10.5, color: 'var(--text-weak)' }}>
+                      {c.vehicleModel ?? ''} · {c.company ?? ''}
+                    </div>
+                  </div>
+                  <CaretRight size={12} weight="bold" style={{ color: 'var(--text-weak)' }} />
+                </Link>
+              ))}
+              <Link href={`/m/ops?q=${encodeURIComponent(q)}`} style={{
+                display: 'block', textAlign: 'center', padding: '10px 14px',
+                fontSize: 12, fontWeight: 600, color: 'var(--brand)',
+                textDecoration: 'none', background: 'var(--bg-sunken)',
+              }}>
+                전체 결과 보기 →
+              </Link>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
