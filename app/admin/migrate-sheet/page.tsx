@@ -140,6 +140,138 @@ export default function MigrateSheetPage() {
     }
   }
 
+  /** 운영 데이터 품질 진단 — 활성 계약에서 필수 필드 결손 카운트 */
+  async function diagnoseOperational() {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    setRunning(true);
+    setLog([]);
+    try {
+      await ensureAuth();
+      const db = getRtdb();
+      if (!db) throw new Error('Firebase 미설정');
+
+      append('═══ 운영 데이터 품질 진단 ═══');
+      const cSnap = await get(ref(db, dbPath('contracts')));
+      const contracts = (cSnap.val() ?? {}) as Record<string, Contract>;
+      const all = Object.values(contracts);
+      const active = all.filter((c) => {
+        const s = c.vehicleStatus;
+        const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
+          || s === '매각' || s === '매각대기'
+          || s === '상품화대기' || s === '상품화중' || s === '상품대기'
+          || s === '구매대기' || s === '등록대기'
+          || c.status === '반납' || c.status === '해지';
+        return !inactive;
+      });
+      append(`전체 계약 ${all.length}건 · 활성 ${active.length}건`);
+
+      // 필수 결손 카운트
+      const missingCustomerIdent = active.filter((c) => {
+        const d = (c.customerIdentNo ?? '').replace(/\D/g, '');
+        return c.customerKind !== '법인' && d.length !== 13;
+      });
+      const missingDriverForCorp = active.filter((c) =>
+        c.customerKind === '법인' && (c.driverIdentNo ?? '').replace(/\D/g, '').length !== 13,
+      );
+      const missingInsurance = active.filter((c) => !c.insuranceAge);
+      const missingPaymentDay = active.filter((c) => !c.paymentDay);
+      const missingMonthlyRent = active.filter((c) => !(c.monthlyRent > 0));
+
+      append('');
+      append('── 활성 계약 필수 결손 ──');
+      append(`  · 개인 임차인 등록번호 결손: ${missingCustomerIdent.length}건`);
+      append(`  · 법인 임차인 주운전자 결손: ${missingDriverForCorp.length}건`);
+      append(`  · 보험연령 결손: ${missingInsurance.length}건`);
+      append(`  · 결제일 결손: ${missingPaymentDay.length}건`);
+      append(`  · 월대여료 0원: ${missingMonthlyRent.length}건`);
+
+      // 샘플 표시 (각 카테고리 5건)
+      function dumpSample(label: string, list: Contract[]) {
+        if (list.length === 0) return;
+        append('');
+        append(`── ${label} 샘플 (앞 5건) ──`);
+        for (const c of list.slice(0, 5)) {
+          append(`  · ${c.vehiclePlate ?? '?'} | ${c.customerName ?? '?'} | ${c.company ?? '?'}`);
+        }
+        if (list.length > 5) append(`  ... 외 ${list.length - 5}건`);
+      }
+      dumpSample('등록번호 결손 개인', missingCustomerIdent);
+      dumpSample('보험연령 결손', missingInsurance);
+
+      // 사진 plate-키 진단
+      append('');
+      append('── 사진 plate-키 (자산 미등록) ──');
+      const aSnap = await get(ref(db, dbPath('vehicle_attachments')));
+      const allAttach = (aSnap.val() ?? {}) as Record<string, { photos?: unknown[] }>;
+      const plateKeys = Object.keys(allAttach).filter((k) => k.startsWith('plate:'));
+      append(`  plate: 키 노드 ${plateKeys.length}개`);
+      for (const k of plateKeys.slice(0, 10)) {
+        const n = allAttach[k]?.photos?.length ?? 0;
+        append(`  · ${k.replace('plate:', '')} — 사진 ${n}장`);
+      }
+      if (plateKeys.length > 10) append(`  ... 외 ${plateKeys.length - 10}개`);
+
+      append('');
+      append('═══ 운영 진단 완료 ═══');
+      append('→ 결손은 계약 detail 에서 직접 입력하거나 import 시트로 일괄 보강');
+      append('→ 사진 plate-키는 아래 「사진 plate-키 → 자체코드 일괄 이관」 버튼으로 정리');
+    } catch (e) {
+      append(`✗ 실패: ${friendlyError(e)}`);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  /** 사진 plate-키 → vehicleId 일괄 이관. plate(또는 plateHistory) 매칭되는 차량에 자동 흡수 */
+  async function migratePlatePhotos() {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    if (!window.confirm('plate-키로 임시 저장된 사진을 자체코드(vehicleId) 로 일괄 이관합니다.\n(매칭되는 차량이 있는 plate만 처리, 미등록 차량은 그대로 plate 유지)')) return;
+    setRunning(true);
+    setLog([]);
+    try {
+      await ensureAuth();
+      const db = getRtdb();
+      if (!db) throw new Error('Firebase 미설정');
+
+      const aSnap = await get(ref(db, dbPath('vehicle_attachments')));
+      const allAttach = (aSnap.val() ?? {}) as Record<string, unknown>;
+      const plateKeys = Object.keys(allAttach).filter((k) => k.startsWith('plate:'));
+      append(`plate-키 노드 ${plateKeys.length}개 발견`);
+
+      const vSnap = await get(ref(db, dbPath('vehicles')));
+      const vehicles = (vSnap.val() ?? {}) as Record<string, { id?: string; plate?: string; plateHistory?: string[] }>;
+      const vehicleList = Object.values(vehicles);
+
+      const { mergePlateAttachmentsToVehicle } = await import('@/lib/firebase/vehicle-attachments-store');
+      let merged = 0;
+      let unmatched = 0;
+
+      for (const k of plateKeys) {
+        const plate = k.slice(6).trim(); // 'plate:' 6자
+        const v = vehicleList.find((vv) =>
+          (vv.plate ?? '').trim() === plate
+          || (vv.plateHistory ?? []).some((p) => (p ?? '').trim() === plate),
+        );
+        if (v && v.id) {
+          append(`✓ ${plate} → ${v.id} 이관`);
+          await mergePlateAttachmentsToVehicle(plate, v.id);
+          merged++;
+        } else {
+          append(`· ${plate} — 자산 미등록 (그대로 유지)`);
+          unmatched++;
+        }
+      }
+      append('');
+      append(`═══ 완료: ${merged}건 이관 / ${unmatched}건 미매칭 ═══`);
+      toast.success(`${merged}건 이관 완료${unmatched > 0 ? ` (${unmatched}건 미매칭)` : ''}`);
+    } catch (e) {
+      append(`✗ 실패: ${friendlyError(e)}`);
+      toast.error(friendlyError(e));
+    } finally {
+      setRunning(false);
+    }
+  }
+
   /** 강제 wipe — root 통째로 삭제 (companies/audit_logs 포함 모든 것) */
   async function nukeEverything() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
@@ -712,6 +844,24 @@ export default function MigrateSheetPage() {
                 style={{ height: 36, fontSize: 12 }}
               >
                 🔍 진단 — 현재 노드 상태 확인 (어디 데이터 있는지)
+              </button>
+              <button
+                className="btn"
+                type="button"
+                disabled={running || !superAdmin}
+                onClick={diagnoseOperational}
+                style={{ height: 36, fontSize: 12 }}
+              >
+                📋 운영 데이터 품질 진단 (등록번호·보험연령·결제일·사진 결손)
+              </button>
+              <button
+                className="btn"
+                type="button"
+                disabled={running || !superAdmin}
+                onClick={migratePlatePhotos}
+                style={{ height: 36, fontSize: 12 }}
+              >
+                📷 사진 plate-키 → 자체코드 일괄 이관
               </button>
               <button
                 className="btn btn-danger"
