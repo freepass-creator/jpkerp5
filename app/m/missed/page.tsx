@@ -1,14 +1,11 @@
 'use client';
 
 /**
- * 모바일 오늘 할 일 — 시간 기준 통합 뷰.
+ * 모바일 밀린 업무 — 오늘 이전 지연된 인도/반납/지시.
  *
- * 섹션:
- *  · 요청받은 업무 (dispatch_orders dueDate=오늘 + 본인 지정 또는 broadcast)
- *  · 인도 예정 (contracts deliveryScheduledDate=오늘 + !deliveredDate)
- *  · 반납 예정 (contracts returnScheduledDate=오늘 + !returnedDate)
- *
- * 빈 섹션은 표시 X. 카테고리별 묶음 + 색 구분.
+ *  · 인도 지연: !deliveredDate && deliveryScheduled < today (휴차/매각 등 비활성 제외)
+ *  · 반납 지연: !returnedDate && returnScheduled < today
+ *  · 지시 지연: dueDate < today && status != 'done' / 'cancelled' (본인 지시)
  */
 
 import { useMemo } from 'react';
@@ -16,34 +13,36 @@ import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useAuth } from '@/lib/use-auth';
 import { useMyDispatchOrders, DISPATCH_LABEL, type DispatchOrder } from '@/lib/firebase/dispatch-store';
-import { Calendar, Megaphone, Truck, ArrowUUpLeft, CaretRight, CheckCircle } from '@phosphor-icons/react';
+import { Warning, Megaphone, Truck, ArrowUUpLeft, CaretRight, CheckCircle } from '@phosphor-icons/react';
 import { todayKr } from '@/lib/mock-data';
 
-export default function MobileToday() {
-  return <SchedulePage targetDate={todayKr()} title="오늘 할 일" />;
-}
-
-/** 공용 컴포넌트 — /m/today 와 /m/tomorrow 가 같은 패턴 + 다른 날짜 */
-export function SchedulePage({ targetDate, title }: { targetDate: string; title: string }) {
+export default function MobileBacklog() {
   const { contracts } = useContracts();
   const { user } = useAuth();
   const orders = useMyDispatchOrders(user?.uid);
+  const today = todayKr();
 
   const data = useMemo(() => {
-    const deliveryList = contracts.filter((c) =>
-      !c.deliveredDate && (c.deliveryScheduledDate ?? c.contractDate) === targetDate
-    );
+    const inactive = (s?: string) => s === '휴차' || s === '휴차대기' || s === '매각검토'
+      || s === '매각' || s === '매각대기' || s === '상품화대기' || s === '상품화중'
+      || s === '상품대기' || s === '구매대기' || s === '등록대기';
+
+    const deliveryList = contracts.filter((c) => {
+      if (c.deliveredDate) return false;
+      const sched = c.deliveryScheduledDate ?? c.contractDate;
+      if (!sched) return false;
+      return sched < today && !inactive(c.vehicleStatus) && c.status !== '반납' && c.status !== '해지';
+    });
     const returnList = contracts.filter((c) =>
-      !c.returnedDate && c.returnScheduledDate === targetDate
+      !c.returnedDate && c.returnScheduledDate && c.returnScheduledDate < today
     );
     const orderList = orders.filter((o) =>
-      o.dueDate === targetDate && (o.status === 'pending' || o.status === 'acknowledged')
+      o.dueDate && o.dueDate < today && o.status !== 'done' && o.status !== 'cancelled'
     );
     return { deliveryList, returnList, orderList };
-  }, [contracts, orders, targetDate]);
+  }, [contracts, orders, today]);
 
   const total = data.deliveryList.length + data.returnList.length + data.orderList.length;
-  const dateLabel = formatDateLabel(targetDate);
 
   return (
     <div>
@@ -53,15 +52,14 @@ export function SchedulePage({ targetDate, title }: { targetDate: string; title:
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         padding: '12px 16px',
-        borderTop: '3px solid var(--brand)',
+        borderTop: '3px solid var(--red-text)',
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Calendar size={20} weight="regular" />
-          {title}
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-sub)', fontFamily: 'var(--font-mono)' }}>{dateLabel}</span>
+          <Warning size={20} weight="regular" />
+          밀린 업무
         </h1>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub)' }}>{total}건</span>
       </header>
@@ -74,43 +72,30 @@ export function SchedulePage({ targetDate, title }: { targetDate: string; title:
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
         }}>
           <CheckCircle size={32} weight="duotone" />
-          예정된 일 없음 — 한가한 날
+          밀린 업무 없음 — 깔끔
         </div>
       )}
 
-      {/* 요청받은 업무 */}
       {data.orderList.length > 0 && (
-        <Section
-          tone="amber"
-          icon={<Megaphone size={16} weight="duotone" />}
-          title={`요청받은 업무 (${data.orderList.length})`}
-        >
+        <Section icon={<Megaphone size={16} weight="duotone" />} title={`지시 지연 (${data.orderList.length})`}>
           {data.orderList.map((o) => <OrderRow key={o.id} order={o} contracts={contracts} />)}
         </Section>
       )}
 
-      {/* 인도 예정 */}
       {data.deliveryList.length > 0 && (
-        <Section
-          tone="green"
-          icon={<Truck size={16} weight="duotone" />}
-          title={`인도 예정 (${data.deliveryList.length})`}
-        >
+        <Section icon={<Truck size={16} weight="duotone" />} title={`인도 지연 (${data.deliveryList.length})`}>
           {data.deliveryList.map((c) => (
-            <ContractRow key={c.id} contract={c} action="인도" hrefBase={`/m/entry/deliver?contractId=${c.id}`} />
+            <ContractRow key={c.id} contract={c} action="인도" date={c.deliveryScheduledDate ?? c.contractDate ?? ''}
+              hrefBase={`/m/entry/deliver?contractId=${c.id}`} />
           ))}
         </Section>
       )}
 
-      {/* 반납 예정 */}
       {data.returnList.length > 0 && (
-        <Section
-          tone="orange"
-          icon={<ArrowUUpLeft size={16} weight="duotone" />}
-          title={`반납 예정 (${data.returnList.length})`}
-        >
+        <Section icon={<ArrowUUpLeft size={16} weight="duotone" />} title={`반납 지연 (${data.returnList.length})`}>
           {data.returnList.map((c) => (
-            <ContractRow key={c.id} contract={c} action="반납" hrefBase={`/m/entry/return?contractId=${c.id}`} />
+            <ContractRow key={c.id} contract={c} action="반납" date={c.returnScheduledDate ?? ''}
+              hrefBase={`/m/entry/return?contractId=${c.id}`} />
           ))}
         </Section>
       )}
@@ -119,25 +104,15 @@ export function SchedulePage({ targetDate, title }: { targetDate: string; title:
   );
 }
 
-function formatDateLabel(date: string): string {
-  if (!date) return '-';
-  const d = new Date(date);
-  const dow = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${dow})`;
-}
-
-function Section({ tone, icon, title, children }: {
-  tone: 'amber' | 'green' | 'orange';
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
+function Section({ icon, title, children }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode;
 }) {
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <header style={{
         padding: '8px 12px',
-        background: `var(--${tone}-bg)`, color: `var(--${tone}-text)`,
-        border: `1px solid var(--${tone}-border, ${tone === 'green' ? 'rgba(22,101,52,0.25)' : tone === 'orange' ? 'rgba(194,65,12,0.25)' : 'rgba(161,98,7,0.25)'})`,
+        background: 'var(--red-bg)', color: 'var(--red-text)',
+        border: '1px solid var(--red-border, rgba(185,28,28,0.25))',
         borderRadius: 'var(--radius)',
         fontSize: 12, fontWeight: 700,
         display: 'flex', alignItems: 'center', gap: 6,
@@ -148,7 +123,7 @@ function Section({ tone, icon, title, children }: {
 }
 
 function OrderRow({ order, contracts }: { order: DispatchOrder; contracts: ReturnType<typeof useContracts>['contracts'] }) {
-  const linkedContract = order.contractId ? contracts.find((c) => c.id === order.contractId) : undefined;
+  const linked = order.contractId ? contracts.find((c) => c.id === order.contractId) : undefined;
   return (
     <Link href="/m/orders" style={{
       display: 'flex', flexDirection: 'column', gap: 4,
@@ -159,29 +134,24 @@ function OrderRow({ order, contracts }: { order: DispatchOrder; contracts: Retur
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span className="badge-base badge-amber" style={{ fontSize: 9 }}>{DISPATCH_LABEL[order.kind]}</span>
-          {order.status === 'pending' && <span className="badge-base badge-orange" style={{ fontSize: 9 }}>미확인</span>}
-          {order.status === 'acknowledged' && <span className="badge-base badge-blue" style={{ fontSize: 9 }}>확인됨</span>}
+          <span className="badge-base badge-red" style={{ fontSize: 9 }}>지연 · {order.dueDate ?? '-'}</span>
         </div>
         <CaretRight size={12} weight="bold" style={{ color: 'var(--text-weak)' }} />
       </div>
       <div style={{ fontSize: 13, fontWeight: 700 }}>{order.title}</div>
-      {order.body && (
-        <div style={{ fontSize: 11, color: 'var(--text-sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {order.body}
-        </div>
-      )}
-      {linkedContract && (
+      {linked && (
         <div style={{ fontSize: 10.5, color: 'var(--text-weak)' }}>
-          연결 — <span style={{ fontFamily: 'var(--font-mono)' }}>{linkedContract.vehiclePlate}</span> {linkedContract.customerName}
+          연결 — <span style={{ fontFamily: 'var(--font-mono)' }}>{linked.vehiclePlate}</span> {linked.customerName}
         </div>
       )}
     </Link>
   );
 }
 
-function ContractRow({ contract: c, action, hrefBase }: {
+function ContractRow({ contract: c, action, date, hrefBase }: {
   contract: ReturnType<typeof useContracts>['contracts'][number];
   action: '인도' | '반납';
+  date: string;
   hrefBase: string;
 }) {
   return (
@@ -196,14 +166,13 @@ function ContractRow({ contract: c, action, hrefBase }: {
           <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{c.vehiclePlate ?? '?'}</span>
           <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>{c.customerName ?? '?'}</span>
         </div>
-        <div style={{ fontSize: 10.5, color: 'var(--text-weak)' }}>
-          {c.vehicleModel ?? ''} · {c.customerPhone1 ?? ''}
+        <div style={{ fontSize: 10.5, color: 'var(--red-text)', fontFamily: 'var(--font-mono)' }}>
+          예정 {date}
         </div>
       </div>
       <span style={{
         padding: '4px 10px',
-        background: action === '인도' ? 'var(--green-bg)' : 'var(--orange-bg)',
-        color: action === '인도' ? 'var(--green-text)' : 'var(--orange-text)',
+        background: 'var(--red-bg)', color: 'var(--red-text)',
         borderRadius: 'var(--radius)', fontSize: 11, fontWeight: 700,
       }}>
         {action}하기 →

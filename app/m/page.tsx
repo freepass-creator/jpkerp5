@@ -67,6 +67,7 @@ export default function MobileHome() {
 
     const today: { delivery: typeof contracts; return: typeof contracts } = { delivery: [], return: [] };
     const tomorrow: { delivery: typeof contracts; return: typeof contracts } = { delivery: [], return: [] };
+    const upcoming: { delivery: typeof contracts; return: typeof contracts } = { delivery: [], return: [] };
     const overdueDelivery: typeof contracts = [];
     const missingIdent: typeof contracts = [];
     const missingInsurance: typeof contracts = [];
@@ -93,7 +94,8 @@ export default function MobileHome() {
         if (sched) {
           const diff = Math.floor((sched.getTime() - todayDate.getTime()) / dayMs);
           if (diff === 0) today.delivery.push(c);
-          else if (diff === 1) tomorrow.delivery.push(c);
+          else if (diff === 1) { tomorrow.delivery.push(c); upcoming.delivery.push(c); }
+          else if (diff > 1) upcoming.delivery.push(c);
           else if (diff < 0 && !inactive) overdueDelivery.push(c);
         }
       }
@@ -103,7 +105,8 @@ export default function MobileHome() {
         if (ret) {
           const diff = Math.floor((ret.getTime() - todayDate.getTime()) / dayMs);
           if (diff === 0) today.return.push(c);
-          else if (diff === 1) tomorrow.return.push(c);
+          else if (diff === 1) { tomorrow.return.push(c); upcoming.return.push(c); }
+          else if (diff > 1) upcoming.return.push(c);
           else if (diff < 0) overdueReturn.push(c);
         }
       }
@@ -137,7 +140,7 @@ export default function MobileHome() {
     }
 
     return {
-      today, tomorrow,
+      today, tomorrow, upcoming,
       overdueDelivery, missingIdent, missingInsurance,
       insuranceGap, unpaidList, overdueReturn, idleList,
       runningList, returningList, deliveringList,
@@ -147,7 +150,8 @@ export default function MobileHome() {
   }, [contracts, todayDate]);
 
   const todayCount = data.today.delivery.length + data.today.return.length;
-  const tomorrowCount = data.tomorrow.delivery.length + data.tomorrow.return.length;
+  const missedCount = data.overdueDelivery.length + data.overdueReturn.length;
+  const upcomingCount = data.upcoming.delivery.length + data.upcoming.return.length;
   const pendingCount = data.overdueDelivery.length + data.missingIdent.length + data.missingInsurance.length;
   const riskCount = data.unpaidList.length + data.overdueReturn.length + data.insuranceGap.length + data.missingIdent.length;
 
@@ -203,9 +207,20 @@ export default function MobileHome() {
       {/* 일정 */}
       <SectionGroup label="일정">
         <SummaryCard
+          href="/m/missed"
+          icon={<Warning size={16} weight="duotone" />}
+          title="밀린 업무"
+          tone="red"
+          count={missedCount}
+          countLabel="건"
+          subtitle={missedCount > 0
+            ? `인도지연 ${data.overdueDelivery.length} · 반납지연 ${data.overdueReturn.length}`
+            : '밀린 업무 없음'}
+        />
+        <SummaryCard
           href="/m/today"
           icon={<Calendar size={16} weight="duotone" />}
-          title="오늘 할 일"
+          title="오늘 업무"
           tone="brand"
           count={todayCount}
           countLabel="건"
@@ -214,24 +229,24 @@ export default function MobileHome() {
             : '오늘 일정 없음'}
         />
         <SummaryCard
-          href="/m/tomorrow"
+          href="/m/upcoming"
           icon={<CalendarBlank size={16} weight="duotone" />}
-          title="내일 할 일"
+          title="예정 업무"
           tone="blue"
-          count={tomorrowCount}
+          count={upcomingCount}
           countLabel="건"
-          subtitle={tomorrowCount > 0
-            ? `인도 ${data.tomorrow.delivery.length} · 반납 ${data.tomorrow.return.length}`
-            : '내일 일정 없음'}
+          subtitle={upcomingCount > 0
+            ? `인도 ${data.upcoming.delivery.length} · 반납 ${data.upcoming.return.length}`
+            : '예정 일정 없음'}
         />
       </SectionGroup>
 
-      {/* 내 업무 */}
-      <SectionGroup label="내 업무">
+      {/* 지시 — 사람에게 받거나 사람에게 보낸 업무 */}
+      <SectionGroup label="지시">
         <SummaryCard
           href="/m/orders"
           icon={<Megaphone size={16} weight="duotone" />}
-          title="요청받은 업무"
+          title="받은 업무"
           tone="amber"
           count={pendingOrders}
           countLabel="건"
@@ -240,7 +255,7 @@ export default function MobileHome() {
         <SummaryCard
           href="/m/orders?view=sent"
           icon={<PaperPlaneTilt size={16} weight="duotone" />}
-          title="요청한 업무"
+          title="보낸 업무"
           tone="indigo"
           count={sentOpenCount}
           countLabel="건"
@@ -253,7 +268,7 @@ export default function MobileHome() {
         <SummaryCard
           href="/m/ops"
           icon={<Car size={16} weight="duotone" />}
-          title="운영"
+          title="운영 요약"
           tone="brand"
           count={data.opsActiveCount}
           countLabel="대"
@@ -264,7 +279,7 @@ export default function MobileHome() {
         <SummaryCard
           href="/m/risk"
           icon={<Warning size={16} weight="duotone" />}
-          title="리스크"
+          title="리스크 요약"
           tone="red"
           count={riskCount}
           countLabel="건"
@@ -275,7 +290,7 @@ export default function MobileHome() {
         <SummaryCard
           href="/m/ops?filter=pending"
           icon={<ListChecks size={16} weight="duotone" />}
-          title="미결 업무"
+          title="미결 요약"
           tone="orange"
           count={pendingCount}
           countLabel="건"
