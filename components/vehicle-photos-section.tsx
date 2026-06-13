@@ -251,3 +251,244 @@ export function VehiclePhotosSection({ vehicleId, contractId, defaultKind = 'pro
     </div>
   );
 }
+
+/**
+ * 단일 kind 사진 섹션 — 운영현황 사진 탭에서 사용.
+ *
+ * 표시: 해당 kind의 "최근 사진" (디폴트 3장) + 우상단 '사진이력 보기' 버튼.
+ * 클릭 시 전체 이력 모달 (해당 vehicle 의 같은 kind 모든 사진).
+ */
+type ByKindProps = {
+  vehicleId: string | null | undefined;
+  kind: VehiclePhotoKind;
+  contractId?: string;
+  /** 섹션 제목 (예: '최근 반납 사진') */
+  title: string;
+  readonly?: boolean;
+  /** 최근 N장 표시 (디폴트 3) */
+  recentCount?: number;
+};
+
+export function VehiclePhotosByKind({ vehicleId, kind, contractId, title, readonly = false, recentCount = 3 }: ByKindProps) {
+  const { user } = useAuth();
+  const attachments = useVehicleAttachments(vehicleId);
+  const allOfKind = useMemo(() => {
+    const list = (attachments?.photos ?? []).filter((p) => p.kind === kind);
+    return list.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+  }, [attachments, kind]);
+  const recent = useMemo(() => allOfKind.slice(0, recentCount), [allOfKind, recentCount]);
+  const history = useMemo(() => allOfKind.slice(recentCount), [allOfKind, recentCount]);
+
+  const [uploading, setUploading] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [preview, setPreview] = useState<VehiclePhoto | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const canUpload = !readonly && !!vehicleId && (kind === 'product' || !!contractId);
+  const tone = PHOTO_KIND_TONE[kind];
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0 || !vehicleId) return;
+    setUploading(true);
+    try {
+      for (const f of Array.from(files)) {
+        const url = await fileToDataUrl(f);
+        const photo: VehiclePhoto = {
+          id: `vp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          kind,
+          url,
+          fileName: f.name,
+          uploadedAt: new Date().toISOString(),
+          uploadedBy: user?.email ?? undefined,
+          contractId: kind === 'product' ? undefined : contractId,
+          eventDate: new Date().toISOString().slice(0, 10),
+        };
+        await addVehiclePhoto(vehicleId, photo);
+      }
+      toast.success(`${files.length}장 업로드 완료`);
+    } catch (e) {
+      toast.error('업로드 실패: ' + ((e as Error).message ?? String(e)));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleDelete(p: VehiclePhoto) {
+    if (!vehicleId) return;
+    if (!window.confirm(`이 사진을 삭제할까요?\n\n${p.fileName ?? p.id}`)) return;
+    try {
+      await removeVehiclePhoto(vehicleId, p.id);
+      toast.success('삭제됨');
+      if (preview?.id === p.id) setPreview(null);
+    } catch (e) {
+      toast.error('삭제 실패: ' + ((e as Error).message ?? String(e)));
+    }
+  }
+
+  if (!vehicleId) return null; // 부모 탭에서 자산 미등록 안내 — 여기선 silent skip
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* 섹션 헤더 — title (좌) / 이력 보기 (우) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Camera size={12} weight="duotone" />
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-main)' }}>{title}</span>
+          <span className={`badge-base badge-${tone}`} style={{ fontSize: 9 }}>{allOfKind.length}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {history.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setHistoryOpen(true)}
+              title={`이전 ${PHOTO_KIND_LABEL[kind]} 사진 ${history.length}장 모두 보기`}
+            >
+              <ImageSquare size={11} weight="duotone" /> 사진이력 보기 ({history.length})
+            </button>
+          )}
+          {canUpload && (
+            <>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Camera size={11} weight="bold" /> {uploading ? '업로드 중…' : '+ 사진'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(e) => void handleFiles(e.target.files)}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 최근 사진 grid */}
+      {recent.length === 0 ? (
+        <div style={{
+          padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-weak)',
+          background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        }}>
+          <ImageSquare size={20} weight="duotone" />
+          {PHOTO_KIND_LABEL[kind]} 사진 없음
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6,
+        }}>
+          {recent.map((p) => (
+            <PhotoThumb key={p.id} photo={p} onOpen={() => setPreview(p)} onDelete={readonly ? undefined : () => void handleDelete(p)} />
+          ))}
+        </div>
+      )}
+
+      {/* 이력 모달 — 전체 사진 grid */}
+      {historyOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32,
+          }}
+          onClick={() => setHistoryOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'var(--bg-card)', borderRadius: 'var(--radius)',
+              maxWidth: '90vw', maxHeight: '85vh', width: 900, padding: 16,
+              display: 'flex', flexDirection: 'column', gap: 10, overflow: 'hidden',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <strong style={{ fontSize: 13 }}>{title} — 사진 이력 ({allOfKind.length}장)</strong>
+              <button type="button" className="btn btn-sm" onClick={() => setHistoryOpen(false)}>닫기 (Esc)</button>
+            </div>
+            <div style={{
+              overflow: 'auto',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: 6,
+            }}>
+              {allOfKind.map((p) => (
+                <PhotoThumb key={p.id} photo={p} onOpen={() => setPreview(p)} onDelete={readonly ? undefined : () => void handleDelete(p)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 사진 확대 미리보기 — 둘 다 (recent / history) 에서 공용 */}
+      {preview && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40,
+            cursor: 'zoom-out',
+          }}
+          onClick={() => setPreview(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview.url}
+            alt={preview.fileName ?? '사진'}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhotoThumb({ photo, onOpen, onDelete }: { photo: VehiclePhoto; onOpen: () => void; onDelete?: () => void }) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        aspectRatio: '4 / 3',
+        background: 'var(--bg-sunken)',
+        border: '1px solid var(--border-soft)',
+        borderRadius: 'var(--radius-sm)',
+        overflow: 'hidden', cursor: 'pointer',
+      }}
+      onClick={onOpen}
+      title={`${photo.fileName ?? photo.id}\n${photo.uploadedAt.slice(0, 16).replace('T', ' ')}${photo.uploadedBy ? ` · ${photo.uploadedBy}` : ''}`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={photo.url} alt={photo.fileName ?? '사진'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          style={{
+            position: 'absolute', top: 4, right: 4,
+            background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none',
+            width: 22, height: 22, borderRadius: '50%', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          title="삭제"
+          aria-label="삭제"
+        >
+          <Trash size={11} weight="bold" />
+        </button>
+      )}
+      {photo.eventDate && (
+        <span style={{
+          position: 'absolute', bottom: 4, left: 4,
+          background: 'rgba(0,0,0,0.55)', color: '#fff',
+          padding: '1px 6px', fontSize: 9.5, fontFamily: 'var(--font-mono)',
+          borderRadius: 'var(--radius-sm)',
+        }}>{photo.eventDate}</span>
+      )}
+    </div>
+  );
+}

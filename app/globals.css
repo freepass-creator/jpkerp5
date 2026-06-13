@@ -2252,37 +2252,7 @@ input[type="radio"]:disabled {
   color: var(--text-main);
 }
 
-/* (3) Tabs — 전역 .chip 규격으로 통일 (필터바와 동일 톤). 활성=brand 채움 */
-.dialog-content .tabs-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: var(--button-height);
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-card);
-  font-size: 12px;
-  font-weight: var(--font-weight-medium);
-  color: var(--text-sub);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-}
-.dialog-content .tabs-trigger:hover {
-  background: var(--bg-sunken);
-  color: var(--text-main);
-}
-.dialog-content .tabs-trigger[data-state="active"] {
-  background: var(--brand);
-  border-color: var(--brand);
-  color: var(--text-inverse);
-  font-weight: 600;
-}
-.dialog-content .tabs-trigger[data-state="active"]:hover {
-  background: var(--brand-h);
-  border-color: var(--brand-h);
-  color: var(--text-inverse);
-}
+/* (3) Tabs — 전역 .tabs-trigger 그대로 상속. 다이얼로그 전용 override 없음 (gap·radius 미세 차이 제거) */
 .dialog-content .tabs-trigger:focus-visible {
   outline: none;
   border-color: var(--brand);

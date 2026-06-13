@@ -13,7 +13,7 @@ import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
-import { VehiclePhotosSection } from '@/components/vehicle-photos-section';
+import { VehiclePhotosByKind } from '@/components/vehicle-photos-section';
 import { useInsurances } from '@/lib/firebase/insurance-store';
 import { normPlate } from '@/lib/entity-sync';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
@@ -343,7 +343,7 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
   },
 };
 
-/* ─────────────── 사진 — 별도 탭 (상품화/출고/반납) ─────────────── */
+/* ─────────────── 사진 — 별도 탭 (반납·인도전·상품화 3섹션 스택) ─────────────── */
 
 function VehiclePhotosTab({ c }: { c: Contract }) {
   // 계약 vehiclePlate → vehicles 마스터에서 vehicleId 매칭 (plate trim 기준)
@@ -352,10 +352,22 @@ function VehiclePhotosTab({ c }: { c: Contract }) {
     () => vehicles.find((v) => (v.plate ?? '').trim() === (c.vehiclePlate ?? '').trim())?.id ?? null,
     [vehicles, c.vehiclePlate],
   );
-  // 현재 계약 단계에 맞춰 디폴트 카테고리 선택 — 인도 후 = 출고, 반납 후 = 반납, 그 외 = 상품화
-  const defaultKind = c.deliveredDate && !c.returnedDate ? 'delivery' : c.returnedDate ? 'return' : 'product';
+
+  if (!matchedVehicleId) {
+    return (
+      <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)' }}>
+        자산 등록(차량) 이 먼저 필요 — 자산 페이지에서 차량 등록 후 사진 업로드 가능
+      </div>
+    );
+  }
+
+  // 라이프사이클 역순 (최근 단계부터): 반납 → 인도전(출고) → 상품화
   return (
-    <VehiclePhotosSection vehicleId={matchedVehicleId} contractId={c.id} defaultKind={defaultKind} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <VehiclePhotosByKind vehicleId={matchedVehicleId} kind="return"   contractId={c.id} title="최근 반납 사진" />
+      <VehiclePhotosByKind vehicleId={matchedVehicleId} kind="delivery" contractId={c.id} title="최근 인도전 사진" />
+      <VehiclePhotosByKind vehicleId={matchedVehicleId} kind="product"  contractId={c.id} title="최근 상품화 사진" />
+    </div>
   );
 }
 
