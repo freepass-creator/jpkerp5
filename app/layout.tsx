@@ -54,6 +54,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css"
         />
+        {/* 모바일 자동 리다이렉트 안전망 — middleware UA 매칭 실패(사파리 "데스크탑 사이트 요청" 등) 케이스 백업.
+            매우 빠른 inline 스크립트로 첫 paint 전에 location.replace → 깜빡임 최소. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function(){
+  try {
+    var p = location.pathname;
+    if (p.indexOf('/m') === 0 || p.indexOf('/api') === 0 || p.indexOf('/customer') === 0) return;
+    var forceDesktop = document.cookie.indexOf('force-desktop=1') !== -1;
+    if (forceDesktop) return;
+    var narrow = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    if (narrow) location.replace('/m');
+  } catch(e) { /* silent */ }
+})();
+            `.trim(),
+          }}
+        />
       </head>
       <body>
         <SettingsInit />
