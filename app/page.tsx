@@ -781,7 +781,7 @@ export default function Page() {
                             if (inactive) return <span className="muted">-</span>;
                             const m = c.termMonths;
                             if (!m || m <= 0) {
-                              return <StatusBadge tone="brand" title="약정 기간 정함 없이 운용 중">무기한</StatusBadge>;
+                              return <StatusBadge tone="brand" title="00 = 기간 정함 없이 운용 (무기한)">00</StatusBadge>;
                             }
                             return <StatusBadge tone={termTone(m)} title={`${m}개월`}>{m}</StatusBadge>;
                           })()}
