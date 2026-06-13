@@ -10,6 +10,7 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useFieldLogs, FIELD_LOG_LABEL, FIELD_LOG_TONE } from '@/lib/firebase/field-logs-store';
 import { CaretLeft, Phone, Camera, NotePencil, ChatCircle } from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -18,6 +19,7 @@ export default function MobileContractDetail() {
   const id = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : '';
   const { contracts } = useContracts();
   const c = contracts.find((x) => x.id === id);
+  const logs = useFieldLogs(c?.id);
 
   if (!c) {
     return (
@@ -61,8 +63,8 @@ export default function MobileContractDetail() {
 
       {/* 액션 4종 */}
       <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-        <ActionBtn icon={<Camera size={22} weight="duotone" />} label="사진" onClick={() => alert('Phase 2: 사진 촬영')} />
-        <ActionBtn icon={<NotePencil size={22} weight="duotone" />} label="메모" onClick={() => alert('Phase 2: 메모')} />
+        <ActionBtn icon={<Camera size={22} weight="duotone" />} label="사진" href={`/m/upload?contractId=${c.id}`} />
+        <ActionBtn icon={<NotePencil size={22} weight="duotone" />} label="메모" href={`/m/entry/memo?contractId=${c.id}`} />
         {c.customerPhone1 ? (
           <ActionBtn icon={<Phone size={22} weight="duotone" />} label="전화" href={`tel:${c.customerPhone1}`} />
         ) : (
@@ -104,6 +106,43 @@ export default function MobileContractDetail() {
           <InfoSection title="비고">
             <div style={{ fontSize: 13, color: 'var(--text-main)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
               {c.notes}
+            </div>
+          </InfoSection>
+        )}
+
+        {logs.length > 0 && (
+          <InfoSection title={`현장 입력 (${logs.length})`}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {logs.map((l) => {
+                const tone = FIELD_LOG_TONE[l.type];
+                return (
+                  <div key={l.id} style={{
+                    padding: '8px 10px', background: 'var(--bg-sunken)',
+                    borderRadius: 'var(--radius-md)',
+                    borderLeft: `3px solid var(--${tone === 'brand' ? 'brand' : tone + '-text'})`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: `var(--${tone === 'brand' ? 'brand' : tone + '-text'})` }}>
+                        {FIELD_LOG_LABEL[l.type]}
+                      </span>
+                      <span style={{ fontSize: 10, color: 'var(--text-weak)' }}>
+                        {l.at.slice(5, 16).replace('T', ' ')}
+                        {l._meta?.source === 'mobile' && ' · 모바일'}
+                      </span>
+                    </div>
+                    {l.body && (
+                      <div style={{ fontSize: 12, color: 'var(--text-main)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                        {l.body}
+                      </div>
+                    )}
+                    {l._meta?.by && (
+                      <div style={{ fontSize: 9.5, color: 'var(--text-weak)', marginTop: 4 }}>
+                        {l._meta.by}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </InfoSection>
         )}

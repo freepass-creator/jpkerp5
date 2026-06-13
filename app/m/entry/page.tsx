@@ -13,7 +13,8 @@
  * Phase 2: 각 액션별 폼 다이얼로그
  */
 
-import { NotePencil, Truck, ArrowUUpLeft, MapPin, Phone, Receipt, Wrench } from '@phosphor-icons/react';
+import Link from 'next/link';
+import { NotePencil, Truck, ArrowUUpLeft, MapPin, Phone, Receipt, Wrench, IdentificationCard } from '@phosphor-icons/react';
 
 type Action = {
   key: string;
@@ -21,16 +22,18 @@ type Action = {
   desc: string;
   icon: React.ReactNode;
   tone: 'brand' | 'green' | 'orange' | 'blue' | 'red';
+  href?: string;        // 구현됐으면 라우트, 아니면 placeholder
 };
 
 const ACTIONS: Action[] = [
-  { key: 'deliver',  label: '인도 처리', desc: '고객에게 차량 인도',     icon: <Truck size={24} weight="duotone" />,         tone: 'green' },
-  { key: 'return',   label: '반납 처리', desc: '고객 반납 받음',          icon: <ArrowUUpLeft size={24} weight="duotone" />,  tone: 'orange' },
-  { key: 'memo',     label: '메모',      desc: '차량/계약 메모',          icon: <NotePencil size={24} weight="duotone" />,    tone: 'brand' },
-  { key: 'location', label: '위치 등록', desc: '차량 현재 위치',          icon: <MapPin size={24} weight="duotone" />,        tone: 'blue' },
-  { key: 'call',     label: '통화 기록', desc: '방금 통화 메모',          icon: <Phone size={24} weight="duotone" />,         tone: 'blue' },
-  { key: 'expense',  label: '비용 등록', desc: '주유/세차/통행료',         icon: <Receipt size={24} weight="duotone" />,       tone: 'orange' },
-  { key: 'inspect',  label: '점검 기록', desc: '차량 점검 결과',          icon: <Wrench size={24} weight="duotone" />,        tone: 'brand' },
+  { key: 'memo',     label: '메모',         desc: '차량/계약 메모',          icon: <NotePencil size={24} weight="duotone" />,         tone: 'brand', href: '/m/entry/memo' },
+  { key: 'license',  label: '면허증 검증',  desc: 'OCR + 운전 가능 확인',     icon: <IdentificationCard size={24} weight="duotone" />, tone: 'blue',  href: '/m/entry/license' },
+  { key: 'deliver',  label: '인도 처리',    desc: '고객에게 차량 인도',       icon: <Truck size={24} weight="duotone" />,              tone: 'green' },
+  { key: 'return',   label: '반납 처리',    desc: '고객 반납 받음',           icon: <ArrowUUpLeft size={24} weight="duotone" />,       tone: 'orange' },
+  { key: 'location', label: '위치 등록',    desc: '차량 현재 위치',           icon: <MapPin size={24} weight="duotone" />,             tone: 'blue' },
+  { key: 'call',     label: '통화 기록',    desc: '방금 통화 메모',           icon: <Phone size={24} weight="duotone" />,              tone: 'blue' },
+  { key: 'expense',  label: '비용 등록',    desc: '주유/세차/통행료',          icon: <Receipt size={24} weight="duotone" />,            tone: 'orange' },
+  { key: 'inspect',  label: '점검 기록',    desc: '차량 점검 결과',           icon: <Wrench size={24} weight="duotone" />,             tone: 'brand' },
 ];
 
 export default function MobileEntry() {
@@ -71,25 +74,32 @@ function ActionCard({ action }: { action: Action }) {
     red:    { bg: 'var(--red-bg)',    fg: 'var(--red-text)' },
   } as const;
   const c = tones[action.tone];
-  return (
-    <button
-      type="button"
-      style={{
-        display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start',
-        padding: 14, background: c.bg, color: c.fg,
-        border: `1px solid ${c.fg}33`, borderRadius: 'var(--radius-lg)',
-        cursor: 'pointer', textAlign: 'left',
-        minHeight: 96, touchAction: 'manipulation',
-        fontFamily: 'inherit',
-      }}
-      onClick={() => {
-        // Phase 2: 모달 또는 페이지 이동 — 차량 선택 → 폼 입력
-        alert(`${action.label} — 다음 라운드에서 폼 구현`);
-      }}
-    >
+  const implemented = !!action.href;
+  const style: React.CSSProperties = {
+    display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start',
+    padding: 14, background: implemented ? c.bg : 'var(--bg-sunken)',
+    color: implemented ? c.fg : 'var(--text-weak)',
+    border: `1px solid ${implemented ? c.fg + '33' : 'var(--border-soft)'}`,
+    borderRadius: 'var(--radius-lg)',
+    cursor: implemented ? 'pointer' : 'not-allowed',
+    textAlign: 'left', textDecoration: 'none',
+    minHeight: 96, touchAction: 'manipulation',
+    fontFamily: 'inherit', position: 'relative',
+  };
+  const content = (
+    <>
       {action.icon}
       <div style={{ fontSize: 14, fontWeight: 700 }}>{action.label}</div>
       <div style={{ fontSize: 10.5, opacity: 0.85 }}>{action.desc}</div>
-    </button>
+      {!implemented && (
+        <span style={{
+          position: 'absolute', top: 8, right: 8, fontSize: 9,
+          padding: '1px 5px', background: 'var(--bg-card)', color: 'var(--text-weak)',
+          border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-sm)',
+        }}>다음</span>
+      )}
+    </>
   );
+  if (implemented) return <Link href={action.href!} style={style}>{content}</Link>;
+  return <div style={style}>{content}</div>;
 }
