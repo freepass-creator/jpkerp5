@@ -25,8 +25,8 @@ import { useMyPendingDispatchCount } from '@/lib/firebase/dispatch-store';
 import { useWeather } from '@/lib/weather';
 import {
   Truck, ArrowUUpLeft, CurrencyKrw, CaretRight, MagnifyingGlass,
-  Calendar, ListChecks, Warning, PauseCircle, ShieldWarning, IdentificationCard,
-  Megaphone,
+  Calendar, ListChecks, Warning, ShieldWarning, IdentificationCard,
+  Megaphone, Car,
 } from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
@@ -70,6 +70,10 @@ export default function MobileHome() {
     const unpaidList: typeof contracts = [];
     const overdueReturn: typeof contracts = [];
     const idleList: typeof contracts = [];
+    const runningList: typeof contracts = [];      // 계약중
+    const returningList: typeof contracts = [];    // 만기임박 (D-7 이내)
+    const deliveringList: typeof contracts = [];   // 인도 예정
+    const opsActiveIds = new Set<string>();
     let totalUnpaid = 0;
 
     for (const c of contracts) {
@@ -101,7 +105,18 @@ export default function MobileHome() {
       }
 
       if (c.unpaidAmount > 0) { unpaidList.push(c); totalUnpaid += c.unpaidAmount; }
-      if (s === '휴차' || s === '휴차대기') idleList.push(c);
+      if (s === '휴차' || s === '휴차대기') { idleList.push(c); opsActiveIds.add(c.id); }
+      if (s === '운행') { runningList.push(c); opsActiveIds.add(c.id); }
+      // 만기임박 — !returnedDate + 예정일 D-7 이내
+      if (!c.returnedDate && c.returnScheduledDate) {
+        const ret = toDate(c.returnScheduledDate);
+        if (ret) {
+          const diff = Math.floor((ret.getTime() - todayDate.getTime()) / dayMs);
+          if (diff >= 0 && diff <= 7) { returningList.push(c); opsActiveIds.add(c.id); }
+        }
+      }
+      // 인도 예정 — !deliveredDate + active
+      if (!c.deliveredDate && !inactive) { deliveringList.push(c); opsActiveIds.add(c.id); }
 
       if (!inactive) {
         const d = (c.customerIdentNo ?? '').replace(/\D/g, '');
@@ -121,6 +136,8 @@ export default function MobileHome() {
       today, tomorrow,
       overdueDelivery, missingIdent, missingInsurance,
       insuranceGap, unpaidList, overdueReturn, idleList,
+      runningList, returningList, deliveringList,
+      opsActiveCount: opsActiveIds.size,
       totalUnpaid,
     };
   }, [contracts, todayDate]);
@@ -216,17 +233,17 @@ export default function MobileHome() {
         subtitle={pendingOrders > 0 ? '사무에서 받은 미확인 지시' : '받은 업무 없음'}
       />
 
-      {/* 미결 업무 */}
+      {/* 운영 요약 — 활성 차량 전체 + 카테고리별 카운트 (휴차 통합) */}
       <SummaryCard
-        href="/m/ops?filter=pending"
-        icon={<ListChecks size={16} weight="duotone" />}
-        title="미결 업무"
-        tone="orange"
-        count={pendingCount}
-        countLabel="건"
-        subtitle={pendingCount > 0
-          ? `인도 지연 ${data.overdueDelivery.length} · 등록번호 결손 ${data.missingIdent.length} · 보험 결손 ${data.missingInsurance.length}`
-          : '없음'}
+        href="/m/ops"
+        icon={<Car size={16} weight="duotone" />}
+        title="운영"
+        tone="brand"
+        count={data.opsActiveCount}
+        countLabel="대"
+        subtitle={data.opsActiveCount > 0
+          ? `계약중 ${data.runningList.length} · 휴차 ${data.idleList.length} · 만기임박 ${data.returningList.length} · 인도예정 ${data.deliveringList.length}`
+          : '운영 차량 없음'}
       />
 
       {/* 리스크 요약 */}
@@ -242,17 +259,17 @@ export default function MobileHome() {
           : '리스크 없음'}
       />
 
-      {/* 휴차 현황 */}
+      {/* 미결 업무 — 데이터 결손/인도 지연 */}
       <SummaryCard
-        href="/m/ops?filter=idle"
-        icon={<PauseCircle size={16} weight="duotone" />}
-        title="휴차 현황"
-        tone="gray"
-        count={data.idleList.length}
-        countLabel="대"
-        subtitle={data.idleList.length > 0
-          ? data.idleList.slice(0, 3).map((c) => c.vehiclePlate).filter(Boolean).join(' · ')
-          : '휴차 차량 없음'}
+        href="/m/ops?filter=pending"
+        icon={<ListChecks size={16} weight="duotone" />}
+        title="미결 업무"
+        tone="orange"
+        count={pendingCount}
+        countLabel="건"
+        subtitle={pendingCount > 0
+          ? `인도 지연 ${data.overdueDelivery.length} · 등록번호 결손 ${data.missingIdent.length} · 보험 결손 ${data.missingInsurance.length}`
+          : '없음'}
       />
       </div>
     </div>
