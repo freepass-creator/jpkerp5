@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef, useImperativeHandle, forwardRef, 
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
-  Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch,
+  Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch, Trash,
   Upload, Warning as WarningIcon, X as XIcon, X, CaretRight,
   Pencil,
 } from '@phosphor-icons/react';
@@ -24,7 +24,7 @@ import { toast } from '@/lib/toast';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone, contractStatusTone, scheduleStatusTone } from '@/lib/status-tones';
 import { DateInput } from '@/components/ui/date-input';
-import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus } from '@/lib/types';
+import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus, AdditionalDriver } from '@/lib/types';
 import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
 import { contractIdentMasked, birthFromIdent, inferKind } from '@/lib/ident';
 import { displayCompanyName } from '@/lib/company-display';
@@ -1775,6 +1775,98 @@ function VehicleLocationEditor({ c, onUpdate, workingContext }: { c: Contract; o
   );
 }
 
+/* ─────────────── 추가운전자 편집기 ─────────────── */
+
+function AdditionalDriversEditor({
+  editing, drivers, onChange,
+}: {
+  editing: boolean;
+  drivers: AdditionalDriver[];
+  onChange: (next: AdditionalDriver[]) => void;
+}) {
+  function patch(i: number, p: Partial<AdditionalDriver>) {
+    onChange(drivers.map((d, idx) => idx === i ? { ...d, ...p } : d));
+  }
+  function add() {
+    onChange([...drivers, { name: '', identNo: '', relation: '', registeredAt: new Date().toISOString() }]);
+  }
+  function remove(i: number) {
+    onChange(drivers.filter((_, idx) => idx !== i));
+  }
+
+  if (!editing && drivers.length === 0) {
+    return (
+      <div style={{ fontSize: 11, color: 'var(--text-weak)', padding: '6px 0' }}>
+        추가운전자 없음
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)' }}>
+        추가운전자 ({drivers.length}) — 보험연령 검증 대상
+      </div>
+      {drivers.length === 0 ? null : (
+        <div style={{ display: 'grid', gap: 4 }}>
+          {drivers.map((d, i) => (
+            <div key={i} style={{
+              display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr auto', gap: 6,
+              alignItems: 'center', padding: '4px 0',
+            }}>
+              {editing ? (
+                <>
+                  <input
+                    className="detail-field-input" placeholder="이름"
+                    value={d.name ?? ''} onChange={(e) => patch(i, { name: e.target.value })}
+                  />
+                  <input
+                    className="detail-field-input" placeholder="주민번호 (YYMMDD-XXXXXXX)" style={{ fontFamily: 'var(--font-mono)' }}
+                    value={d.identNo ?? ''} onChange={(e) => patch(i, { identNo: e.target.value })}
+                  />
+                  <input
+                    className="detail-field-input" placeholder="관계 (배우자/자녀 등)"
+                    value={d.relation ?? ''} onChange={(e) => patch(i, { relation: e.target.value })}
+                  />
+                  <button
+                    type="button" className="btn-ghost"
+                    onClick={() => remove(i)}
+                    title="삭제"
+                    style={{ padding: '4px 6px', cursor: 'pointer', color: 'var(--red-text)' }}
+                  >
+                    <Trash size={12} weight="bold" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: 12 }}>{d.name || <span className="muted">-</span>}</span>
+                  <span className="mono" style={{ fontSize: 11 }}>
+                    {d.identNo ? maskIdentDisplay(d.identNo) : <span className="muted">-</span>}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>{d.relation || <span className="muted">-</span>}</span>
+                  <span />
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {editing && (
+        <button type="button" className="btn btn-sm" onClick={add} style={{ alignSelf: 'flex-start' }}>
+          <Plus size={11} weight="bold" /> 추가운전자
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** 주민번호 13자리 → '900315-1******' 마스킹 (이미 마스킹된 거면 그대로) */
+function maskIdentDisplay(s: string): string {
+  const digits = s.replace(/\D/g, '');
+  if (digits.length < 13) return s;
+  return `${digits.slice(0, 6)}-${digits.slice(6, 7)}******`;
+}
+
 /* ─────────────── 계약정보 탭 (고객 + 조건 + 비고) ─────────────── */
 
 const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (u: Contract) => void; onEditingChange?: (e: boolean) => void }>(function ContractInfoTab({ c, onUpdate, onEditingChange }, ref) {
@@ -1813,6 +1905,25 @@ const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (
             <EditableField label="행정구" value={editing ? (draft.customerDistrict ?? '') : (c.customerDistrict ?? '')} editing={editing} onChange={(v) => set('customerDistrict', v || undefined)} placeholder="-" />
           </div>
         </div>
+      </Section>
+
+      <Section icon={<User size={12} weight="duotone" />} title="운전자">
+        <div className="detail-grid-2">
+          <div>
+            <EditableField label="주운전자명" value={editing ? (draft.driverName ?? '') : (c.driverName ?? '')} editing={editing} onChange={(v) => set('driverName', v || undefined)} placeholder="-" />
+            <EditableField label="주운전자 주민번호" value={editing ? (draft.driverIdentNo ?? '') : (c.driverIdentNo ?? '')} editing={editing} mono onChange={(v) => set('driverIdentNo', v || undefined)} placeholder="-" />
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-weak)', padding: '4px 0' }}>
+            법인 계약은 주운전자 식별번호로 보험연령 검증.
+            개인 계약은 계약자 등록번호 우선 (주운전자 미입력 시 폴백).
+          </div>
+        </div>
+        {/* 추가운전자 리스트 — 보험 미커버 위험 사전 차단 */}
+        <AdditionalDriversEditor
+          editing={editing}
+          drivers={editing ? (draft.additionalDrivers ?? []) : (c.additionalDrivers ?? [])}
+          onChange={(list) => set('additionalDrivers', list.length > 0 ? list : undefined)}
+        />
       </Section>
 
       <Section icon={<ClipboardText size={12} weight="duotone" />} title="계약 조건">
