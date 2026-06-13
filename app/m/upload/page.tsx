@@ -75,7 +75,7 @@ export default function MobileUpload() {
         border: '2px dashed var(--brand)', borderRadius: 'var(--radius-lg)',
         cursor: 'pointer', touchAction: 'manipulation',
       }}>
-        <UploadSimple size={32} weight="duotone" />
+        <UploadSimple size={32} weight="bold" />
         <div style={{ fontSize: 14, fontWeight: 700 }}>탭해서 파일 선택</div>
         <div style={{ fontSize: 11, opacity: 0.85 }}>사진 또는 통화녹음 (여러 개 가능)</div>
         <input
