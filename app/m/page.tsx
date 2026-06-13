@@ -21,12 +21,12 @@ import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useAuth } from '@/lib/use-auth';
 import { useTodayOnLeaveCount } from '@/lib/firebase/attendance-store';
-import { useMyPendingDispatchCount } from '@/lib/firebase/dispatch-store';
+import { useMyPendingDispatchCount, useSentDispatchOrders } from '@/lib/firebase/dispatch-store';
 import { useWeather } from '@/lib/weather';
 import {
-  Truck, ArrowUUpLeft, CurrencyKrw, CaretRight, MagnifyingGlass,
-  Calendar, ListChecks, Warning, ShieldWarning, IdentificationCard,
-  Megaphone, Car,
+  CaretRight, MagnifyingGlass,
+  Calendar, CalendarBlank, ListChecks, Warning,
+  Megaphone, PaperPlaneTilt, Car,
   Sun, CloudSun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudFog,
 } from '@phosphor-icons/react';
 import type { WeatherIconKey } from '@/lib/weather';
@@ -43,6 +43,8 @@ export default function MobileHome() {
   const onLeave = useTodayOnLeaveCount();
   const weather = useWeather();
   const pendingOrders = useMyPendingDispatchCount(user?.uid ?? null);
+  const sentOrders = useSentDispatchOrders(user?.email ?? null);
+  const sentOpenCount = sentOrders.filter((o) => o.status !== 'done' && o.status !== 'cancelled').length;
   const todayDate = new Date(today);
   const dateLabel = `${todayDate.getMonth() + 1}월 ${todayDate.getDate()}일 (${DOW[todayDate.getDay()]})`;
 
@@ -198,83 +200,107 @@ export default function MobileHome() {
         </div>
       </header>
 
-      {/* 오늘 할 일 — 인도 + 반납 통합. 클릭 시 운영 페이지 today 필터 진입 */}
-      <DayCard
-        href="/m/today"
-        icon={<Calendar size={16} weight="duotone" />}
-        title="오늘 할 일"
-        tone="brand"
-        total={todayCount}
-        breakdown={[
-          { label: '인도', count: data.today.delivery.length, items: data.today.delivery },
-          { label: '반납', count: data.today.return.length, items: data.today.return },
-        ]}
-      />
+      {/* 일정 */}
+      <SectionGroup label="일정">
+        <SummaryCard
+          href="/m/today"
+          icon={<Calendar size={16} weight="duotone" />}
+          title="오늘 할 일"
+          tone="brand"
+          count={todayCount}
+          countLabel="건"
+          subtitle={todayCount > 0
+            ? `인도 ${data.today.delivery.length} · 반납 ${data.today.return.length}`
+            : '오늘 일정 없음'}
+        />
+        <SummaryCard
+          href="/m/tomorrow"
+          icon={<CalendarBlank size={16} weight="duotone" />}
+          title="내일 할 일"
+          tone="blue"
+          count={tomorrowCount}
+          countLabel="건"
+          subtitle={tomorrowCount > 0
+            ? `인도 ${data.tomorrow.delivery.length} · 반납 ${data.tomorrow.return.length}`
+            : '내일 일정 없음'}
+        />
+      </SectionGroup>
 
-      {/* 내일 할 일 */}
-      <DayCard
-        href="/m/tomorrow"
-        icon={<Calendar size={16} weight="duotone" />}
-        title="내일 할 일"
-        tone="blue"
-        total={tomorrowCount}
-        breakdown={[
-          { label: '인도', count: data.tomorrow.delivery.length, items: data.tomorrow.delivery },
-          { label: '반납', count: data.tomorrow.return.length, items: data.tomorrow.return },
-        ]}
-      />
+      {/* 내 업무 */}
+      <SectionGroup label="내 업무">
+        <SummaryCard
+          href="/m/orders"
+          icon={<Megaphone size={16} weight="duotone" />}
+          title="요청받은 업무"
+          tone="amber"
+          count={pendingOrders}
+          countLabel="건"
+          subtitle={pendingOrders > 0 ? '미확인 지시 대기' : '받은 업무 없음'}
+        />
+        <SummaryCard
+          href="/m/orders?view=sent"
+          icon={<PaperPlaneTilt size={16} weight="duotone" />}
+          title="요청한 업무"
+          tone="indigo"
+          count={sentOpenCount}
+          countLabel="건"
+          subtitle={sentOpenCount > 0 ? '진행 중인 내가 보낸 지시' : '보낸 업무 없음'}
+        />
+      </SectionGroup>
 
-      {/* 요청받은 업무 */}
-      <SummaryCard
-        href="/m/orders"
-        icon={<Megaphone size={16} weight="duotone" />}
-        title="요청받은 업무"
-        tone="amber"
-        count={pendingOrders}
-        countLabel="건"
-        subtitle={pendingOrders > 0 ? '사무에서 받은 미확인 지시' : '받은 업무 없음'}
-      />
-
-      {/* 운영 요약 — 활성 차량 전체 + 카테고리별 카운트 (휴차 통합) */}
-      <SummaryCard
-        href="/m/ops"
-        icon={<Car size={16} weight="duotone" />}
-        title="운영"
-        tone="brand"
-        count={data.opsActiveCount}
-        countLabel="대"
-        subtitle={data.opsActiveCount > 0
-          ? `계약중 ${data.runningList.length} · 휴차 ${data.idleList.length} · 만기임박 ${data.returningList.length} · 인도예정 ${data.deliveringList.length}`
-          : '운영 차량 없음'}
-      />
-
-      {/* 리스크 요약 */}
-      <SummaryCard
-        href="/m/risk"
-        icon={<Warning size={16} weight="duotone" />}
-        title="리스크 요약"
-        tone="red"
-        count={riskCount}
-        countLabel="건"
-        subtitle={riskCount > 0
-          ? `미수 ${data.unpaidList.length} (₩${formatCurrency(data.totalUnpaid)}) · 반납지연 ${data.overdueReturn.length} · 보험 ${data.insuranceGap.length}`
-          : '리스크 없음'}
-      />
-
-      {/* 미결 업무 — 데이터 결손/인도 지연 */}
-      <SummaryCard
-        href="/m/ops?filter=pending"
-        icon={<ListChecks size={16} weight="duotone" />}
-        title="미결 업무"
-        tone="orange"
-        count={pendingCount}
-        countLabel="건"
-        subtitle={pendingCount > 0
-          ? `인도 지연 ${data.overdueDelivery.length} · 등록번호 결손 ${data.missingIdent.length} · 보험 결손 ${data.missingInsurance.length}`
-          : '없음'}
-      />
+      {/* 회사 현황 */}
+      <SectionGroup label="회사 현황">
+        <SummaryCard
+          href="/m/ops"
+          icon={<Car size={16} weight="duotone" />}
+          title="운영"
+          tone="brand"
+          count={data.opsActiveCount}
+          countLabel="대"
+          subtitle={data.opsActiveCount > 0
+            ? `계약중 ${data.runningList.length} · 휴차 ${data.idleList.length} · 만기임박 ${data.returningList.length} · 인도예정 ${data.deliveringList.length}`
+            : '운영 차량 없음'}
+        />
+        <SummaryCard
+          href="/m/risk"
+          icon={<Warning size={16} weight="duotone" />}
+          title="리스크"
+          tone="red"
+          count={riskCount}
+          countLabel="건"
+          subtitle={riskCount > 0
+            ? `미수 ${data.unpaidList.length} (₩${formatCurrency(data.totalUnpaid)}) · 반납지연 ${data.overdueReturn.length} · 보험 ${data.insuranceGap.length}`
+            : '리스크 없음'}
+        />
+        <SummaryCard
+          href="/m/ops?filter=pending"
+          icon={<ListChecks size={16} weight="duotone" />}
+          title="미결 업무"
+          tone="orange"
+          count={pendingCount}
+          countLabel="건"
+          subtitle={pendingCount > 0
+            ? `인도지연 ${data.overdueDelivery.length} · 등록번호 ${data.missingIdent.length} · 보험 ${data.missingInsurance.length}`
+            : '없음'}
+        />
+      </SectionGroup>
       </div>
     </div>
+  );
+}
+
+/* ─────────── 섹션 그룹 ─────────── */
+
+function SectionGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <h3 style={{
+        margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+        color: 'var(--text-weak)', textTransform: 'uppercase',
+        paddingLeft: 2,
+      }}>{label}</h3>
+      {children}
+    </section>
   );
 }
 
@@ -386,91 +412,21 @@ function InlineSearch({ contracts }: { contracts: ReturnType<typeof useContracts
   );
 }
 
-/* ─────────── 오늘/내일 카드 (인도+반납 통합) ─────────── */
-
-function DayCard({ href, icon, title, tone, total, breakdown }: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  tone: 'brand' | 'blue';
-  total: number;
-  breakdown: { label: string; count: number; items: ReturnType<typeof useContracts>['contracts'] }[];
-}) {
-  const tones = {
-    brand: { bg: 'var(--brand-bg)', fg: 'var(--brand)' },
-    blue:  { bg: 'var(--blue-bg)',  fg: 'var(--blue-text)' },
-  } as const;
-  const t = tones[tone];
-  const active = breakdown.filter((b) => b.count > 0);
-
-  return (
-    <Link href={href} style={{ textDecoration: 'none', color: 'inherit' }}>
-      <section style={{
-        padding: 14, background: 'var(--bg-card)',
-        border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
-        display: 'flex', flexDirection: 'column', gap: 10,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: t.fg }}>{icon}</span>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
-            <span style={{
-              fontSize: 11, fontWeight: 700, padding: '2px 8px',
-              background: total > 0 ? t.bg : 'var(--bg-sunken)',
-              color: total > 0 ? t.fg : 'var(--text-sub)',
-              borderRadius: 'var(--radius-sm)',
-            }}>{total}건</span>
-          </div>
-          <CaretRight size={14} weight="bold" style={{ color: 'var(--text-weak)' }} />
-        </div>
-        {active.length === 0 ? (
-          <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>없음</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {active.map((b) => (
-              <div key={b.label}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)', marginBottom: 4 }}>
-                  {b.label} ({b.count})
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {b.items.slice(0, 3).map((c) => (
-                    <div key={c.id} style={{
-                      padding: '6px 10px', background: 'var(--bg-sunken)',
-                      borderRadius: 'var(--radius-sm)',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    }}>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: 12 }}>{c.vehiclePlate}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>{c.customerName}</span>
-                      </div>
-                    </div>
-                  ))}
-                  {b.items.length > 3 && (
-                    <span style={{ fontSize: 10, color: 'var(--text-weak)' }}>... 외 {b.items.length - 3}건</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </Link>
-  );
-}
-
-/* ─────────── 요약 카드 (요청업무/미결/리스크/휴차) ─────────── */
+/* ─────────── 요약 카드 (홈 단일 규격) ─────────── */
 
 function SummaryCard({ href, icon, title, tone, count, countLabel, subtitle }: {
   href: string;
   icon: React.ReactNode;
   title: string;
-  tone: 'brand' | 'amber' | 'orange' | 'red' | 'gray';
+  tone: 'brand' | 'blue' | 'indigo' | 'amber' | 'orange' | 'red' | 'gray';
   count: number;
   countLabel: string;
   subtitle: string;
 }) {
   const tones = {
     brand:  { bg: 'var(--brand-bg)',  fg: 'var(--brand)' },
+    blue:   { bg: 'var(--blue-bg)',   fg: 'var(--blue-text)' },
+    indigo: { bg: 'var(--indigo-bg)', fg: 'var(--indigo-text)' },
     amber:  { bg: 'var(--amber-bg)',  fg: 'var(--amber-text)' },
     orange: { bg: 'var(--orange-bg)', fg: 'var(--orange-text)' },
     red:    { bg: 'var(--red-bg)',    fg: 'var(--red-text)' },
