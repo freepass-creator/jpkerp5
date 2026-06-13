@@ -382,35 +382,6 @@ function VehiclePhotosTab({ c }: { c: Contract }) {
   // 라이프사이클 역순 (최근 단계부터): 반납 → 인도전(출고) → 상품화
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* 차량 식별자 안내 — 차대번호/자체코드/현재 plate + 이전 plate 이력 */}
-      <div style={{
-        padding: '6px 10px',
-        background: matched ? 'var(--bg-sunken)' : 'var(--amber-bg)',
-        color: matched ? 'var(--text-sub)' : 'var(--amber-text)',
-        border: `1px solid ${matched ? 'var(--border-soft)' : 'var(--amber-border)'}`,
-        borderRadius: 'var(--radius-sm)',
-        fontSize: 10.5, lineHeight: 1.5,
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
-      }}>
-        {matched ? (
-          <>
-            <span><strong>차량번호</strong> {matched.plate}</span>
-            {matched.vin && <span><strong>차대번호</strong> <span className="mono">{matched.vin}</span></span>}
-            <span><strong>자체코드</strong> <span className="mono">{matched.id.slice(0, 10)}</span></span>
-            {(matched.plateHistory?.length ?? 0) > 0 && (
-              <span style={{ color: 'var(--text-weak)' }}>
-                이전 번호 {matched.plateHistory!.join(', ')}
-              </span>
-            )}
-          </>
-        ) : (
-          <span>
-            자산 미등록 차량 — <strong>{c.vehiclePlate}</strong> 기준으로 임시 저장됩니다.
-            자산 등록 시 사진 자동 이관 (plate → 자체코드)
-          </span>
-        )}
-      </div>
-
       <VehiclePhotosByKind vehicleId={storageId} kind="return"   contractId={c.id} title="최근 반납 사진" />
       <VehiclePhotosByKind vehicleId={storageId} kind="delivery" contractId={c.id} title="최근 인도전 사진" />
       <VehiclePhotosByKind vehicleId={storageId} kind="product"  contractId={c.id} title="최근 상품화 사진" />

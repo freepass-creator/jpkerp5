@@ -338,16 +338,20 @@ export function VehiclePhotosByKind({ vehicleId, kind, contractId, title, readon
           <span className={`badge-base badge-${tone}`} style={{ fontSize: 9 }}>{allOfKind.length}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {history.length > 0 && (
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => setHistoryOpen(true)}
-              title={`이전 ${PHOTO_KIND_LABEL[kind]} 사진 ${history.length}장 모두 보기`}
-            >
-              <ImageSquare size={11} weight="duotone" /> 사진이력 보기 ({history.length})
-            </button>
-          )}
+          {/* 사진이력 보기 — 등록된 모든 사진 (최근 + 이전) 다 볼 수 있게 항상 노출 */}
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setHistoryOpen(true)}
+            disabled={allOfKind.length === 0}
+            title={
+              allOfKind.length === 0
+                ? `${PHOTO_KIND_LABEL[kind]} 사진 없음`
+                : `${PHOTO_KIND_LABEL[kind]} 사진 전체 (${allOfKind.length}장) 보기`
+            }
+          >
+            <ImageSquare size={11} weight="duotone" /> 사진이력 보기 ({allOfKind.length})
+          </button>
           {canUpload && (
             <>
               <button
