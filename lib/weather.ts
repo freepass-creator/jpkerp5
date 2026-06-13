@@ -11,10 +11,12 @@ import { useEffect, useState } from 'react';
 
 const SEOUL = { lat: 37.5665, lon: 126.978 };
 
+export type WeatherIconKey = 'sun' | 'cloud_sun' | 'cloud' | 'rain' | 'snow' | 'storm' | 'fog' | 'unknown';
+
 export type WeatherSlot = {
   temp: number;       // °C
   code: number;       // WMO weather code
-  icon: string;       // 이모지
+  iconKey: WeatherIconKey;
   label: string;      // 한글
 };
 
@@ -28,17 +30,17 @@ export type WeatherToday = {
 };
 
 /** WMO weather code → 한글 라벨 + 이모지 */
-function decodeWmo(code: number): { icon: string; label: string } {
-  if (code === 0) return { icon: '☀️', label: '맑음' };
-  if (code <= 3) return { icon: '⛅', label: '구름 조금' };
-  if (code <= 48) return { icon: '🌫️', label: '안개' };
-  if (code <= 57) return { icon: '🌦️', label: '이슬비' };
-  if (code <= 67) return { icon: '🌧️', label: '비' };
-  if (code <= 77) return { icon: '🌨️', label: '눈' };
-  if (code <= 82) return { icon: '🌧️', label: '소나기' };
-  if (code <= 86) return { icon: '🌨️', label: '눈 소나기' };
-  if (code <= 99) return { icon: '⛈️', label: '뇌우' };
-  return { icon: '🌡️', label: '-' };
+function decodeWmo(code: number): { iconKey: WeatherIconKey; label: string } {
+  if (code === 0) return { iconKey: 'sun',       label: '맑음' };
+  if (code <= 3) return { iconKey: 'cloud_sun', label: '구름 조금' };
+  if (code <= 48) return { iconKey: 'fog',       label: '안개' };
+  if (code <= 57) return { iconKey: 'rain',      label: '이슬비' };
+  if (code <= 67) return { iconKey: 'rain',      label: '비' };
+  if (code <= 77) return { iconKey: 'snow',      label: '눈' };
+  if (code <= 82) return { iconKey: 'rain',      label: '소나기' };
+  if (code <= 86) return { iconKey: 'snow',      label: '눈 소나기' };
+  if (code <= 99) return { iconKey: 'storm',     label: '뇌우' };
+  return { iconKey: 'unknown', label: '-' };
 }
 
 async function fetchWeather(lat: number, lon: number): Promise<WeatherToday> {

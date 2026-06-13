@@ -27,7 +27,9 @@ import {
   Truck, ArrowUUpLeft, CurrencyKrw, CaretRight, MagnifyingGlass,
   Calendar, ListChecks, Warning, ShieldWarning, IdentificationCard,
   Megaphone, Car,
+  Sun, CloudSun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudFog,
 } from '@phosphor-icons/react';
+import type { WeatherIconKey } from '@/lib/weather';
 import { formatCurrency } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
 import { ageFromIdent } from '@/lib/ident';
@@ -176,12 +178,12 @@ export default function MobileHome() {
             <span style={{ color: 'var(--text-weak)' }}>날씨 ...</span>
           ) : weather.am && weather.pm ? (
             <>
-              <span title={weather.am.label} style={{ color: 'var(--blue-text)' }}>
-                <span style={{ fontSize: 16, marginRight: 3 }}>{weather.am.icon}</span>
+              <span title={weather.am.label} style={{ color: 'var(--text-sub)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <WeatherIcon icon={weather.am.iconKey} />
                 오전 <strong>{weather.am.temp}°</strong>
               </span>
-              <span title={weather.pm.label} style={{ color: 'var(--orange-text)' }}>
-                <span style={{ fontSize: 16, marginRight: 3 }}>{weather.pm.icon}</span>
+              <span title={weather.pm.label} style={{ color: 'var(--text-sub)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <WeatherIcon icon={weather.pm.iconKey} />
                 오후 <strong>{weather.pm.temp}°</strong>
               </span>
             </>
@@ -277,6 +279,19 @@ export default function MobileHome() {
 }
 
 /* ─────────── 인라인 검색 (드롭다운) ─────────── */
+
+function WeatherIcon({ icon }: { icon: WeatherIconKey }) {
+  const Icon =
+    icon === 'sun'       ? Sun
+    : icon === 'cloud_sun' ? CloudSun
+    : icon === 'cloud'   ? Cloud
+    : icon === 'rain'    ? CloudRain
+    : icon === 'snow'    ? CloudSnow
+    : icon === 'storm'   ? CloudLightning
+    : icon === 'fog'     ? CloudFog
+    : Cloud;
+  return <Icon size={14} weight="bold" />;
+}
 
 function InlineSearch({ contracts }: { contracts: ReturnType<typeof useContracts>['contracts'] }) {
   const [q, setQ] = useState('');

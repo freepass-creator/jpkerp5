@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ref, push, get, update as rtdbUpdate, remove as rtdbRemove } from 'firebase/database';
-import { Database, Upload, Warning, CheckCircle } from '@phosphor-icons/react';
+import { Database, Upload, Warning, CheckCircle, MagnifyingGlass, ListChecks, Image, Truck, Skull } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { getRtdb, dbPath, RTDB_ROOT, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
 import { useAuth } from '@/lib/use-auth';
@@ -334,7 +334,7 @@ export default function MigrateSheetPage() {
   /** 강제 wipe — root 통째로 삭제 (companies/audit_logs 포함 모든 것) */
   async function nukeEverything() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
-    if (!window.confirm(`☢☢☢ 핵 wipe — ${RTDB_ROOT} root 노드 전체 삭제\n\ncompanies/audit_logs 포함 모든 데이터 사라집니다.\n진행할까요?`)) return;
+    if (!window.confirm(`핵 wipe — ${RTDB_ROOT} root 노드 전체 삭제\n\ncompanies/audit_logs 포함 모든 데이터 사라집니다.\n진행할까요?`)) return;
     // Type-to-confirm — 머슬 메모리 'Enter Enter' 사고 방지
     const typed = window.prompt(`마지막 확인 — 아래 문자열을 그대로 입력하세요:\n\n  ${RTDB_ROOT}\n\n(빈 입력·다른 문자 = 취소)`, '');
     if (typed !== RTDB_ROOT) {
@@ -893,7 +893,7 @@ export default function MigrateSheetPage() {
                 onClick={wipeAllContracts}
                 style={{ height: 40, fontSize: 13, background: '#7F1D1D', color: '#fff' }}
               >
-                <Warning weight="bold" size={14} /> ☢ 전체 계약 + 차량 wipe (clean slate)
+                <Warning weight="bold" size={14} /> 전체 계약 + 차량 wipe (clean slate)
               </button>
               <button
                 className="btn"
@@ -902,7 +902,7 @@ export default function MigrateSheetPage() {
                 onClick={diagnose}
                 style={{ height: 36, fontSize: 12 }}
               >
-                🔍 진단 — 현재 노드 상태 확인 (어디 데이터 있는지)
+                <MagnifyingGlass weight="bold" size={14} /> 진단 — 현재 노드 상태 확인 (어디 데이터 있는지)
               </button>
               <button
                 className="btn"
@@ -911,7 +911,7 @@ export default function MigrateSheetPage() {
                 onClick={diagnoseOperational}
                 style={{ height: 36, fontSize: 12 }}
               >
-                📋 운영 데이터 품질 진단 (등록번호·보험연령·결제일·사진 결손)
+                <ListChecks weight="bold" size={14} /> 운영 데이터 품질 진단 (등록번호·보험연령·결제일·사진 결손)
               </button>
               <button
                 className="btn"
@@ -920,7 +920,7 @@ export default function MigrateSheetPage() {
                 onClick={migratePlatePhotos}
                 style={{ height: 36, fontSize: 12 }}
               >
-                📷 사진 plate-키 → 자체코드 일괄 이관
+                <Image weight="bold" size={14} /> 사진 plate-키 → 자체코드 일괄 이관
               </button>
               <button
                 className="btn"
@@ -929,7 +929,7 @@ export default function MigrateSheetPage() {
                 onClick={backfillDeliveredDate}
                 style={{ height: 36, fontSize: 12 }}
               >
-                🚚 인도일 없는 계약 일괄 인도완료 (계약자 있는 거)
+                <Truck weight="bold" size={14} /> 인도일 없는 계약 일괄 인도완료 (계약자 있는 거)
               </button>
               <button
                 className="btn btn-danger"
@@ -938,7 +938,7 @@ export default function MigrateSheetPage() {
                 onClick={nukeEverything}
                 style={{ height: 36, fontSize: 12, background: '#450A0A', color: '#fff' }}
               >
-                ☢☢☢ 핵 wipe — DB root 통째로 삭제 (최후의 수단)
+                <Skull weight="bold" size={14} /> 핵 wipe — DB root 통째로 삭제 (최후의 수단)
               </button>
               <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
                 ✓ (차량+고객) 기준 중복 발견 시 실 입금 많은 쪽 keeper → 나머지 삭제 + 입금 이전<br />

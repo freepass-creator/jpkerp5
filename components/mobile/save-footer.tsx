@@ -11,6 +11,7 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { haptic } from '@/lib/haptic';
 
 type Props = {
   /** 우측 큰 버튼 라벨 (예: '메모 저장', '등록', '결과 저장') */
@@ -46,7 +47,7 @@ export function MobileSaveFooter({
     }}>
       <button
         type="button"
-        onClick={prev}
+        onClick={() => { haptic.light(); prev(); }}
         style={{
           height: 48,
           background: 'var(--bg-card)', color: 'var(--text-sub)',
@@ -59,7 +60,7 @@ export function MobileSaveFooter({
       </button>
       <button
         type="button"
-        onClick={onPrimary}
+        onClick={() => { haptic.medium(); onPrimary(); }}
         disabled={primaryDisabled || primaryBusy}
         style={{
           height: 48,

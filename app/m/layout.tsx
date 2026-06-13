@@ -9,8 +9,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { House, Car, Warning, NotePencil, UploadSimple, GearSix } from '@phosphor-icons/react';
+import { House, Car, Warning, NotePencil, UploadSimple, GearSix, CaretLeft } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
+import { haptic } from '@/lib/haptic';
 
 type Tab = {
   href: string;
@@ -82,7 +83,7 @@ function TabBar({ path }: { path: string }) {
       {TABS.map((t) => {
         const active = t.match(path);
         return (
-          <Link key={t.href} href={t.href} style={{
+          <Link key={t.href} href={t.href} onClick={() => haptic.light()} style={{
             position: 'relative',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             gap: 2, textDecoration: 'none',
@@ -119,17 +120,17 @@ function BackBar() {
     }}>
       <button
         type="button"
-        onClick={() => router.back()}
+        onClick={() => { haptic.light(); router.back(); }}
         style={{
           width: '100%', height: 48,
-          background: 'var(--brand-bg)', color: 'var(--brand)',
-          border: '1.5px solid var(--brand)', borderRadius: 'var(--radius)',
-          fontSize: 15, fontWeight: 700, fontFamily: 'inherit',
-          letterSpacing: '0.02em',
+          background: 'var(--bg-card)', color: 'var(--text-main)',
+          border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+          fontSize: 15, fontWeight: 600, fontFamily: 'inherit',
           cursor: 'pointer', touchAction: 'manipulation',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}
       >
-        이전
+        <CaretLeft size={16} weight="bold" /> 이전
       </button>
     </nav>
   );
