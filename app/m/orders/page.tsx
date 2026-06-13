@@ -10,8 +10,9 @@
  * 보낸 업무: createdBy=본인 email. 상태 모니터링만.
  */
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Megaphone, CheckCircle, CaretRight, Eye, Plus, X, MagnifyingGlass, Play,
 } from '@phosphor-icons/react';
@@ -43,45 +44,68 @@ const STATUS_TONE_MAP: Record<DispatchStatus, 'orange' | 'blue' | 'amber' | 'gre
   cancelled:    'gray',
 };
 
-export default function MobileOrders() {
+export default function MobileOrdersPage() {
+  return (
+    <Suspense fallback={null}>
+      <MobileOrders />
+    </Suspense>
+  );
+}
+
+function MobileOrders() {
   const { user } = useAuth();
   const received = useMyDispatchOrders(user?.uid);
   const sent = useSentDispatchOrders(user?.email);
   const { contracts } = useContracts();
-  const [view, setView] = useState<ViewTab>('received');
+  const params = useSearchParams();
+  const initialView: ViewTab = params?.get('view') === 'sent' ? 'sent' : 'received';
+  const [view, setView] = useState<ViewTab>(initialView);
   const [newOpen, setNewOpen] = useState(false);
 
   const list = view === 'received' ? received : sent;
   const activeCount = list.filter((o) =>
     o.status === 'pending' || o.status === 'acknowledged' || o.status === 'in_progress'
   ).length;
+  const accentColor = view === 'received' ? 'var(--amber-text)' : 'var(--indigo-text)';
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Megaphone size={22} weight="regular" />
+    <div>
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'var(--bg-card)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        padding: '12px 16px',
+        borderTop: `3px solid ${accentColor}`,
+        borderBottom: '1px solid var(--border)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Megaphone size={20} weight="regular" />
           업무
         </h1>
         <button type="button" onClick={() => setNewOpen(true)} style={{
-          padding: '8px 14px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+          padding: '6px 12px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
           background: 'var(--brand)', color: '#fff',
           border: 'none', borderRadius: 'var(--radius)',
           display: 'flex', alignItems: 'center', gap: 4,
           cursor: 'pointer', touchAction: 'manipulation',
         }}>
-          <Plus size={14} weight="bold" />
+          <Plus size={13} weight="bold" />
           새 요청
         </button>
       </header>
 
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
       {/* 받은 / 보낸 탭 */}
       <div style={{ display: 'flex', gap: 6 }}>
         <ViewChip active={view === 'received'} onClick={() => setView('received')}>
-          요청받은 ({received.length})
+          받은 업무 ({received.length})
         </ViewChip>
         <ViewChip active={view === 'sent'} onClick={() => setView('sent')}>
-          내가 요청한 ({sent.length})
+          보낸 업무 ({sent.length})
         </ViewChip>
       </div>
 
@@ -112,6 +136,7 @@ export default function MobileOrders() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
