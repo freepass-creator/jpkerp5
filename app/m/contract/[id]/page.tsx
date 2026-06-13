@@ -165,6 +165,11 @@ export default function MobileContractDetail() {
         {/* 계약 흐름 timeline — 어떻게 계약되서 어떤 상태인지 */}
         <LifecycleTimeline contract={c} />
 
+        {/* 리스크=unpaid 진입 시 결제 이력 (회차별 schedules) 노출 */}
+        {riskKind === 'unpaid' && c.schedules && c.schedules.length > 0 && (
+          <PaymentScheduleHistory schedules={c.schedules} />
+        )}
+
         <InfoSection title="고객">
           <Row label="이름" value={c.customerName ?? '-'} />
           <Row label="연락처" value={c.customerPhone1 ?? '-'} mono />
@@ -185,7 +190,27 @@ export default function MobileContractDetail() {
           <Row label="보증금" value={`₩${formatCurrency(c.deposit ?? 0)}`} mono />
           <Row label="결제일" value={c.paymentDay ? `${c.paymentDay}일` : '-'} />
           <Row label="결제시기" value={c.paymentTiming ?? '-'} />
+          <Row label="회차" value={`${c.currentSeq ?? 0} / ${c.totalSeq ?? 0}`} mono />
+          <Row label="최근 결제일" value={c.lastPaidDate ?? '-'} mono />
+          {c.lastPaidAmount ? <Row label="최근 결제금액" value={`₩${formatCurrency(c.lastPaidAmount)}`} mono /> : null}
           <Row label="미수금" value={c.unpaidAmount > 0 ? `₩${formatCurrency(c.unpaidAmount)}` : '없음'} mono danger={c.unpaidAmount > 0} />
+          {c.unpaidAmount > 0 && c.unpaidSeqCount > 0 && (
+            <Row label="미납 회차" value={`${c.unpaidSeqCount}회차`} danger />
+          )}
+          {c.unpaidAmount > 0 && (() => {
+            const days = calcOverdueDays(c);
+            return days != null ? <Row label="미수 기간" value={`${days}일`} mono danger /> : null;
+          })()}
+        </InfoSection>
+
+        {/* 차량 정보 — 색상/차대번호/보험 */}
+        <InfoSection title="차량">
+          <Row label="차종" value={c.vehicleModel ?? '-'} />
+          {(c.vehicleExteriorColor || c.vehicleInteriorColor) && (
+            <Row label="색상" value={[c.vehicleExteriorColor, c.vehicleInteriorColor].filter(Boolean).join(' · ')} />
+          )}
+          <Row label="차량 상태" value={c.vehicleStatus} />
+          <Row label="보험연령" value={c.insuranceAge ? `${c.insuranceAge}세` : '-'} />
         </InfoSection>
 
         {c.notes && (
@@ -244,6 +269,70 @@ export default function MobileContractDetail() {
   );
 }
 
+/** 미수 기간 계산 — 가장 오래된 미납 회차 dueDate 또는 lastPaidDate 기준 */
+function calcOverdueDays(c: { unpaidAmount?: number; schedules?: { status: string; dueDate: string }[]; lastPaidDate?: string; contractDate?: string }): number | null {
+  if (!c.unpaidAmount || c.unpaidAmount <= 0) return null;
+  // 1순위 — 가장 오래된 미납/연체/부분납 회차 dueDate
+  const oldestUnpaid = (c.schedules ?? [])
+    .filter((s) => s.status === '연체' || s.status === '부분납' || s.status === '예정')
+    .map((s) => s.dueDate)
+    .filter(Boolean)
+    .sort()[0];
+  const baseDate = oldestUnpaid ?? c.lastPaidDate ?? c.contractDate;
+  if (!baseDate) return null;
+  const diff = Math.floor((Date.now() - new Date(baseDate).getTime()) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : null;
+}
+
+/* ─────────────── 결제 이력 (리스크 unpaid 컨텍스트) ─────────────── */
+
+function PaymentScheduleHistory({ schedules }: { schedules: NonNullable<ReturnType<typeof useContracts>['contracts'][number]['schedules']> }) {
+  const sorted = [...schedules].sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
+  return (
+    <section style={{
+      background: 'var(--bg-card)', border: '1px solid var(--border-soft)',
+      borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+    }}>
+      <header style={{
+        padding: '10px 14px', background: 'var(--bg-sunken)',
+        borderBottom: '1px solid var(--border-soft)',
+        fontSize: 11, fontWeight: 700, color: 'var(--text-sub)',
+      }}>결제 이력 ({sorted.length}회차)</header>
+      <div>
+        {sorted.map((s) => {
+          const tone =
+            s.status === '완료' ? 'green'
+            : s.status === '부분납' ? 'orange'
+            : s.status === '연체' ? 'red'
+            : s.status === '면제' ? 'gray'
+            : 'gray';
+          return (
+            <div key={s.seq} style={{
+              display: 'grid', gridTemplateColumns: 'auto 1fr auto auto',
+              gap: 8, alignItems: 'center',
+              padding: '8px 14px', borderTop: '1px solid var(--border-soft)',
+              fontSize: 12,
+            }}>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-weak)', minWidth: 24 }}>{s.seq}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{s.dueDate}</span>
+              <span className="mono" style={{
+                color: s.status === '연체' ? 'var(--red-text)'
+                  : s.status === '완료' ? 'var(--text-main)'
+                  : 'var(--text-sub)',
+                fontWeight: 600,
+              }}>
+                {s.paidAmount > 0 ? `${(s.paidAmount / 10000).toFixed(0)}만` : '-'}
+                <span style={{ color: 'var(--text-weak)' }}> / {(s.amount / 10000).toFixed(0)}만</span>
+              </span>
+              <span className={`badge-base badge-${tone}`} style={{ fontSize: 9 }}>{s.status}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 /* ─────────────── 리스크 컨텍스트 카드 ─────────────── */
 
 function RiskContextCard({ kind, contract: c }: { kind: string; contract: ReturnType<typeof useContracts>['contracts'][number] }) {
@@ -252,21 +341,41 @@ function RiskContextCard({ kind, contract: c }: { kind: string; contract: Return
   }> = {
     'unpaid': {
       label: '미수금', tone: 'red', icon: <CurrencyKrw size={20} weight="duotone" />,
-      render: () => (
-        <div style={{ fontSize: 14 }}>
-          <strong style={{ fontSize: 20 }}>₩{formatCurrency(c.unpaidAmount ?? 0)}</strong>
-          {c.unpaidSeqCount ? <span style={{ marginLeft: 8, fontSize: 12 }}>· 미납 {c.unpaidSeqCount}회차</span> : null}
-        </div>
-      ),
+      render: () => {
+        const overdueDays = calcOverdueDays(c);
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+            <div>
+              <strong style={{ fontSize: 20 }}>₩{formatCurrency(c.unpaidAmount ?? 0)}</strong>
+              {c.unpaidSeqCount ? <span style={{ marginLeft: 8, fontSize: 12 }}>· 미납 {c.unpaidSeqCount}회차</span> : null}
+            </div>
+            {overdueDays != null && (
+              <div>미수 기간 <strong>{overdueDays}일</strong></div>
+            )}
+            {c.lastPaidDate && (
+              <div>최근 결제 <span className="mono">{c.lastPaidDate}</span>
+                {c.lastPaidAmount ? <span> · ₩{formatCurrency(c.lastPaidAmount)}</span> : null}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     'overdue-return': {
       label: '반납 지연', tone: 'orange', icon: <ArrowUUpLeft size={20} weight="duotone" />,
-      render: () => (
-        <div style={{ fontSize: 12 }}>
-          반납 예정 <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{c.returnScheduledDate ?? '-'}</strong>
-          <span style={{ marginLeft: 8 }}>· 오늘 기준 경과</span>
-        </div>
-      ),
+      render: () => {
+        const overdueDays = c.returnScheduledDate
+          ? Math.floor((Date.now() - new Date(c.returnScheduledDate).getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+        return (
+          <div style={{ fontSize: 12 }}>
+            반납 예정 <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{c.returnScheduledDate ?? '-'}</strong>
+            {overdueDays != null && overdueDays > 0 && (
+              <span style={{ marginLeft: 8 }}>· <strong>{overdueDays}일 경과</strong></span>
+            )}
+          </div>
+        );
+      },
     },
     'insurance-gap': {
       label: '보험 미커버', tone: 'red', icon: <ShieldWarning size={20} weight="duotone" />,
