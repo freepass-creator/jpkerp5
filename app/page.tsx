@@ -28,7 +28,7 @@ import { usePersistentState } from '@/lib/use-persistent-state';
 import { toast } from '@/lib/toast';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { ageFromIdent } from '@/lib/ident';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone } from '@/lib/status-tones';
 import {
   getExpiryDate, daysToExpiry,
@@ -107,7 +107,7 @@ function matchesCompany(c: Contract, co: string): boolean {
 }
 
 /** 컬럼 정렬 키 — 수동 정렬 시 클릭한 컬럼명 */
-type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '사용처' | '연락처' | '운전자나이' | '보험연령' | '계약상태' | '시작일' | '종료일' | '결제일' | '회차' | '반납까지' | '수납상태' | '미수금';
+type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '사용처' | '연락처' | '운전자나이' | '보험연령' | '계약상태' | '기간' | '월대여료' | '결제일' | '회차' | '반납까지' | '수납상태' | '미수금';
 type SortDir = 'asc' | 'desc';
 
 const VS_ORDER: VehicleState[] = [
@@ -130,6 +130,15 @@ function driverAge(c: Contract): number | undefined {
   return undefined;
 }
 
+/** 약정개월별 뱃지 색상 — 단기→파랑, 중기→초록/앰버, 장기→오렌지/빨강 */
+function termTone(months: number): BadgeTone {
+  if (months <= 12) return 'blue';
+  if (months <= 24) return 'green';
+  if (months <= 36) return 'amber';
+  if (months <= 48) return 'orange';
+  return 'red'; // 60+
+}
+
 function compareForCol(a: Contract, b: Contract, col: SortCol): number {
   switch (col) {
     case '회사': return a.company.localeCompare(b.company);
@@ -141,12 +150,13 @@ function compareForCol(a: Contract, b: Contract, col: SortCol): number {
     case '운전자나이': return (driverAge(a) ?? 0) - (driverAge(b) ?? 0);
     case '보험연령': return (a.insuranceAge ?? 0) - (b.insuranceAge ?? 0);
     case '계약상태': return CS_ORDER.indexOf(getContractState(a).name) - CS_ORDER.indexOf(getContractState(b).name);
-    case '시작일': return (resolveStartDate(a) ?? '').localeCompare(resolveStartDate(b) ?? '');
-    case '종료일': {
-      const aD = resolveEndDate(a) ?? '9999-12-31';
-      const bD = resolveEndDate(b) ?? '9999-12-31';
-      return aD.localeCompare(bD);
+    case '기간': {
+      // 장기(기간 정함 없음) = 가장 큰 값 취급
+      const aM = a.termMonths && a.termMonths > 0 ? a.termMonths : 9999;
+      const bM = b.termMonths && b.termMonths > 0 ? b.termMonths : 9999;
+      return aM - bM;
     }
+    case '월대여료': return (a.monthlyRent ?? 0) - (b.monthlyRent ?? 0);
     case '결제일': return (a.paymentDay ?? 0) - (b.paymentDay ?? 0);
     case '회차': return (a.currentSeq ?? 0) - (b.currentSeq ?? 0);
     case '반납까지': {
@@ -267,28 +277,6 @@ function sortLabel(view: View): string {
 // → lib/contract-stage.ts 로 이관 (운영현황·상세 다이얼로그에서 공용)
 
 // getExpiryDate / daysToExpiry / getVehicleState / getContractState → lib/contract-stage.ts
-
-/**
- * 시작일 — vehicleStatus 별로 의미가 달라짐
- *   · 휴차/휴차대기/매각검토 → idleSince (휴차 진입일)
- *   · 상품화 단계(상품화대기/상품화중/상품대기) → readiedDate or registeredDate (상품화 시작일)
- *   · 그 외 (운행/연장대기/종료대기/만기임박/반납/해지) → contractDate (계약일)
- */
-function resolveStartDate(c: Contract): string | undefined {
-  const s = c.vehicleStatus;
-  if (s === '휴차' || s === '휴차대기' || s === '매각검토') return c.idleSince ?? c.contractDate;
-  if (s === '상품화대기' || s === '상품화중' || s === '상품대기') {
-    return c.readiedDate ?? c.registeredDate ?? c.purchasedDate ?? c.contractDate;
-  }
-  return c.deliveredDate ?? c.contractDate;
-}
-
-/** 종료일 — 휴차는 idleUntil, 그 외는 returnScheduledDate */
-function resolveEndDate(c: Contract): string | undefined {
-  const s = c.vehicleStatus;
-  if (s === '휴차' || s === '휴차대기' || s === '매각검토') return c.idleUntil;
-  return c.returnScheduledDate;
-}
 
 /**
  * 사용처 — 차량이 지금 어디서/누구한테 쓰이고 있나
@@ -682,11 +670,11 @@ export default function Page() {
                   <SortableTh col="운전자나이" align="center" width={70} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="보험연령" align="center" width={70} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="계약상태" align="center" width={80} sort={manualSort} onSort={toggleSort} />
-                  <SortableTh col="시작일" align="center" width={88} sort={manualSort} onSort={toggleSort} />
-                  <SortableTh col="종료일" align="center" width={88} sort={manualSort} onSort={toggleSort} />
-                  <SortableTh col="결제일" align="center" width={64} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="기간" align="center" width={64} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="월대여료" align="num" width={100} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="결제일" align="center" width={72} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="회차" align="center" width={64} sort={manualSort} onSort={toggleSort} />
-                  <SortableTh col="반납까지" align="center" width={76} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="반납까지" align="center" width={84} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="수납상태" align="center" width={86} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="미수금" align="num" width={110} sort={manualSort} onSort={toggleSort} />
                   <th style={{ width: 240 }}>비고</th>
@@ -781,29 +769,26 @@ export default function Page() {
                         <td className="center">
                           <StatusBadge tone={contractStateTone(cs.name)}>{cs.name}</StatusBadge>
                         </td>
-                        {/* 시작일 — 휴차=idleSince, 상품화 단계=readiedDate, 운행 등=계약일/인도일 */}
-                        <td className="center mono dim">
+                        {/* 기간 — 12/24/36/48/60 별 색상 / 기간정함없음(장기) = brand. 휴차·매각·상품화·종료는 의미 없으니 미표시 */}
+                        <td className="center">
                           {(() => {
                             const s = c.vehicleStatus;
-                            if ((s === '휴차' || s === '휴차대기' || s === '매각검토') && c.idleSince) {
-                              return <span title={`휴차 시작 (계약일: ${shortDate(c.contractDate)})`}>{shortDate(c.idleSince)} <span style={{ fontSize: 10, color: 'var(--orange-text, #c2410c)' }}>휴</span></span>;
+                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
+                              || s === '매각' || s === '매각대기'
+                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
+                              || s === '구매대기' || s === '등록대기'
+                              || c.status === '반납' || c.status === '해지';
+                            if (inactive) return <span className="muted">-</span>;
+                            const m = c.termMonths;
+                            if (!m || m <= 0) {
+                              return <StatusBadge tone="brand" title="약정 기간 정함 없이 운용 중">무기한</StatusBadge>;
                             }
-                            if (s === '상품화대기' || s === '상품화중' || s === '상품대기') {
-                              const d = c.readiedDate ?? c.registeredDate ?? c.purchasedDate;
-                              if (d) return <span title={`상품화 진입 (계약일: ${shortDate(c.contractDate)})`}>{shortDate(d)} <span style={{ fontSize: 10, color: 'var(--brand)' }}>상</span></span>;
-                            }
-                            return shortDate(c.deliveredDate ?? c.contractDate) || <span className="muted">-</span>;
+                            return <StatusBadge tone={termTone(m)} title={`${m}개월`}>{m}</StatusBadge>;
                           })()}
                         </td>
-                        {/* 종료일 — 휴차=idleUntil, 그 외=returnScheduledDate */}
-                        <td className="center mono dim">
-                          {(() => {
-                            const s = c.vehicleStatus;
-                            if ((s === '휴차' || s === '휴차대기' || s === '매각검토')) {
-                              return shortDate(c.idleUntil) || <span className="muted">-</span>;
-                            }
-                            return shortDate(getExpiryDate(c) ?? undefined) || <span className="muted">-</span>;
-                          })()}
+                        {/* 월대여료 */}
+                        <td className="num mono">
+                          {c.monthlyRent > 0 ? formatCurrency(c.monthlyRent) : <span className="muted">-</span>}
                         </td>
                         {/* 결제일 — 운행 중인 계약만 의미 있음. 휴차/상품화/매각/반납/해지는 비표시 */}
                         <td className="center mono dim">
@@ -816,12 +801,11 @@ export default function Page() {
                               || c.status === '반납' || c.status === '해지';
                             if (inactive) return <span className="muted">-</span>;
                             const timing = c.paymentTiming ?? '선불';
-                            const timingColor = timing === '후불' ? 'var(--orange-text)' : 'var(--text-sub)';
                             return (
-                              <>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                 {c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>}
-                                <span style={{ fontSize: 9, color: timingColor, fontWeight: 600, marginLeft: 4 }}>{timing}</span>
-                              </>
+                                <StatusBadge tone={timing === '후불' ? 'orange' : 'blue'}>{timing}</StatusBadge>
+                              </span>
                             );
                           })()}
                         </td>
