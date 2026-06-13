@@ -295,16 +295,3 @@ export async function downloadPenaltyZip(
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
-
-/* ────────────────── 하위 호환 ────────────────── */
-
-/** @deprecated downloadPenaltyZip 사용 */
-export async function downloadPenaltyMergedPdf(
-  items: PenaltyWorkItem[],
-  staff?: IssueContext['staff'],
-): Promise<void> {
-  if (!staff) {
-    throw new Error('downloadPenaltyMergedPdf: staff 인자 필요');
-  }
-  return downloadPenaltyZip(items, staff);
-}

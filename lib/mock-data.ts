@@ -7,9 +7,6 @@ export function todayKr(): string {
   return kr.toISOString().slice(0, 10);
 }
 
-/** @deprecated 모듈 로드 시점에 고정되므로 todayKr() 함수 호출 사용 권장. 호환 위해 유지. */
-export const TODAY = todayKr();
-
 /** 운영 데이터 — RTDB /jpkerp5/contracts 에서 실시간 로드. 빈 배열로 시작. */
 export const MOCK_CONTRACTS: Contract[] = [];
 
