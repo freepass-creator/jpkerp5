@@ -819,8 +819,8 @@ export default function Page() {
                             const timingColor = timing === '후불' ? 'var(--orange-text)' : 'var(--text-sub)';
                             return (
                               <>
-                                <div>{c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>}</div>
-                                <div style={{ fontSize: 9, color: timingColor, fontWeight: 600 }}>{timing}</div>
+                                {c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>}
+                                <span style={{ fontSize: 9, color: timingColor, fontWeight: 600, marginLeft: 4 }}>{timing}</span>
                               </>
                             );
                           })()}
