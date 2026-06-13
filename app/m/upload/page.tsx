@@ -30,6 +30,7 @@ import {
 } from '@/lib/firebase/pending-uploads-store';
 import { addFieldLog } from '@/lib/firebase/field-logs-store';
 import { addVehiclePhoto, type VehiclePhotoKind } from '@/lib/firebase/vehicle-attachments-store';
+import { tryAutoMatch } from '@/lib/firebase/upload-auto-match';
 import { toast } from '@/lib/toast';
 
 type DraftFile = {
@@ -44,6 +45,8 @@ type DraftFile = {
 
 export default function MobileUpload() {
   const { user } = useAuth();
+  const { contracts } = useContracts();
+  const { vehicles } = useVehicles();
   const [drafts, setDrafts] = useState<DraftFile[]>([]);
   const pendingList = usePendingUploads({ onlyPending: true });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -75,9 +78,52 @@ export default function MobileUpload() {
     setDrafts((arr) => arr.filter((d) => d.id !== id));
   }
 
-  async function uploadOne(draft: DraftFile) {
+  /**
+   * 1건 업로드 — 자동 매칭 시도 → 매칭되면 즉시 destination 으로 / 실패면 pending.
+   */
+  async function uploadOne(draft: DraftFile): Promise<{ matched: boolean }> {
     const dataUrl = await fileToDataUrl(draft.file);
-    return addPendingUpload({
+    const autoMatch = tryAutoMatch({
+      kind: draft.kind,
+      detectedPhone: draft.detectedPhone,
+      contracts,
+      vehicles,
+    });
+
+    if (autoMatch && autoMatch.confidence === 'high') {
+      // 자동 매칭 성공 → 분류별 destination 으로 직접 저장 (pending 안 거침)
+      const by = user?.email ?? undefined;
+      if (draft.kind === 'image' && autoMatch.vehicleId) {
+        const photoKind: VehiclePhotoKind =
+          draft.subCategory === 'product' ? 'product'
+          : draft.subCategory === 'delivery' ? 'delivery'
+          : draft.subCategory === 'return' ? 'return'
+          : 'product';
+        await addVehiclePhoto(autoMatch.vehicleId, {
+          id: `vp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          kind: photoKind,
+          url: dataUrl,
+          fileName: draft.file.name,
+          uploadedAt: new Date().toISOString(),
+          uploadedBy: by,
+          contractId: autoMatch.contractId,
+          eventDate: new Date().toISOString().slice(0, 10),
+        });
+      } else if (autoMatch.contractId) {
+        await addFieldLog(autoMatch.contractId, {
+          type: draft.kind === 'audio' ? 'call' : 'memo',
+          body: `${SUB_CATEGORY_LABEL[draft.subCategory] ?? draft.subCategory} — ${draft.file.name}\n${autoMatch.reason}`,
+          payload: { dataUrl, sizeBytes: draft.file.size, mimeType: draft.file.type },
+          vehicleId: autoMatch.vehicleId,
+          customerKey: autoMatch.customerKey,
+          by,
+        });
+      }
+      return { matched: true };
+    }
+
+    // 매칭 실패 → pending 으로
+    await addPendingUpload({
       fileName: draft.file.name,
       mimeType: draft.file.type,
       sizeBytes: draft.file.size,
@@ -87,24 +133,31 @@ export default function MobileUpload() {
       detectedPhone: draft.detectedPhone,
       uploadedBy: user?.email ?? undefined,
     });
+    return { matched: false };
   }
 
   async function handleUploadAll() {
     if (drafts.length === 0) return;
-    let ok = 0;
+    let matched = 0;
+    let pending = 0;
     let fail = 0;
     for (const d of drafts) {
       updateDraft(d.id, { uploading: true });
       try {
-        await uploadOne(d);
-        ok++;
+        const r = await uploadOne(d);
+        if (r.matched) matched++;
+        else pending++;
       } catch (e) {
         fail++;
         toast.error(`${d.file.name} 실패: ${(e as Error).message}`);
       }
     }
     setDrafts([]);
-    toast.success(`${ok}개 업로드${fail > 0 ? ` (${fail}개 실패)` : ''}`);
+    const parts: string[] = [];
+    if (matched > 0) parts.push(`${matched}개 자동 매칭`);
+    if (pending > 0) parts.push(`${pending}개 미매칭 (수동)`);
+    if (fail > 0) parts.push(`${fail}개 실패`);
+    toast.success(parts.join(' · '));
   }
 
   return (
