@@ -677,7 +677,7 @@ export default function Page() {
                   <SortableTh col="사용처" width={96} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="연락처" width={116} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="운전연령" align="center" width={70} sort={manualSort} onSort={toggleSort} />
-                  <SortableTh col="보험연령" align="center" width={70} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="보험연령" align="center" width={90} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="계약상태" align="center" width={80} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="기간" align="center" width={64} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="월대여료" align="num" width={100} sort={manualSort} onSort={toggleSort} />
@@ -815,14 +815,14 @@ export default function Page() {
                             if (uncovered.length === 0) return `${ia}세`;
                             const tip = uncovered.map((d) => `${d.name ?? '추가운전자'}(${d.age}세)`).join(', ');
                             return (
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                <span>{ia}세</span>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                {ia}세
                                 <span
                                   className="badge-base badge-red"
                                   style={{ fontSize: 9, padding: '0 5px', fontWeight: 700 }}
                                   title={`추가운전자 보험 미커버 — ${tip}`}
                                 >추가{uncovered.length} ⚠</span>
-                              </div>
+                              </span>
                             );
                           })()}
                         </td>
