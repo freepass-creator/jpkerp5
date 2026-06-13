@@ -66,7 +66,6 @@ export default function MobileMemoEntry() {
 
       {step === 'pick' && (
         <>
-          <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>1/2 — 차량을 먼저 선택하세요</div>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '10px 12px', background: 'var(--bg-card)',
@@ -110,7 +109,6 @@ export default function MobileMemoEntry() {
 
       {step === 'write' && contract && (
         <>
-          <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>2/2 — 메모 작성</div>
           <div style={{
             padding: '10px 14px', background: 'var(--bg-card)',
             border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',

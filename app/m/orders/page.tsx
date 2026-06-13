@@ -41,9 +41,6 @@ export default function MobileOrders() {
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>요청받은 업무</h1>
-        <p style={{ fontSize: 12, color: 'var(--text-sub)', margin: '4px 0 0' }}>
-          사무에서 본인에게 지정한 지시 + 전체 공지
-        </p>
       </header>
 
       <div style={{ display: 'flex', gap: 6 }}>

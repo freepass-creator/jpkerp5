@@ -40,10 +40,7 @@ export default function MobileEntry() {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0' }}>입력</h1>
-        <p style={{ fontSize: 12, color: 'var(--text-sub)', margin: 0 }}>
-          현장에서 바로 등록할 수 있는 액션
-        </p>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>입력</h1>
       </header>
 
       <div style={{

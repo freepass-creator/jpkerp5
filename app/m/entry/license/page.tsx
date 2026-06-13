@@ -136,7 +136,6 @@ export default function MobileLicenseVerify() {
 
       {step === 'pick' && (
         <>
-          <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>1/3 — 차량/고객 선택</div>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '10px 12px', background: 'var(--bg-card)',
@@ -168,7 +167,6 @@ export default function MobileLicenseVerify() {
 
       {step === 'capture' && contract && (
         <>
-          <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>2/3 — 면허증 촬영 또는 갤러리에서 선택</div>
           <ContractMini contract={contract} onChange={() => { setStep('pick'); setContractId(''); }} />
           <button
             type="button" onClick={() => fileRef.current?.click()} disabled={busy !== 'idle'}
@@ -199,7 +197,6 @@ export default function MobileLicenseVerify() {
 
       {step === 'result' && contract && ocr && (
         <>
-          <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>3/3 — 결과 확인</div>
           <ContractMini contract={contract} onChange={() => { setStep('pick'); setContractId(''); setOcr(null); setVerify(null); }} />
 
           <section style={{

@@ -8,7 +8,7 @@
 
 import { useMemo, useState } from 'react';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { MagnifyingGlass, X, FunnelSimple } from '@phosphor-icons/react';
+import { MagnifyingGlass, X } from '@phosphor-icons/react';
 import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
 
@@ -90,7 +90,6 @@ export default function MobileOps() {
           )}
         </div>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 8, paddingBottom: 2, scrollbarWidth: 'none' }}>
-          <FunnelSimple size={16} weight="duotone" style={{ color: 'var(--text-sub)', flexShrink: 0, alignSelf: 'center' }} />
           {FILTERS.map((f) => (
             <button key={f.key} type="button" onClick={() => setFilter(f.key)} style={{
               padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap',

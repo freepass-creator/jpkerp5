@@ -8,7 +8,7 @@
 
 import { useMemo, useState } from 'react';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, FunnelSimple } from '@phosphor-icons/react';
+import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard } from '@phosphor-icons/react';
 import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
 import { ageFromIdent } from '@/lib/ident';
@@ -79,12 +79,8 @@ export default function MobileRisk() {
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0' }}>리스크</h1>
-        <p style={{ fontSize: 12, color: 'var(--text-sub)', margin: 0 }}>
-          미수 · 반납 지연 · 보험 미커버 · 데이터 결손
-        </p>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 10, paddingBottom: 2, scrollbarWidth: 'none' }}>
-          <FunnelSimple size={16} weight="duotone" style={{ color: 'var(--text-sub)', flexShrink: 0, alignSelf: 'center' }} />
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0' }}>리스크</h1>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
           <KindChip label={`전체 (${totalCount})`} active={activeKind === 'all'} onClick={() => setActiveKind('all')} tone="brand" />
           {KINDS.map((k) => (
             <KindChip

@@ -66,10 +66,7 @@ export default function MobileUpload() {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0' }}>업로드</h1>
-        <p style={{ fontSize: 12, color: 'var(--text-sub)', margin: 0 }}>
-          사진(상품화/출고/반납)과 통화녹음 일괄 업로드. 통화녹음은 파일명 전화번호로 자동 매칭됩니다.
-        </p>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>업로드</h1>
       </header>
 
       <label htmlFor="upload-input" style={{
