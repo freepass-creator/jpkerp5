@@ -63,10 +63,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   try {
     var p = location.pathname;
     if (p.indexOf('/m') === 0 || p.indexOf('/api') === 0 || p.indexOf('/customer') === 0) return;
-    var forceDesktop = document.cookie.indexOf('force-desktop=1') !== -1;
-    if (forceDesktop) return;
-    var narrow = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-    if (narrow) location.replace('/m');
+    if (document.cookie.indexOf('force-desktop=1') !== -1) return;
+
+    var ua = navigator.userAgent || '';
+    var mobileUa = /Mobile|Android|iPhone|iPod|iPad|Windows Phone|BlackBerry|Opera Mini/i.test(ua);
+    var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    var narrow = window.matchMedia && window.matchMedia('(max-width: 1024px)').matches;
+    var screenNarrow = window.screen && window.screen.width <= 1024;
+
+    // 사파리 "데스크탑 사이트 요청"이면 UA·viewport는 데스크탑이지만
+    // pointer는 coarse, screen.width는 폰 폭 그대로 → 둘 중 하나라도 잡힘.
+    if (mobileUa || coarse || narrow || screenNarrow) location.replace('/m');
   } catch(e) { /* silent */ }
 })();
             `.trim(),
