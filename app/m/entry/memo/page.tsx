@@ -11,11 +11,14 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { CaretLeft, MagnifyingGlass, NotePencil, Check } from '@phosphor-icons/react';
+import { MagnifyingGlass, NotePencil, Check } from '@phosphor-icons/react';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useAuth } from '@/lib/use-auth';
-import { addFieldLog } from '@/lib/firebase/field-logs-store';
+import {
+  addFieldLog, addVehicleFieldLog, addCustomerFieldLog,
+  type FieldLogScope,
+} from '@/lib/firebase/field-logs-store';
 import { toast } from '@/lib/toast';
 
 export default function MobileMemoEntry() {
@@ -23,14 +26,41 @@ export default function MobileMemoEntry() {
   const params = useSearchParams();
   const preContractId = params?.get('contractId') ?? '';
   const { contracts } = useContracts();
+  const { vehicles } = useVehicles();
   const { user } = useAuth();
   const [step, setStep] = useState<'pick' | 'write'>(preContractId ? 'write' : 'pick');
   const [contractId, setContractId] = useState(preContractId);
   const [q, setQ] = useState('');
   const [memo, setMemo] = useState('');
   const [saving, setSaving] = useState(false);
+  const [scope, setScope] = useState<FieldLogScope>('contract');
 
   const contract = contracts.find((x) => x.id === contractId);
+  // 차량 ID 매칭 (vehiclePlate 기반)
+  const vehicleId = useMemo(() => {
+    if (!contract?.vehiclePlate) return null;
+    return vehicles.find((v) =>
+      (v.plate ?? '').trim() === (contract.vehiclePlate ?? '').trim()
+      || (v.plateHistory ?? []).some((p) => (p ?? '').trim() === (contract.vehiclePlate ?? '').trim())
+    )?.id ?? null;
+  }, [contract, vehicles]);
+  // 손님 키 (등록번호 디지트만)
+  const customerKey = useMemo(() => {
+    const d = (contract?.customerIdentNo ?? '').replace(/\D/g, '');
+    return d || null;
+  }, [contract]);
+
+  // 기본 scope 선택 로직: 계약 활성이면 contract, 활성 아닌데 차량 매칭되면 vehicle, 둘 다 아니면 contract
+  const defaultScope: FieldLogScope = useMemo(() => {
+    if (!contract) return 'contract';
+    const cs = contract.status;
+    if (cs === '운행' || cs === '대기') return 'contract';
+    if (vehicleId) return 'vehicle';
+    return 'contract';
+  }, [contract, vehicleId]);
+
+  // contract 변경 시 default scope 자동 적용
+  useMemo(() => { setScope(defaultScope); }, [defaultScope]);
 
   const matches = useMemo(() => {
     const query = q.trim().toLowerCase().replace(/[^\w가-힣]/g, '');
@@ -44,11 +74,24 @@ export default function MobileMemoEntry() {
     if (!contractId || !memo.trim()) return;
     setSaving(true);
     try {
-      await addFieldLog(contractId, {
-        type: 'memo',
-        body: memo.trim(),
-        by: user?.email ?? undefined,
-      });
+      const body = memo.trim();
+      const by = user?.email ?? undefined;
+      if (scope === 'contract') {
+        // 계약 메모 — 차량/손님 노드에도 자동 전파 (addFieldLog 가 처리)
+        await addFieldLog(contractId, {
+          type: 'memo', body, by,
+          vehicleId: vehicleId ?? undefined,
+          customerKey: customerKey ?? undefined,
+        });
+      } else if (scope === 'vehicle' && vehicleId) {
+        await addVehicleFieldLog(vehicleId, { type: 'memo', body, by });
+      } else if (scope === 'customer' && customerKey) {
+        await addCustomerFieldLog(customerKey, { type: 'memo', body, by });
+      } else {
+        toast.warning('대상 식별자가 없어 저장 불가 (차량 또는 손님 미매칭)');
+        setSaving(false);
+        return;
+      }
       toast.success('메모 저장됨');
       router.push(`/m/contract/${contractId}`);
     } catch (e) {
@@ -130,6 +173,38 @@ export default function MobileMemoEntry() {
             )}
           </div>
 
+          {/* 메모 대상 (scope) — 계약 / 차량 / 손님 (빈도순) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)' }}>대상</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <ScopeChip
+                active={scope === 'contract'}
+                onClick={() => setScope('contract')}
+                label="이 계약"
+                disabled={false}
+              />
+              <ScopeChip
+                active={scope === 'vehicle'}
+                onClick={() => setScope('vehicle')}
+                label="이 차량"
+                disabled={!vehicleId}
+                hint={!vehicleId ? '자산 미등록 차량' : undefined}
+              />
+              <ScopeChip
+                active={scope === 'customer'}
+                onClick={() => setScope('customer')}
+                label="이 손님"
+                disabled={!customerKey}
+                hint={!customerKey ? '등록번호 없음' : undefined}
+              />
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-weak)' }}>
+              {scope === 'contract' && '계약에 남기고 차량·손님 이력에도 자동 표시됩니다.'}
+              {scope === 'vehicle' && '차량에만 남깁니다 (이 차의 미래 계약에도 노출).'}
+              {scope === 'customer' && '손님에만 남깁니다 (이 손님의 다른 계약에도 노출).'}
+            </div>
+          </div>
+
           <textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
@@ -164,3 +239,33 @@ export default function MobileMemoEntry() {
     </div>
   );
 }
+
+function ScopeChip({ active, onClick, label, disabled, hint }: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  disabled?: boolean;
+  hint?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={hint}
+      style={{
+        flex: 1, padding: '10px 12px',
+        fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+        background: disabled ? 'var(--bg-sunken)' : active ? 'var(--brand)' : 'var(--bg-card)',
+        color: disabled ? 'var(--text-weak)' : active ? '#fff' : 'var(--text-main)',
+        border: `1px solid ${disabled ? 'var(--border-soft)' : active ? 'var(--brand)' : 'var(--border)'}`,
+        borderRadius: 'var(--radius)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        touchAction: 'manipulation',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+

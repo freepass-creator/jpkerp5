@@ -10,13 +10,20 @@
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { useFieldLogs, FIELD_LOG_LABEL, FIELD_LOG_TONE } from '@/lib/firebase/field-logs-store';
 import {
-  CaretLeft, Phone, Camera, NotePencil, ChatCircle,
+  useFieldLogs, useVehicleFieldLogs, useCustomerFieldLogs,
+  FIELD_LOG_LABEL, FIELD_LOG_TONE, SCOPE_LABEL, SCOPE_TONE,
+  type FieldLog,
+} from '@/lib/firebase/field-logs-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { useMemo, useRef } from 'react';
+import {
+  CaretLeft, Phone, ChatCircle, Paperclip, ChatTeardrop, Camera, NotePencil,
   Truck, ArrowUUpLeft, ShieldWarning, IdentificationCard, CurrencyKrw, Warning,
   CheckCircle, Circle,
 } from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';
+import { toast } from '@/lib/toast';
 
 export default function MobileContractDetail() {
   const params = useParams();
@@ -24,8 +31,65 @@ export default function MobileContractDetail() {
   const riskKind = searchParams?.get('risk') ?? null;
   const id = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : '';
   const { contracts } = useContracts();
+  const { vehicles } = useVehicles();
   const c = contracts.find((x) => x.id === id);
-  const logs = useFieldLogs(c?.id);
+
+  // 3 scope 로그 라이브 — 계약 / 차량 / 손님
+  const contractLogs = useFieldLogs(c?.id);
+  const vehicleId = c?.vehiclePlate
+    ? vehicles.find((v) =>
+        (v.plate ?? '').trim() === (c.vehiclePlate ?? '').trim()
+        || (v.plateHistory ?? []).some((p) => (p ?? '').trim() === (c.vehiclePlate ?? '').trim())
+      )?.id ?? null
+    : null;
+  const customerKey = (c?.customerIdentNo ?? '').replace(/\D/g, '') || null;
+  const vehicleLogs = useVehicleFieldLogs(vehicleId);
+  const customerLogs = useCustomerFieldLogs(customerKey);
+
+  // 첨부 공유 — 파일 input + Web Share API
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  function triggerFileShare() {
+    if (!c) return;
+    fileInputRef.current?.click();
+  }
+  async function handleFileShare(files: FileList | null) {
+    if (!files || files.length === 0 || !c) return;
+    const fileArr = Array.from(files);
+    const text = `[${c.vehiclePlate ?? ''}] ${c.customerName ?? ''}`;
+    if (navigator.canShare && navigator.canShare({ files: fileArr })) {
+      try {
+        await navigator.share({ files: fileArr, title: c.customerName ?? '', text });
+      } catch (e) {
+        if ((e as Error).name !== 'AbortError') toast.error('공유 실패');
+      }
+    } else {
+      toast.warning('이 브라우저는 파일 공유 미지원');
+    }
+  }
+  async function shareTextWithKakao(contract: typeof c) {
+    if (!contract) return;
+    const text = `[${contract.vehiclePlate ?? ''}] ${contract.customerName ?? ''}\n${contract.vehicleModel ?? ''}\n계약번호: ${contract.contractNo ?? '-'}`;
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: contract.customerName ?? '', text });
+      } catch (e) {
+        if ((e as Error).name !== 'AbortError') toast.error('공유 실패');
+      }
+    } else {
+      toast.warning('이 브라우저는 공유 기능 미지원');
+    }
+  }
+
+  // 통합 — 중복 id 제거 (계약 메모는 자동 전파되므로 동일 id가 3노드에 나옴)
+  const mergedLogs = useMemo(() => {
+    const map = new Map<string, FieldLog>();
+    for (const l of [...contractLogs, ...vehicleLogs, ...customerLogs]) {
+      if (!map.has(l.id)) map.set(l.id, l);
+    }
+    const list = Array.from(map.values());
+    list.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
+    return list;
+  }, [contractLogs, vehicleLogs, customerLogs]);
 
   if (!c) {
     return (
@@ -63,29 +127,46 @@ export default function MobileContractDetail() {
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
             <Chip>{c.vehicleStatus}</Chip>
-            <Chip>{c.status}</Chip>
+            {c.status && c.status !== c.vehicleStatus && <Chip>{c.status}</Chip>}
             {c.unpaidAmount > 0 && <Chip tone="red">미수 ₩{formatCurrency(c.unpaidAmount)}</Chip>}
           </div>
         </header>
 
-        {/* 액션 4종 — Hero 와 함께 고정 */}
+        {/* 액션 4종 — Hero 와 함께 고정. 손님 소통 + 첨부 */}
         <div style={{
           padding: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
           background: 'var(--bg-card)',
           borderBottom: '1px solid var(--border)',
         }}>
-        <ActionBtn icon={<Camera size={22} weight="duotone" />} label="사진" href={`/m/upload?contractId=${c.id}`} />
-        <ActionBtn icon={<NotePencil size={22} weight="duotone" />} label="메모" href={`/m/entry/memo?contractId=${c.id}`} />
-        {c.customerPhone1 ? (
-          <ActionBtn icon={<Phone size={22} weight="duotone" />} label="전화" href={`tel:${c.customerPhone1}`} />
-        ) : (
-          <ActionBtn icon={<Phone size={22} weight="duotone" />} label="전화" disabled />
-        )}
-        {c.customerPhone1 ? (
-          <ActionBtn icon={<ChatCircle size={22} weight="duotone" />} label="문자" href={`sms:${c.customerPhone1}`} />
-        ) : (
-          <ActionBtn icon={<ChatCircle size={22} weight="duotone" />} label="문자" disabled />
-        )}
+        <ActionBtn
+          icon={<Phone size={22} weight="duotone" />}
+          label="전화"
+          href={c.customerPhone1 ? `tel:${c.customerPhone1}` : undefined}
+          disabled={!c.customerPhone1}
+        />
+        <ActionBtn
+          icon={<ChatCircle size={22} weight="duotone" />}
+          label="문자"
+          href={c.customerPhone1 ? `sms:${c.customerPhone1}` : undefined}
+          disabled={!c.customerPhone1}
+        />
+        <ActionBtn
+          icon={<ChatTeardrop size={22} weight="duotone" />}
+          label="카카오"
+          onClick={() => shareTextWithKakao(c)}
+        />
+        <ActionBtn
+          icon={<Paperclip size={22} weight="duotone" />}
+          label="첨부"
+          onClick={() => triggerFileShare()}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => void handleFileShare(e.target.files)}
+        />
         </div>
       </div>
 
@@ -128,21 +209,28 @@ export default function MobileContractDetail() {
           </InfoSection>
         )}
 
-        {logs.length > 0 && (
-          <InfoSection title={`현장 입력 (${logs.length})`}>
+        {mergedLogs.length > 0 && (
+          <InfoSection title={`현장 입력 (${mergedLogs.length})`}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {logs.map((l) => {
+              {mergedLogs.map((l) => {
                 const tone = FIELD_LOG_TONE[l.type];
+                const scope = l.scope ?? 'contract';
+                const scopeTone = SCOPE_TONE[scope];
                 return (
                   <div key={l.id} style={{
                     padding: '8px 10px', background: 'var(--bg-sunken)',
                     borderRadius: 'var(--radius-md)',
                     borderLeft: `3px solid var(--${tone === 'brand' ? 'brand' : tone + '-text'})`,
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: `var(--${tone === 'brand' ? 'brand' : tone + '-text'})` }}>
-                        {FIELD_LOG_LABEL[l.type]}
-                      </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: `var(--${tone === 'brand' ? 'brand' : tone + '-text'})` }}>
+                          {FIELD_LOG_LABEL[l.type]}
+                        </span>
+                        <span className={`badge-base badge-${scopeTone}`} style={{ fontSize: 9, padding: '0 5px' }}>
+                          {SCOPE_LABEL[scope]}
+                        </span>
+                      </div>
                       <span style={{ fontSize: 10, color: 'var(--text-weak)' }}>
                         {l.at.slice(5, 16).replace('T', ' ')}
                         {l._meta?.source === 'mobile' && ' · 모바일'}
