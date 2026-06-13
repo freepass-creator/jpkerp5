@@ -13,11 +13,11 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
-  CaretLeft, MagnifyingGlass, IdentificationCard, Camera,
+  MagnifyingGlass, IdentificationCard, Camera,
   CheckCircle, XCircle, CircleNotch,
 } from '@phosphor-icons/react';
+import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useAuth } from '@/lib/use-auth';
 import { addFieldLog } from '@/lib/firebase/field-logs-store';
@@ -233,19 +233,19 @@ export default function MobileLicenseVerify() {
             </section>
           )}
 
-          <button
-            type="button" onClick={handleSave} disabled={busy === 'saving'}
-            style={{
-              height: 52, fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
-              background: 'var(--brand)', color: '#fff', border: 'none',
-              borderRadius: 'var(--radius-lg)', cursor: busy === 'saving' ? 'wait' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            <CheckCircle size={16} weight="bold" />
-            {busy === 'saving' ? '저장 중...' : '결과 저장'}
-          </button>
         </>
+      )}
+
+      {/* 하단 [취소] [결과 저장] — 결과 확인 단계만 */}
+      {step === 'result' && (
+        <MobileSaveFooter
+          prevLabel="취소"
+          onPrev={() => router.back()}
+          primaryLabel="결과 저장"
+          primaryBusyLabel="저장 중..."
+          primaryBusy={busy === 'saving'}
+          onPrimary={handleSave}
+        />
       )}
     </div>
   );

@@ -131,10 +131,21 @@ export default function MobileHome() {
   const riskCount = data.unpaidList.length + data.overdueReturn.length + data.insuranceGap.length + data.missingIdent.length;
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* 인라인 검색 (C 안) — 타이핑 시 드롭다운 즉시 표시 */}
-      <InlineSearch contracts={contracts} />
+    <div>
+      {/* 인라인 검색 (C 안) — 상단 고정. 타이핑 시 드롭다운 즉시 표시 */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'var(--bg-card)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        padding: '12px 16px 10px',
+        borderBottom: '1px solid var(--border)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      }}>
+        <InlineSearch contracts={contracts} />
+      </div>
 
+      <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* 오늘 헤더 */}
       <header style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
@@ -242,6 +253,7 @@ export default function MobileHome() {
           ? data.idleList.slice(0, 3).map((c) => c.vehiclePlate).filter(Boolean).join(' · ')
           : '휴차 차량 없음'}
       />
+      </div>
     </div>
   );
 }

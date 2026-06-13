@@ -18,7 +18,7 @@ import {
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useMemo, useRef } from 'react';
 import {
-  CaretLeft, Phone, ChatCircle, Paperclip, ChatTeardrop, Camera, NotePencil,
+  CaretLeft, Phone, ChatCircle, Paperclip, NotePencil,
   Truck, ArrowUUpLeft, ShieldWarning, IdentificationCard, CurrencyKrw, Warning,
   CheckCircle, Circle,
 } from '@phosphor-icons/react';
@@ -64,19 +64,6 @@ export default function MobileContractDetail() {
       }
     } else {
       toast.warning('이 브라우저는 파일 공유 미지원');
-    }
-  }
-  async function shareTextWithKakao(contract: typeof c) {
-    if (!contract) return;
-    const text = `[${contract.vehiclePlate ?? ''}] ${contract.customerName ?? ''}\n${contract.vehicleModel ?? ''}\n계약번호: ${contract.contractNo ?? '-'}`;
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      try {
-        await navigator.share({ title: contract.customerName ?? '', text });
-      } catch (e) {
-        if ((e as Error).name !== 'AbortError') toast.error('공유 실패');
-      }
-    } else {
-      toast.warning('이 브라우저는 공유 기능 미지원');
     }
   }
 
@@ -146,19 +133,19 @@ export default function MobileContractDetail() {
         />
         <ActionBtn
           icon={<ChatCircle size={22} weight="duotone" />}
-          label="문자"
+          label="메시지"
           href={c.customerPhone1 ? `sms:${c.customerPhone1}` : undefined}
           disabled={!c.customerPhone1}
-        />
-        <ActionBtn
-          icon={<ChatTeardrop size={22} weight="duotone" />}
-          label="카카오"
-          onClick={() => shareTextWithKakao(c)}
         />
         <ActionBtn
           icon={<Paperclip size={22} weight="duotone" />}
           label="첨부"
           onClick={() => triggerFileShare()}
+        />
+        <ActionBtn
+          icon={<NotePencil size={22} weight="duotone" />}
+          label="메모"
+          href={`/m/entry/memo?contractId=${c.id}`}
         />
         <input
           ref={fileInputRef}

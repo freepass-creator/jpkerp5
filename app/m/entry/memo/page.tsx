@@ -11,7 +11,8 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { MagnifyingGlass, NotePencil, Check } from '@phosphor-icons/react';
+import { MagnifyingGlass, NotePencil } from '@phosphor-icons/react';
+import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useAuth } from '@/lib/use-auth';
@@ -219,22 +220,20 @@ export default function MobileMemoEntry() {
             }}
           />
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!memo.trim() || saving}
-            style={{
-              height: 52, fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
-              background: 'var(--brand)', color: '#fff', border: 'none',
-              borderRadius: 'var(--radius-lg)', cursor: saving ? 'wait' : 'pointer',
-              opacity: !memo.trim() ? 0.5 : 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            <Check size={16} weight="bold" />
-            {saving ? '저장 중...' : '메모 저장'}
-          </button>
         </>
+      )}
+
+      {/* 하단 [취소] [메모 저장] — 하단 BackBar 영역 활용 */}
+      {step === 'write' && (
+        <MobileSaveFooter
+          prevLabel="취소"
+          onPrev={() => router.back()}
+          primaryLabel="메모 저장"
+          primaryBusyLabel="저장 중..."
+          primaryBusy={saving}
+          primaryDisabled={!memo.trim()}
+          onPrimary={handleSave}
+        />
       )}
     </div>
   );

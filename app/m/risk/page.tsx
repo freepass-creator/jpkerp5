@@ -8,7 +8,7 @@
 
 import { useMemo, useState } from 'react';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard } from '@phosphor-icons/react';
+import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
 import { ageFromIdent } from '@/lib/ident';
@@ -25,6 +25,7 @@ const KINDS: { key: RiskKind; label: string; icon: React.ReactNode; tone: 'red' 
 export default function MobileRisk() {
   const { contracts } = useContracts();
   const [activeKind, setActiveKind] = useState<RiskKind | 'all'>('all');
+  const [q, setQ] = useState('');
 
   const groups = useMemo(() => {
     const todayDate = new Date();
@@ -80,7 +81,25 @@ export default function MobileRisk() {
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0' }}>리스크</h1>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, scrollbarWidth: 'none' }}>
+        {/* 검색바 — 운영과 동일 규격 */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 12px', background: 'var(--bg-card)',
+          border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
+        }}>
+          <MagnifyingGlass size={18} weight="duotone" />
+          <input
+            value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder="차량번호 / 고객명 / 연락처"
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 16, fontFamily: 'inherit' }}
+          />
+          {q && (
+            <button onClick={() => setQ('')} type="button" style={{ padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-sub)' }} aria-label="지우기">
+              <X size={16} weight="bold" />
+            </button>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 8, paddingBottom: 2, scrollbarWidth: 'none' }}>
           <KindChip label={`전체 (${totalCount})`} active={activeKind === 'all'} onClick={() => setActiveKind('all')} tone="brand" />
           {KINDS.map((k) => (
             <KindChip
@@ -94,7 +113,11 @@ export default function MobileRisk() {
         </div>
       </div>
 
-      <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* 운영과 동일 — 총 건수 표시 */}
+        <div style={{ fontSize: 11, color: 'var(--text-sub)' }}>
+          총 {totalCount}건
+        </div>
       {/* 카테고리별 섹션 */}
       {(activeKind === 'all' ? KINDS : KINDS.filter((k) => k.key === activeKind)).map((kind) => {
         const items = groups[kind.key];
