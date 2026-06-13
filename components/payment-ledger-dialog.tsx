@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { toast } from '@/lib/toast';
 import { Upload, Bank, CreditCard, CheckCircle, MagnifyingGlass, X, Link as LinkIcon, CaretLeft, ArrowsCounterClockwise, Warning } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
@@ -95,20 +96,20 @@ export function PaymentLedgerDialog({
         <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
           {matchingTx ? (
             <MatchPane tx={matchingTx} contracts={contracts} onBack={() => setMatchingTx(null)} onAssign={(cId, cat) => {
-              alert(`mock: ${matchingTx.id} → 계약 ${cId} 매칭, 항목: ${cat}`);
+              toast.info(`mock: ${matchingTx.id} → 계약 ${cId} 매칭, 항목: ${cat}`);
               setMatchingTx(null);
             }} />
           ) : (
             <>
               {/* 상단 액션 + 요약 */}
               <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn" onClick={() => alert('mock: 계좌 엑셀 업로드')}>
+                <button className="btn" onClick={() => toast.info('mock: 계좌 엑셀 업로드')}>
                   <Bank size={14} weight="duotone" /> 계좌 업로드
                 </button>
-                <button className="btn" onClick={() => alert('mock: 자동이체 결과 업로드 (CMS 출금 결과)')}>
+                <button className="btn" onClick={() => toast.info('mock: 자동이체 결과 업로드 (CMS 출금 결과)')}>
                   <ArrowsCounterClockwise size={14} weight="duotone" /> 자동이체 업로드
                 </button>
-                <button className="btn" onClick={() => alert('mock: 카드 매출 엑셀 업로드')}>
+                <button className="btn" onClick={() => toast.info('mock: 카드 매출 엑셀 업로드')}>
                   <CreditCard size={14} weight="duotone" /> 카드 업로드
                 </button>
 

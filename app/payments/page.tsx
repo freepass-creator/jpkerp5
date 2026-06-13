@@ -282,7 +282,7 @@ export default function PaymentsPage() {
   async function handleSettlementMatchAll() {
     const matches = findAllSettlements(bankTx, cardTx);
     if (matches.length === 0) {
-      alert('정산 매칭 가능한 집금 입금이 없습니다.\n(CMS·카드 집금건 + 같은날 미정산 묶음 후보 필요)');
+      toast.warning('정산 매칭 가능한 집금 입금이 없습니다.\n(CMS·카드 집금건 + 같은날 미정산 묶음 후보 필요)');
       return;
     }
     const preview = matches.slice(0, 8).map((m) => {

@@ -14,6 +14,7 @@
  */
 
 import { useRef, useState } from 'react';
+import { toast } from '@/lib/toast';
 import { FileText, Paperclip } from '@phosphor-icons/react';
 import { StatusBadge } from '@/components/ui/status-badge';
 
@@ -209,7 +210,7 @@ function FleetApplyDialog({ c, pending: pendingProp, onClose }: { c: MockCompany
       localStorage.setItem('jpkerp5_fleet_apply_print', JSON.stringify(payload));
       window.open('/general/fleet-apply/print', '_blank');
     } catch (e) {
-      alert(`인쇄 페이지 열기 실패: ${(e as Error).message ?? String(e)}`);
+      toast.error(`인쇄 페이지 열기 실패: ${(e as Error).message ?? String(e)}`);
     }
   }
   void carTypeBucket; // type checker — 추후 grouping 확장용
@@ -299,7 +300,7 @@ function FleetApplyDialog({ c, pending: pendingProp, onClose }: { c: MockCompany
                               type="button"
                               onClick={() => {
                                 // 실제: window.open(v.contractDocUrl, '_blank') 또는 PDF 미리보기 모달
-                                alert(`계약사실확인서 미리보기\n파일: ${v.contractDocName ?? '계약사실확인서.pdf'}\n차량: ${v.plate}\n(샘플: 실제는 저장된 PDF/이미지 새 창)`);
+                                toast.error(`계약사실확인서 미리보기\n파일: ${v.contractDocName ?? '계약사실확인서.pdf'}\n차량: ${v.plate}\n(샘플: 실제는 저장된 PDF/이미지 새 창)`);
                               }}
                               title="클릭 시 미리보기"
                               style={{

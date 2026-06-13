@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from '@/lib/toast';
 import { CheckCircle, CircleNotch } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DateInput } from '@/components/ui/date-input';
@@ -108,7 +109,7 @@ export function HistoryAddDialog({
       setMeta({});
       onOpenChange(false);
     } catch (e) {
-      alert('이력 추가 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('이력 추가 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setSaving(false);
     }

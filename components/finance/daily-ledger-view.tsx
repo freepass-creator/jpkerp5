@@ -25,6 +25,7 @@
 
 
 import { useMemo, useState, Fragment } from 'react';
+import { toast } from '@/lib/toast';
 
 import { useVendors } from '@/lib/firebase/vendors-store';
 
@@ -409,7 +410,7 @@ export function DailyLedgerView({
 
       } catch (e) {
 
-        alert(`거래泥??깅줉 ?ㅽ뙣: ${(e as Error).message ?? String(e)}`);
+        toast.error(`거래처 등록 실패: ${(e as Error).message ?? String(e)}`);
 
         return;
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { ref, set, onValue, get } from 'firebase/database';
 import { getRtdb, ensureAuth } from './firebase/client';
 import { stripUndef } from './store-utils';
+import { toast } from './toast';
 
 /**
  * RTDB keyed-object store factory — 도메인 무관 공용.
@@ -130,9 +131,7 @@ export function createKeyedStore<T>(opts: Options<T>) {
       // 초기 로드 전 write 거부 — RTDB 가 비어있다고 오해해서 통째 덮어쓰는 사고 방지
       if (!initialized) {
         console.warn(`[${storeName}] write rejected — RTDB initial load 미완료. 사용자 액션 재시도 필요`);
-        if (typeof window !== 'undefined') {
-          alert(`${alertLabel ?? path} 저장 보류 — 데이터 로딩 중입니다. 1초 후 다시 시도해주세요.`);
-        }
+        toast.warning(`${alertLabel ?? path} 저장 보류 — 데이터 로딩 중. 1초 후 다시 시도`);
         return;
       }
       const prev = cache;
@@ -140,19 +139,15 @@ export function createKeyedStore<T>(opts: Options<T>) {
       cache = next;
       listeners.forEach((l) => l(next));
       const obj = toRtdb(next);
-      console.log(`[${storeName}] writing ${next.length} items to RTDB ${path}/...`);
       const db = getRtdb();
       if (!db) {
         console.warn(`[${storeName}] no RTDB — keeping in-memory only`);
         return;
       }
       set(ref(db, path), stripUndef(obj))
-        .then(() => console.log(`[${storeName}] ✓ RTDB write OK (${next.length} items)`))
         .catch((e) => {
           console.error(`[${storeName}] ✗ write failed`, e);
-          if (typeof window !== 'undefined') {
-            alert(`${alertLabel ?? path} 저장 실패: ${e?.message ?? e}\n\nFirebase Console → Realtime Database → Rules 확인 필요.`);
-          }
+          toast.error(`${alertLabel ?? path} 저장 실패: ${e?.message ?? e}`);
         });
     }, []);
 

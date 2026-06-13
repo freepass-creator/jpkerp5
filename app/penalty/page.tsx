@@ -111,7 +111,7 @@ export default function PenaltyPage() {
       if (duplicates.length > 0) {
         // 사용자에게 알림 (suppressed silently 안되게)
         setTimeout(() => {
-          alert(`중복으로 판정된 ${duplicates.length}건이 함께 추가되었습니다. 빨간 라벨로 표시되니 확인 후 삭제하세요.`);
+          toast.info(`중복으로 판정된 ${duplicates.length}건이 함께 추가되었습니다. 빨간 라벨로 표시되니 확인 후 삭제하세요.`);
         }, 0);
       }
 
@@ -190,7 +190,7 @@ export default function PenaltyPage() {
   async function handleDownloadSelected() {
     const targets = items.filter((i) => selectedIds.has(i.id) && !i._duplicate);
     if (targets.length === 0) {
-      alert('다운로드 가능한 항목이 없습니다 (중복은 제외됨).');
+      toast.info('다운로드 가능한 항목이 없습니다 (중복은 제외됨).');
       return;
     }
     setBusy(true);
@@ -218,7 +218,7 @@ export default function PenaltyPage() {
     const dupCount = all.filter((i) => i._duplicate).length;
     const target = all.filter((i) => !i._duplicate);  // 중복 자동 제외
     if (target.length === 0) {
-      alert(dupCount > 0 ? `처리중 ${dupCount}건이 모두 중복입니다. 중복 정리 후 다시 시도하세요.` : '처리할 항목이 없습니다.');
+      toast.info(dupCount > 0 ? `처리중 ${dupCount}건이 모두 중복입니다. 중복 정리 후 다시 시도하세요.` : '처리할 항목이 없습니다.');
       return;
     }
     if (dupCount > 0 && !confirm(`중복 ${dupCount}건은 자동 제외하고 ${target.length}건만 PDF 생성합니다. 진행할까요?`)) return;

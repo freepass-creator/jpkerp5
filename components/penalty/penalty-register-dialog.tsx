@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { toast } from '@/lib/toast';
 import JSZip from 'jszip';
 import { X, CircleNotch, CheckCircle, Warning, Plus, ArrowCounterClockwise, Printer, DownloadSimple, PaperPlaneTilt, Trash } from '@phosphor-icons/react';
 import { Dialog, DialogTrigger, DialogContent, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -451,8 +452,8 @@ function FaxSendDialog({
   }, [open, defaultSender]);
 
   async function send() {
-    if (!receiver.trim()) { alert('받는 팩스번호 입력'); return; }
-    if (!sender.trim()) { alert('발신 팩스번호 입력 (회사정보의 팩스를 등록하면 자동 채움)'); return; }
+    if (!receiver.trim()) { toast.warning('받는 팩스번호 입력'); return; }
+    if (!sender.trim()) { toast.warning('발신 팩스번호 입력 (회사정보의 팩스를 등록하면 자동 채움)'); return; }
     if (items.length === 0) return;
     setBusy(true);
     setResult(null);

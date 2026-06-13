@@ -8,6 +8,7 @@
  *   3) zip 으로 묶어서 다운로드
  */
 import type { PenaltyParsed } from './parsers/penalty';
+import { toast } from '@/lib/toast';
 import type { Company } from './sample-companies';
 import type { IssueContext, ConfirmationArgs } from './penalty-templates';
 import type { AuditFields } from './audit-fields';
@@ -180,7 +181,7 @@ export async function previewPenaltyItem(
   // 팝업 블로커 회피 — 사용자 클릭 직후 즉시 빈 창 열고, async PDF 생성 후 URL 채움
   const win = window.open('about:blank', '_blank');
   if (!win) {
-    alert('PDF 미리보기를 위해 팝업을 허용해주세요.');
+    toast.warning('PDF 미리보기를 위해 팝업을 허용해주세요.');
     return;
   }
   // 로딩 안내

@@ -1045,7 +1045,7 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
       });
       onSubmit();
     } catch (e) {
-      alert('차량 등록 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('차량 등록 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setSaving(false);
     }
@@ -1223,7 +1223,7 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
       });
       onSubmit();
     } catch (e) {
-      alert('차량 등록 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('차량 등록 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setSaving(false);
     }
@@ -1252,7 +1252,7 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
       await updateVehicle(merged);
       onSubmit();
     } catch (e) {
-      alert('차량 갱신 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('차량 갱신 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setSaving(false);
     }
@@ -2022,7 +2022,7 @@ function ContractRegisterPane({
       </div>
 
       {mode === 'manual' && <ContractManualForm onSubmit={onClose} />}
-      {mode === 'ocr' && <ContractOcrPane onSubmit={() => { alert('mock: OCR 계약 등록 완료'); onClose(); }} />}
+      {mode === 'ocr' && <ContractOcrPane onSubmit={() => { toast.info('mock: OCR 계약 등록 완료'); onClose(); }} />}
       {mode === 'excel' && (
         <UploadPane
           files={files} drag={drag} onPick={onPick} onChangeKind={onChangeKind}
@@ -2214,7 +2214,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
       }
       onSubmit();
     } catch (e) {
-      alert('계약 등록 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('계약 등록 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setSaving(false);
     }
@@ -2252,7 +2252,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
         }
       }
     } catch (e) {
-      alert('면허증 OCR 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('면허증 OCR 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setLicenseOcrBusy(false);
     }
@@ -2647,10 +2647,10 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
         try { await upsertVehicleFromContract(c as Contract, syncCtx2); }
         catch (e) { console.error('legacy contracts vehicle sync failed', (c as Contract).contractNo, e); }
       }
-      alert(`✓ ${valid.length}건 계약 등록${toCreateVehicles.length > 0 ? ` (신규 차량 ${toCreateVehicles.length}대 자동 생성)` : ''}`);
+      toast.success(`${valid.length}건 계약 등록${toCreateVehicles.length > 0 ? ` (신규 차량 ${toCreateVehicles.length}대 자동 생성)` : ''}`);
       onSubmit();
     } catch (e) {
-      alert('계약 등록 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('계약 등록 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setSaving(false);
     }
@@ -3166,7 +3166,7 @@ function PaymentManualForm({ onSubmit, variant }: { onSubmit: () => void; varian
       }
       onSubmit();
     } catch (e) {
-      alert('등록 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('등록 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setSaving(false);
     }
@@ -3440,7 +3440,7 @@ function ExpenseRegisterPane({ onClose }: { onClose: () => void }) {
       });
       onClose();
     } catch (e) {
-      alert('지출 등록 실패: ' + ((e as Error).message ?? String(e)));
+      toast.error('지출 등록 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
       setSaving(false);
     }
@@ -3518,7 +3518,7 @@ function HistoryAddPane({ onClose }: { onClose: () => void }) {
 
   if (selected) {
     return <HistoryForm contract={selected} onBack={() => setSelected(null)} onSubmit={(scope) => {
-      alert(`mock: ${selected.vehiclePlate} ${selected.customerName} ${scope === 'vehicle' ? '차량' : '계약'} 이력 등록 완료`);
+      toast.info(`mock: ${selected.vehiclePlate} ${selected.customerName} ${scope === 'vehicle' ? '차량' : '계약'} 이력 등록 완료`);
       onClose();
     }} />;
   }
