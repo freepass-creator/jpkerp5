@@ -14,11 +14,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/use-auth';
-import { useSettings, type Theme, type Radius, type FontSize } from '@/lib/use-settings';
+import { useSettings, type Theme, type Radius } from '@/lib/use-settings';
 import { getAuth, signOut } from 'firebase/auth';
 import { getFirebaseApp } from '@/lib/firebase/client';
 import {
-  User, Monitor, SignOut, Bell, BellSlash, ShareNetwork, Copy, Check,
+  User, SignOut, Bell, BellSlash, ShareNetwork, Copy, Check,
   Calendar, Sun, Moon, CircleHalf,
 } from '@phosphor-icons/react';
 import { toast } from '@/lib/toast';
@@ -81,12 +81,6 @@ export default function MobileMe() {
           href="/m/me/attendance"
         />
         <NotificationToggle />
-        <MenuItem
-          icon={<Monitor size={18} weight="duotone" />}
-          label="데스크탑 모드"
-          desc="데스크탑 ERP 화면 (전체 설정 포함)"
-          href="/"
-        />
       </section>
 
       <button
@@ -126,7 +120,6 @@ function DisplaySettings() {
     { value: 'soft',    label: '약간' },
     { value: 'rounded', label: '둥글게' },
   ];
-  const fontSizes: FontSize[] = [11, 12, 13, 14];
 
   return (
     <section style={{
@@ -158,19 +151,8 @@ function DisplaySettings() {
         </ChipRow>
       </SettingRow>
 
-      {/* 폰트 크기 */}
-      <SettingRow label="폰트 크기">
-        <ChipRow>
-          {fontSizes.map((s) => (
-            <Chip key={s} active={settings.fontSize === s} onClick={() => update({ fontSize: s })}>
-              {s}
-            </Chip>
-          ))}
-        </ChipRow>
-      </SettingRow>
-
       <div style={{ fontSize: 10, color: 'var(--text-weak)' }}>
-        폰트 종류 / 강조색 등 상세 설정은 데스크탑 <Link href="/settings" style={{ color: 'var(--brand)' }}>/settings</Link>
+        폰트·강조색·밀도 등 상세는 데스크탑 <Link href="/settings" style={{ color: 'var(--brand)' }}>/settings</Link>
       </div>
     </section>
   );
