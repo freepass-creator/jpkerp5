@@ -43,7 +43,7 @@ export default function MobileOrders() {
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Megaphone size={22} weight="duotone" />
+          <Megaphone size={22} weight="regular" />
           요청받은 업무
         </h1>
         <button type="button" onClick={() => setNewOpen(true)} style={{

@@ -1,77 +1,122 @@
 'use client';
 
 /**
- * 모바일 업로드 — 사진 + 통화녹음 통합 일괄 업로드.
+ * 모바일 업로드 — 사진/문서/통화녹음 등 일단 업로드 후 매칭 (Phase A).
  *
- * 파일 종류 자동 분기:
- *  · image/* → 사진 (차량 선택 → 카테고리 → vehicle_attachments/{id}/photos)
- *  · audio/* → 통화녹음 (파일명에서 전화번호 → contracts.customerPhone 매칭 → contact_logs)
+ * 흐름:
+ *  1. 파일 선택 (이미지/PDF/오디오/기타) — 자동 종류 감지
+ *  2. 파일별 분류 선택 (상품화/등록증/견적서/통화녹음 등)
+ *  3. (선택) 차량/계약 매칭
+ *  4. 업로드:
+ *      · 매칭 됐으면 vehicle_attachments / contact_logs 등 적절한 노드로
+ *      · 매칭 안 됐으면 pending_uploads 로 (수동 매칭 대기)
  *
- * 파일명 전화번호 자동 추출:
- *  · `010-1234-5678_2026-06-13_14-30.amr` 같은 형식 매칭
- *  · 매칭된 Contract.customerPhone1/2 → contact_logs/{contractId} 자동 push
- *  · STT (Google Cloud Speech) 비동기 처리
- *
- * Phase 1 (이번 라운드): 업로드 zone + 파일 목록 placeholder
- * Phase 2: 실제 업로드 처리 + 전화번호 매칭 + STT 큐
+ * Phase B (다음): STT 자동, OCR 자동 매칭, 신뢰도 기반 자동/추천/미매칭 분류.
  */
 
-import { useState } from 'react';
-import { UploadSimple, Image as ImageIcon, MicrophoneStage, FileX } from '@phosphor-icons/react';
+import { useMemo, useRef, useState } from 'react';
+import {
+  UploadSimple, Image as ImageIcon, FilePdf, MicrophoneStage, File as FileIcon,
+  MagnifyingGlass, X, Plus,
+} from '@phosphor-icons/react';
+import { useAuth } from '@/lib/use-auth';
+import { useContracts } from '@/lib/firebase/contracts-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
+import {
+  usePendingUploads, addPendingUpload, matchUpload, removePendingUpload,
+  detectKind, extractPhone, fileToDataUrl,
+  SUB_CATEGORY_LABEL, SUB_CATEGORIES_BY_KIND,
+  type UploadKind, type PendingUpload,
+} from '@/lib/firebase/pending-uploads-store';
+import { addFieldLog } from '@/lib/firebase/field-logs-store';
+import { addVehiclePhoto, type VehiclePhotoKind } from '@/lib/firebase/vehicle-attachments-store';
+import { toast } from '@/lib/toast';
 
-type QueuedFile = {
+type DraftFile = {
   id: string;
   file: File;
-  kind: 'image' | 'audio' | 'unknown';
+  kind: UploadKind;
+  subCategory: string;
+  contractId?: string;
   detectedPhone?: string;
-  matchedContractId?: string;
-  status: 'pending' | 'uploading' | 'done' | 'failed';
+  uploading?: boolean;
 };
 
-const PHONE_REGEX = /(\d{2,3})-?(\d{3,4})-?(\d{4})/;
-
-function detectKind(file: File): 'image' | 'audio' | 'unknown' {
-  if (file.type.startsWith('image/')) return 'image';
-  if (file.type.startsWith('audio/')) return 'audio';
-  return 'unknown';
-}
-
-function extractPhone(fileName: string): string | undefined {
-  const m = fileName.match(PHONE_REGEX);
-  if (!m) return undefined;
-  return `${m[1]}-${m[2]}-${m[3]}`;
-}
-
 export default function MobileUpload() {
-  const [queue, setQueue] = useState<QueuedFile[]>([]);
+  const { user } = useAuth();
+  const [drafts, setDrafts] = useState<DraftFile[]>([]);
+  const pendingList = usePendingUploads({ onlyPending: true });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const next: QueuedFile[] = Array.from(files).map((f) => ({
-      id: `q-${Math.random().toString(36).slice(2, 10)}`,
-      file: f,
-      kind: detectKind(f),
-      detectedPhone: extractPhone(f.name),
-      status: 'pending',
-    }));
-    setQueue((q) => [...q, ...next]);
+    const next: DraftFile[] = Array.from(files).map((f) => {
+      const k = detectKind(f.type);
+      const subs = SUB_CATEGORIES_BY_KIND[k];
+      // 디폴트 분류: audio=call / image=product / document=registration / 기타=general
+      const defaultSub =
+        k === 'audio'    ? 'call'
+        : k === 'image'  ? 'product'
+        : k === 'document' ? 'registration'
+        : (subs[0] ?? 'other');
+      return {
+        id: `d-${Math.random().toString(36).slice(2, 10)}`,
+        file: f, kind: k, subCategory: defaultSub,
+        detectedPhone: k === 'audio' ? extractPhone(f.name) : undefined,
+      };
+    });
+    setDrafts((d) => [...d, ...next]);
   }
 
-  const counts = {
-    image: queue.filter((q) => q.kind === 'image').length,
-    audio: queue.filter((q) => q.kind === 'audio').length,
-    unknown: queue.filter((q) => q.kind === 'unknown').length,
-  };
+  function updateDraft(id: string, patch: Partial<DraftFile>) {
+    setDrafts((arr) => arr.map((d) => d.id === id ? { ...d, ...patch } : d));
+  }
+  function removeDraft(id: string) {
+    setDrafts((arr) => arr.filter((d) => d.id !== id));
+  }
+
+  async function uploadOne(draft: DraftFile) {
+    const dataUrl = await fileToDataUrl(draft.file);
+    return addPendingUpload({
+      fileName: draft.file.name,
+      mimeType: draft.file.type,
+      sizeBytes: draft.file.size,
+      dataUrl,
+      kind: draft.kind,
+      subCategory: draft.subCategory,
+      detectedPhone: draft.detectedPhone,
+      uploadedBy: user?.email ?? undefined,
+    });
+  }
+
+  async function handleUploadAll() {
+    if (drafts.length === 0) return;
+    let ok = 0;
+    let fail = 0;
+    for (const d of drafts) {
+      updateDraft(d.id, { uploading: true });
+      try {
+        await uploadOne(d);
+        ok++;
+      } catch (e) {
+        fail++;
+        toast.error(`${d.file.name} 실패: ${(e as Error).message}`);
+      }
+    }
+    setDrafts([]);
+    toast.success(`${ok}개 업로드${fail > 0 ? ` (${fail}개 실패)` : ''}`);
+  }
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <UploadSimple size={22} weight="duotone" />
+          <UploadSimple size={22} weight="regular" />
           업로드
         </h1>
       </header>
 
+      {/* 파일 선택 zone */}
       <label htmlFor="upload-input" style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
         padding: 28, background: 'var(--brand-bg)', color: 'var(--brand)',
@@ -80,93 +125,308 @@ export default function MobileUpload() {
       }}>
         <UploadSimple size={32} weight="bold" />
         <div style={{ fontSize: 14, fontWeight: 700 }}>탭해서 파일 선택</div>
-        <div style={{ fontSize: 11, opacity: 0.85 }}>사진 또는 통화녹음 (여러 개 가능)</div>
+        <div style={{ fontSize: 11, opacity: 0.85 }}>
+          사진 · 통화녹음 · PDF · 등록증 · 견적서 등 (여러 개)
+        </div>
         <input
-          id="upload-input"
-          type="file"
-          multiple
-          accept="image/*,audio/*"
+          ref={fileInputRef}
+          id="upload-input" type="file" multiple
           style={{ display: 'none' }}
           onChange={(e) => handleFiles(e.target.files)}
         />
       </label>
 
-      {queue.length > 0 && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-            <SummaryBox icon={<ImageIcon size={16} weight="duotone" />} label="사진" count={counts.image} tone="green" />
-            <SummaryBox icon={<MicrophoneStage size={16} weight="duotone" />} label="녹음" count={counts.audio} tone="blue" />
-            <SummaryBox icon={<FileX size={16} weight="duotone" />} label="알 수 없음" count={counts.unknown} tone="orange" />
+      {/* 업로드 대기 (drafts) */}
+      {drafts.length > 0 && (
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub)' }}>
+            업로드 대기 ({drafts.length})
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {queue.map((q) => (
-              <FileRow key={q.id} item={q} onRemove={(id) => setQueue((qs) => qs.filter((x) => x.id !== id))} />
-            ))}
-          </div>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ height: 48, fontSize: 14, fontWeight: 700 }}
-            onClick={() => {
-              alert('다음 라운드: 실제 업로드 + 전화번호 매칭 + STT');
+          {drafts.map((d) => (
+            <DraftCard key={d.id} draft={d} onChange={(p) => updateDraft(d.id, p)} onRemove={() => removeDraft(d.id)} />
+          ))}
+          <button type="button" onClick={handleUploadAll} disabled={drafts.some((d) => d.uploading)}
+            style={{
+              height: 48, fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
+              background: 'var(--brand)', color: '#fff', border: 'none',
+              borderRadius: 'var(--radius)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
           >
-            {queue.length}개 업로드 시작
+            <UploadSimple size={16} weight="bold" />
+            {drafts.length}개 업로드
           </button>
-        </>
+        </section>
+      )}
+
+      {/* 미매칭 (pending) — 수동 매칭 대기 */}
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub)' }}>
+          미매칭 ({pendingList.length})
+        </div>
+        {pendingList.length === 0 ? (
+          <div style={{
+            padding: 24, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)',
+            background: 'var(--bg-sunken)', borderRadius: 'var(--radius-lg)',
+          }}>
+            미매칭 파일 없음
+          </div>
+        ) : (
+          pendingList.map((p) => (
+            <PendingCard key={p.id} item={p} userEmail={user?.email ?? undefined} />
+          ))
+        )}
+      </section>
+    </div>
+  );
+}
+
+/* ─────────── 업로드 대기 카드 (Draft) ─────────── */
+
+function DraftCard({ draft, onChange, onRemove }: {
+  draft: DraftFile;
+  onChange: (patch: Partial<DraftFile>) => void;
+  onRemove: () => void;
+}) {
+  const KindIcon = draft.kind === 'image' ? ImageIcon
+    : draft.kind === 'audio' ? MicrophoneStage
+    : draft.kind === 'document' ? FilePdf : FileIcon;
+  const subs = SUB_CATEGORIES_BY_KIND[draft.kind];
+  return (
+    <div style={{
+      padding: 12, background: 'var(--bg-card)',
+      border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <KindIcon size={20} weight="duotone" style={{ color: 'var(--brand)' }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {draft.file.name}
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-weak)' }}>
+            {(draft.file.size / 1024).toFixed(0)} KB
+            {draft.detectedPhone && <> · 📞 <span className="mono">{draft.detectedPhone}</span></>}
+          </div>
+        </div>
+        <button type="button" onClick={onRemove} style={{
+          padding: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-weak)',
+        }} aria-label="제거"><X size={14} weight="bold" /></button>
+      </div>
+
+      {/* 종류 (auto-detected, override possible) */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        {(['image', 'document', 'audio', 'other'] as UploadKind[]).map((k) => (
+          <button key={k} type="button" onClick={() => onChange({ kind: k, subCategory: SUB_CATEGORIES_BY_KIND[k][0] })} style={{
+            padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+            background: draft.kind === k ? 'var(--brand)' : 'var(--bg-sunken)',
+            color: draft.kind === k ? '#fff' : 'var(--text-sub)',
+            border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+          }}>
+            {k === 'image' ? '사진' : k === 'document' ? '문서' : k === 'audio' ? '음성' : '기타'}
+          </button>
+        ))}
+      </div>
+
+      {/* 분류 */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        {subs.map((s) => (
+          <button key={s} type="button" onClick={() => onChange({ subCategory: s })} style={{
+            padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+            background: draft.subCategory === s ? 'var(--brand-bg)' : 'transparent',
+            color: draft.subCategory === s ? 'var(--brand)' : 'var(--text-sub)',
+            border: `1px solid ${draft.subCategory === s ? 'var(--brand)' : 'var(--border)'}`,
+            borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+          }}>
+            {SUB_CATEGORY_LABEL[s] ?? s}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── 미매칭 카드 (Pending) — 수동 매칭 ─────────── */
+
+function PendingCard({ item, userEmail }: { item: PendingUpload; userEmail?: string }) {
+  const [matching, setMatching] = useState(false);
+  const KindIcon = item.kind === 'image' ? ImageIcon
+    : item.kind === 'audio' ? MicrophoneStage
+    : item.kind === 'document' ? FilePdf : FileIcon;
+
+  async function handleDelete() {
+    if (!window.confirm('이 업로드를 삭제할까요?')) return;
+    try {
+      await removePendingUpload(item.id);
+      toast.success('삭제됨');
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  return (
+    <div style={{
+      padding: 12, background: 'var(--bg-card)',
+      border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {item.kind === 'image' && item.dataUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.dataUrl} alt="" style={{
+            width: 44, height: 44, objectFit: 'cover',
+            borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-soft)',
+          }} />
+        ) : (
+          <div style={{
+            width: 44, height: 44, background: 'var(--bg-sunken)',
+            borderRadius: 'var(--radius-sm)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--brand)',
+          }}>
+            <KindIcon size={22} weight="regular" />
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {item.fileName}
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-weak)' }}>
+            <span className={`badge-base badge-brand`} style={{ fontSize: 9, marginRight: 4 }}>
+              {SUB_CATEGORY_LABEL[item.subCategory ?? 'other'] ?? '기타'}
+            </span>
+            {item.detectedPhone && <>📞 <span className="mono">{item.detectedPhone}</span> · </>}
+            {item.uploadedAt.slice(5, 16).replace('T', ' ')}
+          </div>
+        </div>
+        <button type="button" onClick={handleDelete} style={{
+          padding: 6, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-weak)',
+        }} aria-label="삭제"><X size={14} weight="bold" /></button>
+      </div>
+
+      {!matching ? (
+        <button type="button" onClick={() => setMatching(true)} style={{
+          padding: '8px 12px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+          background: 'var(--brand)', color: '#fff',
+          border: 'none', borderRadius: 'var(--radius)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+          cursor: 'pointer',
+        }}>
+          <Plus size={13} weight="bold" /> 매칭하기
+        </button>
+      ) : (
+        <ContractMatcher
+          phoneHint={item.detectedPhone}
+          onCancel={() => setMatching(false)}
+          onMatch={async (contractId, vehicleId, customerKey) => {
+            try {
+              await matchUpload(item.id, {
+                matchedContractId: contractId,
+                matchedVehicleId: vehicleId,
+                matchedCustomerKey: customerKey,
+                matchedBy: userEmail,
+                subCategory: item.subCategory,
+              });
+              // 분류에 따라 적절한 노드로 이관
+              if (item.kind === 'image' && vehicleId) {
+                const photoKind: VehiclePhotoKind =
+                  item.subCategory === 'product' ? 'product'
+                  : item.subCategory === 'delivery' ? 'delivery'
+                  : item.subCategory === 'return' ? 'return'
+                  : 'product';
+                await addVehiclePhoto(vehicleId, {
+                  id: `vp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  kind: photoKind,
+                  url: item.dataUrl,
+                  fileName: item.fileName,
+                  uploadedAt: item.uploadedAt,
+                  uploadedBy: item.uploadedBy,
+                  contractId,
+                  eventDate: item.uploadedAt.slice(0, 10),
+                });
+              } else if (contractId) {
+                await addFieldLog(contractId, {
+                  type: item.kind === 'audio' ? 'call' : 'memo',
+                  body: `${SUB_CATEGORY_LABEL[item.subCategory ?? 'other']} — ${item.fileName}`,
+                  payload: { dataUrl: item.dataUrl, sizeBytes: item.sizeBytes, mimeType: item.mimeType },
+                  vehicleId, customerKey,
+                  by: userEmail,
+                });
+              }
+              await removePendingUpload(item.id);
+              toast.success('매칭 완료');
+            } catch (e) {
+              toast.error(`매칭 실패: ${(e as Error).message}`);
+            }
+          }}
+        />
       )}
     </div>
   );
 }
 
-function SummaryBox({ icon, label, count, tone }: { icon: React.ReactNode; label: string; count: number; tone: 'green' | 'blue' | 'orange' }) {
-  const tones = {
-    green:  { bg: 'var(--green-bg)',  fg: 'var(--green-text)' },
-    blue:   { bg: 'var(--blue-bg)',   fg: 'var(--blue-text)' },
-    orange: { bg: 'var(--orange-bg)', fg: 'var(--orange-text)' },
-  } as const;
-  const c = tones[tone];
-  return (
-    <div style={{
-      padding: 10, background: c.bg, color: c.fg,
-      borderRadius: 'var(--radius-md)', textAlign: 'center',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-    }}>
-      {icon}
-      <div style={{ fontSize: 18, fontWeight: 700 }}>{count}</div>
-      <div style={{ fontSize: 10, opacity: 0.85 }}>{label}</div>
-    </div>
-  );
-}
+/* ─────────── 차량/계약 매칭 검색기 ─────────── */
 
-function FileRow({ item, onRemove }: { item: QueuedFile; onRemove: (id: string) => void }) {
-  const kindIcon = item.kind === 'image' ? <ImageIcon size={18} weight="duotone" />
-    : item.kind === 'audio' ? <MicrophoneStage size={18} weight="duotone" />
-    : <FileX size={18} weight="duotone" />;
+function ContractMatcher({ phoneHint, onCancel, onMatch }: {
+  phoneHint?: string;
+  onCancel: () => void;
+  onMatch: (contractId: string, vehicleId?: string, customerKey?: string) => Promise<void>;
+}) {
+  const { contracts } = useContracts();
+  const { vehicles } = useVehicles();
+  const initialQ = phoneHint ?? '';
+  const [q, setQ] = useState(initialQ);
+
+  const matches = useMemo(() => {
+    const query = q.trim().toLowerCase().replace(/[^\w가-힣]/g, '');
+    if (!query) return [];
+    return contracts.filter((c) =>
+      `${c.vehiclePlate ?? ''}${c.customerName ?? ''}${c.customerPhone1 ?? ''}${c.customerPhone2 ?? ''}`
+        .toLowerCase().replace(/[^\w가-힣]/g, '').includes(query),
+    ).slice(0, 7);
+  }, [contracts, q]);
+
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: 10, background: 'var(--bg-card)',
-      border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)',
-    }}>
-      {kindIcon}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {item.file.name}
-        </div>
-        <div style={{ fontSize: 10, color: 'var(--text-weak)' }}>
-          {(item.file.size / 1024).toFixed(0)} KB
-          {item.detectedPhone && (
-            <> · 📞 <span className="mono">{item.detectedPhone}</span></>
-          )}
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 12px', background: 'var(--bg-sunken)',
+        border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+      }}>
+        <MagnifyingGlass size={14} weight="duotone" />
+        <input
+          value={q} onChange={(e) => setQ(e.target.value)}
+          placeholder="차량번호 / 고객명 / 전화번호" autoFocus
+          style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, fontFamily: 'inherit' }}
+        />
+        <button type="button" onClick={onCancel} style={{
+          background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-weak)', padding: 2,
+        }}><X size={14} weight="bold" /></button>
       </div>
-      <button type="button" onClick={() => onRemove(item.id)} style={{
-        padding: 6, background: 'transparent', border: 'none', cursor: 'pointer',
-        color: 'var(--text-weak)',
-      }} aria-label="제거">✕</button>
+      {matches.map((c) => {
+        const vehicleId = vehicles.find((v) =>
+          (v.plate ?? '').trim() === (c.vehiclePlate ?? '').trim()
+          || (v.plateHistory ?? []).some((p) => (p ?? '').trim() === (c.vehiclePlate ?? '').trim())
+        )?.id;
+        const customerKey = (c.customerIdentNo ?? '').replace(/\D/g, '') || undefined;
+        return (
+          <button key={c.id} type="button" onClick={() => void onMatch(c.id, vehicleId, customerKey)} style={{
+            padding: '10px 12px', background: 'var(--bg-sunken)',
+            border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{c.vehiclePlate}</strong>
+                <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>{c.customerName}</span>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-weak)' }}>{c.customerPhone1 ?? ''}</div>
+            </div>
+            <Plus size={14} weight="bold" style={{ color: 'var(--brand)' }} />
+          </button>
+        );
+      })}
     </div>
   );
 }

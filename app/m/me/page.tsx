@@ -40,7 +40,7 @@ export default function MobileMe() {
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <GearSix size={22} weight="duotone" />
+          <GearSix size={22} weight="regular" />
           설정
         </h1>
       </header>

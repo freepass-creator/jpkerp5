@@ -30,7 +30,7 @@ export default function MobileAttendance() {
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Calendar size={22} weight="duotone" />
+          <Calendar size={22} weight="regular" />
           근태관리
         </h1>
       </header>

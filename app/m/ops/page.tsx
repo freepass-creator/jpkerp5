@@ -101,7 +101,7 @@ export default function MobileOps() {
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Car size={22} weight="duotone" />
+          <Car size={22} weight="regular" />
           운영
         </h1>
         <div style={{

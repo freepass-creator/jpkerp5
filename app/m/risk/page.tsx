@@ -81,7 +81,7 @@ export default function MobileRisk() {
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Warning size={22} weight="duotone" />
+          <Warning size={22} weight="regular" />
           리스크
         </h1>
         {/* 검색바 — 운영과 동일 규격 */}
