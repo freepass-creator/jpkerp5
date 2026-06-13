@@ -9,7 +9,7 @@
  *  3. 토스트 + 입력 탭으로 복귀
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MagnifyingGlass, NotePencil } from '@phosphor-icons/react';
 import { MobileSaveFooter } from '@/components/mobile/save-footer';
@@ -60,8 +60,8 @@ export default function MobileMemoEntry() {
     return 'contract';
   }, [contract, vehicleId]);
 
-  // contract 변경 시 default scope 자동 적용
-  useMemo(() => { setScope(defaultScope); }, [defaultScope]);
+  // contract 변경 시 default scope 자동 적용 (사용자 선택은 동일 deps 동안 유지)
+  useEffect(() => { setScope(defaultScope); }, [defaultScope]);
 
   const matches = useMemo(() => {
     const query = q.trim().toLowerCase().replace(/[^\w가-힣]/g, '');
