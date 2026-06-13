@@ -60,9 +60,15 @@ export default function MobileOps() {
   }, [contracts, q, filter]);
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 12px 0' }}>운영</h1>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* 상단 고정 — 타이틀 + 검색바 + 필터칩. 스크롤해도 따라옴 */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'var(--bg-main)',
+        padding: '16px 16px 10px',
+        borderBottom: '1px solid var(--border-soft)',
+      }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0' }}>운영</h1>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '10px 12px', background: 'var(--bg-card)',
@@ -80,24 +86,24 @@ export default function MobileOps() {
             </button>
           )}
         </div>
-      </header>
-
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-        <FunnelSimple size={16} weight="duotone" style={{ color: 'var(--text-sub)', flexShrink: 0, alignSelf: 'center' }} />
-        {FILTERS.map((f) => (
-          <button key={f.key} type="button" onClick={() => setFilter(f.key)} style={{
-            padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap',
-            background: filter === f.key ? 'var(--brand)' : 'var(--bg-card)',
-            color: filter === f.key ? '#fff' : 'var(--text-sub)',
-            border: `1px solid ${filter === f.key ? 'var(--brand)' : 'var(--border)'}`,
-            borderRadius: 'var(--radius)', cursor: 'pointer', flexShrink: 0,
-          }}>{f.label}</button>
-        ))}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 8, paddingBottom: 2, scrollbarWidth: 'none' }}>
+          <FunnelSimple size={16} weight="duotone" style={{ color: 'var(--text-sub)', flexShrink: 0, alignSelf: 'center' }} />
+          {FILTERS.map((f) => (
+            <button key={f.key} type="button" onClick={() => setFilter(f.key)} style={{
+              padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap',
+              background: filter === f.key ? 'var(--brand)' : 'var(--bg-card)',
+              color: filter === f.key ? '#fff' : 'var(--text-sub)',
+              border: `1px solid ${filter === f.key ? 'var(--brand)' : 'var(--border)'}`,
+              borderRadius: 'var(--radius)', cursor: 'pointer', flexShrink: 0,
+            }}>{f.label}</button>
+          ))}
+        </div>
       </div>
 
-      <div style={{ fontSize: 11, color: 'var(--text-sub)' }}>{filtered.length}건</div>
+      <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-sub)' }}>{filtered.length}건</div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {filtered.map((c) => (
           <Link key={c.id} href={`/m/contract/${c.id}`} style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -123,15 +129,17 @@ export default function MobileOps() {
             <CaretRight size={14} weight="bold" style={{ color: 'var(--text-weak)', flexShrink: 0 }} />
           </Link>
         ))}
-        {filtered.length === 0 && (
-          <div style={{
-            padding: 32, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)',
-            background: 'var(--bg-sunken)', borderRadius: 'var(--radius-lg)',
-          }}>
-            {q ? '검색 결과 없음' : '해당 조건 없음'}
-          </div>
-        )}
+          {filtered.length === 0 && (
+            <div style={{
+              padding: 32, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)',
+              background: 'var(--bg-sunken)', borderRadius: 'var(--radius-lg)',
+            }}>
+              {q ? '검색 결과 없음' : '해당 조건 없음'}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+

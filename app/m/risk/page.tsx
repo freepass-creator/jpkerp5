@@ -68,29 +68,34 @@ export default function MobileRisk() {
   const totalCount = (Object.values(groups) as (typeof contracts)[]).reduce((a, list) => a + list.length, 0);
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <header>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* 상단 고정 — 타이틀 + 카테고리 칩. 스크롤해도 따라옴 */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'var(--bg-main)',
+        padding: '16px 16px 10px',
+        borderBottom: '1px solid var(--border-soft)',
+      }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0' }}>리스크</h1>
         <p style={{ fontSize: 12, color: 'var(--text-sub)', margin: 0 }}>
           미수 · 반납 지연 · 보험 미커버 · 데이터 결손
         </p>
-      </header>
-
-      {/* 카테고리 필터 */}
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-        <FunnelSimple size={16} weight="duotone" style={{ color: 'var(--text-sub)', flexShrink: 0, alignSelf: 'center' }} />
-        <KindChip label={`전체 (${totalCount})`} active={activeKind === 'all'} onClick={() => setActiveKind('all')} tone="brand" />
-        {KINDS.map((k) => (
-          <KindChip
-            key={k.key}
-            label={`${k.label} (${groups[k.key].length})`}
-            active={activeKind === k.key}
-            onClick={() => setActiveKind(k.key)}
-            tone={k.tone}
-          />
-        ))}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 10, paddingBottom: 2, scrollbarWidth: 'none' }}>
+          <FunnelSimple size={16} weight="duotone" style={{ color: 'var(--text-sub)', flexShrink: 0, alignSelf: 'center' }} />
+          <KindChip label={`전체 (${totalCount})`} active={activeKind === 'all'} onClick={() => setActiveKind('all')} tone="brand" />
+          {KINDS.map((k) => (
+            <KindChip
+              key={k.key}
+              label={`${k.label} (${groups[k.key].length})`}
+              active={activeKind === k.key}
+              onClick={() => setActiveKind(k.key)}
+              tone={k.tone}
+            />
+          ))}
+        </div>
       </div>
 
+      <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* 카테고리별 섹션 */}
       {(activeKind === 'all' ? KINDS : KINDS.filter((k) => k.key === activeKind)).map((kind) => {
         const items = groups[kind.key];
@@ -157,6 +162,7 @@ export default function MobileRisk() {
           리스크 없음 — 좋은 상태
         </div>
       )}
+      </div>
     </div>
   );
 }

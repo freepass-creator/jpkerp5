@@ -39,30 +39,38 @@ export default function MobileContractDetail() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* Hero — 차량번호 큼지막 + 핵심 메타 */}
-      <header style={{
-        background: 'linear-gradient(135deg, var(--brand-bg), var(--bg-card))',
-        padding: '14px 16px 18px',
-        borderBottom: '1px solid var(--border)',
+      {/* 상단 고정 — Hero (차량번호 + 상태) + 액션 4종. 정보 카드 스크롤해도 액션 노출 */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'var(--bg-main)',
       }}>
-        <Link href="/m/search" style={{ color: 'var(--text-sub)', textDecoration: 'none', fontSize: 12 }}>
-          <CaretLeft size={14} weight="bold" /> 조회로
-        </Link>
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{c.vehiclePlate ?? '?'}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-sub)', marginTop: 2 }}>
-            {c.vehicleModel ?? '-'} · {c.company ?? '-'}
+        <header style={{
+          background: 'linear-gradient(135deg, var(--brand-bg), var(--bg-card))',
+          padding: '14px 16px 18px',
+          borderBottom: '1px solid var(--border)',
+        }}>
+          <Link href="/m/ops" style={{ color: 'var(--text-sub)', textDecoration: 'none', fontSize: 12 }}>
+            <CaretLeft size={14} weight="bold" /> 운영
+          </Link>
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{c.vehiclePlate ?? '?'}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-sub)', marginTop: 2 }}>
+              {c.vehicleModel ?? '-'} · {c.company ?? '-'}
+            </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-          <Chip>{c.vehicleStatus}</Chip>
-          <Chip>{c.status}</Chip>
-          {c.unpaidAmount > 0 && <Chip tone="red">미수 ₩{formatCurrency(c.unpaidAmount)}</Chip>}
-        </div>
-      </header>
+          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            <Chip>{c.vehicleStatus}</Chip>
+            <Chip>{c.status}</Chip>
+            {c.unpaidAmount > 0 && <Chip tone="red">미수 ₩{formatCurrency(c.unpaidAmount)}</Chip>}
+          </div>
+        </header>
 
-      {/* 액션 4종 */}
-      <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+        {/* 액션 4종 — Hero 와 함께 고정 */}
+        <div style={{
+          padding: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
+          background: 'var(--bg-main)',
+          borderBottom: '1px solid var(--border-soft)',
+        }}>
         <ActionBtn icon={<Camera size={22} weight="duotone" />} label="사진" href={`/m/upload?contractId=${c.id}`} />
         <ActionBtn icon={<NotePencil size={22} weight="duotone" />} label="메모" href={`/m/entry/memo?contractId=${c.id}`} />
         {c.customerPhone1 ? (
@@ -75,10 +83,11 @@ export default function MobileContractDetail() {
         ) : (
           <ActionBtn icon={<ChatCircle size={22} weight="duotone" />} label="문자" disabled />
         )}
+        </div>
       </div>
 
       {/* 정보 카드들 */}
-      <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <InfoSection title="고객">
           <Row label="이름" value={c.customerName ?? '-'} />
           <Row label="연락처" value={c.customerPhone1 ?? '-'} mono />
