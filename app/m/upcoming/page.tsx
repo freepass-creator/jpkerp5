@@ -145,7 +145,7 @@ function formatDateLabel(date: string): string {
 function OrderRow({ order, contracts }: { order: DispatchOrder; contracts: Contract[] }) {
   const linked = order.contractId ? contracts.find((c) => c.id === order.contractId) : undefined;
   return (
-    <Link href="/m/orders" style={{
+    <Link href="/m/orders/received" style={{
       display: 'flex', flexDirection: 'column', gap: 4,
       padding: '12px 14px', background: 'var(--bg-card)',
       border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',

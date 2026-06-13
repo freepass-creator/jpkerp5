@@ -239,8 +239,12 @@ export default function MobileHome() {
             ? `인도 ${data.upcoming.delivery.length} · 반납 ${data.upcoming.return.length}`
             : '예정 일정 없음'}
         />
+      </SectionGroup>
+
+      {/* 요청 — 받은 지시 처리 + 내가 보낸 지시 추적 */}
+      <SectionGroup label="요청">
         <SummaryCard
-          href="/m/orders"
+          href="/m/orders/received"
           icon={<Megaphone size={16} weight="bold" />}
           title="받은 업무"
           tone="amber"
@@ -248,12 +252,8 @@ export default function MobileHome() {
           countLabel="건"
           subtitle={pendingOrders > 0 ? '미확인 지시 대기' : '받은 업무 없음'}
         />
-      </SectionGroup>
-
-      {/* 요청 — 새 요청 보내기 + 내가 보낸 거 추적 */}
-      <SectionGroup label="요청">
         <SummaryCard
-          href="/m/orders?view=sent"
+          href="/m/orders/sent"
           icon={<PaperPlaneTilt size={16} weight="bold" />}
           title="보낸 업무"
           tone="indigo"
