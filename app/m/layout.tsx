@@ -41,6 +41,8 @@ function isDetailRoute(path: string): boolean {
   return path.startsWith('/m/contract/')
     || path.startsWith('/m/entry/memo')
     || path.startsWith('/m/entry/license')
+    || path.startsWith('/m/entry/deliver')
+    || path.startsWith('/m/entry/return')
     || (path.startsWith('/m/me/') && path !== '/m/me');
 }
 

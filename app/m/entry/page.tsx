@@ -28,8 +28,8 @@ type Action = {
 const ACTIONS: Action[] = [
   { key: 'memo',     label: '메모',         desc: '차량/계약 메모',          icon: <NotePencil size={24} weight="duotone" />,         tone: 'brand', href: '/m/entry/memo' },
   { key: 'license',  label: '면허증 검증',  desc: 'OCR + 운전 가능 확인',     icon: <IdentificationCard size={24} weight="duotone" />, tone: 'blue',  href: '/m/entry/license' },
-  { key: 'deliver',  label: '인도 처리',    desc: '고객에게 차량 인도',       icon: <Truck size={24} weight="duotone" />,              tone: 'green' },
-  { key: 'return',   label: '반납 처리',    desc: '고객 반납 받음',           icon: <ArrowUUpLeft size={24} weight="duotone" />,       tone: 'orange' },
+  { key: 'deliver',  label: '인도 처리',    desc: '고객에게 차량 인도',       icon: <Truck size={24} weight="duotone" />,              tone: 'green',  href: '/m/entry/deliver' },
+  { key: 'return',   label: '반납 처리',    desc: '고객 반납 받음',           icon: <ArrowUUpLeft size={24} weight="duotone" />,       tone: 'orange', href: '/m/entry/return' },
   { key: 'location', label: '위치 등록',    desc: '차량 현재 위치',           icon: <MapPin size={24} weight="duotone" />,             tone: 'blue' },
   { key: 'call',     label: '통화 기록',    desc: '방금 통화 메모',           icon: <Phone size={24} weight="duotone" />,              tone: 'blue' },
   { key: 'expense',  label: '비용 등록',    desc: '주유/세차/통행료',          icon: <Receipt size={24} weight="duotone" />,            tone: 'orange' },
