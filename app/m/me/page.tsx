@@ -1,16 +1,29 @@
 'use client';
 
 /**
- * 모바일 설정 — 내 프로필, 알림, 디자인, 로그아웃, 데스크탑 모드.
+ * 모바일 설정 — 모바일에 정말 필요한 것만.
+ *  · 프로필
+ *  · 화면 (테마/라운드/폰트 — 컴팩트 3종, 디테일한 건 데스크탑 /settings)
+ *  · 손님조회 링크 공유 (Web Share + Clipboard)
+ *  · 근태관리 (휴가/반차/조퇴 신청)
+ *  · 알림 토글 (localStorage, FCM 추후)
+ *  · 데스크탑 모드 link
+ *  · 로그아웃
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/use-auth';
+import { useSettings, type Theme, type Radius, type FontSize } from '@/lib/use-settings';
 import { getAuth, signOut } from 'firebase/auth';
 import { getFirebaseApp } from '@/lib/firebase/client';
-import { User, Monitor, SignOut, Bell, Palette, ShareNetwork, Copy, Check } from '@phosphor-icons/react';
+import {
+  User, Monitor, SignOut, Bell, BellSlash, ShareNetwork, Copy, Check,
+  Calendar, Sun, Moon, CircleHalf,
+} from '@phosphor-icons/react';
 import { toast } from '@/lib/toast';
+
+const NOTI_KEY = 'jpkerp5:mobile:notifications';
 
 export default function MobileMe() {
   const { user } = useAuth();
@@ -29,7 +42,7 @@ export default function MobileMe() {
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0' }}>설정</h1>
       </header>
 
-      {/* 프로필 카드 */}
+      {/* 프로필 */}
       <section style={{
         padding: 16, background: 'var(--bg-card)',
         border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
@@ -50,17 +63,30 @@ export default function MobileMe() {
         </div>
       </section>
 
-      {/* 손님조회 링크 공유 — 카톡·문자로 손님에게 보낼 셀프 조회 URL */}
+      {/* 화면 — 컴팩트 (테마·라운드·폰트). 더 디테일한 건 /settings */}
+      <DisplaySettings />
+
+      {/* 손님조회 링크 */}
       <CustomerPortalShare />
 
-      {/* 메뉴 */}
+      {/* 근태 + 알림 + 데스크탑 모드 */}
       <section style={{
         background: 'var(--bg-card)', border: '1px solid var(--border-soft)',
         borderRadius: 'var(--radius-lg)', overflow: 'hidden',
       }}>
-        <MenuItem icon={<Bell size={18} weight="duotone" />} label="알림" desc="푸시·진동·메시지 (Phase 2)" onClick={() => toast.info('Phase 2 — 푸시 알림 설정')} />
-        <MenuItem icon={<Palette size={18} weight="duotone" />} label="디자인" desc="폰트·라운드·색상" href="/settings" />
-        <MenuItem icon={<Monitor size={18} weight="duotone" />} label="데스크탑 모드" desc="데스크탑 ERP 화면으로" href="/" />
+        <MenuItem
+          icon={<Calendar size={18} weight="duotone" />}
+          label="근태관리"
+          desc="휴가·반차·조퇴 신청"
+          href="/m/me/attendance"
+        />
+        <NotificationToggle />
+        <MenuItem
+          icon={<Monitor size={18} weight="duotone" />}
+          label="데스크탑 모드"
+          desc="데스크탑 ERP 화면 (전체 설정 포함)"
+          href="/"
+        />
       </section>
 
       <button
@@ -85,9 +111,102 @@ export default function MobileMe() {
   );
 }
 
+/* ─────────── 화면 설정 — 컴팩트 (테마·라운드·폰트) ─────────── */
+
+function DisplaySettings() {
+  const { settings, update } = useSettings();
+
+  const themes: { value: Theme; label: string; icon: React.ReactNode }[] = [
+    { value: 'light', label: '라이트', icon: <Sun size={14} weight="duotone" /> },
+    { value: 'dark',  label: '다크',   icon: <Moon size={14} weight="duotone" /> },
+    { value: 'auto',  label: '자동',   icon: <CircleHalf size={14} weight="duotone" /> },
+  ];
+  const radii: { value: Radius; label: string }[] = [
+    { value: 'square',  label: '각지게' },
+    { value: 'soft',    label: '약간' },
+    { value: 'rounded', label: '둥글게' },
+  ];
+  const fontSizes: FontSize[] = [11, 12, 13, 14];
+
+  return (
+    <section style={{
+      padding: 14, background: 'var(--bg-card)',
+      border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
+      display: 'flex', flexDirection: 'column', gap: 12,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>화면</div>
+
+      {/* 테마 */}
+      <SettingRow label="테마">
+        <ChipRow>
+          {themes.map((t) => (
+            <Chip key={t.value} active={settings.theme === t.value} onClick={() => update({ theme: t.value })}>
+              {t.icon}{t.label}
+            </Chip>
+          ))}
+        </ChipRow>
+      </SettingRow>
+
+      {/* 라운드 */}
+      <SettingRow label="라운드">
+        <ChipRow>
+          {radii.map((r) => (
+            <Chip key={r.value} active={settings.radius === r.value} onClick={() => update({ radius: r.value })}>
+              {r.label}
+            </Chip>
+          ))}
+        </ChipRow>
+      </SettingRow>
+
+      {/* 폰트 크기 */}
+      <SettingRow label="폰트 크기">
+        <ChipRow>
+          {fontSizes.map((s) => (
+            <Chip key={s} active={settings.fontSize === s} onClick={() => update({ fontSize: s })}>
+              {s}
+            </Chip>
+          ))}
+        </ChipRow>
+      </SettingRow>
+
+      <div style={{ fontSize: 10, color: 'var(--text-weak)' }}>
+        폰트 종류 / 강조색 등 상세 설정은 데스크탑 <Link href="/settings" style={{ color: 'var(--brand)' }}>/settings</Link>
+      </div>
+    </section>
+  );
+}
+
+function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)' }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+function ChipRow({ children }: { children: React.ReactNode }) {
+  return <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{children}</div>;
+}
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button" onClick={onClick}
+      style={{
+        padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+        background: active ? 'var(--brand)' : 'var(--bg-card)',
+        color: active ? '#fff' : 'var(--text-main)',
+        border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+        borderRadius: 'var(--radius)',
+        cursor: 'pointer', touchAction: 'manipulation',
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+      }}
+    >{children}</button>
+  );
+}
+
+/* ─────────── 손님조회 링크 ─────────── */
+
 function CustomerPortalShare() {
-  // 손님 셀프 조회 URL — 추후 별도 페이지 (/customer/{contractId} 등) 구축 시 동적 생성
-  // 현재는 모바일 메인 URL 기준 (placeholder)
   const url = typeof window !== 'undefined' ? `${window.location.origin}/customer` : '';
   const [copied, setCopied] = useState(false);
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
@@ -157,6 +276,59 @@ function CustomerPortalShare() {
         )}
       </div>
     </section>
+  );
+}
+
+/* ─────────── 알림 토글 (localStorage, FCM 추후) ─────────── */
+
+function NotificationToggle() {
+  const [enabled, setEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(NOTI_KEY);
+      setEnabled(v !== '0');
+    } catch { /* silent */ }
+  }, []);
+
+  function toggle() {
+    const next = !enabled;
+    setEnabled(next);
+    try { localStorage.setItem(NOTI_KEY, next ? '1' : '0'); } catch { /* silent */ }
+    toast.info(next ? '알림 켜짐 (FCM 푸시는 Phase 2)' : '알림 꺼짐');
+  }
+
+  return (
+    <button type="button" onClick={toggle} style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 14px', background: 'transparent',
+      border: 'none', borderBottom: '1px solid var(--border-soft)',
+      cursor: 'pointer', textAlign: 'left', width: '100%',
+      fontFamily: 'inherit', color: 'inherit',
+      touchAction: 'manipulation',
+    }}>
+      <div style={{ color: enabled ? 'var(--brand)' : 'var(--text-weak)' }}>
+        {enabled ? <Bell size={18} weight="duotone" /> : <BellSlash size={18} weight="duotone" />}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>알림</div>
+        <div style={{ fontSize: 10.5, color: 'var(--text-weak)' }}>
+          {enabled ? '받기 (사무 신규 등록 알림)' : '받지 않기'}
+        </div>
+      </div>
+      <div style={{
+        width: 36, height: 20,
+        background: enabled ? 'var(--brand)' : 'var(--bg-sunken)',
+        borderRadius: 999, position: 'relative',
+        transition: 'background 0.15s',
+      }}>
+        <div style={{
+          position: 'absolute', top: 2, left: enabled ? 18 : 2,
+          width: 16, height: 16, background: '#fff', borderRadius: '50%',
+          transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+        }} />
+      </div>
+    </button>
   );
 }
 

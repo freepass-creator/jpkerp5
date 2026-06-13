@@ -14,7 +14,7 @@ import { useMemo } from 'react';
 import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useAuth } from '@/lib/use-auth';
-import { Truck, ArrowUUpLeft, CurrencyKrw, Bell, CaretRight } from '@phosphor-icons/react';
+import { Truck, ArrowUUpLeft, CurrencyKrw, Bell, CaretRight, MagnifyingGlass } from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
 
@@ -69,30 +69,42 @@ export default function MobileHome() {
         <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-main)' }}>오늘</div>
       </header>
 
+      {/* 빠른 조회 — 탭 전환 없이 즉시 검색 */}
+      <Link href="/m/ops" style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '12px 14px', background: 'var(--bg-card)',
+        border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
+        textDecoration: 'none', color: 'var(--text-sub)',
+        touchAction: 'manipulation',
+      }}>
+        <MagnifyingGlass size={18} weight="duotone" />
+        <span style={{ fontSize: 14 }}>차량번호 · 고객명 조회</span>
+      </Link>
+
       {/* KPI 카드 4종 */}
       <KpiRow>
         <KpiCard
           tone="brand" icon={<Truck size={18} weight="duotone" />}
           label="오늘 인도" value={buckets.deliveryToday.length}
-          href="/m/search?filter=delivery-today"
+          href="/m/ops?filter=delivery-today"
         />
         <KpiCard
           tone="blue" icon={<Truck size={18} weight="duotone" />}
           label="내일 인도" value={buckets.deliveryTomorrow.length}
-          href="/m/search?filter=delivery-tomorrow"
+          href="/m/ops?filter=delivery-tomorrow"
         />
         <KpiCard
           tone="orange" icon={<ArrowUUpLeft size={18} weight="duotone" />}
           label="반납 임박" value={buckets.returnSoon.length}
           subtext="D-3 이내"
-          href="/m/search?filter=return-soon"
+          href="/m/ops?filter=return-soon"
         />
         <KpiCard
           tone="red" icon={<CurrencyKrw size={18} weight="duotone" />}
           label="미수"
           value={buckets.unpaidCount}
           subtext={`₩${formatCurrency(buckets.totalUnpaid)}`}
-          href="/m/search?filter=unpaid"
+          href="/m/risk?filter=unpaid"
         />
       </KpiRow>
 
