@@ -29,8 +29,9 @@ import {
 type StatusFilter = DispatchStatus | 'all';
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
-  { key: 'pending',      label: '미확인' },
+  { key: 'pending',      label: '받음' },
   { key: 'acknowledged', label: '확인' },
+  { key: 'in_progress',  label: '진행중' },
   { key: 'done',         label: '완료' },
   { key: 'cancelled',    label: '취소' },
   { key: 'all',          label: '전체' },
@@ -44,16 +45,18 @@ const KINDS: { key: DispatchKind; label: string }[] = [
   { key: 'other',      label: '기타' },
 ];
 
-const STATUS_TONE: Record<DispatchStatus, 'orange' | 'blue' | 'green' | 'gray'> = {
+const STATUS_TONE: Record<DispatchStatus, 'orange' | 'blue' | 'amber' | 'green' | 'gray'> = {
   pending:      'orange',
   acknowledged: 'blue',
+  in_progress:  'amber',
   done:         'green',
   cancelled:    'gray',
 };
 
 const STATUS_LABEL: Record<DispatchStatus, string> = {
-  pending:      '미확인',
-  acknowledged: '확인됨',
+  pending:      '받음',
+  acknowledged: '확인',
+  in_progress:  '진행중',
   done:         '완료',
   cancelled:    '취소',
 };
@@ -97,7 +100,7 @@ export default function DispatchPage() {
   }, [list, statusFilter, kindFilter, q]);
 
   const counts = useMemo(() => {
-    const c = { pending: 0, acknowledged: 0, done: 0, cancelled: 0 };
+    const c: Record<DispatchStatus, number> = { pending: 0, acknowledged: 0, in_progress: 0, done: 0, cancelled: 0 };
     for (const o of list) c[o.status] = (c[o.status] ?? 0) + 1;
     return c;
   }, [list]);

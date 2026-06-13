@@ -28,7 +28,7 @@ import { withMeta, type WriteMeta } from '../write-meta';
 const PATH = dbPath('dispatch_orders');
 
 export type DispatchKind = 'inspection' | 'delivery' | 'return' | 'memo' | 'other';
-export type DispatchStatus = 'pending' | 'acknowledged' | 'done' | 'cancelled';
+export type DispatchStatus = 'pending' | 'acknowledged' | 'in_progress' | 'done' | 'cancelled';
 
 export type DispatchOrder = {
   id: string;
@@ -45,6 +45,7 @@ export type DispatchOrder = {
   status: DispatchStatus;
   createdBy?: string;
   acknowledgedAt?: string;
+  startedAt?: string;
   doneAt?: string;
   _meta?: WriteMeta;
 };
@@ -84,7 +85,7 @@ export async function createDispatchOrder(
 
 export async function updateDispatchStatus(
   orderId: string,
-  patch: { status: DispatchStatus; acknowledgedAt?: string; doneAt?: string },
+  patch: { status: DispatchStatus; acknowledgedAt?: string; startedAt?: string; doneAt?: string },
 ): Promise<void> {
   await ensureAuth();
   const db = getRtdb();
@@ -122,6 +123,30 @@ export function useMyDispatchOrders(uid: string | null | undefined): DispatchOrd
 export function useMyPendingDispatchCount(uid: string | null | undefined): number {
   const orders = useMyDispatchOrders(uid);
   return orders.filter((o) => o.status === 'pending').length;
+}
+
+/** 본인이 보낸 업무 라이브 구독 — createdBy 매치 */
+export function useSentDispatchOrders(email: string | null | undefined): DispatchOrder[] {
+  const [data, setData] = useState<DispatchOrder[]>([]);
+  useEffect(() => {
+    if (!email) { setData([]); return; }
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      try { await ensureAuth(); } catch { /* silent */ }
+      if (cancelled) return;
+      const db = getRtdb();
+      if (!db) return;
+      unsub = onValue(ref(db, PATH), (snap) => {
+        const val = (snap.val() ?? {}) as Record<string, DispatchOrder>;
+        const list = Object.values(val).filter((o) => o.createdBy === email);
+        list.sort((a, b) => (b._meta?.at ?? '').localeCompare(a._meta?.at ?? ''));
+        setData(list);
+      });
+    })();
+    return () => { cancelled = true; if (unsub) unsub(); };
+  }, [email]);
+  return data;
 }
 
 /** 전체 요청 1회 fetch — 사무/관리자 페이지 */

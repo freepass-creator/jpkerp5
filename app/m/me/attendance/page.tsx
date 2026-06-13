@@ -12,7 +12,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { CaretLeft, Plus, Calendar, CheckCircle, XCircle, ClockCounterClockwise, X } from '@phosphor-icons/react';
+import { Plus, Calendar, CheckCircle, XCircle, ClockCounterClockwise, X } from '@phosphor-icons/react';
+import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { useAuth } from '@/lib/use-auth';
 import {
   useMyAttendanceRequests, submitAttendanceRequest,
@@ -168,7 +169,8 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
       <div onClick={(e) => e.stopPropagation()} style={{
         background: 'var(--bg-card)', width: '100%', maxWidth: 560,
         borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)',
-        padding: 18, paddingBottom: 'calc(18px + env(safe-area-inset-bottom))',
+        padding: 18,
+        paddingBottom: 'calc(76px + env(safe-area-inset-bottom))', // SaveFooter 공간
         display: 'flex', flexDirection: 'column', gap: 14,
         maxHeight: '92vh', overflow: 'auto',
       }}>
@@ -219,19 +221,17 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
             style={{ ...inputStyle(), minHeight: 80, resize: 'vertical', lineHeight: 1.5 }} />
         </Field>
 
-        <button type="button" onClick={handleSubmit} disabled={saving || !fromDate}
-          style={{
-            height: 50, fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
-            background: 'var(--brand)', color: '#fff', border: 'none',
-            borderRadius: 'var(--radius-lg)', cursor: saving ? 'wait' : 'pointer',
-            opacity: !fromDate ? 0.5 : 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}
-        >
-          <Calendar size={16} weight="bold" />
-          {saving ? '신청 중...' : '신청'}
-        </button>
       </div>
+
+      <MobileSaveFooter
+        prevLabel="취소"
+        onPrev={onClose}
+        primaryLabel="신청"
+        primaryBusyLabel="신청 중..."
+        primaryBusy={saving}
+        primaryDisabled={!fromDate}
+        onPrimary={handleSubmit}
+      />
     </div>
   );
 }

@@ -37,15 +37,21 @@ const TABS: Tab[] = [
 ];
 
 /** 상세 페이지 패턴 — 진입 시 탭바 대신 풀폭 '이전' 바 노출. */
+/**
+ * 서브 페이지 패턴 — 탭바 자리에 '이전' 바 노출.
+ *
+ * 모바일 규격:
+ *  · 탭 페이지(6개: 홈/운영/리스크/입력/업로드/설정) → 탭바
+ *  · 서브 페이지(상세/스케줄/액션 폼 등) → 이전 바 (하단)
+ *  · 저장 폼 페이지 → [취소][저장] 바 (SaveFooter — 이전 바 위로 덮음)
+ */
 function isDetailRoute(path: string): boolean {
-  return path.startsWith('/m/contract/')
-    || path.startsWith('/m/entry/memo')
-    || path.startsWith('/m/entry/license')
-    || path.startsWith('/m/entry/deliver')
-    || path.startsWith('/m/entry/return')
-    || path.startsWith('/m/today')
-    || path.startsWith('/m/tomorrow')
-    || (path.startsWith('/m/me/') && path !== '/m/me');
+  if (path === '/m') return false;
+  // 6개 탭 페이지는 탭바 유지
+  const tabPaths = ['/m/ops', '/m/risk', '/m/entry', '/m/upload', '/m/me'];
+  if (tabPaths.includes(path)) return false;
+  // 그 외 모든 /m/* 는 서브 페이지로 간주 → 이전 바
+  return path.startsWith('/m/');
 }
 
 export default function MobileLayout({ children }: { children: ReactNode }) {

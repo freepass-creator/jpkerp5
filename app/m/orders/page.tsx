@@ -1,50 +1,67 @@
 'use client';
 
 /**
- * 모바일 요청받은 업무 — 나에게 지정됐거나 전체 broadcast 된 dispatch_orders.
+ * 모바일 업무 — 요청받은 / 요청한 양쪽 통합.
  *
- * 상태:
- *  · pending — 신규 (확인 필요)
- *  · acknowledged — 확인함
- *  · done — 완료
+ * 3단계 흐름:
+ *   pending(받음) → acknowledged(확인) → in_progress(진행중) → done(완료)
  *
- * 액션: 확인 / 완료
+ * 받은 업무: 본인 uid 매치 또는 broadcast. 액션 [확인][진행중][완료]
+ * 보낸 업무: createdBy=본인 email. 상태 모니터링만.
  */
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Megaphone, CheckCircle, CaretRight, Eye, Plus, X, MagnifyingGlass,
+  Megaphone, CheckCircle, CaretRight, Eye, Plus, X, MagnifyingGlass, Play,
 } from '@phosphor-icons/react';
 import { useAuth, useUsers } from '@/lib/use-auth';
 import {
-  useMyDispatchOrders, updateDispatchStatus, createDispatchOrder,
+  useMyDispatchOrders, useSentDispatchOrders, updateDispatchStatus, createDispatchOrder,
   DISPATCH_LABEL, DISPATCH_TONE,
-  type DispatchOrder, type DispatchKind,
+  type DispatchOrder, type DispatchKind, type DispatchStatus,
 } from '@/lib/firebase/dispatch-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { toast } from '@/lib/toast';
 import { MobileSaveFooter } from '@/components/mobile/save-footer';
 
-type Filter = 'pending' | 'all';
+type ViewTab = 'received' | 'sent';
+
+const STATUS_LABEL: Record<DispatchStatus, string> = {
+  pending:      '받음',
+  acknowledged: '확인',
+  in_progress:  '진행중',
+  done:         '완료',
+  cancelled:    '취소',
+};
+
+const STATUS_TONE_MAP: Record<DispatchStatus, 'orange' | 'blue' | 'amber' | 'green' | 'gray'> = {
+  pending:      'orange',
+  acknowledged: 'blue',
+  in_progress:  'amber',
+  done:         'green',
+  cancelled:    'gray',
+};
 
 export default function MobileOrders() {
   const { user } = useAuth();
-  const orders = useMyDispatchOrders(user?.uid);
+  const received = useMyDispatchOrders(user?.uid);
+  const sent = useSentDispatchOrders(user?.email);
   const { contracts } = useContracts();
-  const [filter, setFilter] = useState<Filter>('pending');
+  const [view, setView] = useState<ViewTab>('received');
   const [newOpen, setNewOpen] = useState(false);
 
-  const filtered = filter === 'pending'
-    ? orders.filter((o) => o.status === 'pending')
-    : orders;
+  const list = view === 'received' ? received : sent;
+  const activeCount = list.filter((o) =>
+    o.status === 'pending' || o.status === 'acknowledged' || o.status === 'in_progress'
+  ).length;
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Megaphone size={22} weight="regular" />
-          요청받은 업무
+          업무
         </h1>
         <button type="button" onClick={() => setNewOpen(true)} style={{
           padding: '8px 14px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
@@ -58,32 +75,38 @@ export default function MobileOrders() {
         </button>
       </header>
 
+      {/* 받은 / 보낸 탭 */}
       <div style={{ display: 'flex', gap: 6 }}>
-        <Chip active={filter === 'pending'} onClick={() => setFilter('pending')}>
-          미확인 ({orders.filter((o) => o.status === 'pending').length})
-        </Chip>
-        <Chip active={filter === 'all'} onClick={() => setFilter('all')}>
-          전체 ({orders.length})
-        </Chip>
+        <ViewChip active={view === 'received'} onClick={() => setView('received')}>
+          요청받은 ({received.length})
+        </ViewChip>
+        <ViewChip active={view === 'sent'} onClick={() => setView('sent')}>
+          내가 요청한 ({sent.length})
+        </ViewChip>
       </div>
 
       {newOpen && <NewOrderModal onClose={() => setNewOpen(false)} creatorEmail={user?.email ?? undefined} />}
 
-      {filtered.length === 0 ? (
+      <div style={{ fontSize: 11, color: 'var(--text-sub)' }}>
+        진행 중 {activeCount}건 / 전체 {list.length}건
+      </div>
+
+      {list.length === 0 ? (
         <div style={{
           padding: 32, textAlign: 'center', fontSize: 13, color: 'var(--text-weak)',
           background: 'var(--bg-sunken)', borderRadius: 'var(--radius-lg)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
         }}>
           <Megaphone size={32} weight="duotone" />
-          {filter === 'pending' ? '미확인 요청 없음' : '받은 요청 없음'}
+          {view === 'received' ? '받은 업무 없음' : '보낸 업무 없음'}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((o) => (
+          {list.map((o) => (
             <OrderRow
               key={o.id}
               order={o}
+              isReceived={view === 'received'}
               contract={o.contractId ? contracts.find((c) => c.id === o.contractId) : undefined}
             />
           ))}
@@ -93,10 +116,10 @@ export default function MobileOrders() {
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function ViewChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button type="button" onClick={onClick} style={{
-      padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+      flex: 1, padding: '10px 12px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
       background: active ? 'var(--brand)' : 'var(--bg-card)',
       color: active ? '#fff' : 'var(--text-sub)',
       border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
@@ -105,23 +128,23 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
-function OrderRow({ order, contract }: { order: DispatchOrder; contract?: { vehiclePlate?: string; customerName?: string } }) {
-  const tone = DISPATCH_TONE[order.kind];
-  const isPending = order.status === 'pending';
-  const isAck = order.status === 'acknowledged';
+function OrderRow({ order: o, isReceived, contract }: {
+  order: DispatchOrder;
+  isReceived: boolean;
+  contract?: { vehiclePlate?: string; customerName?: string };
+}) {
+  const tone = DISPATCH_TONE[o.kind];
+  const statusTone = STATUS_TONE_MAP[o.status];
 
-  async function acknowledge() {
+  async function transition(next: DispatchStatus) {
     try {
-      await updateDispatchStatus(order.id, { status: 'acknowledged', acknowledgedAt: new Date().toISOString() });
-      toast.success('확인 처리');
-    } catch (e) {
-      toast.error(`실패: ${(e as Error).message}`);
-    }
-  }
-  async function markDone() {
-    try {
-      await updateDispatchStatus(order.id, { status: 'done', doneAt: new Date().toISOString() });
-      toast.success('완료 처리');
+      const patch: { status: DispatchStatus; acknowledgedAt?: string; startedAt?: string; doneAt?: string } = { status: next };
+      const now = new Date().toISOString();
+      if (next === 'acknowledged') patch.acknowledgedAt = now;
+      if (next === 'in_progress') patch.startedAt = now;
+      if (next === 'done') patch.doneAt = now;
+      await updateDispatchStatus(o.id, patch);
+      toast.success(`${STATUS_LABEL[next]} 처리`);
     } catch (e) {
       toast.error(`실패: ${(e as Error).message}`);
     }
@@ -130,33 +153,31 @@ function OrderRow({ order, contract }: { order: DispatchOrder; contract?: { vehi
   return (
     <div style={{
       padding: 14, background: 'var(--bg-card)',
-      border: `1px solid ${isPending ? 'var(--amber-text)' : 'var(--border-soft)'}`,
+      border: `1px solid ${o.status === 'pending' && isReceived ? 'var(--amber-text)' : 'var(--border-soft)'}`,
       borderLeft: `3px solid var(--${tone === 'brand' ? 'brand' : tone + '-text'})`,
       borderRadius: 'var(--radius-lg)',
       display: 'flex', flexDirection: 'column', gap: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span className={`badge-base badge-${tone}`} style={{ fontSize: 10 }}>{DISPATCH_LABEL[order.kind]}</span>
-        {isPending && <span className="badge-base badge-amber" style={{ fontSize: 10 }}>신규</span>}
-        {isAck && <span className="badge-base badge-blue" style={{ fontSize: 10 }}>확인됨</span>}
-        {order.status === 'done' && <span className="badge-base badge-green" style={{ fontSize: 10 }}>완료</span>}
-        {order.dueDate && (
+        <span className={`badge-base badge-${tone}`} style={{ fontSize: 10 }}>{DISPATCH_LABEL[o.kind]}</span>
+        <span className={`badge-base badge-${statusTone}`} style={{ fontSize: 10 }}>{STATUS_LABEL[o.status]}</span>
+        {o.dueDate && (
           <span style={{ fontSize: 10, color: 'var(--text-weak)', marginLeft: 'auto' }}>
-            마감 <span className="mono">{order.dueDate}</span>
+            마감 <span className="mono">{o.dueDate}</span>
           </span>
         )}
       </div>
 
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)' }}>{order.title}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-main)' }}>{o.title}</div>
 
-      {order.body && (
+      {o.body && (
         <div style={{ fontSize: 12, color: 'var(--text-sub)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-          {order.body}
+          {o.body}
         </div>
       )}
 
-      {contract && (
-        <Link href={`/m/contract/${order.contractId}`} style={{
+      {contract && o.contractId && (
+        <Link href={`/m/contract/${o.contractId}`} style={{
           fontSize: 11, color: 'var(--brand)', textDecoration: 'none',
           display: 'flex', alignItems: 'center', gap: 4,
         }}>
@@ -167,40 +188,53 @@ function OrderRow({ order, contract }: { order: DispatchOrder; contract?: { vehi
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: 'var(--text-weak)' }}>
         <span>
-          {order.createdBy ?? '?'} · {order._meta?.at?.slice(5, 16).replace('T', ' ')}
+          {isReceived ? '보낸이' : '받는이'}: {isReceived ? (o.createdBy ?? '?') : (o.assignedToName ?? '전체 공지')}
         </span>
+        <span>{o._meta?.at?.slice(5, 16).replace('T', ' ')}</span>
       </div>
 
-      {/* 액션 */}
-      {(isPending || isAck) && (
+      {/* 받은 업무 — 3단계 액션. 보낸 업무 — 상태 모니터링만 */}
+      {isReceived && o.status !== 'done' && o.status !== 'cancelled' && (
         <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-          {isPending && (
-            <button type="button" onClick={acknowledge} style={{
-              flex: 1, padding: '10px 12px',
-              background: 'var(--bg-card)', color: 'var(--brand)',
-              border: '1px solid var(--brand)', borderRadius: 'var(--radius)',
-              fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-            }}>
-              <Eye size={13} weight="bold" /> 확인
-            </button>
+          {o.status === 'pending' && (
+            <StageBtn onClick={() => transition('acknowledged')} tone="blue" icon={<Eye size={13} weight="bold" />} label="확인" />
           )}
-          <button type="button" onClick={markDone} style={{
-            flex: 1, padding: '10px 12px',
-            background: 'var(--green-text)', color: '#fff',
-            border: 'none', borderRadius: 'var(--radius)',
-            fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-          }}>
-            <CheckCircle size={13} weight="bold" /> 완료
-          </button>
+          {(o.status === 'pending' || o.status === 'acknowledged') && (
+            <StageBtn onClick={() => transition('in_progress')} tone="amber" icon={<Play size={13} weight="bold" />} label="진행중" />
+          )}
+          <StageBtn onClick={() => transition('done')} tone="green" icon={<CheckCircle size={13} weight="bold" />} label="완료" />
         </div>
       )}
     </div>
   );
 }
 
-/* ─────────── 새 요청 보내기 모달 ─────────── */
+function StageBtn({ onClick, tone, icon, label }: {
+  onClick: () => void;
+  tone: 'blue' | 'amber' | 'green';
+  icon: React.ReactNode;
+  label: string;
+}) {
+  const colors = {
+    blue:  { bg: 'var(--bg-card)', fg: 'var(--blue-text)',  border: 'var(--blue-text)' },
+    amber: { bg: 'var(--bg-card)', fg: 'var(--amber-text)', border: 'var(--amber-text)' },
+    green: { bg: 'var(--green-text)', fg: '#fff', border: 'var(--green-text)' },
+  } as const;
+  const c = colors[tone];
+  return (
+    <button type="button" onClick={onClick} style={{
+      flex: 1, padding: '10px 12px',
+      background: c.bg, color: c.fg,
+      border: `1px solid ${c.border}`, borderRadius: 'var(--radius)',
+      fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+    }}>
+      {icon} {label}
+    </button>
+  );
+}
+
+/* ─────────── 새 요청 보내기 모달 (기존 그대로) ─────────── */
 
 const KINDS: { key: DispatchKind; label: string }[] = [
   { key: 'memo',       label: '메모' },
@@ -268,7 +302,7 @@ function NewOrderModal({ onClose, creatorEmail }: { onClose: () => void; creator
         background: 'var(--bg-card)', width: '100%', maxWidth: 560,
         borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)',
         padding: 18,
-        paddingBottom: 'calc(76px + env(safe-area-inset-bottom))', // SaveFooter 공간
+        paddingBottom: 'calc(76px + env(safe-area-inset-bottom))',
         display: 'flex', flexDirection: 'column', gap: 12,
         maxHeight: '92vh', overflow: 'auto',
       }}>
