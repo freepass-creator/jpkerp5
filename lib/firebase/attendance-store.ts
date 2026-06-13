@@ -112,9 +112,20 @@ export async function updateAttendanceStatus(
   );
 }
 
-/** 오늘 휴무자 수 라이브 구독 — 오늘 날짜가 fromDate ~ toDate 범위 안 & status=approved */
-export function useTodayOnLeaveCount(): { count: number; types: AttendanceType[] } {
-  const [state, setState] = useState<{ count: number; types: AttendanceType[] }>({ count: 0, types: [] });
+/**
+ * 오늘 휴무자 수 라이브 구독 — 오늘 날짜가 fromDate ~ toDate 범위 안 & status=approved.
+ *
+ *  · am   — 오전반차
+ *  · pm   — 오후반차 + 조퇴 (둘 다 오후 부재)
+ *  · full — 연차/병가/기타 (종일 부재)
+ *  · count — 전체 합
+ */
+export function useTodayOnLeaveCount(): {
+  am: number; pm: number; full: number; count: number; types: AttendanceType[];
+} {
+  const [state, setState] = useState<{
+    am: number; pm: number; full: number; count: number; types: AttendanceType[];
+  }>({ am: 0, pm: 0, full: 0, count: 0, types: [] });
   useEffect(() => {
     let unsub: (() => void) | undefined;
     let cancelled = false;
@@ -132,7 +143,14 @@ export function useTodayOnLeaveCount(): { count: number; types: AttendanceType[]
           const to = r.toDate ?? from;
           return from <= today && today <= to;
         });
+        let am = 0, pm = 0, full = 0;
+        for (const r of filtered) {
+          if (r.type === 'half-day-am') am += 1;
+          else if (r.type === 'half-day-pm' || r.type === 'early-leave') pm += 1;
+          else full += 1;
+        }
         setState({
+          am, pm, full,
           count: filtered.length,
           types: Array.from(new Set(filtered.map((r) => r.type))),
         });

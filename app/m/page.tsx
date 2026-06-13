@@ -199,7 +199,7 @@ export default function MobileHome() {
             color: onLeave.count > 0 ? 'var(--amber-text)' : 'var(--text-sub)',
             borderRadius: 'var(--radius)', fontWeight: 600,
           }}>
-            휴무 {onLeave.count}명
+            휴무 오전 {onLeave.am} · 오후 {onLeave.pm} · 종일 {onLeave.full}
           </span>
         </div>
       </header>
