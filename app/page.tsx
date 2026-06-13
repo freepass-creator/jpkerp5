@@ -788,7 +788,7 @@ export default function Page() {
                           })()}
                         </td>
                         {/* 보험연령 — 휴차/매각/상품화/반납/해지는 의미 없음 → '-'.
-                            운영 중인데 보험연령 미입력 = 빨강 경고 (운전연령 미입력과 동일 톤). */}
+                            운영 중인데 미입력 = 빨강. 추가운전자 중 보험연령보다 어린 사람 있으면 셀 아래 ⚠ 뱃지 */}
                         <td className="center mono dim">
                           {(() => {
                             const s = c.vehicleStatus;
@@ -798,7 +798,8 @@ export default function Page() {
                               || s === '구매대기' || s === '등록대기'
                               || c.status === '반납' || c.status === '해지';
                             if (inactive) return <span className="muted">-</span>;
-                            if (!c.insuranceAge) {
+                            const ia = c.insuranceAge ?? 0;
+                            if (!ia) {
                               return (
                                 <span
                                   style={{ color: 'var(--red-text)', fontWeight: 700, fontSize: 11 }}
@@ -806,7 +807,23 @@ export default function Page() {
                                 >미입력 ⚠</span>
                               );
                             }
-                            return `${c.insuranceAge}세`;
+                            // 추가운전자 중 보험연령 미커버 (보험연령보다 어림) 검사
+                            const drivers = c.additionalDrivers ?? [];
+                            const uncovered = drivers
+                              .map((d) => ({ name: d.name, age: ageFromIdent(d.identNo, '개인') }))
+                              .filter((d) => d.age != null && d.age < ia);
+                            if (uncovered.length === 0) return `${ia}세`;
+                            const tip = uncovered.map((d) => `${d.name ?? '추가운전자'}(${d.age}세)`).join(', ');
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                <span>{ia}세</span>
+                                <span
+                                  className="badge-base badge-red"
+                                  style={{ fontSize: 9, padding: '0 5px', fontWeight: 700 }}
+                                  title={`추가운전자 보험 미커버 — ${tip}`}
+                                >추가{uncovered.length} ⚠</span>
+                              </div>
+                            );
                           })()}
                         </td>
                         {/* 계약상태 + 기간 */}

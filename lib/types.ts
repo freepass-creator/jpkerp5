@@ -26,6 +26,17 @@ export type ContractStatus = '대기' | '운행' | '반납' | '해지' | '채권
 export type PaymentMethod = string;
 
 /** 계약 = 고객/차량/일정/금액 라이프사이클 1회분 */
+/**
+ * 추가운전자 — 계약자/주운전자 외 추가로 등록된 운전 허락자.
+ * identNo (주민번호) 로 보험연령 검증 — 보험연령보다 어리면 미커버 경고.
+ */
+export type AdditionalDriver = {
+  name?: string;
+  identNo?: string;       // 주민번호 — 보험연령 검증용
+  relation?: string;      // 관계(배우자/자녀/직원 등)
+  registeredAt?: string;  // 등록 시점 ISO
+};
+
 export type Contract = {
   id: string;
   contractNo: string;          // ICR-YYMM-XXXX
@@ -56,6 +67,11 @@ export type Contract = {
   driverName?: string;
   /** 주운전자 식별번호 — 주민번호(개인). 만연령·보험가능연령 매칭용. 비어있으면 customerIdentNo 사용 */
   driverIdentNo?: string;
+  /**
+   * 추가운전자 — 본인·주운전자 외 차량 운전 허락된 사람들.
+   * 보험 미커버 검증 대상 (모두 보험연령 ≥ 이어야 함). 빈 어레이/undefined 면 검증 생략.
+   */
+  additionalDrivers?: AdditionalDriver[];
   // 차량 (임베드)
   vehiclePlate: string;
   vehicleModel: string;            // 자동 결합 풀네임 (예: '현대 아반떼 더 뉴 그랜저 GN7 가솔린 3.5 AWD 캘리그래피')
