@@ -21,6 +21,7 @@ import {
   type FieldLogScope,
 } from '@/lib/firebase/field-logs-store';
 import { toast } from '@/lib/toast';
+import { haptic } from '@/lib/haptic';
 
 export default function MobileMemoEntry() {
   const router = useRouter();
@@ -50,6 +51,19 @@ export default function MobileMemoEntry() {
     const d = (contract?.customerIdentNo ?? '').replace(/\D/g, '');
     return d || null;
   }, [contract]);
+
+  // 차량/손님 저장 키 — 자산 미등록/등록번호 결손 시 plate·phone 으로 폴백
+  // 추후 plate-key → 자체코드 이관(migrate-sheet)으로 통합 가능
+  const vehicleStorageKey = useMemo(() => {
+    if (vehicleId) return vehicleId;
+    const plate = (contract?.vehiclePlate ?? '').trim();
+    return plate || null;
+  }, [vehicleId, contract]);
+  const customerStorageKey = useMemo(() => {
+    if (customerKey) return customerKey;
+    const phone = (contract?.customerPhone1 ?? '').replace(/\D/g, '');
+    return phone || null;
+  }, [customerKey, contract]);
 
   // 기본 scope 선택 로직: 계약 활성이면 contract, 활성 아닌데 차량 매칭되면 vehicle, 둘 다 아니면 contract
   const defaultScope: FieldLogScope = useMemo(() => {
@@ -81,15 +95,15 @@ export default function MobileMemoEntry() {
         // 계약 메모 — 차량/손님 노드에도 자동 전파 (addFieldLog 가 처리)
         await addFieldLog(contractId, {
           type: 'memo', body, by,
-          vehicleId: vehicleId ?? undefined,
-          customerKey: customerKey ?? undefined,
+          vehicleId: vehicleStorageKey ?? undefined,
+          customerKey: customerStorageKey ?? undefined,
         });
-      } else if (scope === 'vehicle' && vehicleId) {
-        await addVehicleFieldLog(vehicleId, { type: 'memo', body, by });
-      } else if (scope === 'customer' && customerKey) {
-        await addCustomerFieldLog(customerKey, { type: 'memo', body, by });
+      } else if (scope === 'vehicle' && vehicleStorageKey) {
+        await addVehicleFieldLog(vehicleStorageKey, { type: 'memo', body, by });
+      } else if (scope === 'customer' && customerStorageKey) {
+        await addCustomerFieldLog(customerStorageKey, { type: 'memo', body, by });
       } else {
-        toast.warning('대상 식별자가 없어 저장 불가 (차량 또는 손님 미매칭)');
+        toast.warning('대상 식별자가 없어 저장 불가 (차량번호·휴대폰·등록번호 전부 결손)');
         setSaving(false);
         return;
       }
@@ -183,23 +197,23 @@ export default function MobileMemoEntry() {
             <div style={{ display: 'flex', gap: 6 }}>
               <ScopeChip
                 active={scope === 'contract'}
-                onClick={() => setScope('contract')}
+                onClick={() => { haptic.light(); setScope('contract'); }}
                 label="이 계약"
                 disabled={false}
               />
               <ScopeChip
                 active={scope === 'vehicle'}
-                onClick={() => setScope('vehicle')}
+                onClick={() => { haptic.light(); setScope('vehicle'); }}
                 label="이 차량"
-                disabled={!vehicleId}
-                hint={!vehicleId ? '자산 미등록 차량' : undefined}
+                disabled={!vehicleStorageKey}
+                hint={!vehicleId && vehicleStorageKey ? '자산 미등록 — 차량번호 키로 저장' : undefined}
               />
               <ScopeChip
                 active={scope === 'customer'}
-                onClick={() => setScope('customer')}
+                onClick={() => { haptic.light(); setScope('customer'); }}
                 label="이 손님"
-                disabled={!customerKey}
-                hint={!customerKey ? '등록번호 없음' : undefined}
+                disabled={!customerStorageKey}
+                hint={!customerKey && customerStorageKey ? '등록번호 없음 — 휴대폰 키로 저장' : undefined}
               />
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-weak)' }}>
@@ -213,7 +227,6 @@ export default function MobileMemoEntry() {
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             placeholder="메모 내용을 입력하세요 (차량 상태·고객 요청·특이사항 등)"
-            autoFocus
             style={{
               minHeight: 200, padding: 14,
               background: 'var(--bg-card)', border: '1px solid var(--border)',
