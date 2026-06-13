@@ -43,6 +43,8 @@ function isDetailRoute(path: string): boolean {
     || path.startsWith('/m/entry/license')
     || path.startsWith('/m/entry/deliver')
     || path.startsWith('/m/entry/return')
+    || path.startsWith('/m/today')
+    || path.startsWith('/m/tomorrow')
     || (path.startsWith('/m/me/') && path !== '/m/me');
 }
 

@@ -198,7 +198,7 @@ export default function MobileHome() {
 
       {/* 오늘 할 일 — 인도 + 반납 통합. 클릭 시 운영 페이지 today 필터 진입 */}
       <DayCard
-        href="/m/ops?filter=today"
+        href="/m/today"
         icon={<Calendar size={16} weight="duotone" />}
         title="오늘 할 일"
         tone="brand"
@@ -211,7 +211,7 @@ export default function MobileHome() {
 
       {/* 내일 할 일 */}
       <DayCard
-        href="/m/ops?filter=tomorrow"
+        href="/m/tomorrow"
         icon={<Calendar size={16} weight="duotone" />}
         title="내일 할 일"
         tone="blue"
