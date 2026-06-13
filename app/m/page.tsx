@@ -204,11 +204,11 @@ export default function MobileHome() {
         </div>
       </header>
 
-      {/* 일정 */}
+      {/* 일정 — 내가 처리해야 할 것 (시간축 + 받은 지시) */}
       <SectionGroup label="일정">
         <SummaryCard
           href="/m/missed"
-          icon={<Warning size={16} weight="duotone" />}
+          icon={<Warning size={16} weight="bold" />}
           title="밀린 업무"
           tone="red"
           count={missedCount}
@@ -219,7 +219,7 @@ export default function MobileHome() {
         />
         <SummaryCard
           href="/m/today"
-          icon={<Calendar size={16} weight="duotone" />}
+          icon={<Calendar size={16} weight="bold" />}
           title="오늘 업무"
           tone="brand"
           count={todayCount}
@@ -230,7 +230,7 @@ export default function MobileHome() {
         />
         <SummaryCard
           href="/m/upcoming"
-          icon={<CalendarBlank size={16} weight="duotone" />}
+          icon={<CalendarBlank size={16} weight="bold" />}
           title="예정 업무"
           tone="blue"
           count={upcomingCount}
@@ -239,22 +239,22 @@ export default function MobileHome() {
             ? `인도 ${data.upcoming.delivery.length} · 반납 ${data.upcoming.return.length}`
             : '예정 일정 없음'}
         />
-      </SectionGroup>
-
-      {/* 지시 — 사람에게 받거나 사람에게 보낸 업무 */}
-      <SectionGroup label="지시">
         <SummaryCard
           href="/m/orders"
-          icon={<Megaphone size={16} weight="duotone" />}
+          icon={<Megaphone size={16} weight="bold" />}
           title="받은 업무"
           tone="amber"
           count={pendingOrders}
           countLabel="건"
           subtitle={pendingOrders > 0 ? '미확인 지시 대기' : '받은 업무 없음'}
         />
+      </SectionGroup>
+
+      {/* 요청 — 새 요청 보내기 + 내가 보낸 거 추적 */}
+      <SectionGroup label="요청">
         <SummaryCard
           href="/m/orders?view=sent"
-          icon={<PaperPlaneTilt size={16} weight="duotone" />}
+          icon={<PaperPlaneTilt size={16} weight="bold" />}
           title="보낸 업무"
           tone="indigo"
           count={sentOpenCount}
@@ -263,11 +263,11 @@ export default function MobileHome() {
         />
       </SectionGroup>
 
-      {/* 회사 현황 */}
-      <SectionGroup label="회사 현황">
+      {/* 현황 — 회사 전체 모니터링 */}
+      <SectionGroup label="현황">
         <SummaryCard
           href="/m/ops"
-          icon={<Car size={16} weight="duotone" />}
+          icon={<Car size={16} weight="bold" />}
           title="운영 요약"
           tone="brand"
           count={data.opsActiveCount}
@@ -278,7 +278,7 @@ export default function MobileHome() {
         />
         <SummaryCard
           href="/m/risk"
-          icon={<Warning size={16} weight="duotone" />}
+          icon={<Warning size={16} weight="bold" />}
           title="리스크 요약"
           tone="red"
           count={riskCount}
@@ -289,8 +289,8 @@ export default function MobileHome() {
         />
         <SummaryCard
           href="/m/ops?filter=pending"
-          icon={<ListChecks size={16} weight="duotone" />}
-          title="미결 요약"
+          icon={<ListChecks size={16} weight="bold" />}
+          title="보완 필요"
           tone="orange"
           count={pendingCount}
           countLabel="건"

@@ -16,7 +16,7 @@ import { haptic } from '@/lib/haptic';
 type Tab = {
   href: string;
   label: string;
-  icon: (p: { size: number; weight: 'duotone' | 'bold' }) => JSX.Element;
+  icon: (p: { size: number; weight: 'bold' }) => JSX.Element;
   match: (p: string) => boolean;
   /** 활성 색 — 페이지 상단 라인과 매칭 */
   activeColor: string;
@@ -98,7 +98,7 @@ function TabBar({ path }: { path: string }) {
                 height: 2.5, background: t.activeColor, borderRadius: '0 0 4px 4px',
               }} />
             )}
-            {t.icon({ size: active ? 22 : 20, weight: active ? 'duotone' : 'bold' })}
+            {t.icon({ size: active ? 23 : 20, weight: 'bold' })}
             <span>{t.label}</span>
           </Link>
         );
