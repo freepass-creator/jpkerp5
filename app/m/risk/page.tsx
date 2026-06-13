@@ -8,7 +8,7 @@
 
 import { useMemo, useState } from 'react';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, MagnifyingGlass, X, Warning } from '@phosphor-icons/react';
+import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
 import { ageFromIdent } from '@/lib/ident';
@@ -70,21 +70,18 @@ export default function MobileRisk() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* 상단 고정 — 타이틀 + 카테고리 칩. 스크롤해도 따라옴 */}
+      {/* 상단 고정 — 검색바 + 카테고리 칩. 탭바로 위치 인지 */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
         background: 'var(--bg-card)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        padding: '16px 16px 10px',
+        padding: '12px 16px 10px',
+        borderTop: '3px solid var(--red-text)',
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Warning size={22} weight="regular" />
-          리스크
-        </h1>
-        {/* 검색바 — 운영과 동일 규격 */}
+        {/* 검색바 */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '10px 12px', background: 'var(--bg-card)',

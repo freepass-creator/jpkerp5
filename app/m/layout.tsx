@@ -64,13 +64,21 @@ function TabBar({ path }: { path: string }) {
         const active = t.match(path);
         return (
           <Link key={t.href} href={t.href} style={{
+            position: 'relative',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             gap: 2, textDecoration: 'none',
             color: active ? 'var(--brand)' : 'var(--text-sub)',
-            fontSize: 10, fontWeight: active ? 700 : 500,
+            fontSize: active ? 11 : 10, fontWeight: active ? 800 : 500,
             touchAction: 'manipulation', minHeight: 44,
           }}>
-            {t.icon({ size: 20, weight: active ? 'duotone' : 'bold' })}
+            {/* 활성 탭 상단 indicator */}
+            {active && (
+              <span style={{
+                position: 'absolute', top: 0, left: '25%', right: '25%',
+                height: 2.5, background: 'var(--brand)', borderRadius: '0 0 4px 4px',
+              }} />
+            )}
+            {t.icon({ size: active ? 22 : 20, weight: active ? 'duotone' : 'bold' })}
             <span>{t.label}</span>
           </Link>
         );

@@ -38,28 +38,26 @@ const ACTIONS: Action[] = [
 
 export default function MobileEntry() {
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <NotePencil size={22} weight="regular" />
-          입력
-        </h1>
-      </header>
+    <div>
+      {/* 탭별 상단 색 표시 */}
+      <div style={{ height: 3, background: 'var(--indigo-text)' }} />
 
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10,
-      }}>
-        {ACTIONS.map((a) => (
-          <ActionCard key={a.key} action={a} />
-        ))}
-      </div>
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10,
+        }}>
+          {ACTIONS.map((a) => (
+            <ActionCard key={a.key} action={a} />
+          ))}
+        </div>
 
-      <div style={{
-        padding: 14, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-lg)',
-        fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6,
-      }}>
-        모든 입력은 차량 선택 → 폼 → 저장 흐름. 모바일 출처 (_meta.source=mobile) 자동 태깅.
-        사무 직원이 활동 피드에서 신규 입력 즉시 확인 가능.
+        <div style={{
+          padding: 14, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-lg)',
+          fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6,
+        }}>
+          모든 입력은 차량 선택 → 폼 → 저장 흐름. 모바일 출처 (_meta.source=mobile) 자동 태깅.
+          사무 직원이 활동 피드에서 신규 입력 즉시 확인 가능.
+        </div>
       </div>
     </div>
   );

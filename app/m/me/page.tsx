@@ -37,15 +37,10 @@ export default function MobileMe() {
   }
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <GearSix size={22} weight="regular" />
-          설정
-        </h1>
-      </header>
-
-      {/* 프로필 */}
+    <div>
+      <div style={{ height: 3, background: 'var(--text-sub)' }} />
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* 프로필 */}
       <section style={{
         padding: 16, background: 'var(--bg-card)',
         border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
@@ -103,6 +98,7 @@ export default function MobileMe() {
 
       <div style={{ fontSize: 10, color: 'var(--text-weak)', textAlign: 'center', marginTop: 8 }}>
         렌터카매니저 모바일 · v1.0 (beta)
+      </div>
       </div>
     </div>
   );

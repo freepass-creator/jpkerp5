@@ -90,20 +90,17 @@ export default function MobileOps() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* 상단 고정 — 타이틀 + 검색바 + 그룹 칩 */}
+      {/* 상단 고정 — 검색바 + 그룹 칩. 타이틀은 탭바로 인지 */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
         background: 'var(--bg-card)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        padding: '16px 16px 10px',
+        padding: '12px 16px 10px',
+        borderTop: '3px solid var(--brand)',
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Car size={22} weight="regular" />
-          운영
-        </h1>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '10px 12px', background: 'var(--bg-card)',

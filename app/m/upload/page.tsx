@@ -108,15 +108,10 @@ export default function MobileUpload() {
   }
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <UploadSimple size={22} weight="regular" />
-          업로드
-        </h1>
-      </header>
-
-      {/* 파일 선택 zone */}
+    <div>
+      <div style={{ height: 3, background: 'var(--green-text)' }} />
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* 파일 선택 zone */}
       <label htmlFor="upload-input" style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
         padding: 28, background: 'var(--brand-bg)', color: 'var(--brand)',
@@ -177,6 +172,7 @@ export default function MobileUpload() {
           ))
         )}
       </section>
+      </div>
     </div>
   );
 }
