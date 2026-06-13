@@ -24,9 +24,6 @@ export default function MobileContractDetail() {
   if (!c) {
     return (
       <div style={{ padding: 16 }}>
-        <Link href="/m/search" style={{ color: 'var(--brand)', textDecoration: 'none', fontSize: 13 }}>
-          <CaretLeft size={14} weight="bold" /> 조회로
-        </Link>
         <div style={{
           padding: 24, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)',
           background: 'var(--bg-sunken)', borderRadius: 'var(--radius-lg)', marginTop: 16,
@@ -52,10 +49,7 @@ export default function MobileContractDetail() {
           padding: '14px 16px 18px',
           borderBottom: '1px solid var(--border)',
         }}>
-          <Link href="/m/ops" style={{ color: 'var(--text-sub)', textDecoration: 'none', fontSize: 12 }}>
-            <CaretLeft size={14} weight="bold" /> 운영
-          </Link>
-          <div style={{ marginTop: 8 }}>
+          <div>
             <div style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{c.vehiclePlate ?? '?'}</div>
             <div style={{ fontSize: 13, color: 'var(--text-sub)', marginTop: 2 }}>
               {c.vehicleModel ?? '-'} · {c.company ?? '-'}

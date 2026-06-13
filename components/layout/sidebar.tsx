@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Calendar,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Calendar, Pulse,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -183,6 +183,10 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
             <Link href="/attendance" className={`sb-item ${isActive('/attendance') ? 'active' : ''}`} title="근태 결재 — 휴가·반차·조퇴 신청 승인">
               <Calendar size={14} weight={isActive('/attendance') ? 'fill' : 'regular'} />
               <span>근태 결재</span>
+            </Link>
+            <Link href="/activity" className={`sb-item ${isActive('/activity') ? 'active' : ''}`} title="활동 피드 — 모바일·웹 입력 실시간 통합">
+              <Pulse size={14} weight={isActive('/activity') ? 'fill' : 'regular'} />
+              <span>활동 피드</span>
             </Link>
           </div>
           <div className="sb-divider" />

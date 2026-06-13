@@ -28,11 +28,8 @@ export default function MobileAttendance() {
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Link href="/m/me" style={{ color: 'var(--text-sub)', textDecoration: 'none', fontSize: 12 }}>
-          <CaretLeft size={14} weight="bold" /> 설정
-        </Link>
-        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>근태관리</h1>
+      <header>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>근태관리</h1>
       </header>
 
       <button type="button" onClick={() => setNewOpen(true)} style={{

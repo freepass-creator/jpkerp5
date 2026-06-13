@@ -10,7 +10,7 @@
  *  · 새 지시 (사무→현장) — TODO Phase 2 (dispatch_orders 노드)
  */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useAuth } from '@/lib/use-auth';
@@ -30,6 +30,20 @@ export default function MobileHome() {
   const weather = useWeather();
   const todayDate = new Date(today);
   const dateLabel = `${todayDate.getMonth() + 1}월 ${todayDate.getDate()}일 (${DOW[todayDate.getDay()]})`;
+
+  // 실시간 시계 — 매 분 갱신 (배터리 절약)
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    tick();
+    const t = setInterval(tick, 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const hh = now.getHours();
+  const mm = now.getMinutes();
+  const ampm = hh < 12 ? '오전' : '오후';
+  const h12 = ((hh + 11) % 12) + 1;
+  const timeLabel = `${ampm} ${h12}:${mm.toString().padStart(2, '0')}`;
 
   const buckets = useMemo(() => {
     // 오늘·내일 D 자체 계산
@@ -90,6 +104,7 @@ export default function MobileHome() {
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-main)' }}>오늘</span>
           <span style={{ fontSize: 14, color: 'var(--text-sub)', fontFamily: 'var(--font-mono)' }}>{dateLabel}</span>
+          <span style={{ fontSize: 14, color: 'var(--text-main)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{timeLabel}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
           {weather.loading ? (
