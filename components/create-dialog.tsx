@@ -13,7 +13,6 @@ import { DateInput } from '@/components/ui/date-input';
 import { parseExcelFile, type ParsedSheet, type UploadKind } from '@/lib/excel-detect';
 import { formatCurrency, cn } from '@/lib/utils';
 import { MAKERS, MODELS_BY_MAKER, buildVehicleFullName } from '@/lib/vehicle-master';
-import { MOCK_CONTRACTS } from '@/lib/mock-data';
 import type { Contract, HistoryCategory, HistoryScope } from '@/lib/types';
 import {
   VEHICLE_COLUMNS, CONTRACT_COLUMNS, BANK_TX_COLUMNS, CARD_TX_COLUMNS, SNAPSHOT_COLUMNS,
@@ -3542,14 +3541,15 @@ function HistoryAddPane({ onClose }: { onClose: () => void }) {
 }
 
 function HistorySearchResults({ q, onPick }: { q: string; onPick: (c: Contract) => void }) {
+  const { contracts } = useContracts();
   const matches = useMemo(() => {
     const query = q.trim().toLowerCase();
     if (!query) return [];
-    return MOCK_CONTRACTS.filter((c) => {
-      const hay = `${c.vehiclePlate} ${c.customerName} ${c.contractNo} ${c.vehicleModel} ${c.customerPhone1}`.toLowerCase();
+    return contracts.filter((c) => {
+      const hay = `${c.vehiclePlate ?? ''} ${c.customerName ?? ''} ${c.contractNo ?? ''} ${c.vehicleModel ?? ''} ${c.customerPhone1 ?? ''}`.toLowerCase();
       return hay.includes(query);
     }).slice(0, 20);
-  }, [q]);
+  }, [q, contracts]);
 
   if (!q.trim()) {
     return (

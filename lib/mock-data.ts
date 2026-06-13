@@ -7,8 +7,6 @@ export function todayKr(): string {
   return kr.toISOString().slice(0, 10);
 }
 
-/** 운영 데이터 — RTDB /jpkerp5/contracts 에서 실시간 로드. 빈 배열로 시작. */
-export const MOCK_CONTRACTS: Contract[] = [];
 
 /* 출고 일정 */
 export type DeliveryItem = {
