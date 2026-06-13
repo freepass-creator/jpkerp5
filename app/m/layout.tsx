@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { House, ListChecks, Warning, NotePencil, UploadSimple, GearSix, CaretLeft } from '@phosphor-icons/react';
+import { House, ListChecks, Warning, NotePencil, UploadSimple, GearSix } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 
 const TABS: { href: string; label: string; icon: (p: { size: number; weight: 'duotone' | 'bold' }) => JSX.Element; match: (p: string) => boolean }[] = [
@@ -94,12 +94,12 @@ function BackBar() {
         onClick={() => router.back()}
         style={{
           width: '100%', height: 58, background: 'transparent', border: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          color: 'var(--brand)', fontSize: 15, fontWeight: 700, fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--text-main)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit',
+          letterSpacing: '0.02em',
           cursor: 'pointer', touchAction: 'manipulation',
         }}
       >
-        <CaretLeft size={20} weight="bold" />
         이전
       </button>
     </nav>
