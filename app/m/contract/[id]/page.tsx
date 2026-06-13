@@ -42,7 +42,10 @@ export default function MobileContractDetail() {
       {/* 상단 고정 — Hero (차량번호 + 상태) + 액션 4종. 정보 카드 스크롤해도 액션 노출 */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'var(--bg-main)',
+        background: 'var(--bg-card)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <header style={{
           background: 'linear-gradient(135deg, var(--brand-bg), var(--bg-card))',
@@ -68,8 +71,8 @@ export default function MobileContractDetail() {
         {/* 액션 4종 — Hero 와 함께 고정 */}
         <div style={{
           padding: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
-          background: 'var(--bg-main)',
-          borderBottom: '1px solid var(--border-soft)',
+          background: 'var(--bg-card)',
+          borderBottom: '1px solid var(--border)',
         }}>
         <ActionBtn icon={<Camera size={22} weight="duotone" />} label="사진" href={`/m/upload?contractId=${c.id}`} />
         <ActionBtn icon={<NotePencil size={22} weight="duotone" />} label="메모" href={`/m/entry/memo?contractId=${c.id}`} />

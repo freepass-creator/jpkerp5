@@ -64,9 +64,12 @@ export default function MobileOps() {
       {/* 상단 고정 — 타이틀 + 검색바 + 필터칩. 스크롤해도 따라옴 */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'var(--bg-main)',
+        background: 'var(--bg-card)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         padding: '16px 16px 10px',
-        borderBottom: '1px solid var(--border-soft)',
+        borderBottom: '1px solid var(--border)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0' }}>운영</h1>
         <div style={{

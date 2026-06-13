@@ -72,9 +72,12 @@ export default function MobileRisk() {
       {/* 상단 고정 — 타이틀 + 카테고리 칩. 스크롤해도 따라옴 */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'var(--bg-main)',
+        background: 'var(--bg-card)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         padding: '16px 16px 10px',
-        borderBottom: '1px solid var(--border-soft)',
+        borderBottom: '1px solid var(--border)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0' }}>리스크</h1>
         <p style={{ fontSize: 12, color: 'var(--text-sub)', margin: 0 }}>
