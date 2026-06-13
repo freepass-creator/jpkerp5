@@ -754,24 +754,28 @@ export default function Page() {
                         </td>
                         <td className="mono dim">{c.customerPhone1}</td>
                         {/* 운전연령 — 임차인 생년월일(개인) 또는 주운전자(법인) 기반.
-                            보험연령보다 작거나 운전자 미입력이면 빨강 (보험 미커버 = 운전 불가) */}
+                            휴차/매각/상품화/반납/해지 = 운전 안 함 → 의미 없음 (-).
+                            운행 계약 중인데 운전자 미입력 = 빨강 경고.
+                            운전연령 < 보험연령 = 보험 미커버 (운전 불가) 빨강 경고. */}
                         <td className="center mono">
                           {(() => {
+                            const s = c.vehicleStatus;
+                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
+                              || s === '매각' || s === '매각대기'
+                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
+                              || s === '구매대기' || s === '등록대기'
+                              || c.status === '반납' || c.status === '해지';
+                            if (inactive) return <span className="muted">-</span>;
                             const a = driverAge(c);
                             const ia = c.insuranceAge ?? 0;
-                            // 운전자 미입력 — 보험연령 있으면 빨강 경고, 없으면 회색 (의도 없음)
                             if (a == null) {
-                              if (ia > 0) {
-                                return (
-                                  <span
-                                    style={{ color: 'var(--red-text)', fontWeight: 700, fontSize: 11 }}
-                                    title={`운전자 미입력 — 보험연령 ${ia}세 커버 대상 불명`}
-                                  >미입력 ⚠</span>
-                                );
-                              }
-                              return <span className="muted" style={{ fontSize: 11 }}>미입력</span>;
+                              return (
+                                <span
+                                  style={{ color: 'var(--red-text)', fontWeight: 700, fontSize: 11 }}
+                                  title={ia > 0 ? `운전자 미입력 — 보험연령 ${ia}세 커버 대상 불명` : '운전자 미입력 — 등록번호 확인 필요'}
+                                >미입력 ⚠</span>
+                              );
                             }
-                            // 운전연령 < 보험연령 — 보험 미커버 (운전 불가)
                             const blocked = ia > 0 && a < ia;
                             return (
                               <span
@@ -783,9 +787,27 @@ export default function Page() {
                             );
                           })()}
                         </td>
-                        {/* 보험연령 */}
+                        {/* 보험연령 — 휴차/매각/상품화/반납/해지는 의미 없음 → '-'.
+                            운영 중인데 보험연령 미입력 = 빨강 경고 (운전연령 미입력과 동일 톤). */}
                         <td className="center mono dim">
-                          {c.insuranceAge ? `${c.insuranceAge}세` : <span className="muted">-</span>}
+                          {(() => {
+                            const s = c.vehicleStatus;
+                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
+                              || s === '매각' || s === '매각대기'
+                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
+                              || s === '구매대기' || s === '등록대기'
+                              || c.status === '반납' || c.status === '해지';
+                            if (inactive) return <span className="muted">-</span>;
+                            if (!c.insuranceAge) {
+                              return (
+                                <span
+                                  style={{ color: 'var(--red-text)', fontWeight: 700, fontSize: 11 }}
+                                  title="보험연령 미입력 — 보험증권 확인 후 등록 필요"
+                                >미입력 ⚠</span>
+                              );
+                            }
+                            return `${c.insuranceAge}세`;
+                          })()}
                         </td>
                         {/* 계약상태 + 기간 */}
                         <td className="center">
