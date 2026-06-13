@@ -25,7 +25,7 @@ import { useMyPendingDispatchCount, useSentDispatchOrders } from '@/lib/firebase
 import { useWeather } from '@/lib/weather';
 import {
   CaretRight, MagnifyingGlass,
-  Calendar, CalendarBlank, ListChecks, Clock, ShieldWarning,
+  Calendar, CalendarBlank, ListChecks, Clock, Warning,
   Megaphone, PaperPlaneTilt, CarProfile,
   Sun, CloudSun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudFog,
 } from '@phosphor-icons/react';
@@ -278,7 +278,7 @@ export default function MobileHome() {
         />
         <SummaryCard
           href="/m/risk"
-          icon={<ShieldWarning size={16} weight="bold" />}
+          icon={<Warning size={16} weight="bold" />}
           title="리스크 요약"
           tone="red"
           count={riskCount}

@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { House, Car, Warning, NotePencil, UploadSimple, GearSix, CaretLeft } from '@phosphor-icons/react';
+import { House, Car, ShieldWarning, NotePencil, UploadSimple, GearSix } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 import { haptic } from '@/lib/haptic';
 
@@ -27,7 +27,7 @@ const TABS: Tab[] = [
     match: (p) => p === '/m', activeColor: 'var(--green-text)' },
   { href: '/m/ops',    label: '운영',   icon: ({ size, weight }) => <Car size={size} weight={weight} />,
     match: (p) => p.startsWith('/m/ops') || p.startsWith('/m/contract'), activeColor: 'var(--brand)' },
-  { href: '/m/risk',   label: '리스크', icon: ({ size, weight }) => <Warning size={size} weight={weight} />,
+  { href: '/m/risk',   label: '리스크', icon: ({ size, weight }) => <ShieldWarning size={size} weight={weight} />,
     match: (p) => p.startsWith('/m/risk'), activeColor: 'var(--red-text)' },
   { href: '/m/entry',  label: '입력',   icon: ({ size, weight }) => <NotePencil size={size} weight={weight} />,
     match: (p) => p.startsWith('/m/entry'), activeColor: 'var(--indigo-text)' },
@@ -130,7 +130,7 @@ function BackBar() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}
       >
-        <CaretLeft size={16} weight="bold" /> 이전
+        이전
       </button>
     </nav>
   );

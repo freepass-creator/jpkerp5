@@ -18,7 +18,7 @@ import {
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useMemo, useRef } from 'react';
 import {
-  CaretLeft, Phone, ChatCircle, Paperclip, NotePencil,
+  Phone, ChatCircle, Paperclip, NotePencil,
   Truck, ArrowUUpLeft, ShieldWarning, IdentificationCard, CurrencyKrw, Warning,
   CheckCircle, Circle,
 } from '@phosphor-icons/react';
