@@ -8,7 +8,7 @@
 
 import { useMemo, useState } from 'react';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, MagnifyingGlass, X } from '@phosphor-icons/react';
+import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, MagnifyingGlass, X, Warning } from '@phosphor-icons/react';
 import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
 import { ageFromIdent } from '@/lib/ident';
@@ -80,7 +80,10 @@ export default function MobileRisk() {
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0' }}>리스크</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Warning size={22} weight="duotone" />
+          리스크
+        </h1>
         {/* 검색바 — 운영과 동일 규격 */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,

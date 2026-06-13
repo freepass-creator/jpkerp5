@@ -131,7 +131,10 @@ export default function MobileLicenseVerify() {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>면허증 검증</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <IdentificationCard size={22} weight="duotone" />
+          면허증 검증
+        </h1>
       </header>
 
       {step === 'pick' && (

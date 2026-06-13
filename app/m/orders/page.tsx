@@ -42,7 +42,10 @@ export default function MobileOrders() {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>요청받은 업무</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Megaphone size={22} weight="duotone" />
+          요청받은 업무
+        </h1>
         <button type="button" onClick={() => setNewOpen(true)} style={{
           padding: '8px 14px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
           background: 'var(--brand)', color: '#fff',

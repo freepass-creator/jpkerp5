@@ -100,7 +100,10 @@ export default function MobileOps() {
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0' }}>운영</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Car size={22} weight="duotone" />
+          운영
+        </h1>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '10px 12px', background: 'var(--bg-card)',

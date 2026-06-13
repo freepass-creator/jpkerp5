@@ -105,7 +105,10 @@ export default function MobileMemoEntry() {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>메모</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <NotePencil size={22} weight="duotone" />
+          메모
+        </h1>
       </header>
 
       {step === 'pick' && (

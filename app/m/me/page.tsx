@@ -19,7 +19,7 @@ import { getAuth, signOut } from 'firebase/auth';
 import { getFirebaseApp } from '@/lib/firebase/client';
 import {
   User, SignOut, Bell, BellSlash, ShareNetwork, Copy, Check,
-  Calendar, Sun, Moon, CircleHalf,
+  Calendar, Sun, Moon, CircleHalf, GearSix,
 } from '@phosphor-icons/react';
 import { toast } from '@/lib/toast';
 
@@ -39,7 +39,10 @@ export default function MobileMe() {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0' }}>설정</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <GearSix size={22} weight="duotone" />
+          설정
+        </h1>
       </header>
 
       {/* 프로필 */}

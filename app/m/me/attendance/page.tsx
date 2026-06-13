@@ -29,7 +29,10 @@ export default function MobileAttendance() {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <header>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>근태관리</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Calendar size={22} weight="duotone" />
+          근태관리
+        </h1>
       </header>
 
       <button type="button" onClick={() => setNewOpen(true)} style={{
