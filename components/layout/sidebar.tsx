@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Calendar, Pulse,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Calendar, Pulse, Megaphone,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -180,6 +180,10 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
                 <span>일반 관리</span>
               </Link>
             )}
+            <Link href="/dispatch" className={`sb-item ${isActive('/dispatch') ? 'active' : ''}`} title="디스패치 — 현장 직원 업무 지시 발송 + 처리 현황">
+              <Megaphone size={14} weight={isActive('/dispatch') ? 'fill' : 'regular'} />
+              <span>디스패치</span>
+            </Link>
             <Link href="/attendance" className={`sb-item ${isActive('/attendance') ? 'active' : ''}`} title="근태 결재 — 휴가·반차·조퇴 신청 승인">
               <Calendar size={14} weight={isActive('/attendance') ? 'fill' : 'regular'} />
               <span>근태 결재</span>
