@@ -1366,6 +1366,10 @@ input[type="radio"]:disabled {
   border-bottom: 1px solid var(--border-soft);
   border-right: 1px solid var(--bg-stripe);
   color: var(--text-main);
+  /* 행 시각 폭 균일화 — 콘텐츠(badge/span/inline style 등)에 관계없이
+   * 같은 페이지 안 모든 행이 동일 높이로 보이도록 */
+  vertical-align: middle;
+  line-height: 1.4;
 }
 .table tbody td:last-child { border-right: none; }
 .table tbody tr:nth-child(even) td { background: var(--bg-stripe); }
