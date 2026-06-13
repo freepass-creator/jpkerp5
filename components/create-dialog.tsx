@@ -13,7 +13,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { parseExcelFile, type ParsedSheet, type UploadKind } from '@/lib/excel-detect';
 import { formatCurrency, cn } from '@/lib/utils';
 import { MAKERS, MODELS_BY_MAKER, buildVehicleFullName } from '@/lib/vehicle-master';
-import type { Contract, HistoryCategory, HistoryScope } from '@/lib/types';
+import type { Contract, HistoryCategory, HistoryScope, AdditionalDriver } from '@/lib/types';
 import {
   VEHICLE_COLUMNS, CONTRACT_COLUMNS, BANK_TX_COLUMNS, CARD_TX_COLUMNS, SNAPSHOT_COLUMNS,
   type ColumnSpec,
@@ -2085,6 +2085,8 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
   // 운전자 / 면허
   const [customerKind, setCustomerKind] = useState<'개인' | '사업자' | '법인'>('개인');
   const [driverName, setDriverName] = useState('');
+  const [driverIdentNo, setDriverIdentNo] = useState('');
+  const [additionalDrivers, setAdditionalDrivers] = useState<AdditionalDriver[]>([]);
   const [licenseNo, setLicenseNo] = useState('');
   const [licenseType, setLicenseType] = useState('1종 보통');
   const [licenseOcrBusy, setLicenseOcrBusy] = useState(false);
@@ -2152,6 +2154,10 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
         customerIdentNo: identDigits || undefined,
         customerPhone1: customerPhone1.trim(),
         driverName: customerKind === '법인' ? driverName.trim() || undefined : undefined,
+        driverIdentNo: customerKind === '법인' ? (driverIdentNo.replace(/\D/g, '') || undefined) : undefined,
+        additionalDrivers: additionalDrivers.length > 0
+          ? additionalDrivers.filter((d) => (d.identNo ?? '').replace(/\D/g, '').length === 13 || (d.name ?? '').trim().length > 0)
+          : undefined,
         customerLicenseNo: licenseNo.trim() || undefined,
         customerLicenseType: licenseType,
         vehiclePlate: normPlate(plate.trim()) || '미정',
@@ -2382,8 +2388,57 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
                   onChange={(e) => setDriverName(e.target.value)}
                   style={{ gridColumn: 'span 3' }}
                 />
+                <label className="form-label">주운전자 주민번호</label>
+                <input
+                  className="input mono"
+                  placeholder="900101-1234567 (보험연령 검증용)"
+                  value={driverIdentNo}
+                  onChange={(e) => setDriverIdentNo(e.target.value)}
+                  style={{ gridColumn: 'span 3' }}
+                />
               </>
             )}
+
+            {/* 추가운전자 — 가족·배우자·직원 등. 보험연령 자동 검증 대상.
+                계약 등록 후에도 detail '운전자' 섹션에서 추가/수정 가능. */}
+            <label className="form-label" style={{ alignSelf: 'start', paddingTop: 6 }}>추가운전자</label>
+            <div style={{ gridColumn: 'span 3', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {additionalDrivers.length === 0 ? (
+                <div style={{ fontSize: 11, color: 'var(--text-weak)', padding: '4px 0' }}>없음 — 필요 시 추가</div>
+              ) : (
+                additionalDrivers.map((d, i) => (
+                  <div key={i} style={{
+                    display: 'grid', gridTemplateColumns: '1fr 1.4fr 1fr auto', gap: 6, alignItems: 'center',
+                  }}>
+                    <input
+                      className="input" placeholder="이름"
+                      value={d.name ?? ''}
+                      onChange={(e) => setAdditionalDrivers((arr) => arr.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))}
+                    />
+                    <input
+                      className="input mono" placeholder="주민번호"
+                      value={d.identNo ?? ''}
+                      onChange={(e) => setAdditionalDrivers((arr) => arr.map((x, idx) => idx === i ? { ...x, identNo: e.target.value } : x))}
+                    />
+                    <input
+                      className="input" placeholder="관계 (배우자/자녀 등)"
+                      value={d.relation ?? ''}
+                      onChange={(e) => setAdditionalDrivers((arr) => arr.map((x, idx) => idx === i ? { ...x, relation: e.target.value } : x))}
+                    />
+                    <button
+                      type="button" className="btn-ghost"
+                      onClick={() => setAdditionalDrivers((arr) => arr.filter((_, idx) => idx !== i))}
+                      style={{ padding: '4px 6px', cursor: 'pointer', color: 'var(--red-text)' }}
+                    >✕</button>
+                  </div>
+                ))
+              )}
+              <button
+                type="button" className="btn btn-sm"
+                onClick={() => setAdditionalDrivers((arr) => [...arr, { name: '', identNo: '', relation: '', registeredAt: new Date().toISOString() }])}
+                style={{ alignSelf: 'flex-start' }}
+              >+ 추가운전자</button>
+            </div>
 
             <label className="form-label">
               면허번호
