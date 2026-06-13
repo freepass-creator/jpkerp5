@@ -107,7 +107,7 @@ function matchesCompany(c: Contract, co: string): boolean {
 }
 
 /** 컬럼 정렬 키 — 수동 정렬 시 클릭한 컬럼명 */
-type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '사용처' | '연락처' | '운전자나이' | '보험연령' | '계약상태' | '기간' | '월대여료' | '결제일' | '회차' | '반납까지' | '수납상태' | '미수금';
+type SortCol = '회사' | '차량상태' | '차량번호' | '차종' | '사용처' | '연락처' | '운전연령' | '보험연령' | '계약상태' | '기간' | '월대여료' | '결제일' | '회차' | '반납까지' | '수납상태' | '미수금';
 type SortDir = 'asc' | 'desc';
 
 const VS_ORDER: VehicleState[] = [
@@ -150,7 +150,7 @@ function compareForCol(a: Contract, b: Contract, col: SortCol): number {
     case '차종': return a.vehicleModel.localeCompare(b.vehicleModel);
     case '사용처': return resolveUsage(a).localeCompare(resolveUsage(b));
     case '연락처': return a.customerPhone1.localeCompare(b.customerPhone1);
-    case '운전자나이': return (driverAge(a) ?? 0) - (driverAge(b) ?? 0);
+    case '운전연령': return (driverAge(a) ?? 0) - (driverAge(b) ?? 0);
     case '보험연령': return (a.insuranceAge ?? 0) - (b.insuranceAge ?? 0);
     case '계약상태': return CS_ORDER.indexOf(getContractState(a).name) - CS_ORDER.indexOf(getContractState(b).name);
     case '기간': {
@@ -670,7 +670,7 @@ export default function Page() {
                   <SortableTh col="차종" sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="사용처" width={96} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="연락처" width={116} sort={manualSort} onSort={toggleSort} />
-                  <SortableTh col="운전자나이" align="center" width={70} sort={manualSort} onSort={toggleSort} />
+                  <SortableTh col="운전연령" align="center" width={70} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="보험연령" align="center" width={70} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="계약상태" align="center" width={80} sort={manualSort} onSort={toggleSort} />
                   <SortableTh col="기간" align="center" width={64} sort={manualSort} onSort={toggleSort} />
@@ -807,7 +807,7 @@ export default function Page() {
                             return (
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                 {c.paymentDay ? `${c.paymentDay}일` : <span className="muted">-</span>}
-                                <StatusBadge tone={timing === '후불' ? 'orange' : 'gray'} title={timing}>{timing === '후불' ? '후' : '선'}</StatusBadge>
+                                <StatusBadge tone={timing === '후불' ? 'red' : 'blue'} title={timing}>{timing === '후불' ? '후' : '선'}</StatusBadge>
                               </span>
                             );
                           })()}
@@ -838,12 +838,31 @@ export default function Page() {
                             return formatRemainingHuman(today, expiryDate);
                           })()}
                         </td>
-                        {/* 수납상태 + 미수금 — 미납일수는 뱃지 밖 텍스트로 (색 연동) */}
+                        {/* 수납상태 + 미납일수 — 미납액이 월대여료×N 이상이면 미납N (금액 기준) */}
                         <td className="center">
-                          <StatusBadge tone={paymentStateTone(ps.name)}>{ps.name}</StatusBadge>
-                          {ps.name === '미납' && ps.days > 0 && (
-                            <span className="mono" style={{ marginLeft: 4, fontWeight: 600, color: 'var(--red-text)', fontSize: 11 }}>+{ps.days}</span>
-                          )}
+                          {(() => {
+                            const isUnpaid = ps.name === '미납';
+                            const unpaidMonths = isUnpaid && c.monthlyRent > 0
+                              ? Math.floor(c.unpaidAmount / c.monthlyRent)
+                              : 0;
+                            const intense = unpaidMonths >= 2;
+                            const label = intense ? `미납${unpaidMonths}` : ps.name;
+                            return (
+                              <>
+                                {intense ? (
+                                  <span className="badge-base" style={{
+                                    background: 'var(--red-text)', color: '#fff',
+                                    borderColor: 'var(--red-text)', fontWeight: 700,
+                                  }}>{label}</span>
+                                ) : (
+                                  <StatusBadge tone={paymentStateTone(ps.name)}>{label}</StatusBadge>
+                                )}
+                                {isUnpaid && ps.days > 0 && (
+                                  <span className="mono" style={{ marginLeft: 4, fontWeight: 600, color: 'var(--red-text)', fontSize: 11 }}>+{ps.days}</span>
+                                )}
+                              </>
+                            );
+                          })()}
                         </td>
                         <td className={`num mono ${c.unpaidAmount > 0 ? 'danger' : ''}`}>
                           {c.unpaidAmount > 0 ? formatCurrency(c.unpaidAmount) : <span className="muted">없음</span>}
