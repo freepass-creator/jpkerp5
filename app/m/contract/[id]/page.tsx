@@ -7,15 +7,21 @@
  * Phase 2: 통화이력·사진 갤러리·메모 인라인 입력
  */
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useFieldLogs, FIELD_LOG_LABEL, FIELD_LOG_TONE } from '@/lib/firebase/field-logs-store';
-import { CaretLeft, Phone, Camera, NotePencil, ChatCircle } from '@phosphor-icons/react';
+import {
+  CaretLeft, Phone, Camera, NotePencil, ChatCircle,
+  Truck, ArrowUUpLeft, ShieldWarning, IdentificationCard, CurrencyKrw, Warning,
+  CheckCircle, Circle,
+} from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';
 
 export default function MobileContractDetail() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const riskKind = searchParams?.get('risk') ?? null;
   const id = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : '';
   const { contracts } = useContracts();
   const c = contracts.find((x) => x.id === id);
@@ -85,6 +91,12 @@ export default function MobileContractDetail() {
 
       {/* 정보 카드들 */}
       <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* 리스크 컨텍스트 — ?risk=X 진입 시 상단 강조 카드 */}
+        {riskKind && <RiskContextCard kind={riskKind} contract={c} />}
+
+        {/* 계약 흐름 timeline — 어떻게 계약되서 어떤 상태인지 */}
+        <LifecycleTimeline contract={c} />
+
         <InfoSection title="고객">
           <Row label="이름" value={c.customerName ?? '-'} />
           <Row label="연락처" value={c.customerPhone1 ?? '-'} mono />
@@ -152,6 +164,109 @@ export default function MobileContractDetail() {
             </div>
           </InfoSection>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── 리스크 컨텍스트 카드 ─────────────── */
+
+function RiskContextCard({ kind, contract: c }: { kind: string; contract: ReturnType<typeof useContracts>['contracts'][number] }) {
+  const map: Record<string, {
+    label: string; tone: 'red' | 'orange' | 'amber'; icon: React.ReactNode; render: () => React.ReactNode;
+  }> = {
+    'unpaid': {
+      label: '미수금', tone: 'red', icon: <CurrencyKrw size={20} weight="duotone" />,
+      render: () => (
+        <div style={{ fontSize: 14 }}>
+          <strong style={{ fontSize: 20 }}>₩{formatCurrency(c.unpaidAmount ?? 0)}</strong>
+          {c.unpaidSeqCount ? <span style={{ marginLeft: 8, fontSize: 12 }}>· 미납 {c.unpaidSeqCount}회차</span> : null}
+        </div>
+      ),
+    },
+    'overdue-return': {
+      label: '반납 지연', tone: 'orange', icon: <ArrowUUpLeft size={20} weight="duotone" />,
+      render: () => (
+        <div style={{ fontSize: 12 }}>
+          반납 예정 <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{c.returnScheduledDate ?? '-'}</strong>
+          <span style={{ marginLeft: 8 }}>· 오늘 기준 경과</span>
+        </div>
+      ),
+    },
+    'insurance-gap': {
+      label: '보험 미커버', tone: 'red', icon: <ShieldWarning size={20} weight="duotone" />,
+      render: () => (
+        <div style={{ fontSize: 12 }}>
+          보험연령 <strong>{c.insuranceAge ?? '-'}세</strong>
+          {' / '}계약자 또는 주운전자가 보험연령에 못 미침
+        </div>
+      ),
+    },
+    'missing-ident': {
+      label: '등록번호 결손', tone: 'amber', icon: <IdentificationCard size={20} weight="duotone" />,
+      render: () => (
+        <div style={{ fontSize: 12 }}>
+          계약자 등록번호 미입력 — 신원/연령 검증 불가
+        </div>
+      ),
+    },
+  };
+  const info = map[kind];
+  if (!info) return null;
+  const t = info.tone;
+  return (
+    <div style={{
+      padding: 14, background: `var(--${t}-bg)`, color: `var(--${t}-text)`,
+      border: `1px solid var(--${t}-border, ${t === 'red' ? 'rgba(220,38,38,0.3)' : t === 'orange' ? 'rgba(194,65,12,0.3)' : 'rgba(161,98,7,0.3)'})`,
+      borderRadius: 'var(--radius-lg)',
+      display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+      <div style={{ flexShrink: 0 }}>{info.icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>리스크 · {info.label}</div>
+        {info.render()}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── 계약 흐름 timeline ─────────────── */
+
+function LifecycleTimeline({ contract: c }: { contract: ReturnType<typeof useContracts>['contracts'][number] }) {
+  const steps: { label: string; date?: string; done: boolean; current: boolean }[] = [
+    { label: '계약',     date: c.contractDate,           done: !!c.contractDate,                                    current: !c.deliveredDate && !!c.contractDate },
+    { label: '인도',     date: c.deliveredDate ?? c.deliveryScheduledDate, done: !!c.deliveredDate,                  current: !!c.deliveredDate && !c.returnedDate },
+    { label: '반납 예정', date: c.returnScheduledDate,    done: !!c.returnedDate || (!!c.returnScheduledDate && new Date(c.returnScheduledDate) < new Date()), current: false },
+    { label: '반납',     date: c.returnedDate,           done: !!c.returnedDate,                                    current: !!c.returnedDate && c.status !== '해지' },
+  ];
+
+  return (
+    <div style={{
+      padding: 14, background: 'var(--bg-card)',
+      border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub)', marginBottom: 12 }}>
+        계약 흐름 · 현재 <span style={{ color: 'var(--brand)' }}>{c.vehicleStatus}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+        {steps.map((s, i) => (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: s.done ? 'var(--green-text)' : s.current ? 'var(--brand)' : 'var(--bg-sunken)',
+              color: s.done || s.current ? '#fff' : 'var(--text-weak)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: s.current ? '2px solid var(--brand)' : '1px solid var(--border)',
+              boxShadow: s.current ? '0 0 0 3px var(--focus-ring)' : 'none',
+            }}>
+              {s.done ? <CheckCircle size={16} weight="fill" /> : <Circle size={10} weight="fill" />}
+            </div>
+            <div style={{ fontSize: 10.5, fontWeight: s.current ? 700 : 600, color: s.done || s.current ? 'var(--text-main)' : 'var(--text-sub)' }}>{s.label}</div>
+            <div style={{ fontSize: 9.5, fontFamily: 'var(--font-mono)', color: 'var(--text-weak)', textAlign: 'center' }}>
+              {s.date ? s.date.slice(5) : '-'}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -119,7 +119,7 @@ export default function MobileRisk() {
             </header>
             <div>
               {items.slice(0, 30).map((c) => (
-                <Link key={c.id} href={`/m/contract/${c.id}`} style={{
+                <Link key={c.id} href={`/m/contract/${c.id}?risk=${kind.key}`} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '10px 14px', borderBottom: '1px solid var(--border-soft)',
                   textDecoration: 'none', color: 'inherit', touchAction: 'manipulation',

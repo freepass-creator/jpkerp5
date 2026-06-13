@@ -9,13 +9,13 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { House, ListChecks, Warning, NotePencil, UploadSimple, GearSix } from '@phosphor-icons/react';
+import { House, Car, Warning, NotePencil, UploadSimple, GearSix } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 
 const TABS: { href: string; label: string; icon: (p: { size: number; weight: 'duotone' | 'bold' }) => JSX.Element; match: (p: string) => boolean }[] = [
   { href: '/m',         label: '홈',     icon: ({ size, weight }) => <House size={size} weight={weight} />,
     match: (p) => p === '/m' },
-  { href: '/m/ops',     label: '운영',   icon: ({ size, weight }) => <ListChecks size={size} weight={weight} />,
+  { href: '/m/ops',     label: '운영',   icon: ({ size, weight }) => <Car size={size} weight={weight} />,
     match: (p) => p.startsWith('/m/ops') || p.startsWith('/m/contract') },
   { href: '/m/risk',    label: '리스크', icon: ({ size, weight }) => <Warning size={size} weight={weight} />,
     match: (p) => p.startsWith('/m/risk') },
