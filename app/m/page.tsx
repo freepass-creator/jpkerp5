@@ -14,14 +14,22 @@ import { useMemo } from 'react';
 import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useAuth } from '@/lib/use-auth';
+import { useTodayOnLeaveCount } from '@/lib/firebase/attendance-store';
+import { useWeather } from '@/lib/weather';
 import { Truck, ArrowUUpLeft, CurrencyKrw, Bell, CaretRight, MagnifyingGlass } from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
+
+const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
 export default function MobileHome() {
   const { contracts } = useContracts();
   const { user } = useAuth();
   const today = todayKr();
+  const onLeave = useTodayOnLeaveCount();
+  const weather = useWeather();
+  const todayDate = new Date(today);
+  const dateLabel = `${todayDate.getMonth() + 1}월 ${todayDate.getDate()}일 (${DOW[todayDate.getDay()]})`;
 
   const buckets = useMemo(() => {
     // 오늘·내일 D 자체 계산
@@ -64,15 +72,10 @@ export default function MobileHome() {
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>{today} · {user?.email?.split('@')[0] ?? '직원'}</div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-main)' }}>오늘</div>
-      </header>
-
-      {/* 빠른 조회 — 탭 전환 없이 즉시 검색 */}
+      {/* 빠른 조회 — 페이지 진입 즉시 보이는 최상단. 운영현황 검색으로 점프 */}
       <Link href="/m/ops" style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        padding: '12px 14px', background: 'var(--bg-card)',
+        padding: '14px 16px', background: 'var(--bg-card)',
         border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
         textDecoration: 'none', color: 'var(--text-sub)',
         touchAction: 'manipulation',
@@ -80,6 +83,38 @@ export default function MobileHome() {
         <MagnifyingGlass size={18} weight="duotone" />
         <span style={{ fontSize: 14 }}>차량번호 · 고객명 조회</span>
       </Link>
+
+      {/* '오늘 + 날짜 + 요일 + 날씨 + 휴무' 한눈에 — 인사 한 줄 */}
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>{user?.email?.split('@')[0] ?? '직원'}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-main)' }}>오늘</span>
+          <span style={{ fontSize: 14, color: 'var(--text-sub)', fontFamily: 'var(--font-mono)' }}>{dateLabel}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
+          {weather.loading ? (
+            <span style={{ color: 'var(--text-weak)' }}>날씨 ...</span>
+          ) : weather.am && weather.pm ? (
+            <>
+              <span title={weather.am.label}>
+                <span style={{ fontSize: 16, marginRight: 3 }}>{weather.am.icon}</span>
+                오전 <strong>{weather.am.temp}°</strong>
+              </span>
+              <span title={weather.pm.label}>
+                <span style={{ fontSize: 16, marginRight: 3 }}>{weather.pm.icon}</span>
+                오후 <strong>{weather.pm.temp}°</strong>
+              </span>
+            </>
+          ) : null}
+          <span style={{
+            padding: '2px 8px', background: onLeave.count > 0 ? 'var(--amber-bg)' : 'var(--bg-sunken)',
+            color: onLeave.count > 0 ? 'var(--amber-text)' : 'var(--text-sub)',
+            borderRadius: 'var(--radius)', fontWeight: 600,
+          }}>
+            휴무 {onLeave.count}명
+          </span>
+        </div>
+      </header>
 
       {/* KPI 카드 4종 */}
       <KpiRow>

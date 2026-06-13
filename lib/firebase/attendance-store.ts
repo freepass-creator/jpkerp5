@@ -112,6 +112,37 @@ export async function updateAttendanceStatus(
   );
 }
 
+/** 오늘 휴무자 수 라이브 구독 — 오늘 날짜가 fromDate ~ toDate 범위 안 & status=approved */
+export function useTodayOnLeaveCount(): { count: number; types: AttendanceType[] } {
+  const [state, setState] = useState<{ count: number; types: AttendanceType[] }>({ count: 0, types: [] });
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      try { await ensureAuth(); } catch { /* silent */ }
+      if (cancelled) return;
+      const db = getRtdb();
+      if (!db) return;
+      unsub = onValue(ref(db, PATH), (snap) => {
+        const val = (snap.val() ?? {}) as Record<string, AttendanceRequest>;
+        const today = new Date().toISOString().slice(0, 10);
+        const filtered = Object.values(val).filter((r) => {
+          if (r.status !== 'approved') return false;
+          const from = r.fromDate ?? '';
+          const to = r.toDate ?? from;
+          return from <= today && today <= to;
+        });
+        setState({
+          count: filtered.length,
+          types: Array.from(new Set(filtered.map((r) => r.type))),
+        });
+      });
+    })();
+    return () => { cancelled = true; if (unsub) unsub(); };
+  }, []);
+  return state;
+}
+
 /** 본인 신청만 라이브 구독 — 모바일 근태관리 페이지에서 사용 */
 export function useMyAttendanceRequests(uid: string | null | undefined): AttendanceRequest[] {
   const [data, setData] = useState<AttendanceRequest[]>([]);
