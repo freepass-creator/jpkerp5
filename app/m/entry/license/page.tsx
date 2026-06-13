@@ -144,7 +144,7 @@ export default function MobileLicenseVerify() {
             padding: '10px 12px', background: 'var(--bg-card)',
             border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
           }}>
-            <MagnifyingGlass size={18} weight="duotone" />
+            <MagnifyingGlass size={18} weight="bold" />
             <input
               value={q} onChange={(e) => setQ(e.target.value)}
               placeholder="차량번호 또는 고객명" autoFocus

@@ -393,7 +393,7 @@ function ContractMatcher({ phoneHint, onCancel, onMatch }: {
         padding: '8px 12px', background: 'var(--bg-sunken)',
         border: '1px solid var(--border)', borderRadius: 'var(--radius)',
       }}>
-        <MagnifyingGlass size={14} weight="duotone" />
+        <MagnifyingGlass size={14} weight="bold" />
         <input
           value={q} onChange={(e) => setQ(e.target.value)}
           placeholder="차량번호 / 고객명 / 전화번호" autoFocus

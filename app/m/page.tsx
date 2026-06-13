@@ -283,7 +283,7 @@ function InlineSearch({ contracts }: { contracts: ReturnType<typeof useContracts
         border: '1px solid var(--border)',
         borderRadius: showDropdown ? 'var(--radius-lg) var(--radius-lg) 0 0' : 'var(--radius-lg)',
       }}>
-        <MagnifyingGlass size={18} weight="duotone" />
+        <MagnifyingGlass size={18} weight="bold" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
