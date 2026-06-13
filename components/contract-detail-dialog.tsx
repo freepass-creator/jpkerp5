@@ -996,7 +996,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
         {/* 임시배차 picker */}
         {tempPicker && (
-          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 6, marginBottom: 12 }}>
+          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8, fontWeight: 500 }}>
               임시배차 — 원본 차량 ({c.vehiclePlate} {c.vehicleModel}) 대신 출고할 차량
             </div>
@@ -1022,7 +1022,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
         {/* 휴차 사유 picker */}
         {idlePicker && (
-          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 6, marginBottom: 12 }}>
+          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8, fontWeight: 500 }}>휴차 사유</div>
             <div className="filter-bar" style={{ marginBottom: 10 }}>
               {IDLE_REASONS.map((r) => (
@@ -1079,7 +1079,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
           return (
             <div style={{
               padding: 14, marginBottom: 12, background: bg, color: text,
-              borderRadius: 8, border: `1px solid ${text}`,
+              borderRadius: 'var(--radius-lg)', border: `1px solid ${text}`,
             }}>
               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
                 ⚠ 계약 만기 임박 — {label}
@@ -1114,7 +1114,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
         {/* 연장 picker */}
         {renewPicker && (
-          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 6, marginBottom: 12 }}>
+          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8, fontWeight: 500 }}>연장 처리 — 새 반납예정일 / 월대여료</div>
             <div className="form-grid-2" style={{ marginBottom: 16 }}>
               <label className="form-label">새 반납예정일 *</label>
@@ -1138,7 +1138,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
         {/* 종료 picker */}
         {endPicker && (
-          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 6, marginBottom: 12 }}>
+          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 8, fontWeight: 500 }}>종료 결정 — 반납 약속일</div>
             <div className="form-grid-2" style={{ marginBottom: 16 }}>
               <label className="form-label">반납 약속일 *</label>
@@ -1351,7 +1351,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
 
         {/* 임시배차 정보 (해당 시) */}
         {stage === '임시배차' && c.tempReplacementPlate && (
-          <div style={{ marginTop: 14, padding: 10, background: 'var(--amber-bg)', borderRadius: 6, fontSize: 12 }}>
+          <div style={{ marginTop: 14, padding: 10, background: 'var(--amber-bg)', borderRadius: 'var(--radius-md)', fontSize: 12 }}>
             <div style={{ fontWeight: 600, color: 'var(--amber-text)', marginBottom: 4 }}>임시배차 중</div>
             <div style={{ color: 'var(--text-main)' }}>
               원본 <span className="plate">{c.vehiclePlate}</span> {c.vehicleModel} →
@@ -1892,7 +1892,7 @@ const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUpdate: (
             value={draft.notes ?? ''}
             onChange={(e) => set('notes', e.target.value || undefined)}
             rows={4}
-            style={{ width: '100%', fontSize: 12, padding: 8, border: '1px solid var(--border)', borderRadius: 4, resize: 'vertical' }}
+            style={{ width: '100%', fontSize: 12, padding: 8, border: '1px solid var(--border)', borderRadius: 'var(--radius)', resize: 'vertical' }}
             placeholder="메모"
           />
         ) : (

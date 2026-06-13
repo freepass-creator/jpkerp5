@@ -777,7 +777,7 @@ export default function MigrateSheetPage() {
               <div className="detail-section-body">
                 <pre style={{
                   fontSize: 11, color: 'var(--text-sub)', background: 'var(--bg-sunken)',
-                  padding: 10, borderRadius: 4, maxHeight: 400, overflow: 'auto',
+                  padding: 10, borderRadius: 'var(--radius)', maxHeight: 400, overflow: 'auto',
                   whiteSpace: 'pre-wrap', wordBreak: 'break-all',
                 }}>
                   {log.join('\n')}

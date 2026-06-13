@@ -215,7 +215,7 @@ export default function ImportTemplatesPage() {
           {/* 가이드 패널 — 접힘 */}
           <section style={{
             border: '1px solid var(--border)',
-            borderRadius: 6,
+            borderRadius: 'var(--radius-md)',
             background: 'var(--blue-bg)',
             overflow: 'hidden',
           }}>
@@ -278,7 +278,7 @@ export default function ImportTemplatesPage() {
                   <div>아무 형식이나 가능: <code>2025-04-22 / 25.4.22 / 250422 / 엑셀 날짜 셀</code></div>
                 </div>
 
-                <div style={{ padding: 8, background: 'var(--bg-main)', borderRadius: 4, marginTop: 8 }}>
+                <div style={{ padding: 8, background: 'var(--bg-main)', borderRadius: 'var(--radius)', marginTop: 8 }}>
                   <strong style={{ color: 'var(--red-text)' }}>⚠️ 주의:</strong>{' '}
                   같은 차량+계약자가 이미 있으면 <strong>덮어쓰기 갱신</strong>, 없으면 신규.
                   먼저 계약이력 → 수납이력 순서로 진행. 반대로 하면 매칭 안 됨.
@@ -335,7 +335,7 @@ export default function ImportTemplatesPage() {
                 />
               </label>
               {contractParsed && (
-                <div style={{ padding: 10, background: 'var(--blue-bg)', borderRadius: 4, fontSize: 12 }}>
+                <div style={{ padding: 10, background: 'var(--blue-bg)', borderRadius: 'var(--radius)', fontSize: 12 }}>
                   파싱됨 — 차량 <strong>{contractParsed.length}대</strong>,
                   계약 <strong>{contractParsed.reduce((s, r) => s + r.blocks.length, 0)}건</strong>
                   <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-sub)' }}>
@@ -371,7 +371,7 @@ export default function ImportTemplatesPage() {
                 />
               </label>
               {receiptParsed && (
-                <div style={{ padding: 10, background: 'var(--green-bg)', borderRadius: 4, fontSize: 12 }}>
+                <div style={{ padding: 10, background: 'var(--green-bg)', borderRadius: 'var(--radius)', fontSize: 12 }}>
                   파싱됨 — 계약 <strong>{receiptParsed.length}건</strong>,
                   결제 <strong>{receiptParsed.reduce((s, r) => s + r.payments.length, 0)}건</strong>
                 </div>
@@ -401,7 +401,7 @@ export default function ImportTemplatesPage() {
                   margin: 0,
                   padding: 10,
                   background: 'var(--bg-sub)',
-                  borderRadius: 4,
+                  borderRadius: 'var(--radius)',
                   maxHeight: 400,
                   overflow: 'auto',
                   whiteSpace: 'pre-wrap',

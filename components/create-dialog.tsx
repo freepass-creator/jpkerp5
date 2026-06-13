@@ -680,7 +680,7 @@ function UploadPane({
         <SheetPreview key={`${p.fileName}-${p.sheetName}-${i}`} sheet={p} onChangeKind={(k) => onChangeKind(i, k)} />
       ))}
       {result && (
-        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 6, fontSize: 12, border: '1px solid var(--green-border)' }}>
+        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 'var(--radius-md)', fontSize: 12, border: '1px solid var(--green-border)' }}>
           {result}
         </div>
       )}
@@ -763,7 +763,7 @@ function UploadPaneMulti({
         <SheetPreview key={`${p.fileName}-${p.sheetName}-${i}`} sheet={p} onChangeKind={(k) => onChangeKind(i, k)} />
       ))}
       {result && (
-        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 6, fontSize: 12, border: '1px solid var(--green-border)' }}>
+        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 'var(--radius-md)', fontSize: 12, border: '1px solid var(--green-border)' }}>
           {result}
         </div>
       )}
@@ -1565,7 +1565,7 @@ function VehicleExcelPane({
         <SheetPreview key={`${p.fileName}-${p.sheetName}-${i}`} sheet={p} onChangeKind={() => { /* no-op */ }} />
       ))}
       {result && (
-        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 6, fontSize: 12, border: '1px solid var(--green-border)' }}>
+        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 'var(--radius-md)', fontSize: 12, border: '1px solid var(--green-border)' }}>
           {result}
         </div>
       )}
@@ -1804,7 +1804,7 @@ function SnapshotPane({
               padding: 14,
               background: isAutoDetected ? 'var(--brand-bg)' : 'var(--bg-sunken)',
               border: `1px solid ${isAutoDetected ? 'var(--brand)' : 'var(--border)'}`,
-              borderRadius: 6,
+              borderRadius: 'var(--radius-md)',
               display: 'flex', flexDirection: 'column', gap: 8,
             }}
           >
@@ -1846,7 +1846,7 @@ function SnapshotPane({
             {/* 전체 헤더 보기 — 매칭 안 잡힌 케이스 디버깅 */}
             <details style={{ fontSize: 11, color: 'var(--text-weak)' }}>
               <summary style={{ cursor: 'pointer' }}>전체 헤더 ({rawHeadersForDiag.length}개) 보기</summary>
-              <div className="mono" style={{ fontSize: 10, padding: 6, background: 'var(--bg-card)', marginTop: 4, borderRadius: 4, wordBreak: 'break-all' }}>
+              <div className="mono" style={{ fontSize: 10, padding: 6, background: 'var(--bg-card)', marginTop: 4, borderRadius: 'var(--radius)', wordBreak: 'break-all' }}>
                 {rawHeadersForDiag.map((h, idx) => `${idx + 1}.${h || '(빈)'}`).join(' | ')}
               </div>
             </details>
@@ -1858,7 +1858,7 @@ function SnapshotPane({
       {receivablesSheets.length > 0 && onCommitReceivables && (
         <div style={{
           padding: 14, background: 'var(--green-bg)', border: '1px solid var(--green-text)',
-          borderRadius: 6, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--green-text)' }}>
@@ -1962,7 +1962,7 @@ function SnapshotPane({
       </div>
 
       {result && (
-        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 6, fontSize: 12, border: '1px solid var(--green-border)' }}>
+        <div style={{ padding: 10, background: 'var(--green-bg)', color: 'var(--green-text)', borderRadius: 'var(--radius-md)', fontSize: 12, border: '1px solid var(--green-border)' }}>
           {result}
         </div>
       )}
@@ -2297,7 +2297,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
 
           {/* 매칭 상태 배너 */}
           {plate.trim() && plate.trim() !== '미정' && (
-            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 4, fontSize: 12, border: '1px solid var(--line)', background: matchedVehicle ? '#ecfdf5' : '#fffbeb', color: matchedVehicle ? '#065f46' : '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: 12, border: '1px solid var(--line)', background: matchedVehicle ? '#ecfdf5' : '#fffbeb', color: matchedVehicle ? '#065f46' : '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
               {matchedVehicle ? (
                 <>
                   <strong>✓ 기존 차량 매칭</strong>
@@ -2313,7 +2313,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
             </div>
           )}
           {(!plate.trim() || plate.trim() === '미정') && (
-            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 4, fontSize: 12, border: '1px solid var(--line)', background: 'var(--bg-soft)', color: 'var(--text-weak)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: 12, border: '1px solid var(--line)', background: 'var(--bg-soft)', color: 'var(--text-weak)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <strong style={{ color: 'var(--ink)' }}>ⓘ 차량번호 미정</strong>
               <span>신차 구매예정 — 차량은 추후 별도 등록</span>
             </div>

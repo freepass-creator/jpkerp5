@@ -197,7 +197,7 @@ export function ContractDocSection({
             {plateMismatch && (
               <div style={{
                 padding: '6px 10px', background: 'var(--orange-bg)', color: 'var(--orange-text)',
-                fontSize: 11, borderRadius: 4, display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 11, borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: 6,
               }}>
                 <Warning size={12} weight="duotone" />
                 차량번호 불일치 — 문서: <strong>{extracted.car_number}</strong>, 현재 차량: <strong>{vehicle.plate}</strong>
@@ -285,7 +285,7 @@ export function ContractDocSection({
         )}
 
         {error && (
-          <div style={{ marginTop: 10, padding: 8, background: 'var(--red-bg)', color: 'var(--red-text)', fontSize: 11, borderRadius: 4 }}>
+          <div style={{ marginTop: 10, padding: 8, background: 'var(--red-bg)', color: 'var(--red-text)', fontSize: 11, borderRadius: 'var(--radius)' }}>
             ❌ {error}
           </div>
         )}

@@ -49,7 +49,7 @@ const DEFAULTS: Settings = {
   fontFamily: 'pretendard',
   fontSize: 12,
   density: 'compact',
-  radius: 'square',
+  radius: 'soft', // 약간 둥글게 — 표준. 각지게(square)/더 둥글게(rounded) 사용자 선택
   accent: 'navy',
   customAccent: '#1B2A4A',
 };

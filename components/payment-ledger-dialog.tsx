@@ -329,7 +329,7 @@ function PeriodView({ ledger, period }: { ledger: LedgerRow[]; period: Period })
               </td>
               <td className="center mono dim">{g.count}</td>
               <td>
-                <div style={{ height: 6, background: 'var(--bg-sunken)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: 6, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
                   <div style={{ width: `${(g.total / maxBar) * 100}%`, height: '100%', background: 'var(--brand)' }} />
                 </div>
               </td>

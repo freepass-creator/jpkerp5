@@ -31,7 +31,7 @@ export function KpiCard({
       padding: '10px 12px',
       background: 'var(--bg-soft)',
       border: '1px solid var(--border)',
-      borderRadius: 6,
+      borderRadius: 'var(--radius-md)',
       display: 'flex',
       flexDirection: 'column',
       gap: 2,

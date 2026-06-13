@@ -234,7 +234,7 @@ function FleetApplyDialog({ c, pending: pendingProp, onClose }: { c: MockCompany
       onClick={onClose}
     >
       <div
-        style={{ background: 'var(--bg-card)', borderRadius: 8, width: '90vw', maxWidth: 900, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', width: '90vw', maxWidth: 900, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ flex: '0 0 auto', background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -290,7 +290,7 @@ function FleetApplyDialog({ c, pending: pendingProp, onClose }: { c: MockCompany
                       </td>
                       <td className="mono"><strong>{v.plate}</strong></td>
                       <td>{v.model}</td>
-                      <td><span style={{ fontSize: 10, padding: '1px 6px', background: 'var(--bg-sunken)', borderRadius: 3 }}>{v.carType}</span></td>
+                      <td><span style={{ fontSize: 10, padding: '1px 6px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>{v.carType}</span></td>
                       <td className="mono dim">{v.purchaseDate}</td>
                       <td onClick={(e) => e.stopPropagation()}>
                         {v.contractDocAttached ? (
@@ -355,13 +355,13 @@ function FleetApplyDialog({ c, pending: pendingProp, onClose }: { c: MockCompany
             <textarea
               value={reason} onChange={(e) => setReason(e.target.value)}
               rows={2}
-              style={{ width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 4, resize: 'vertical' }}
+              style={{ width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius)', resize: 'vertical' }}
               placeholder="예: 영업 확장에 따른 차량 증차"
             />
           </div>
 
           {/* 4. 자동 묶음 안내 */}
-          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 4, fontSize: 11 }}>
+          <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 'var(--radius)', fontSize: 11 }}>
             <strong>출력 시 자동 생성·수집:</strong>
             <ul style={{ margin: '6px 0 0', paddingLeft: 18, lineHeight: 1.8 }}>
               <li>📄 자동차대여사업 변경등록신청서 (별지 제35호) — 회사·차량 자동 합성</li>

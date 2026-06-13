@@ -339,7 +339,7 @@ function KpiCard({ label, value, tone }: { label: string; value: number; tone?: 
     : tone === 'green' ? 'var(--green-text, #10b981)'
     : 'var(--text-main)';
   return (
-    <div style={{ padding: 12, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6 }}>
+    <div style={{ padding: 12, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
       <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 4 }}>{label}</div>
       <div className="mono" style={{ fontSize: 20, fontWeight: 700, color }}>{value.toLocaleString()}</div>
     </div>

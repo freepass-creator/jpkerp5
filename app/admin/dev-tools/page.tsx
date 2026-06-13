@@ -99,7 +99,7 @@ export default function DevToolsPage() {
                   padding: 16,
                   background: 'var(--bg-main)',
                   border: '1px solid var(--border)',
-                  borderRadius: 8,
+                  borderRadius: 'var(--radius-lg)',
                   textDecoration: 'none',
                   color: 'var(--text-main)',
                   transition: 'border-color 0.15s, transform 0.1s',
@@ -124,7 +124,7 @@ export default function DevToolsPage() {
                       padding: '2px 6px',
                       background: 'var(--red-bg)',
                       color: 'var(--red-text)',
-                      borderRadius: 3,
+                      borderRadius: 'var(--radius-sm)',
                       marginLeft: 'auto',
                     }}>
                       위험

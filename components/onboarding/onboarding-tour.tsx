@@ -170,7 +170,7 @@ export function OnboardingTour() {
             style={{
               background: 'transparent', border: 'none', cursor: 'pointer',
               color: 'var(--text-weak)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 24, height: 24, borderRadius: 4,
+              width: 24, height: 24, borderRadius: 'var(--radius)',
             }}
           >
             <X size={14} weight="bold" />
@@ -199,7 +199,7 @@ export function OnboardingTour() {
                 marginTop: 12,
                 padding: '12px 16px',
                 background: 'var(--bg-sunken)',
-                borderRadius: 8,
+                borderRadius: 'var(--radius-lg)',
                 textAlign: 'left',
                 width: '100%',
               }}>

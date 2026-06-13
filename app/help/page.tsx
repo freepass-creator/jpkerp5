@@ -136,7 +136,7 @@ export default function HelpPage() {
 
             {/* 3. 차량 등록 5단 */}
             <Section icon={<Car weight="bold" />} title="3. 차량 등록 — 5단 분류" id="vehicle">
-              <div style={{ padding: 10, background: 'var(--blue-bg)', borderRadius: 4, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
+              <div style={{ padding: 10, background: 'var(--blue-bg)', borderRadius: 'var(--radius)', fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
                 차종은 <strong>5단계로 분리</strong>해서 입력합니다. 제조사·모델은 dropdown으로 자동완성, 나머지는 자유 입력.
                 나중에 분류·통계·검색에 활용됩니다.
               </div>
@@ -152,7 +152,7 @@ export default function HelpPage() {
                 <span style={{ fontWeight: 700, color: 'var(--brand)' }}>⑤ 트림</span>
                 <span>입력 — <span className="mono">예: 캘리그래피</span> (인스퍼레이션·익스클루시브·N 라인 등 그레이드)</span>
               </div>
-              <div style={{ marginTop: 10, padding: 10, background: 'var(--bg-sunken)', borderRadius: 4, fontSize: 12 }}>
+              <div style={{ marginTop: 10, padding: 10, background: 'var(--bg-sunken)', borderRadius: 'var(--radius)', fontSize: 12 }}>
                 <strong>저장 시 풀네임 자동 결합:</strong>
                 <div className="mono" style={{ marginTop: 4 }}>현대 그랜저 더 뉴 그랜저 GN7 가솔린 3.5 AWD 캘리그래피</div>
               </div>
@@ -217,7 +217,7 @@ export default function HelpPage() {
 
             {/* 6. 리스크 관리 */}
             <Section icon={<Warning weight="bold" />} title="6. 리스크 관리 (미수)" id="risk">
-              <div style={{ padding: 10, background: 'var(--red-bg)', color: 'var(--text-main)', borderRadius: 4, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
+              <div style={{ padding: 10, background: 'var(--red-bg)', color: 'var(--text-main)', borderRadius: 'var(--radius)', fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
                 사이드바 → 리스크 관리. 운영현황에서 떨어진 <strong>위반·종료·매각 계약</strong>을 전문적으로 다루는 화면.
               </div>
               <Row icon={<Warning size={14} />} title="진행중 그룹">
@@ -240,7 +240,7 @@ export default function HelpPage() {
             {/* 7. 업로드 */}
             <Section icon={<FileXls weight="bold" />} title="7. 엑셀 일괄 업로드" id="upload">
               <SubSection title="운영현황 업로드 (운영현황 → +신규)">
-                <div style={{ padding: 10, background: 'var(--blue-bg)', borderRadius: 4, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
+                <div style={{ padding: 10, background: 'var(--blue-bg)', borderRadius: 'var(--radius)', fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
                   <strong>가장 빠른 초기 세팅 방법</strong>. 템플릿 다운로드 → 채움 → 업로드 → 행별 검증·중복 체크 → 적용.
                   차량 + 계약 + 회차 + 미수 한 번에 생성.
                 </div>
@@ -267,7 +267,7 @@ export default function HelpPage() {
                 </ul>
               </SubSection>
               <SubSection title="이력 일괄 업로드 (개발도구 → 이력 업로드, 관리자 전용)">
-                <div style={{ padding: 10, background: 'var(--bg-sunken)', borderRadius: 4, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
+                <div style={{ padding: 10, background: 'var(--bg-sunken)', borderRadius: 'var(--radius)', fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
                   과거 데이터 마이그레이션용. <strong>horizontal 형식</strong> (1행 = 1차량/계약, 우측으로 갈수록 직전 이력).
                 </div>
                 <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: 12 }}>
@@ -296,7 +296,7 @@ export default function HelpPage() {
 
             {/* 9. 권한 */}
             <Section icon={<ShieldCheck weight="bold" />} title="9. 권한 시스템" id="roles">
-              <div style={{ padding: 10, background: 'var(--bg-sunken)', borderRadius: 4, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
+              <div style={{ padding: 10, background: 'var(--bg-sunken)', borderRadius: 'var(--radius)', fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
                 3단계 권한 구조. 가입은 누구나, 권한 부여는 마스터만.
               </div>
               <Row icon={<Crown size={14} />} title="마스터 (master)">
@@ -527,7 +527,7 @@ export default function HelpPage() {
 
             {/* 20. 문의 */}
             <Section icon={<Phone weight="bold" />} title="19. 문의 · 오류 신고" id="contact">
-              <div style={{ padding: '14px 16px', background: 'var(--bg-sunken)', borderRadius: 6, fontSize: 13, lineHeight: 1.7 }}>
+              <div style={{ padding: '14px 16px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', fontSize: 13, lineHeight: 1.7 }}>
                 사용 중 막히면 <strong>화면 캡쳐 + 어떤 작업 중이었는지</strong>를 같이 보내주세요. 빠르게 조치합니다.
                 <br />
                 <br />
@@ -640,7 +640,7 @@ function Chip({ children, color = 'gray' }: { children: React.ReactNode; color?:
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', height: 18, padding: '0 8px',
-      background: c.bg, color: c.text, borderRadius: 4, fontSize: 11, fontWeight: 600, margin: '0 2px',
+      background: c.bg, color: c.text, borderRadius: 'var(--radius)', fontSize: 11, fontWeight: 600, margin: '0 2px',
     }}>{children}</span>
   );
 }

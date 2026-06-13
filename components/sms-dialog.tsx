@@ -193,7 +193,7 @@ export function SmsDialog({
 
               <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>
                 미리보기: {recipients[0]
-                  ? <code style={{ background: 'var(--bg-sunken)', padding: '2px 6px', borderRadius: 4 }}>{preview(body, recipients[0])}</code>
+                  ? <code style={{ background: 'var(--bg-sunken)', padding: '2px 6px', borderRadius: 'var(--radius)' }}>{preview(body, recipients[0])}</code>
                   : <span>수신자 없음</span>}
               </div>
             </div>

@@ -132,9 +132,9 @@ const DENSITIES: { value: Density; label: string; desc: string }[] = [
   { value: 'comfortable', label: '편안함', desc: '여유 (행 36px)' },
 ];
 const RADII: { value: Radius; label: string; desc: string }[] = [
-  { value: 'square',  label: '직각',  desc: '모서리 0 — 기능 우선 (기본)' },
-  { value: 'soft',    label: '약간',  desc: '모서리 3~8px — 살짝 둥글게' },
-  { value: 'rounded', label: '둥근',  desc: '모서리 4~12px — 부드럽게' },
+  { value: 'square',  label: '각지게',     desc: '모서리 0 — 직각 (전통 ERP)' },
+  { value: 'soft',    label: '약간 둥글게', desc: '모서리 3~8px — 표준 (기본)' },
+  { value: 'rounded', label: '더 둥글게',   desc: '모서리 4~12px — 부드럽게' },
 ];
 
 function DisplaySettings() {
@@ -524,7 +524,7 @@ function MenuVisibilitySettings() {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {orderedKeys.map((k) => (
-          <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: vis[k] ? 'var(--bg-card)' : 'var(--bg-sunken)' }}>
+          <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', background: vis[k] ? 'var(--bg-card)' : 'var(--bg-sunken)' }}>
             <input type="checkbox" checked={vis[k] !== false} onChange={() => toggle(k)} />
             <span style={{ fontSize: 13, fontWeight: vis[k] ? 600 : 400, color: vis[k] ? 'var(--text-main)' : 'var(--text-sub)' }}>{MENU_LABELS[k]}</span>
           </label>

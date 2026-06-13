@@ -157,7 +157,7 @@ export function RiskDetailDialog({
                   <div style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 6px',
                     fontSize: 10, color: categoryTone(h.category),
-                    border: `1px solid ${categoryTone(h.category)}`, borderRadius: 3,
+                    border: `1px solid ${categoryTone(h.category)}`, borderRadius: 'var(--radius-sm)',
                     height: 18, flexShrink: 0,
                   }}>
                     {categoryIcon(h.category)}
@@ -211,7 +211,7 @@ function CollectionStageProgress({ contract, overdueDays }: { contract: Contract
       padding: '8px 10px',
       background: 'var(--bg-soft)',
       border: '1px solid var(--border)',
-      borderRadius: 6,
+      borderRadius: 'var(--radius-md)',
     }}>
       {stages.map((s, i) => {
         const passed = s.idx < currentStage;
@@ -229,7 +229,7 @@ function CollectionStageProgress({ contract, overdueDays }: { contract: Contract
             padding: '6px 8px',
             background: bg,
             border: `1px solid ${future ? 'var(--border)' : color}`,
-            borderRadius: 4,
+            borderRadius: 'var(--radius)',
             opacity: future ? 0.55 : 1,
             fontSize: 10,
             display: 'flex',
