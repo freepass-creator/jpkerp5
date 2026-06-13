@@ -40,7 +40,7 @@ export default function MobileEntry() {
   return (
     <div>
       {/* 탭별 상단 색 표시 */}
-      <div style={{ height: 3, background: 'var(--indigo-text)' }} />
+      <div style={{ height: 3, background: 'var(--indigo-text)' }} />{/* 탭색 = 입력 indigo */}
 
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{

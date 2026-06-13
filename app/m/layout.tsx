@@ -12,19 +12,28 @@ import { usePathname, useRouter } from 'next/navigation';
 import { House, Car, Warning, NotePencil, UploadSimple, GearSix } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 
-const TABS: { href: string; label: string; icon: (p: { size: number; weight: 'duotone' | 'bold' }) => JSX.Element; match: (p: string) => boolean }[] = [
-  { href: '/m',         label: '홈',     icon: ({ size, weight }) => <House size={size} weight={weight} />,
-    match: (p) => p === '/m' },
-  { href: '/m/ops',     label: '운영',   icon: ({ size, weight }) => <Car size={size} weight={weight} />,
-    match: (p) => p.startsWith('/m/ops') || p.startsWith('/m/contract') },
-  { href: '/m/risk',    label: '리스크', icon: ({ size, weight }) => <Warning size={size} weight={weight} />,
-    match: (p) => p.startsWith('/m/risk') },
-  { href: '/m/entry',   label: '입력',   icon: ({ size, weight }) => <NotePencil size={size} weight={weight} />,
-    match: (p) => p.startsWith('/m/entry') },
-  { href: '/m/upload',  label: '업로드', icon: ({ size, weight }) => <UploadSimple size={size} weight={weight} />,
-    match: (p) => p.startsWith('/m/upload') },
-  { href: '/m/me',      label: '설정',   icon: ({ size, weight }) => <GearSix size={size} weight={weight} />,
-    match: (p) => p.startsWith('/m/me') },
+type Tab = {
+  href: string;
+  label: string;
+  icon: (p: { size: number; weight: 'duotone' | 'bold' }) => JSX.Element;
+  match: (p: string) => boolean;
+  /** 활성 색 — 페이지 상단 라인과 매칭 */
+  activeColor: string;
+};
+
+const TABS: Tab[] = [
+  { href: '/m',        label: '홈',     icon: ({ size, weight }) => <House size={size} weight={weight} />,
+    match: (p) => p === '/m', activeColor: 'var(--green-text)' },
+  { href: '/m/ops',    label: '운영',   icon: ({ size, weight }) => <Car size={size} weight={weight} />,
+    match: (p) => p.startsWith('/m/ops') || p.startsWith('/m/contract'), activeColor: 'var(--brand)' },
+  { href: '/m/risk',   label: '리스크', icon: ({ size, weight }) => <Warning size={size} weight={weight} />,
+    match: (p) => p.startsWith('/m/risk'), activeColor: 'var(--red-text)' },
+  { href: '/m/entry',  label: '입력',   icon: ({ size, weight }) => <NotePencil size={size} weight={weight} />,
+    match: (p) => p.startsWith('/m/entry'), activeColor: 'var(--indigo-text)' },
+  { href: '/m/upload', label: '업로드', icon: ({ size, weight }) => <UploadSimple size={size} weight={weight} />,
+    match: (p) => p.startsWith('/m/upload'), activeColor: 'var(--amber-text)' },
+  { href: '/m/me',     label: '설정',   icon: ({ size, weight }) => <GearSix size={size} weight={weight} />,
+    match: (p) => p.startsWith('/m/me'), activeColor: 'var(--text-sub)' },
 ];
 
 /** 상세 페이지 패턴 — 진입 시 탭바 대신 풀폭 '이전' 바 노출. */
@@ -67,15 +76,15 @@ function TabBar({ path }: { path: string }) {
             position: 'relative',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             gap: 2, textDecoration: 'none',
-            color: active ? 'var(--brand)' : 'var(--text-sub)',
+            color: active ? t.activeColor : 'var(--text-sub)',
             fontSize: active ? 11 : 10, fontWeight: active ? 800 : 500,
             touchAction: 'manipulation', minHeight: 44,
           }}>
-            {/* 활성 탭 상단 indicator */}
+            {/* 활성 탭 상단 indicator — 페이지 상단 색과 매칭 */}
             {active && (
               <span style={{
                 position: 'absolute', top: 0, left: '25%', right: '25%',
-                height: 2.5, background: 'var(--brand)', borderRadius: '0 0 4px 4px',
+                height: 2.5, background: t.activeColor, borderRadius: '0 0 4px 4px',
               }} />
             )}
             {t.icon({ size: active ? 22 : 20, weight: active ? 'duotone' : 'bold' })}

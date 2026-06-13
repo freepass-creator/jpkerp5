@@ -109,7 +109,7 @@ export default function MobileUpload() {
 
   return (
     <div>
-      <div style={{ height: 3, background: 'var(--green-text)' }} />
+      <div style={{ height: 3, background: 'var(--amber-text)' }} />{/* 탭색 = 업로드 amber */}
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* 파일 선택 zone */}
       <label htmlFor="upload-input" style={{

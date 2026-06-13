@@ -139,7 +139,7 @@ export default function MobileHome() {
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         padding: '12px 16px 10px',
-        borderTop: '3px solid var(--brand)',
+        borderTop: '3px solid var(--green-text)',
         borderBottom: '1px solid var(--border)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
