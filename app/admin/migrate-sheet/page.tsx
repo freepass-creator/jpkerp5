@@ -144,7 +144,12 @@ export default function MigrateSheetPage() {
   async function nukeEverything() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!window.confirm(`☢☢☢ 핵 wipe — ${RTDB_ROOT} root 노드 전체 삭제\n\ncompanies/audit_logs 포함 모든 데이터 사라집니다.\n진행할까요?`)) return;
-    if (!window.confirm(`정말로? ${RTDB_ROOT} 노드 전체 삭제`)) return;
+    // Type-to-confirm — 머슬 메모리 'Enter Enter' 사고 방지
+    const typed = window.prompt(`마지막 확인 — 아래 문자열을 그대로 입력하세요:\n\n  ${RTDB_ROOT}\n\n(빈 입력·다른 문자 = 취소)`, '');
+    if (typed !== RTDB_ROOT) {
+      toast.info(typed == null ? '취소됨' : `입력 불일치 — 취소됨 (입력: "${typed}")`);
+      return;
+    }
     setRunning(true);
     setLog([]);
     try {
@@ -204,7 +209,14 @@ export default function MigrateSheetPage() {
       }
 
       if (!window.confirm(`⚠️ contracts ${cAll.length}건 + vehicles ${vAll.length}대 영구 삭제. 진행?`)) return;
-      if (!window.confirm(`정말로? 마지막 확인`)) return;
+      // Type-to-confirm — 머슬 메모리 'Enter Enter' 사고 방지
+      const phrase = 'WIPE';
+      const typed = window.prompt(`마지막 확인 — 아래 단어를 그대로 입력하세요:\n\n  ${phrase}\n\n(빈 입력·다른 문자 = 취소)`, '');
+      if (typed !== phrase) {
+        append(`✗ 취소됨 (입력: "${typed ?? ''}")`);
+        toast.info(typed == null ? '취소됨' : `입력 불일치 — 취소됨`);
+        return;
+      }
 
       // ── 2) 삭제 ──
       append('═══ 삭제 실행 ═══');
