@@ -1,13 +1,19 @@
 'use client';
 
 /**
- * 모바일 홈 — 오늘 핵심 + 알림 inbox.
+ * 모바일 홈 — 직원이 들어왔을 때 회사 현황 + 본인 할 일 한눈에.
  *
- * 표시:
- *  · 인도 예정 (오늘·내일)
- *  · 반납 임박 (D-3 이내)
- *  · 미수 (전체 합계 + 미납 N건)
- *  · 새 지시 (사무→현장) — TODO Phase 2 (dispatch_orders 노드)
+ * 카드:
+ *  · 검색 (빠른 진입)
+ *  · 오늘 헤더 (날짜 + 시간 + 날씨 + 휴무)
+ *  · 오늘 할 일 (인도+반납+검사 통합)
+ *  · 내일 할 일
+ *  · 요청받은 업무 (사무→나 지시)
+ *  · 미결 업무 (데이터 결손, 인도 지연)
+ *  · 리스크 요약 (/m/risk 점프)
+ *  · 휴차 현황
+ *
+ * 데이터: 기존 Contract 필드 + 신규 dispatch_orders 만.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -15,10 +21,16 @@ import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useAuth } from '@/lib/use-auth';
 import { useTodayOnLeaveCount } from '@/lib/firebase/attendance-store';
+import { useMyPendingDispatchCount } from '@/lib/firebase/dispatch-store';
 import { useWeather } from '@/lib/weather';
-import { Truck, ArrowUUpLeft, CurrencyKrw, Bell, CaretRight, MagnifyingGlass } from '@phosphor-icons/react';
+import {
+  Truck, ArrowUUpLeft, CurrencyKrw, CaretRight, MagnifyingGlass,
+  Calendar, ListChecks, Warning, PauseCircle, ShieldWarning, IdentificationCard,
+  Megaphone,
+} from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
+import { ageFromIdent } from '@/lib/ident';
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -28,10 +40,10 @@ export default function MobileHome() {
   const today = todayKr();
   const onLeave = useTodayOnLeaveCount();
   const weather = useWeather();
+  const pendingOrders = useMyPendingDispatchCount(user?.uid ?? null);
   const todayDate = new Date(today);
   const dateLabel = `${todayDate.getMonth() + 1}월 ${todayDate.getDate()}일 (${DOW[todayDate.getDay()]})`;
 
-  // 실시간 시계 — 매 분 갱신 (배터리 절약)
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const tick = () => setNow(new Date());
@@ -45,48 +57,82 @@ export default function MobileHome() {
   const h12 = ((hh + 11) % 12) + 1;
   const timeLabel = `${ampm} ${h12}:${mm.toString().padStart(2, '0')}`;
 
-  const buckets = useMemo(() => {
-    // 오늘·내일 D 자체 계산
-    const todayDate = new Date(today);
+  const data = useMemo(() => {
     const dayMs = 24 * 60 * 60 * 1000;
     const toDate = (s?: string) => s ? new Date(s) : null;
 
-    const deliveryToday: typeof contracts = [];
-    const deliveryTomorrow: typeof contracts = [];
-    const returnSoon: typeof contracts = [];
+    const today: { delivery: typeof contracts; return: typeof contracts } = { delivery: [], return: [] };
+    const tomorrow: { delivery: typeof contracts; return: typeof contracts } = { delivery: [], return: [] };
+    const overdueDelivery: typeof contracts = [];
+    const missingIdent: typeof contracts = [];
+    const missingInsurance: typeof contracts = [];
+    const insuranceGap: typeof contracts = [];
+    const unpaidList: typeof contracts = [];
+    const overdueReturn: typeof contracts = [];
+    const idleList: typeof contracts = [];
     let totalUnpaid = 0;
-    let unpaidCount = 0;
 
     for (const c of contracts) {
-      // 인도 예정 — deliveredDate 없고 deliveryScheduledDate 또는 contractDate 가 오늘/내일
+      const s = c.vehicleStatus;
+      const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
+        || s === '매각' || s === '매각대기'
+        || s === '상품화대기' || s === '상품화중' || s === '상품대기'
+        || s === '구매대기' || s === '등록대기'
+        || c.status === '반납' || c.status === '해지';
+
       if (!c.deliveredDate) {
         const sched = toDate(c.deliveryScheduledDate ?? c.contractDate);
         if (sched) {
           const diff = Math.floor((sched.getTime() - todayDate.getTime()) / dayMs);
-          if (diff === 0) deliveryToday.push(c);
-          else if (diff === 1) deliveryTomorrow.push(c);
+          if (diff === 0) today.delivery.push(c);
+          else if (diff === 1) tomorrow.delivery.push(c);
+          else if (diff < 0 && !inactive) overdueDelivery.push(c);
         }
       }
-      // 반납 임박 — returnScheduledDate D-3 이내, 아직 안 반납
+
       if (!c.returnedDate && c.returnScheduledDate) {
         const ret = toDate(c.returnScheduledDate);
         if (ret) {
           const diff = Math.floor((ret.getTime() - todayDate.getTime()) / dayMs);
-          if (diff >= 0 && diff <= 3) returnSoon.push(c);
+          if (diff === 0) today.return.push(c);
+          else if (diff === 1) tomorrow.return.push(c);
+          else if (diff < 0) overdueReturn.push(c);
         }
       }
-      // 미수
-      if (c.unpaidAmount > 0) {
-        totalUnpaid += c.unpaidAmount;
-        unpaidCount += 1;
+
+      if (c.unpaidAmount > 0) { unpaidList.push(c); totalUnpaid += c.unpaidAmount; }
+      if (s === '휴차' || s === '휴차대기') idleList.push(c);
+
+      if (!inactive) {
+        const d = (c.customerIdentNo ?? '').replace(/\D/g, '');
+        if (c.customerKind !== '법인' && d.length !== 13) missingIdent.push(c);
+        if (!c.insuranceAge) missingInsurance.push(c);
+
+        const ia = c.insuranceAge ?? 0;
+        const driverIdent = c.customerKind === '법인' ? c.driverIdentNo : (c.customerIdentNo ?? c.driverIdentNo);
+        const age = ageFromIdent(driverIdent, '개인');
+        const blocked = (ia > 0 && age != null && age < ia);
+        const missingDriver = ia > 0 && age == null;
+        if (blocked || missingDriver) insuranceGap.push(c);
       }
     }
-    return { deliveryToday, deliveryTomorrow, returnSoon, totalUnpaid, unpaidCount };
-  }, [contracts, today]);
+
+    return {
+      today, tomorrow,
+      overdueDelivery, missingIdent, missingInsurance,
+      insuranceGap, unpaidList, overdueReturn, idleList,
+      totalUnpaid,
+    };
+  }, [contracts, todayDate]);
+
+  const todayCount = data.today.delivery.length + data.today.return.length;
+  const tomorrowCount = data.tomorrow.delivery.length + data.tomorrow.return.length;
+  const pendingCount = data.overdueDelivery.length + data.missingIdent.length + data.missingInsurance.length;
+  const riskCount = data.unpaidList.length + data.overdueReturn.length + data.insuranceGap.length + data.missingIdent.length;
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* 빠른 조회 — 페이지 진입 즉시 보이는 최상단. 운영현황 검색으로 점프 */}
+      {/* 검색 */}
       <Link href="/m/ops" style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '14px 16px', background: 'var(--bg-card)',
@@ -98,9 +144,8 @@ export default function MobileHome() {
         <span style={{ fontSize: 14 }}>차량번호 · 고객명 조회</span>
       </Link>
 
-      {/* '오늘 + 날짜 + 요일 + 날씨 + 휴무' 한눈에 — 인사 한 줄 */}
+      {/* 오늘 헤더 */}
       <header style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>{user?.email?.split('@')[0] ?? '직원'}</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-main)' }}>오늘</span>
           <span style={{ fontSize: 14, color: 'var(--text-sub)', fontFamily: 'var(--font-mono)' }}>{dateLabel}</span>
@@ -131,136 +176,205 @@ export default function MobileHome() {
         </div>
       </header>
 
-      {/* KPI 카드 4종 */}
-      <KpiRow>
-        <KpiCard
-          tone="brand" icon={<Truck size={18} weight="duotone" />}
-          label="오늘 인도" value={buckets.deliveryToday.length}
-          href="/m/ops?filter=delivery-today"
-        />
-        <KpiCard
-          tone="blue" icon={<Truck size={18} weight="duotone" />}
-          label="내일 인도" value={buckets.deliveryTomorrow.length}
-          href="/m/ops?filter=delivery-tomorrow"
-        />
-        <KpiCard
-          tone="orange" icon={<ArrowUUpLeft size={18} weight="duotone" />}
-          label="반납 임박" value={buckets.returnSoon.length}
-          subtext="D-3 이내"
-          href="/m/ops?filter=return-soon"
-        />
-        <KpiCard
-          tone="red" icon={<CurrencyKrw size={18} weight="duotone" />}
-          label="미수"
-          value={buckets.unpaidCount}
-          subtext={`₩${formatCurrency(buckets.totalUnpaid)}`}
-          href="/m/risk?filter=unpaid"
-        />
-      </KpiRow>
+      {/* 오늘 할 일 — 인도 + 반납 통합. 클릭 시 운영 페이지 today 필터 진입 */}
+      <DayCard
+        href="/m/ops?filter=today"
+        icon={<Calendar size={16} weight="duotone" />}
+        title="오늘 할 일"
+        tone="brand"
+        total={todayCount}
+        breakdown={[
+          { label: '인도', count: data.today.delivery.length, items: data.today.delivery },
+          { label: '반납', count: data.today.return.length, items: data.today.return },
+        ]}
+      />
 
-      {/* 알림 inbox — Phase 2 dispatch_orders 노드 도입 후 채움 */}
-      <section>
-        <SectionHeader title="알림" icon={<Bell size={14} weight="duotone" />} />
-        <div style={{
-          padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)',
-          background: 'var(--bg-sunken)', borderRadius: 'var(--radius-lg)',
-        }}>
-          (Phase 2) 사무에서 등록한 새 지시·계약·인도건이 여기로 푸시됩니다
-        </div>
-      </section>
+      {/* 내일 할 일 */}
+      <DayCard
+        href="/m/ops?filter=tomorrow"
+        icon={<Calendar size={16} weight="duotone" />}
+        title="내일 할 일"
+        tone="blue"
+        total={tomorrowCount}
+        breakdown={[
+          { label: '인도', count: data.tomorrow.delivery.length, items: data.tomorrow.delivery },
+          { label: '반납', count: data.tomorrow.return.length, items: data.tomorrow.return },
+        ]}
+      />
 
-      {/* 오늘 인도 목록 */}
-      {buckets.deliveryToday.length > 0 && (
-        <section>
-          <SectionHeader title={`오늘 인도 (${buckets.deliveryToday.length})`} icon={<Truck size={14} weight="duotone" />} />
-          <ContractList items={buckets.deliveryToday} />
-        </section>
-      )}
-      {/* 반납 임박 목록 */}
-      {buckets.returnSoon.length > 0 && (
-        <section>
-          <SectionHeader title={`반납 임박 (${buckets.returnSoon.length})`} icon={<ArrowUUpLeft size={14} weight="duotone" />} />
-          <ContractList items={buckets.returnSoon} />
-        </section>
-      )}
+      {/* 요청받은 업무 */}
+      <SummaryCard
+        href="/m/orders"
+        icon={<Megaphone size={16} weight="duotone" />}
+        title="요청받은 업무"
+        tone="amber"
+        count={pendingOrders}
+        countLabel="건"
+        subtitle={pendingOrders > 0 ? '사무에서 받은 미확인 지시' : '받은 업무 없음'}
+      />
+
+      {/* 미결 업무 */}
+      <SummaryCard
+        href="/m/ops?filter=pending"
+        icon={<ListChecks size={16} weight="duotone" />}
+        title="미결 업무"
+        tone="orange"
+        count={pendingCount}
+        countLabel="건"
+        subtitle={pendingCount > 0
+          ? `인도 지연 ${data.overdueDelivery.length} · 등록번호 결손 ${data.missingIdent.length} · 보험 결손 ${data.missingInsurance.length}`
+          : '없음'}
+      />
+
+      {/* 리스크 요약 */}
+      <SummaryCard
+        href="/m/risk"
+        icon={<Warning size={16} weight="duotone" />}
+        title="리스크 요약"
+        tone="red"
+        count={riskCount}
+        countLabel="건"
+        subtitle={riskCount > 0
+          ? `미수 ${data.unpaidList.length} (₩${formatCurrency(data.totalUnpaid)}) · 반납지연 ${data.overdueReturn.length} · 보험 ${data.insuranceGap.length}`
+          : '리스크 없음'}
+      />
+
+      {/* 휴차 현황 */}
+      <SummaryCard
+        href="/m/ops?filter=idle"
+        icon={<PauseCircle size={16} weight="duotone" />}
+        title="휴차 현황"
+        tone="gray"
+        count={data.idleList.length}
+        countLabel="대"
+        subtitle={data.idleList.length > 0
+          ? data.idleList.slice(0, 3).map((c) => c.vehiclePlate).filter(Boolean).join(' · ')
+          : '휴차 차량 없음'}
+      />
     </div>
   );
 }
 
-function KpiRow({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10,
-    }}>{children}</div>
-  );
-}
+/* ─────────── 오늘/내일 카드 (인도+반납 통합) ─────────── */
 
-function KpiCard({
-  tone, icon, label, value, subtext, href,
-}: {
-  tone: 'brand' | 'blue' | 'orange' | 'red';
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  subtext?: string;
+function DayCard({ href, icon, title, tone, total, breakdown }: {
   href: string;
+  icon: React.ReactNode;
+  title: string;
+  tone: 'brand' | 'blue';
+  total: number;
+  breakdown: { label: string; count: number; items: ReturnType<typeof useContracts>['contracts'] }[];
 }) {
-  const colorMap = {
-    brand:  { bg: 'var(--brand-bg)',  fg: 'var(--brand)'      },
-    blue:   { bg: 'var(--blue-bg)',   fg: 'var(--blue-text)'  },
-    orange: { bg: 'var(--orange-bg)', fg: 'var(--orange-text)' },
-    red:    { bg: 'var(--red-bg)',    fg: 'var(--red-text)'   },
+  const tones = {
+    brand: { bg: 'var(--brand-bg)', fg: 'var(--brand)' },
+    blue:  { bg: 'var(--blue-bg)',  fg: 'var(--blue-text)' },
   } as const;
-  const c = colorMap[tone];
+  const t = tones[tone];
+  const active = breakdown.filter((b) => b.count > 0);
+
   return (
-    <Link href={href} style={{
-      display: 'flex', flexDirection: 'column', gap: 4,
-      padding: 14, background: c.bg, borderRadius: 'var(--radius-lg)',
-      textDecoration: 'none', color: c.fg, border: `1px solid ${c.fg}22`,
-      touchAction: 'manipulation',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {icon}
-        <CaretRight size={12} weight="bold" style={{ opacity: 0.5 }} />
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 600 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700 }}>{value}</div>
-      {subtext && <div style={{ fontSize: 10, opacity: 0.85 }}>{subtext}</div>}
+    <Link href={href} style={{ textDecoration: 'none', color: 'inherit' }}>
+      <section style={{
+        padding: 14, background: 'var(--bg-card)',
+        border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
+        display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: t.fg }}>{icon}</span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '2px 8px',
+              background: total > 0 ? t.bg : 'var(--bg-sunken)',
+              color: total > 0 ? t.fg : 'var(--text-sub)',
+              borderRadius: 'var(--radius-sm)',
+            }}>{total}건</span>
+          </div>
+          <CaretRight size={14} weight="bold" style={{ color: 'var(--text-weak)' }} />
+        </div>
+        {active.length === 0 ? (
+          <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>없음</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {active.map((b) => (
+              <div key={b.label}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)', marginBottom: 4 }}>
+                  {b.label} ({b.count})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {b.items.slice(0, 3).map((c) => (
+                    <div key={c.id} style={{
+                      padding: '6px 10px', background: 'var(--bg-sunken)',
+                      borderRadius: 'var(--radius-sm)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: 12 }}>{c.vehiclePlate}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>{c.customerName}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {b.items.length > 3 && (
+                    <span style={{ fontSize: 10, color: 'var(--text-weak)' }}>... 외 {b.items.length - 3}건</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </Link>
   );
 }
 
-function SectionHeader({ title, icon }: { title: string; icon: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-      {icon}
-      <h2 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>{title}</h2>
-    </div>
-  );
-}
+/* ─────────── 요약 카드 (요청업무/미결/리스크/휴차) ─────────── */
 
-function ContractList({ items }: { items: { id: string; vehiclePlate?: string; customerName?: string; company?: string; vehicleModel?: string }[] }) {
+function SummaryCard({ href, icon, title, tone, count, countLabel, subtitle }: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  tone: 'brand' | 'amber' | 'orange' | 'red' | 'gray';
+  count: number;
+  countLabel: string;
+  subtitle: string;
+}) {
+  const tones = {
+    brand:  { bg: 'var(--brand-bg)',  fg: 'var(--brand)' },
+    amber:  { bg: 'var(--amber-bg)',  fg: 'var(--amber-text)' },
+    orange: { bg: 'var(--orange-bg)', fg: 'var(--orange-text)' },
+    red:    { bg: 'var(--red-bg)',    fg: 'var(--red-text)' },
+    gray:   { bg: 'var(--bg-sunken)', fg: 'var(--text-sub)' },
+  } as const;
+  const t = tones[tone];
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {items.slice(0, 10).map((c) => (
-        <Link key={c.id} href={`/m/contract/${c.id}`} style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 14px', background: 'var(--bg-card)',
-          border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
-          textDecoration: 'none', color: 'inherit', touchAction: 'manipulation',
-        }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{c.vehiclePlate ?? '?'}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>{c.customerName ?? '?'}</span>
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--text-weak)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {c.vehicleModel ?? ''} · {c.company ?? ''}
-            </div>
+    <Link href={href} style={{ textDecoration: 'none', color: 'inherit' }}>
+      <section style={{
+        padding: 14, background: 'var(--bg-card)',
+        border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)',
+        display: 'flex', alignItems: 'center', gap: 12,
+      }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 'var(--radius)',
+          background: t.bg, color: t.fg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>{icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>{title}</span>
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '1px 7px',
+              background: count > 0 ? t.bg : 'var(--bg-sunken)',
+              color: count > 0 ? t.fg : 'var(--text-sub)',
+              borderRadius: 'var(--radius-sm)',
+            }}>{count}{countLabel}</span>
           </div>
-          <CaretRight size={14} weight="bold" style={{ color: 'var(--text-weak)', flexShrink: 0 }} />
-        </Link>
-      ))}
-    </div>
+          <div style={{ fontSize: 11, color: 'var(--text-weak)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {subtitle}
+          </div>
+        </div>
+        <CaretRight size={14} weight="bold" style={{ color: 'var(--text-weak)' }} />
+      </section>
+    </Link>
   );
 }
