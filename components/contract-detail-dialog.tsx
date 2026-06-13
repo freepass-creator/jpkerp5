@@ -354,15 +354,22 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
  */
 function VehiclePhotosTab({ c }: { c: Contract }) {
   const { vehicles } = useVehicles();
-  const matchedVehicleId = useMemo(
-    () => vehicles.find((v) => (v.plate ?? '').trim() === (c.vehiclePlate ?? '').trim())?.id ?? null,
-    [vehicles, c.vehiclePlate],
-  );
+  // 차량 매칭: 현재 plate 우선, 없으면 plateHistory[] 도 확인 (번호 변경 차량 추적)
+  const matched = useMemo(() => {
+    const plate = (c.vehiclePlate ?? '').trim();
+    if (!plate) return null;
+    return vehicles.find((v) =>
+      (v.plate ?? '').trim() === plate
+      || (v.plateHistory ?? []).some((p) => (p ?? '').trim() === plate)
+    ) ?? null;
+  }, [vehicles, c.vehiclePlate]);
+
+  // 저장 키: 등록된 차량은 vehicleId (자체코드 역할, 불변), 미등록은 plate fallback
   const storageId = useMemo(() => {
-    if (matchedVehicleId) return matchedVehicleId;
+    if (matched?.id) return matched.id;
     const plate = (c.vehiclePlate ?? '').trim();
     return plate ? `plate:${plate}` : null;
-  }, [matchedVehicleId, c.vehiclePlate]);
+  }, [matched, c.vehiclePlate]);
 
   if (!storageId) {
     return (
@@ -375,15 +382,35 @@ function VehiclePhotosTab({ c }: { c: Contract }) {
   // 라이프사이클 역순 (최근 단계부터): 반납 → 인도전(출고) → 상품화
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {!matchedVehicleId && (
-        <div style={{
-          padding: '8px 10px', background: 'var(--amber-bg)', color: 'var(--amber-text)',
-          border: '1px solid var(--amber-border)', borderRadius: 'var(--radius-sm)',
-          fontSize: 11, display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          자산 미등록 차량 — 차량번호 기준으로 임시 저장됩니다. 자산 등록 후엔 정식 차량 키로 이관 권장
-        </div>
-      )}
+      {/* 차량 식별자 안내 — 차대번호/자체코드/현재 plate + 이전 plate 이력 */}
+      <div style={{
+        padding: '6px 10px',
+        background: matched ? 'var(--bg-sunken)' : 'var(--amber-bg)',
+        color: matched ? 'var(--text-sub)' : 'var(--amber-text)',
+        border: `1px solid ${matched ? 'var(--border-soft)' : 'var(--amber-border)'}`,
+        borderRadius: 'var(--radius-sm)',
+        fontSize: 10.5, lineHeight: 1.5,
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
+      }}>
+        {matched ? (
+          <>
+            <span><strong>차량번호</strong> {matched.plate}</span>
+            {matched.vin && <span><strong>차대번호</strong> <span className="mono">{matched.vin}</span></span>}
+            <span><strong>자체코드</strong> <span className="mono">{matched.id.slice(0, 10)}</span></span>
+            {(matched.plateHistory?.length ?? 0) > 0 && (
+              <span style={{ color: 'var(--text-weak)' }}>
+                이전 번호 {matched.plateHistory!.join(', ')}
+              </span>
+            )}
+          </>
+        ) : (
+          <span>
+            자산 미등록 차량 — <strong>{c.vehiclePlate}</strong> 기준으로 임시 저장됩니다.
+            자산 등록 시 사진 자동 이관 (plate → 자체코드)
+          </span>
+        )}
+      </div>
+
       <VehiclePhotosByKind vehicleId={storageId} kind="return"   contractId={c.id} title="최근 반납 사진" />
       <VehiclePhotosByKind vehicleId={storageId} kind="delivery" contractId={c.id} title="최근 인도전 사진" />
       <VehiclePhotosByKind vehicleId={storageId} kind="product"  contractId={c.id} title="최근 상품화 사진" />

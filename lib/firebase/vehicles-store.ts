@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
+import { mergePlateAttachmentsToVehicle } from './vehicle-attachments-store';
 import { useDataContext } from '@/lib/data-context';
 import type { Vehicle } from '@/lib/types';
 
@@ -36,6 +37,10 @@ export function useVehicles(): {
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
       await set(newRef, pruneUndefined({ ...v, id }));
+      // plate-키로 임시 저장돼있던 사진/첨부가 있으면 신규 vehicleId 로 흡수
+      if (v.plate) {
+        void mergePlateAttachmentsToVehicle(v.plate, id);
+      }
       void audit.create('vehicle', id, `차량 등록 ${v.plate} ${v.model}`);
       return id;
     },
@@ -64,7 +69,21 @@ export function useVehicles(): {
       if (!configured) return;
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbUpdate(ref(db, `${VEHICLES_PATH}/${v.id}`), pruneUndefined(v as unknown as Record<string, unknown>));
+      // plate 변경 감지 → 이전 plate 를 plateHistory 에 누적 + plate-키 첨부 흡수
+      const prev = vehicles.find((x) => x.id === v.id);
+      let next = v;
+      const prevPlate = (prev?.plate ?? '').trim();
+      const newPlate = (v.plate ?? '').trim();
+      if (prev && prevPlate && newPlate && prevPlate !== newPlate) {
+        const history = prev.plateHistory ?? [];
+        if (!history.includes(prevPlate)) {
+          next = { ...v, plateHistory: [...history, prevPlate] };
+        }
+        // 새 plate 로 임시 등록돼있던 사진이 있을 수 있으니 흡수 (드물지만 가능)
+        void mergePlateAttachmentsToVehicle(newPlate, v.id);
+        void audit.update('vehicle', v.id, `차량번호 변경 ${prevPlate} → ${newPlate}`);
+      }
+      await rtdbUpdate(ref(db, `${VEHICLES_PATH}/${v.id}`), pruneUndefined(next as unknown as Record<string, unknown>));
       void audit.update('vehicle', v.id, `차량 수정 ${v.plate} ${v.model}`);
     },
     remove: async (id) => {

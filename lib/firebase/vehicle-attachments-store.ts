@@ -96,6 +96,53 @@ export async function addVehiclePhoto(vehicleId: string, photo: VehiclePhoto): P
   await set(ref(db, `${PATH}/${vehicleId}`), pruneUndefined(next as unknown as Record<string, unknown>));
 }
 
+/**
+ * plate-키 첨부묶음을 vehicleId-키로 흡수 (merge).
+ *
+ * 시점:
+ *  · 자산 등록 시 (Vehicle.add) — 'plate:{새 plate}' 키에 사진이 있으면 신규 vehicleId 로 이관
+ *  · 차량번호 변경 시 (Vehicle.update plate 변경) — 옛 plate 의 plate: 키도 같이 흡수
+ *
+ * 정책:
+ *  · 기존 vehicleId 묶음의 photos 어레이에 plate 묶음의 photos 를 append (중복 id 자동 제거)
+ *  · plate 묶음의 첨부 메타 (registrationCert 등) 는 vehicleId 가 비어있을 때만 채움 (안 덮어씀)
+ *  · 이관 후 plate 키 삭제
+ *  · 한쪽이 비어있으면 silent no-op
+ */
+export async function mergePlateAttachmentsToVehicle(plate: string, vehicleId: string): Promise<void> {
+  await ensureAuth();
+  const db = getRtdb();
+  if (!db) return;
+  const plateKey = `plate:${plate.trim()}`;
+  if (!plateKey || plateKey === 'plate:' || !vehicleId || plateKey === vehicleId) return;
+
+  const plateRef = ref(db, `${PATH}/${plateKey}`);
+  const plateSnap = await get(plateRef);
+  const plateData = plateSnap.val() as VehicleAttachments | null;
+  if (!plateData) return;
+
+  const existing = (await fetchVehicleAttachments(vehicleId)) ?? {};
+  const seen = new Set((existing.photos ?? []).map((p) => p.id));
+  const merged: VehicleAttachments = {
+    // 메타: vehicleId 가 비어있을 때만 plate 쪽 값 사용 (덮어쓰지 않음)
+    registrationCertUrl: existing.registrationCertUrl ?? plateData.registrationCertUrl,
+    registrationCertFileName: existing.registrationCertFileName ?? plateData.registrationCertFileName,
+    registrationCertUploadedAt: existing.registrationCertUploadedAt ?? plateData.registrationCertUploadedAt,
+    insuranceCertUrl: existing.insuranceCertUrl ?? plateData.insuranceCertUrl,
+    insuranceCertFileName: existing.insuranceCertFileName ?? plateData.insuranceCertFileName,
+    insuranceCertUploadedAt: existing.insuranceCertUploadedAt ?? plateData.insuranceCertUploadedAt,
+    loanContractUrl: existing.loanContractUrl ?? plateData.loanContractUrl,
+    loanContractFileName: existing.loanContractFileName ?? plateData.loanContractFileName,
+    loanContractUploadedAt: existing.loanContractUploadedAt ?? plateData.loanContractUploadedAt,
+    photos: [
+      ...(existing.photos ?? []),
+      ...(plateData.photos ?? []).filter((p) => !seen.has(p.id)),
+    ],
+  };
+  await set(ref(db, `${PATH}/${vehicleId}`), pruneUndefined(merged as unknown as Record<string, unknown>));
+  await remove(plateRef);
+}
+
 /** 차량 사진 1장 삭제 — photo.id 기준. */
 export async function removeVehiclePhoto(vehicleId: string, photoId: string): Promise<void> {
   await ensureAuth();

@@ -464,7 +464,13 @@ export type Vehicle = {
   interiorColor?: string;      // 내부 색상
 
   // ─── 자동차 등록증 정보 ───
-  vin?: string;                // 차대번호
+  vin?: string;                // 차대번호 (불변 — 차량 실제 unique id)
+  /**
+   * 차량번호 변경 이력 — 파손/임의변경 시 이전 plate 가 push 됨.
+   * Contract 매칭에 사용: contract.vehiclePlate 가 vehicle.plate 또는 plateHistory[] 중 하나에 매치되면 같은 차량으로 인식.
+   * 차대번호(VIN) / vehicle.id (자체코드) 는 변하지 않음.
+   */
+  plateHistory?: string[];
   manufacturedDate?: string;   // 제작연월일 (YYYY-MM-DD)
   firstRegisteredDate?: string;// 최초등록일 (YYYY-MM-DD)
   fuelType?: string;           // 사용연료
