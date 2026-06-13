@@ -46,9 +46,13 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  // HTML 응답은 캐시 금지 — 사용자가 매번 새 빌드를 즉시 받게 (캐시 비우기 안내 없이)
+  // HTML 응답은 캐시 금지 — Vercel CDN + 브라우저 둘 다.
+  // 일반 Cache-Control 만으론 Vercel CDN이 stale-while-revalidate로 옛 응답 계속 서빙함.
+  // Vercel-CDN-Cache-Control 로 CDN 단계에서 캐시 자체 차단.
   const res = NextResponse.next();
-  res.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.headers.set('CDN-Cache-Control', 'no-store');
+  res.headers.set('Vercel-CDN-Cache-Control', 'no-store');
   return res;
 }
 

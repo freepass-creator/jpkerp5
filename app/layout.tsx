@@ -45,6 +45,10 @@ export const viewport: Viewport = {
   themeColor: '#1B2A4A',
 };
 
+// CDN/브라우저 캐시 금지 — 폰에서 옛 빌드가 계속 보이는 문제 차단
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
