@@ -732,10 +732,11 @@ a { color: var(--text-link); text-decoration: none; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 10px;
+  padding: 6px 10px;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
-  height: var(--topbar-h);
+  min-height: var(--topbar-h);
+  flex-wrap: wrap;
 }
 
 .topbar-title {

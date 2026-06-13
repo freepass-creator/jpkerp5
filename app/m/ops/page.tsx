@@ -32,7 +32,7 @@ export default function MobileOps() {
   const [q, setQ] = useState('');
   const [activeGroup, setActiveGroup] = useState<GroupKey | 'all'>('all');
 
-  const groups = useMemo(() => {
+  const { groups, totalCount } = useMemo(() => {
     const query = q.trim().toLowerCase().replace(/[^\w가-힣]/g, '');
     const todayDate = new Date();
     const dayMs = 24 * 60 * 60 * 1000;
@@ -43,9 +43,9 @@ export default function MobileOps() {
       idle:       [],
       running:    [],
     };
+    const uniqueIds = new Set<string>();
 
     for (const c of contracts) {
-      // 검색 필터 (있으면)
       if (query) {
         const hay = `${c.vehiclePlate ?? ''}${c.customerName ?? ''}${c.customerPhone1 ?? ''}${c.contractNo ?? ''}`
           .toLowerCase().replace(/[^\w가-힣]/g, '');
@@ -53,39 +53,40 @@ export default function MobileOps() {
       }
 
       const s = c.vehicleStatus;
+      let matched = false;
 
-      // 1. 만기임박 — 반납 안 됨 + 예정일 D-7 이내
+      // 만기임박 — 반납 안 됨 + 예정일 D-7 이내 (계약중의 부분집합)
       if (!c.returnedDate && c.returnScheduledDate) {
         const ret = new Date(c.returnScheduledDate);
         const diff = Math.floor((ret.getTime() - todayDate.getTime()) / dayMs);
         if (diff >= 0 && diff <= 7) {
           out.returning.push(c);
-          continue;
+          matched = true;
         }
       }
-      // 2. 인도예정 — 인도 안 됨 + 비활성 차량 상태 제외
+      // 인도예정 — 인도 안 됨 + 활성 차량 상태
       if (!c.deliveredDate) {
         if (s !== '휴차' && s !== '휴차대기' && s !== '매각' && s !== '매각대기' && s !== '매각검토'
             && c.status !== '반납' && c.status !== '해지') {
           out.delivering.push(c);
-          continue;
+          matched = true;
         }
       }
-      // 3. 휴차
+      // 휴차
       if (s === '휴차' || s === '휴차대기') {
         out.idle.push(c);
-        continue;
+        matched = true;
       }
-      // 4. 계약중 — 운행
+      // 계약중 — 운행 (만기임박 contract 도 여기 같이 포함)
       if (s === '운행') {
         out.running.push(c);
-        continue;
+        matched = true;
       }
-    }
-    return out;
-  }, [contracts, q]);
 
-  const totalCount = GROUPS.reduce((a, g) => a + groups[g.key].length, 0);
+      if (matched) uniqueIds.add(c.id);
+    }
+    return { groups: out, totalCount: uniqueIds.size };
+  }, [contracts, q]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -117,7 +118,7 @@ export default function MobileOps() {
             </button>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 8, paddingBottom: 2, scrollbarWidth: 'none' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 8, paddingBottom: 2 }}>
           <GroupChip label={`전체 (${totalCount})`} active={activeGroup === 'all'} onClick={() => setActiveGroup('all')} tone="brand" />
           {GROUPS.map((g) => (
             <GroupChip
@@ -151,7 +152,7 @@ export default function MobileOps() {
                 {g.label} ({items.length})
               </header>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {items.slice(0, 30).map((c) => (
+                {items.map((c) => (
                   <ContractListItem
                     key={c.id}
                     contract={c}
@@ -160,11 +161,6 @@ export default function MobileOps() {
                       : undefined}
                   />
                 ))}
-                {items.length > 30 && (
-                  <div style={{ padding: 10, textAlign: 'center', fontSize: 11, color: 'var(--text-weak)' }}>
-                    ... 외 {items.length - 30}건
-                  </div>
-                )}
               </div>
             </section>
           );

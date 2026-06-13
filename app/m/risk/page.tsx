@@ -99,7 +99,7 @@ export default function MobileRisk() {
             </button>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 8, paddingBottom: 2, scrollbarWidth: 'none' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 8, paddingBottom: 2 }}>
           <KindChip label={`전체 (${totalCount})`} active={activeKind === 'all'} onClick={() => setActiveKind('all')} tone="brand" />
           {KINDS.map((k) => (
             <KindChip
@@ -135,7 +135,7 @@ export default function MobileRisk() {
               {kind.label} ({items.length})
             </header>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {items.slice(0, 30).map((c) => {
+              {items.map((c) => {
                 const extraText =
                   kind.key === 'unpaid' && c.unpaidAmount > 0
                     ? <span style={{ color: 'var(--red-text)', fontWeight: 600 }}>₩{formatCurrency(c.unpaidAmount)}</span>
@@ -155,11 +155,6 @@ export default function MobileRisk() {
                   />
                 );
               })}
-              {items.length > 30 && (
-                <div style={{ padding: 10, textAlign: 'center', fontSize: 11, color: 'var(--text-weak)' }}>
-                  ... 외 {items.length - 30}건
-                </div>
-              )}
             </div>
           </section>
         );
