@@ -84,19 +84,20 @@ function BackBar() {
   return (
     <nav style={{
       position: 'fixed', bottom: 0, left: 0, right: 0,
-      height: 'calc(58px + env(safe-area-inset-bottom))',
-      paddingBottom: 'env(safe-area-inset-bottom)',
+      paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)',
+      paddingLeft: 12, paddingRight: 12, paddingTop: 10,
       background: 'var(--bg-card)', borderTop: '1px solid var(--border)',
       zIndex: 100, boxShadow: '0 -2px 8px rgba(0,0,0,0.04)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <button
         type="button"
         onClick={() => router.back()}
         style={{
-          width: '100%', height: 58, background: 'transparent', border: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--text-main)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit',
-          letterSpacing: '0.02em',
+          padding: '10px 36px', height: 40,
+          background: 'var(--bg-card)', color: 'var(--text-main)',
+          border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+          fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
           cursor: 'pointer', touchAction: 'manipulation',
         }}
       >
