@@ -345,18 +345,29 @@ const STAGE_CHECKLISTS: Partial<Record<Stage, { label: string; nextLabel: string
 
 /* ─────────────── 사진 — 별도 탭 (반납·인도전·상품화 3섹션 스택) ─────────────── */
 
+/**
+ * 사진 저장소 키 우선순위:
+ *  1. 자산 등록된 차량 → vehicleId 그대로 (vehicle_attachments/{vehicleId})
+ *  2. 자산 미등록 → 'plate:{차량번호}' (vehicle_attachments/plate:12가3456)
+ *  → 추후 자산 등록 시 admin/migrate-sheet 에서 plate: 키 → vehicleId 키 이관 가능
+ *  → 자산현황 페이지는 vehicleId 키만 보므로, 자산 등록 후엔 plate: 키 사진은 따로 합쳐줘야 함 (TODO)
+ */
 function VehiclePhotosTab({ c }: { c: Contract }) {
-  // 계약 vehiclePlate → vehicles 마스터에서 vehicleId 매칭 (plate trim 기준)
   const { vehicles } = useVehicles();
   const matchedVehicleId = useMemo(
     () => vehicles.find((v) => (v.plate ?? '').trim() === (c.vehiclePlate ?? '').trim())?.id ?? null,
     [vehicles, c.vehiclePlate],
   );
+  const storageId = useMemo(() => {
+    if (matchedVehicleId) return matchedVehicleId;
+    const plate = (c.vehiclePlate ?? '').trim();
+    return plate ? `plate:${plate}` : null;
+  }, [matchedVehicleId, c.vehiclePlate]);
 
-  if (!matchedVehicleId) {
+  if (!storageId) {
     return (
       <div style={{ padding: 24, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)' }}>
-        자산 등록(차량) 이 먼저 필요 — 자산 페이지에서 차량 등록 후 사진 업로드 가능
+        차량번호가 없어 사진을 저장할 수 없음 — 계약 탭에서 차량번호 입력 후 사용
       </div>
     );
   }
@@ -364,9 +375,18 @@ function VehiclePhotosTab({ c }: { c: Contract }) {
   // 라이프사이클 역순 (최근 단계부터): 반납 → 인도전(출고) → 상품화
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <VehiclePhotosByKind vehicleId={matchedVehicleId} kind="return"   contractId={c.id} title="최근 반납 사진" />
-      <VehiclePhotosByKind vehicleId={matchedVehicleId} kind="delivery" contractId={c.id} title="최근 인도전 사진" />
-      <VehiclePhotosByKind vehicleId={matchedVehicleId} kind="product"  contractId={c.id} title="최근 상품화 사진" />
+      {!matchedVehicleId && (
+        <div style={{
+          padding: '8px 10px', background: 'var(--amber-bg)', color: 'var(--amber-text)',
+          border: '1px solid var(--amber-border)', borderRadius: 'var(--radius-sm)',
+          fontSize: 11, display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          자산 미등록 차량 — 차량번호 기준으로 임시 저장됩니다. 자산 등록 후엔 정식 차량 키로 이관 권장
+        </div>
+      )}
+      <VehiclePhotosByKind vehicleId={storageId} kind="return"   contractId={c.id} title="최근 반납 사진" />
+      <VehiclePhotosByKind vehicleId={storageId} kind="delivery" contractId={c.id} title="최근 인도전 사진" />
+      <VehiclePhotosByKind vehicleId={storageId} kind="product"  contractId={c.id} title="최근 상품화 사진" />
     </div>
   );
 }
