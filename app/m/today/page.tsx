@@ -23,8 +23,8 @@ export default function MobileToday() {
   return <SchedulePage targetDate={todayKr()} title="오늘 할 일" />;
 }
 
-/** 공용 컴포넌트 — /m/today 와 /m/tomorrow 가 같은 패턴 + 다른 날짜 */
-export function SchedulePage({ targetDate, title }: { targetDate: string; title: string }) {
+/** 내부 컴포넌트 — page.tsx 에서 named export 금지 (Next.js 15 규칙) */
+function SchedulePage({ targetDate, title }: { targetDate: string; title: string }) {
   const { contracts } = useContracts();
   const { user } = useAuth();
   const orders = useMyDispatchOrders(user?.uid);
