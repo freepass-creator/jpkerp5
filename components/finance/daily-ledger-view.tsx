@@ -26,8 +26,10 @@
 
 import { useMemo, useState, Fragment } from 'react';
 import { toast } from '@/lib/toast';
+import { MagnifyingGlass } from '@phosphor-icons/react';
 
 import { useVendors } from '@/lib/firebase/vendors-store';
+import { ContractSearchDialog } from '@/components/finance/contract-search-dialog';
 
 import type { BankTransaction, CardTransaction, Contract, Vendor } from '@/lib/types';
 
@@ -142,6 +144,14 @@ export function DailyLedgerView({
   /** ???쇱묠 ??CMS 留ㅼ묶 ?댁뿭 보기 (자금일보 ?꾩슜) */
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  /** 계약 검색 다이얼로그 — 매칭 셀의 돋보기에서 열기 */
+  const [searchTarget, setSearchTarget] = useState<{
+    rowId: string;
+    companyCode?: string;
+    initialQuery?: string;
+    currentContractId?: string;
+  } | null>(null);
 
   function toggleExpand(rowKey: string) {
 
@@ -504,11 +514,11 @@ export function DailyLedgerView({
 
           <th style={{ width: 116 }}>계정과목</th>
 
-          <th style={{ width: 96 }}>거래泥?</th>
+          <th style={{ width: 96 }}>거래처</th>
 
-          <th style={{ width: 84 }}>李⑤웾번호</th>
+          <th style={{ width: 84 }}>차량번호</th>
 
-          <th style={{ width: 130 }}>留ㅼ묶 계약</th>
+          <th style={{ width: 130 }}>매칭 계약</th>
 
           <th style={{ width: 110 }}>비고</th>
 
@@ -570,7 +580,7 @@ export function DailyLedgerView({
 
                   }}
 
-                  title="CMS 留ㅼ묶 ?댁뿭 ?쇱튂湲?"
+                  title="CMS 매칭 이력 일치기"
                 >▶</button>
               )}
 
@@ -714,13 +724,13 @@ export function DailyLedgerView({
 
                   }}
 
-                  title={matched ? `?꾩옱 留ㅼ묶: ${matched.contractNo} 쨌 ${matched.customerName}` : (r.linkedCustomerName ? `거래泥? ${r.linkedCustomerName}` : '계약?????먮뒗 거래泥??깅줉')}
+                  title={matched ? `현재 매칭: ${matched.contractNo} · ${matched.customerName}` : (r.linkedCustomerName ? `거래처: ${r.linkedCustomerName}` : '계약 검색 또는 새 거래처 등록')}
 
                 >
 
                   <option value="">미매칭</option>
 
-                  <optgroup label="계약??(寃??">
+                  <optgroup label="계약 (검색)">
 
                     {contracts
 
@@ -730,7 +740,7 @@ export function DailyLedgerView({
 
                         <option key={c.id} value={c.id}>
 
-                          {c.customerName} 쨌 {c.vehiclePlate}
+                          {c.customerName} · {c.vehiclePlate}
 
                         </option>
 
@@ -738,7 +748,7 @@ export function DailyLedgerView({
 
                   </optgroup>
 
-                  <optgroup label="거래泥?(?뺣퉬공장·공급??외???">
+                  <optgroup label="거래처 (정비공장·공급사 외)">
 
                     {vendors
 
@@ -756,7 +766,7 @@ export function DailyLedgerView({
 
                   </optgroup>
 
-                  <option value="__new__">+ ??거래泥??깅줉...</option>
+                  <option value="__new__">+ 새 거래처 등록...</option>
 
                 </select>
 
@@ -786,11 +796,11 @@ export function DailyLedgerView({
 
                   onChange={(e) => handleContractMatch(r, e.target.value)}
 
-                  title={matched ? `현재: ${matched.vehiclePlate} ${matched.vehicleModel ?? ''} 시 ?ㅻⅨ 李⑤웾 ?좏깮 ??강제 蹂寃?` : '李⑤웾 ?좏깮'}
+                  title={matched ? `현재: ${matched.vehiclePlate} ${matched.vehicleModel ?? ''} — 다른 차량 선택 시 강제 변경` : '차량 선택'}
 
                 >
 
-                  <option value="">미매칭{r.linkedVehiclePlate ? ` (吏곸젒 ?낅젰: ${r.linkedVehiclePlate})` : ''}</option>
+                  <option value="">미매칭{r.linkedVehiclePlate ? ` (직접 입력: ${r.linkedVehiclePlate})` : ''}</option>
 
                   {contracts
 
@@ -800,7 +810,7 @@ export function DailyLedgerView({
 
                       <option key={c.id} value={c.id}>
 
-                        {c.vehiclePlate} 쨌 {c.customerName}
+                        {c.vehiclePlate} · {c.customerName}
 
                       </option>
 
@@ -812,39 +822,51 @@ export function DailyLedgerView({
 
             </td>
 
-            {/* 12. 留ㅼ묶 계약 (?닿구?거래泥?李⑤웾 ?먮룞 set) */}
+            {/* 12. 매칭 계약 — 돋보기 검색 다이얼로그 (드롭다운 폐기) */}
 
             <td>
 
-              <select
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
 
-                className="input"
+                <span className="mono" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
 
-                style={{ height: 24, fontSize: 11, padding: '0 4px', width: '100%' }}
+                  {matched ? matched.contractNo : <span className="muted">미매칭</span>}
 
-                value={r.matchedContractId}
+                </span>
 
-                onChange={(e) => handleContractMatch(r, e.target.value)}
+                {r.source === 'bank' && (
 
-              >
+                  <button
 
-                <option value="">미매칭</option>
+                    type="button"
 
-                {contracts
+                    className="btn btn-sm"
 
-                  .filter((c) => !r.companyCode || c.company === r.companyCode)
+                    title="계약 검색 (거래처/차량번호/계약번호/별칭)"
 
-                  .map((c) => (
+                    onClick={() => setSearchTarget({
 
-                    <option key={c.id} value={c.id}>
+                      rowId: r.id,
 
-                      {c.contractNo} 쨌 {c.customerName} ({c.vehiclePlate})
+                      companyCode: r.companyCode,
 
-                    </option>
+                      initialQuery: r.linkedCustomerName || r.linkedVehiclePlate || '',
 
-                  ))}
+                      currentContractId: r.matchedContractId,
 
-              </select>
+                    })}
+
+                    style={{ padding: '0 4px', height: 20 }}
+
+                  >
+
+                    <MagnifyingGlass size={11} weight="bold" />
+
+                  </button>
+
+                )}
+
+              </div>
 
             </td>
 
@@ -870,7 +892,7 @@ export function DailyLedgerView({
 
                   }}
 
-                  placeholder="硫붾え"
+                  placeholder="메모"
 
                 />
 
@@ -894,19 +916,19 @@ export function DailyLedgerView({
 
                     <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--text-sub)' }}>
 
-                      留ㅼ묶??CMS ?먮룞?댁껜 ({settlementItems.length}嫄?
+                      매칭된 CMS 자동이체 ({settlementItems.length}건)
 
                       {bankRecord?.settlementGrossAmount && (
 
                         <span style={{ marginLeft: 8 }}>
 
-                          쨌 묶음 합계 <strong className="mono">??{fmtNum(bankRecord.settlementGrossAmount)}</strong>
+                          · 묶음 합계 <strong className="mono">₩{fmtNum(bankRecord.settlementGrossAmount)}</strong>
 
                           {bankRecord.settlementFeeAmount != null && (
 
                             <span style={{ marginLeft: 8, color: 'var(--red-text)' }}>
 
-                              쨌 CMS 수수료<strong className="mono">-??{fmtNum(bankRecord.settlementFeeAmount)}</strong>
+                              · CMS 수수료 <strong className="mono">-₩{fmtNum(bankRecord.settlementFeeAmount)}</strong>
 
                             </span>
 
@@ -926,7 +948,7 @@ export function DailyLedgerView({
 
                           <th style={{ width: 96 }}>거래일자</th>
 
-                          <th style={{ width: 130 }}>입금??</th>
+                          <th style={{ width: 130 }}>입금일</th>
 
                           <th>적요</th>
 
@@ -974,7 +996,7 @@ export function DailyLedgerView({
 
                   <div style={{ fontSize: 12, color: 'var(--orange-text)', padding: '8px 12px', background: 'var(--orange-bg)', borderRadius: 'var(--radius)' }}>
 
-                    ??留ㅼ묶??CMS ?댁뿭 ?놁쓬 ????기간 CMS(?먮룞?댁껜) ?낅줈?쒕? ????것으?추정?⑸땲??
+                    · 매칭된 CMS 이력 없음 — 해당 기간 CMS(자동이체) 업로드가 안 된 것으로 추정됩니다
 
                     <br />
 
@@ -1003,6 +1025,24 @@ export function DailyLedgerView({
       </tbody>
 
     </table>
+
+    <ContractSearchDialog
+      open={!!searchTarget}
+      onClose={() => setSearchTarget(null)}
+      contracts={contracts}
+      companyCode={searchTarget?.companyCode}
+      initialQuery={searchTarget?.initialQuery}
+      currentContractId={searchTarget?.currentContractId}
+      onPick={(contractId) => {
+        const row = unified.find((r) => r.id === searchTarget?.rowId);
+        if (row) handleContractMatch(row, contractId);
+      }}
+      allowClear={!!searchTarget?.currentContractId}
+      onClear={() => {
+        const row = unified.find((r) => r.id === searchTarget?.rowId);
+        if (row) handleContractMatch(row, '');
+      }}
+    />
 
     </>
 
