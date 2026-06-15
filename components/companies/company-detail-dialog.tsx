@@ -22,9 +22,11 @@ import { audit } from '@/lib/firebase/audit-store';
 import { displayCompanyShort } from '@/lib/company-display';
 import { reassignVehiclesToCompany } from '@/lib/entity-sync';
 import { toast } from '@/lib/toast';
-import type { Company } from '@/lib/types';
+import type { Company, BankAccount, CorporateCard, AutoTransferChannel, CardTerminalChannel } from '@/lib/types';
+import { Plus, Trash } from '@phosphor-icons/react';
 
 const cleanReg = (s?: string) => (s ?? '').replace(/[^\d-]/g, '');
+const newId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
 export function CompanyDetailDialog({
   companyId, onOpenChange,
@@ -148,6 +150,124 @@ export function CompanyDetailDialog({
           </Grid2>
         </Section>
 
+        {/* 계좌 — 입출금 (BankTx 업로드 시 매칭) */}
+        <ChannelSection
+          title="계좌 (입출금)"
+          editing={editing}
+          rows={cur.accounts ?? []}
+          columns={[
+            { key: 'bankName', label: '은행', width: 90, placeholder: '국민/신한/우리…' },
+            { key: 'accountNo', label: '계좌번호', width: 180, placeholder: '110-xxx-xxxxxx', mono: true },
+            { key: 'accountHolder', label: '예금주', width: 110 },
+            { key: 'nickname', label: '별명', width: 110, placeholder: '운영/수납/보증금…' },
+            { key: 'purpose', label: '용도', width: 110, placeholder: '대여료수납/관리비…' },
+          ]}
+          onAdd={() => setDraft((d) => d && {
+            ...d,
+            accounts: [...(d.accounts ?? []), { id: newId('acct'), bankName: '', accountNo: '', accountHolder: '' } as BankAccount],
+          })}
+          onChange={(idx, key, value) => setDraft((d) => {
+            if (!d) return d;
+            const rows = [...(d.accounts ?? [])];
+            rows[idx] = { ...rows[idx], [key]: value };
+            return { ...d, accounts: rows };
+          })}
+          onRemove={(idx) => setDraft((d) => {
+            if (!d) return d;
+            const rows = [...(d.accounts ?? [])];
+            rows.splice(idx, 1);
+            return { ...d, accounts: rows };
+          })}
+        />
+
+        {/* 자동이체 (CMS) — 입금 거래의 cmsId 로 회사 자동 식별 */}
+        <ChannelSection
+          title="자동이체 (CMS · 수입)"
+          editing={editing}
+          rows={cur.autoTransfers ?? []}
+          columns={[
+            { key: 'providerName', label: 'CMS 사업자', width: 140, placeholder: 'KICC/효성/KCP…' },
+            { key: 'cmsId', label: 'CMS ID', width: 160, placeholder: '거래내역 식별자', mono: true },
+            { key: 'nickname', label: '별명', width: 130, placeholder: '장기렌트CMS…' },
+            { key: 'purpose', label: '용도', width: 110, placeholder: '대여료/관리비…' },
+          ]}
+          onAdd={() => setDraft((d) => d && {
+            ...d,
+            autoTransfers: [...(d.autoTransfers ?? []), { id: newId('at'), providerName: '', cmsId: '' } as AutoTransferChannel],
+          })}
+          onChange={(idx, key, value) => setDraft((d) => {
+            if (!d) return d;
+            const rows = [...(d.autoTransfers ?? [])];
+            rows[idx] = { ...rows[idx], [key]: value };
+            return { ...d, autoTransfers: rows };
+          })}
+          onRemove={(idx) => setDraft((d) => {
+            if (!d) return d;
+            const rows = [...(d.autoTransfers ?? [])];
+            rows.splice(idx, 1);
+            return { ...d, autoTransfers: rows };
+          })}
+        />
+
+        {/* 카드매출 단말기 — CardTx 업로드 시 terminalId 로 회사 식별 */}
+        <ChannelSection
+          title="카드매출 단말기 (수입)"
+          editing={editing}
+          rows={cur.cardTerminals ?? []}
+          columns={[
+            { key: 'vanProvider', label: 'VAN사', width: 100, placeholder: 'KIS/NICE/KOCES…' },
+            { key: 'terminalId', label: '단말기 ID', width: 160, placeholder: 'TID', mono: true },
+            { key: 'merchantNo', label: '가맹점번호', width: 140, mono: true },
+            { key: 'nickname', label: '별명', width: 140, placeholder: '사무실/출고장…' },
+          ]}
+          onAdd={() => setDraft((d) => d && {
+            ...d,
+            cardTerminals: [...(d.cardTerminals ?? []), { id: newId('ct'), vanProvider: '', terminalId: '' } as CardTerminalChannel],
+          })}
+          onChange={(idx, key, value) => setDraft((d) => {
+            if (!d) return d;
+            const rows = [...(d.cardTerminals ?? [])];
+            rows[idx] = { ...rows[idx], [key]: value };
+            return { ...d, cardTerminals: rows };
+          })}
+          onRemove={(idx) => setDraft((d) => {
+            if (!d) return d;
+            const rows = [...(d.cardTerminals ?? [])];
+            rows.splice(idx, 1);
+            return { ...d, cardTerminals: rows };
+          })}
+        />
+
+        {/* 법인카드 — 지출 (CardTx 업로드 시 cardLast4 매칭) */}
+        <ChannelSection
+          title="법인카드 (지출)"
+          editing={editing}
+          rows={cur.cards ?? []}
+          columns={[
+            { key: 'cardName', label: '카드명', width: 130, placeholder: '법인BC / 운영비…' },
+            { key: 'cardCompany', label: '카드사', width: 90, placeholder: 'KB/신한…' },
+            { key: 'cardLast4', label: '끝 4자리', width: 80, mono: true },
+            { key: 'holder', label: '명의자', width: 110 },
+            { key: 'purpose', label: '용도', width: 130, placeholder: '주유/유료도로…' },
+          ]}
+          onAdd={() => setDraft((d) => d && {
+            ...d,
+            cards: [...(d.cards ?? []), { id: newId('card'), cardName: '', cardCompany: '', cardLast4: '' } as CorporateCard],
+          })}
+          onChange={(idx, key, value) => setDraft((d) => {
+            if (!d) return d;
+            const rows = [...(d.cards ?? [])];
+            rows[idx] = { ...rows[idx], [key]: value };
+            return { ...d, cards: rows };
+          })}
+          onRemove={(idx) => setDraft((d) => {
+            if (!d) return d;
+            const rows = [...(d.cards ?? [])];
+            rows.splice(idx, 1);
+            return { ...d, cards: rows };
+          })}
+        />
+
         {/* 첨부 문서 — 사업자등록증 등 */}
         {(company.documents ?? []).length > 0 && (
           <Section title={`첨부 문서 (${company.documents!.length})`}>
@@ -166,6 +286,94 @@ export function CompanyDetailDialog({
         )}
       </Stack>
     </DetailDialogShell>
+  );
+}
+
+type ChannelColumn<T> = {
+  key: keyof T & string;
+  label: string;
+  width?: number;
+  placeholder?: string;
+  mono?: boolean;
+};
+
+function ChannelSection<T extends { id: string }>({
+  title, editing, rows, columns, onAdd, onChange, onRemove,
+}: {
+  title: string;
+  editing: boolean;
+  rows: T[];
+  columns: ChannelColumn<T>[];
+  onAdd: () => void;
+  onChange: (idx: number, key: keyof T & string, value: string) => void;
+  onRemove: (idx: number) => void;
+}) {
+  const action = editing ? (
+    <button type="button" className="btn btn-sm" onClick={onAdd}>
+      <Plus size={11} weight="bold" /> 추가
+    </button>
+  ) : undefined;
+
+  return (
+    <Section title={`${title} (${rows.length})`} action={action}>
+      {rows.length === 0 ? (
+        <div className="muted" style={{ fontSize: 12, padding: '8px 0' }}>
+          {editing ? '[+ 추가] 로 등록' : '등록된 항목 없음'}
+        </div>
+      ) : (
+        <table className="table" style={{ fontSize: 12 }}>
+          <thead>
+            <tr>
+              {columns.map((c) => (
+                <th key={c.key} style={{ width: c.width }}>{c.label}</th>
+              ))}
+              {editing && <th style={{ width: 40 }} />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr key={row.id}>
+                {columns.map((c) => {
+                  const value = String((row as Record<string, unknown>)[c.key] ?? '');
+                  if (!editing) {
+                    return (
+                      <td key={c.key} className={c.mono ? 'mono dim' : 'dim'}>
+                        {value || <span className="muted">-</span>}
+                      </td>
+                    );
+                  }
+                  return (
+                    <td key={c.key} style={{ padding: 4 }}>
+                      <input
+                        type="text"
+                        className={`input-compact ${c.mono ? 'mono' : ''}`}
+                        style={{ width: '100%' }}
+                        value={value}
+                        placeholder={c.placeholder}
+                        onChange={(e) => onChange(idx, c.key, e.target.value)}
+                      />
+                    </td>
+                  );
+                })}
+                {editing && (
+                  <td className="center" style={{ padding: 4 }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => onRemove(idx)}
+                      title="삭제"
+                      style={{ color: 'var(--red-text)' }}
+                    >
+                      <Trash size={11} weight="bold" />
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Section>
   );
 }
 

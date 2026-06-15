@@ -410,6 +410,34 @@ export type CorporateCard = {
   holder?: string;        // 카드 명의자
 };
 
+/**
+ * 자동이체(CMS) 마스터 — 회사 단위로 N개.
+ * 거래 upload(BankTransaction) 시 cmsId 매칭으로 회사 자동 식별.
+ */
+export type AutoTransferChannel = {
+  id: string;
+  providerName: string;   // 위탁사·CMS 사업자 (예: KICC, 효성, KCP)
+  cmsId: string;          // CMS 식별 ID (입금 거래의 counterparty 또는 memo 에서 추출)
+  nickname?: string;      // 별명 (장기렌트CMS 등)
+  bankAccountId?: string; // 정산 들어오는 회사 계좌 (BankAccount.id 참조)
+  purpose?: string;       // 대여료/관리비/보증금 등
+  isDefault?: boolean;
+};
+
+/**
+ * 카드매출 단말기 마스터 — 회사 단위로 N개.
+ * CardTransaction upload 시 terminalId 매칭으로 회사 자동 식별.
+ */
+export type CardTerminalChannel = {
+  id: string;
+  vanProvider: string;    // VAN 사 (KIS, NICE, KOCES, KICC 등)
+  terminalId: string;     // 단말기 ID
+  nickname?: string;      // 별명 (사무실 단말기 / 출고장 단말기 등)
+  bankAccountId?: string; // 정산 입금 받는 계좌 (BankAccount.id 참조)
+  merchantNo?: string;    // 가맹점 번호
+  isDefault?: boolean;
+};
+
 export type LocationKind = '사무실' | '차고지' | '주차장';
 
 export type CompanyLocation = {
@@ -457,8 +485,10 @@ export type Company = {
   stampUrl?: string;
   stampFileName?: string;
   stampUploadedAt?: string;
-  accounts: BankAccount[];       // 계좌 N개
-  cards?: CorporateCard[];       // 법인카드 N개
+  accounts: BankAccount[];               // 계좌 N개 (입출금)
+  cards?: CorporateCard[];               // 법인카드 N개 (지출)
+  autoTransfers?: AutoTransferChannel[]; // 자동이체/CMS N개 (수입)
+  cardTerminals?: CardTerminalChannel[]; // 카드매출 단말기 N개 (수입)
   locations?: CompanyLocation[]; // 사무실/차고지/주차장 통합
   documents?: CompanyDocument[]; // 사업자등록증/등기부/인감 등 서류
   notes?: string;
