@@ -23,6 +23,8 @@ import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
 import { COL, COL_FLEX } from '@/lib/table-cols';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
+import { todayKr } from '@/lib/mock-data';
 
 /** KV — 공용 Field wrap alias (시각 통일). */
 function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boolean }) {
@@ -91,6 +93,8 @@ function OperationOverviewTab({
           <KV k="개시일" v={vehicle.loanStartDate} mono />
         </Grid2>
       </Section>
+
+      <AssetLedgerSection vehicle={vehicle} />
 
       <Section title="GPS 설치">
         <Grid2>
@@ -665,5 +669,55 @@ export function VehicleDetailDialog({
             { value: 'incident', label: `사고·위반 (${incidentHistory.length})`, content: <IncidentTab history={incidentHistory} /> },
           ]}
     />
+  );
+}
+
+/* ─── 자산대장 (ERP 표준) — 취득가/감가/장부가/처분손익 ─── */
+function AssetLedgerSection({ vehicle }: { vehicle: Vehicle }) {
+  const entry = useMemo(() => computeAssetLedgerEntry(vehicle, todayKr()), [vehicle]);
+  if (entry.incomplete) {
+    return (
+      <Section title="자산대장 (ERP 표준)">
+        <div className="dim" style={{ fontSize: 12 }}>
+          매입가·취득일이 입력되어야 감가·장부가가 자동 계산됩니다.
+          <br />
+          현재: 매입가 {entry.acquisitionCost ? `₩${entry.acquisitionCost.toLocaleString()}` : '-'} · 취득일 {entry.acquisitionDate || '-'}
+        </div>
+      </Section>
+    );
+  }
+  const fmt = (v: number) => `₩${v.toLocaleString()}`;
+  return (
+    <Section title="자산대장 (ERP 표준)">
+      <div className="dim" style={{ fontSize: 11, marginBottom: 6 }}>
+        정액법 60개월 · 잔존가치 10% (회사·차종별 정책은 추후 마스터)
+      </div>
+      <Grid2>
+        <KV k="취득가" v={fmt(entry.acquisitionCost)} mono />
+        <KV k="취득일" v={entry.acquisitionDate} mono />
+        <KV k="경과" v={`${entry.monthsHeld}개월`} mono />
+        <KV k="잔존가치" v={fmt(entry.salvageValue)} mono />
+        <KV k="누적 감가" v={<span style={{ color: 'var(--orange-text)' }}>{fmt(entry.accumulatedDepreciation)}</span>} mono />
+        <KV k="장부가" v={<span style={{ color: 'var(--brand)', fontWeight: 600 }}>{fmt(entry.bookValue)}</span>} mono />
+        {entry.disposed && (
+          <>
+            <KV k="매각일" v={entry.saleDate} mono />
+            <KV k="매각가" v={entry.salePrice !== undefined ? fmt(entry.salePrice) : '-'} mono />
+            <KV
+              k="처분손익"
+              v={entry.disposalGainLoss === undefined ? '-' : (
+                <span style={{
+                  color: entry.disposalGainLoss >= 0 ? 'var(--green-text)' : 'var(--red-text)',
+                  fontWeight: 600,
+                }}>
+                  {entry.disposalGainLoss >= 0 ? '+' : ''}{fmt(entry.disposalGainLoss)}
+                </span>
+              )}
+              mono
+            />
+          </>
+        )}
+      </Grid2>
+    </Section>
   );
 }

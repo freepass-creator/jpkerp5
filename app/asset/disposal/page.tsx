@@ -145,9 +145,12 @@ export default function AssetDisposalPage() {
                   const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
                   if (!confirm(`선택한 ${targets.length}건의 자산 상태를 '${next}' 로 변경합니다.\n같은 plate 활성 계약 vehicleStatus 도 sync 됩니다.${note}\n계속?`)) return;
                   let changed = 0, syncedContracts = 0;
+                  const todayIso = new Date().toISOString().slice(0, 10);
                   for (const v of targets) {
                     if (v.status === next) continue;
-                    const merged = { ...v, status: next };
+                    // 매각 status 전환 시 saleDate 자동 set (자산대장 처분손익 계산용)
+                    const saleDate = next === '매각' && !v.saleDate ? todayIso : v.saleDate;
+                    const merged = { ...v, status: next, saleDate };
                     try {
                       await updateVehicle(merged);
                       changed++;

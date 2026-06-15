@@ -74,7 +74,8 @@ export function computeAssetLedgerEntry(
   policy: DepreciationPolicy = DEFAULT_POLICY,
 ): AssetLedgerEntry {
   const acquisitionCost = v.purchasePrice ?? v.contractDocPrice ?? 0;
-  const acquisitionDate = v.acquisitionDate ?? v.firstRegisteredDate;
+  // 취득일 우선순위: 매입완료일(purchasedDate) > 명시 취득일(acquisitionDate) > 최초등록일
+  const acquisitionDate = v.purchasedDate ?? v.acquisitionDate ?? v.firstRegisteredDate;
   const disposed = !!v.saleDate || DISPOSED_STATUSES.has(v.status ?? '');
   const cutoffDate = disposed && v.saleDate ? v.saleDate : asOfDate;
   const incomplete = acquisitionCost <= 0 || !acquisitionDate;
