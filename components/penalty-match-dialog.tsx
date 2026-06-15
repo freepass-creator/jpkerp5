@@ -136,8 +136,8 @@ export function PenaltyMatchDialog({
                     <span style={{ flex: 1, fontWeight: 500 }}>{c.customerName}</span>
                     <span className="text-sub" style={{ fontSize: 11 }}>{c.vehicleModel}</span>
                     <span className="text-weak mono" style={{ fontSize: 11 }}>{c.customerPhone1}</span>
-                    {plateMatch && <span className="chip" style={{ height: 18, padding: '0 6px', fontSize: 10, background: 'var(--green-bg)', color: 'var(--green-text)' }}>차량일치</span>}
-                    {inPeriod && <span className="chip" style={{ height: 18, padding: '0 6px', fontSize: 10, background: 'var(--blue-bg)', color: 'var(--blue-text)' }}>운행시기</span>}
+                    {plateMatch && <span className="chip" style={{ height: 16, padding: '0 6px', fontSize: 10, background: 'var(--green-bg)', color: 'var(--green-text)' }}>차량일치</span>}
+                    {inPeriod && <span className="chip" style={{ height: 16, padding: '0 6px', fontSize: 10, background: 'var(--blue-bg)', color: 'var(--blue-text)' }}>운행시기</span>}
                     {score > 0 && <span className="mono dim" style={{ fontSize: 10 }}>{score}</span>}
                   </button>
                 ))}

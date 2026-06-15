@@ -19,6 +19,8 @@ import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-register-dialog';
 import { ActivityView } from '@/components/activity/activity-view';
+import { DispatchView } from '@/components/dispatch/dispatch-view';
+import { AttendanceView } from '@/components/attendance/attendance-view';
 import { CompanyDetailDialog } from '@/components/companies/company-detail-dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { audit } from '@/lib/firebase/audit-store';
@@ -108,7 +110,7 @@ export default function GeneralPage() {
             <NavBtn label="손익 (집계)" icon={<ChartLineUp size={14} />} active={view === 'profit'} onClick={() => setView('profit')} />
           </nav>
 
-          <main className="page-shell-main" style={(view === 'company' || view === 'fleet_apply' || view === 'staff' || view === 'activity') ? { padding: 0, overflow: 'hidden' } : undefined}>
+          <main className="page-shell-main" style={(view === 'company' || view === 'fleet_apply' || view === 'staff' || view === 'activity' || view === 'dispatch' || view === 'attendance') ? { padding: 0, overflow: 'hidden' } : undefined}>
             {view === 'company' && (
               <CompanyListView
                 onEdit={setEditCompanyId}
@@ -119,7 +121,9 @@ export default function GeneralPage() {
             {view === 'staff' && <StaffListView />}
             {view === 'fleet_apply' && <FleetApplyView companies={MOCK_COMPANIES} pendingByCompany={MOCK_PENDING} />}
             {view === 'activity' && <ActivityView />}
-            {view !== 'company' && view !== 'staff' && view !== 'fleet_apply' && view !== 'activity' && <ViewPlaceholder view={view} />}
+            {view === 'dispatch' && <DispatchView />}
+            {view === 'attendance' && <AttendanceView />}
+            {view !== 'company' && view !== 'staff' && view !== 'fleet_apply' && view !== 'activity' && view !== 'dispatch' && view !== 'attendance' && <ViewPlaceholder view={view} />}
           </main>
         </div>
 

@@ -51,6 +51,11 @@ export function buildMatchIndex(contracts: Contract[]): MatchIndex {
       const dn = normName(c.driverName);
       if (dn) names.add(dn);
     }
+    // 입금자명 별칭 (가족·법인 계좌 등 customerName 과 다른 이름으로 입금되는 케이스)
+    for (const alias of c.payerAliases ?? []) {
+      const a = normName(alias);
+      if (a) names.add(a);
+    }
     for (const n of names) {
       const arr = byName.get(n);
       if (arr) arr.push(c);

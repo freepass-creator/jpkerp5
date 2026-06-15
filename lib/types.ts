@@ -44,6 +44,11 @@ export type Contract = {
   manager?: string;            // 담당자
   // 고객 (임베드)
   customerName: string;
+  /**
+   * 입금자명 별칭 — 가족·법인 계좌 등 customerName 과 다른 이름으로 입금되는 케이스.
+   * receipt-match 의 buildMatchIndex 가 별칭도 byName 색인에 포함 → 자동 매칭에서 인식.
+   */
+  payerAliases?: string[];
   customerKind?: '개인' | '사업자' | '법인';
   /** 식별번호 — kind에 따라 주민번호/사업자번호/법인번호 1개. raw 그대로 저장 */
   customerIdentNo?: string;
@@ -221,7 +226,7 @@ export type PaymentEntry = {
 export type DiscountEntry = {
   date: string;          // YYYY-MM-DD
   amount: number;        // 할인액 (양수로 저장, 표시는 마이너스)
-  reason?: '자가조치' | '보상' | '사은품' | '캠페인' | '기타';
+  reason?: '자가조치' | '보상' | '사은품' | '캠페인' | '반납 일할' | '기타';
   memo?: string;
   by?: string;
   at?: string;
@@ -291,6 +296,11 @@ export type BankTransaction = {
   matchedScheduleSeq?: number; // schedule 의 회차 번호 (인라인 schedules 매칭용)
   matchedAt?: string;          // 매칭 처리 시각 (ISO)
   matchedBy?: string;          // 매칭 처리자 (이메일/uid)
+  /**
+   * 다중 매칭 — 한 거래로 여러 계약 한 번에 결제 (회사 일괄결제·가족 결합납부 등).
+   * 비어있거나 1개면 matchedContractId 단일 매칭과 동일 의미. matches[].amount 합은 거래 amount 이하.
+   */
+  matches?: Array<{ contractId: string; amount: number; matchedAt?: string }>;
   /** CMS 집금 정산 ID — 1 deposit ↔ N 개별 CMS 거래 묶음. settlementRole='deposit' 가 집금건, 'item' 이 개별 CMS */
   settlementId?: string;
   settlementRole?: 'deposit' | 'item';

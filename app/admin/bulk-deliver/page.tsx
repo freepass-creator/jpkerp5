@@ -35,6 +35,7 @@ export default function BulkDeliverPage() {
   const { contracts, update: updateContract } = useContracts();
   const { vehicles, update: updateVehicleMaster } = useVehicles();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [overrideDate, setOverrideDate] = useState('');  // 빈값=각자 계약시작일
   const [running, setRunning] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
 
@@ -73,7 +74,7 @@ export default function BulkDeliverPage() {
     setDoneCount(0);
     try {
       for (const c of targets) {
-        const deliveredDate = c.contractDate || todayKr();
+        const deliveredDate = overrideDate || c.contractDate || todayKr();
         const updated = { ...c, deliveredDate, status: '운행' as const, vehicleStatus: '운행' as const };
         await syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster);
         setDoneCount((n) => n + 1);
@@ -100,8 +101,8 @@ export default function BulkDeliverPage() {
           </div>
         </header>
 
-        <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <header className="page-header">
+        <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+          <header className="page-header" style={{ flexShrink: 0 }}>
             <div className="page-header-title-group">
               <h1 className="page-header-title">
                 <Truck size={18} weight="duotone" />
@@ -113,10 +114,21 @@ export default function BulkDeliverPage() {
             </div>
           </header>
 
-          <section className="detail-section">
-            <div className="detail-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <section className="detail-section" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <div className="detail-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span className="title">대상 ({candidates.length}건)</span>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <label style={{ fontSize: 11, color: 'var(--text-sub)', display: 'flex', gap: 4, alignItems: 'center' }}>
+                  인도일
+                  <input
+                    type="date"
+                    value={overrideDate}
+                    onChange={(e) => setOverrideDate(e.target.value)}
+                    className="input-compact"
+                    style={{ width: 130 }}
+                    title="비워두면 각자 계약시작일이 인도일로 들어감"
+                  />
+                </label>
                 <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>선택 {selected.size}건</span>
                 <button className="btn btn-sm" onClick={toggleAll}>
                   {selected.size === candidates.length ? '전체 해제' : '전체 선택'}
@@ -133,7 +145,7 @@ export default function BulkDeliverPage() {
               </div>
             </div>
 
-            <div className="detail-section-body" style={{ padding: 0 }}>
+            <div className="detail-section-body" style={{ padding: 0, flex: 1, minHeight: 0, overflow: 'auto' }}>
               {candidates.length === 0 ? (
                 <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-weak)', fontSize: 12 }}>
                   미인도 계약 없음 (전부 처리됨)

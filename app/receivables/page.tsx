@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple, PaperPlaneTilt, FileText, Copy, FloppyDisk } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
@@ -14,6 +14,8 @@ const RiskDetailDialog = dynamic(() => import('@/components/risk-detail-dialog')
 const ContractDetailDialog = dynamic(() => import('@/components/contract-detail-dialog').then((m) => m.ContractDetailDialog), { ssr: false });
 import { buildCompanyOptions } from '@/lib/filter-helpers';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
@@ -96,7 +98,12 @@ function lastContactDate(contractId: string, history: ReturnType<typeof useHisto
 }
 
 export default function ReceivablesPage() {
-  const { contracts, loading: contractsLoading, update: updateContract } = useContracts();
+  const { contracts, loading: contractsLoading, update: rtdbUpdate } = useContracts();
+  const { vehicles, update: updateVehicleMaster } = useVehicles();
+  // 미수 페이지에서도 Contract.vehicleStatus 변경 시 Vehicle 마스터 status 자동 동기화
+  const updateContract = useCallback((updated: Contract) => {
+    void syncContractAndVehicleStatus(updated, vehicles, rtdbUpdate, updateVehicleMaster);
+  }, [rtdbUpdate, vehicles, updateVehicleMaster]);
   const { companies: companyMaster } = useCompanies();
   const { entries: history, add: addHistory } = useHistoryEntries();
   const { user } = useAuth();

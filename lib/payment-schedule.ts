@@ -48,7 +48,8 @@ export function recalcSchedule<T extends PaymentScheduleInline>(s: T, today: str
   let status: ScheduleStatus;
   if (effective === 0 && disc > 0) status = '완료';        // 할인으로 전액 처리
   else if (paid >= effective) status = '완료';
-  else if (paid > 0 || disc > 0) status = '부분납';        // 일부 납부 또는 일부 할인
+  // 부분 결제 — dueDate 도래 전이면 '예정' 유지 (선납 의도, 미수 X). 도래 후만 '부분납' (미수).
+  else if (paid > 0 || disc > 0) status = s.dueDate <= today ? '부분납' : '예정';
   else status = s.dueDate < today ? '연체' : '예정';
   return { ...s, status, paidAmount: paid, discountAmount: disc, paidAt: lastDate || undefined };
 }

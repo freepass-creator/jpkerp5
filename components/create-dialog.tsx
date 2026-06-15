@@ -877,7 +877,7 @@ function SheetPreview({ sheet, onChangeKind }: { sheet: ParsedSheet; onChangeKin
         <span className="text-weak">·</span>
         <div className="text-sub mono">{sheet.rows.length}행</div>
         {sheet.kind === '계좌' && sheet.bankHint && (
-          <span className="chip" style={{ height: 18, padding: '0 8px', fontSize: 10, background: 'var(--blue-bg)', color: 'var(--blue-text)' }}>
+          <span className="chip" style={{ height: 16, padding: '0 6px', fontSize: 10, background: 'var(--blue-bg)', color: 'var(--blue-text)' }}>
             {sheet.bankHint}은행
           </span>
         )}
@@ -1942,7 +1942,7 @@ function SnapshotPane({
                   {(() => {
                     const vs = v.patch?.vehicleStatus || v.vehiclePatch?.vehicleStatus;
                     if (!vs) return <span className="dim" style={{ fontSize: 10 }}>-</span>;
-                    return <span className="chip" style={{ height: 18, padding: '0 6px', fontSize: 10 }}>{vs}</span>;
+                    return <span className="chip" style={{ height: 16, padding: '0 6px', fontSize: 10 }}>{vs}</span>;
                   })()}
                 </td>
                 <td className="mono dim">

@@ -1,31 +1,23 @@
 'use client';
 
 /**
- * 모바일 근태관리 — 휴가/반차/조퇴 신청 + 본인 신청 이력.
+ * 모바일 근태관리 — 본인 신청 이력.
  *
- * 데이터: /attendance_requests (웹·모바일 공유 단일 노드).
- * 추후 전자결재 흐름:
- *  · 본인 신청 → status='pending'
- *  · 데스크탑 /attendance (다음 라운드) — 결재자 승인/반려
- *  · approvalChain[] — 다단계 결재 확장 대비
+ * "새 신청" 은 /m/me/attendance/new 페이지로 이동 (모달 폐기).
  */
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Calendar, CheckCircle, XCircle, ClockCounterClockwise, X } from '@phosphor-icons/react';
-import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { useAuth } from '@/lib/use-auth';
 import {
-  useMyAttendanceRequests, submitAttendanceRequest,
+  useMyAttendanceRequests, updateAttendanceStatus,
   ATTENDANCE_LABEL, STATUS_LABEL, STATUS_TONE,
-  type AttendanceType,
 } from '@/lib/firebase/attendance-store';
 import { toast } from '@/lib/toast';
 
 export default function MobileAttendance() {
   const { user } = useAuth();
   const list = useMyAttendanceRequests(user?.uid);
-  const [newOpen, setNewOpen] = useState(false);
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -36,17 +28,16 @@ export default function MobileAttendance() {
         </h1>
       </header>
 
-      <button type="button" onClick={() => setNewOpen(true)} style={{
+      <Link href="/m/me/attendance/new" style={{
         height: 52, fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
-        background: 'var(--brand)', color: '#fff', border: 'none',
+        background: 'var(--brand)', color: '#fff', textDecoration: 'none',
         borderRadius: 'var(--radius-lg)', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
       }}>
         <Plus size={18} weight="bold" />
         새 신청
-      </button>
+      </Link>
 
-      {/* 본인 신청 이력 */}
       <section style={{
         background: 'var(--bg-card)', border: '1px solid var(--border-soft)',
         borderRadius: 'var(--radius-lg)', overflow: 'hidden',
@@ -69,10 +60,7 @@ export default function MobileAttendance() {
 
       <div style={{ fontSize: 10.5, color: 'var(--text-weak)', lineHeight: 1.6 }}>
         신청 후 사무/관리자가 데스크탑에서 승인 → 알림으로 결과 받음 (Phase 2 푸시).
-        추후 전자결재 시스템과 통합 예정.
       </div>
-
-      {newOpen && <NewRequestModal onClose={() => setNewOpen(false)} />}
     </div>
   );
 }
@@ -80,6 +68,18 @@ export default function MobileAttendance() {
 function RequestRow({ req }: { req: ReturnType<typeof useMyAttendanceRequests>[number] }) {
   const tone = STATUS_TONE[req.status];
   const toneClass = `badge-${tone}`;
+  const canCancel = req.status === 'pending';
+
+  async function handleCancel() {
+    if (!window.confirm(`${ATTENDANCE_LABEL[req.type]} 신청을 취소하시겠습니까?`)) return;
+    try {
+      await updateAttendanceStatus(req.id, { status: 'cancelled' });
+      toast.success('신청 취소됨');
+    } catch (e) {
+      toast.error(`취소 실패: ${(e as Error).message}`);
+    }
+  }
+
   return (
     <div style={{
       padding: '12px 14px',
@@ -111,144 +111,22 @@ function RequestRow({ req }: { req: ReturnType<typeof useMyAttendanceRequests>[n
           </div>
         )}
       </div>
-      <div style={{ color: `var(--${tone === 'gray' ? 'text-weak' : tone + '-text'})` }}>
-        {req.status === 'approved' ? <CheckCircle size={18} weight="duotone" />
-         : req.status === 'rejected' ? <XCircle size={18} weight="duotone" />
-         : req.status === 'cancelled' ? <X size={18} weight="duotone" />
-         : <ClockCounterClockwise size={18} weight="duotone" />}
-      </div>
-    </div>
-  );
-}
-
-function NewRequestModal({ onClose }: { onClose: () => void }) {
-  const { user } = useAuth();
-  const [type, setType] = useState<AttendanceType>('vacation');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [earlyLeaveAt, setEarlyLeaveAt] = useState('');
-  const [reason, setReason] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const isRange = type === 'vacation' || type === 'sick';
-  const isEarly = type === 'early-leave';
-
-  async function handleSubmit() {
-    if (!user?.uid || !fromDate.trim()) {
-      toast.warning('날짜를 입력하세요');
-      return;
-    }
-    setSaving(true);
-    try {
-      await submitAttendanceRequest({
-        applicantUid: user.uid,
-        applicantEmail: user.email ?? undefined,
-        applicantName: user.displayName ?? undefined,
-        type,
-        fromDate,
-        toDate: isRange ? (toDate.trim() || fromDate) : undefined,
-        earlyLeaveAt: isEarly ? (earlyLeaveAt.trim() || undefined) : undefined,
-        reason: reason.trim() || undefined,
-      });
-      toast.success('신청 완료 — 승인 대기');
-      onClose();
-    } catch (e) {
-      toast.error(`신청 실패: ${(e as Error).message ?? String(e)}`);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const types: AttendanceType[] = ['vacation', 'half-day-am', 'half-day-pm', 'early-leave', 'sick', 'other'];
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100,
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-    }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background: 'var(--bg-card)', width: '100%', maxWidth: 560,
-        borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)',
-        padding: 18,
-        paddingBottom: 'calc(76px + env(safe-area-inset-bottom))', // SaveFooter 공간
-        display: 'flex', flexDirection: 'column', gap: 14,
-        maxHeight: '92vh', overflow: 'auto',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>새 근태 신청</h2>
-          <button type="button" onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 6 }} aria-label="닫기">
-            <X size={20} weight="bold" />
-          </button>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+        <div style={{ color: `var(--${tone === 'gray' ? 'text-weak' : tone + '-text'})` }}>
+          {req.status === 'approved' ? <CheckCircle size={18} weight="duotone" />
+           : req.status === 'rejected' ? <XCircle size={18} weight="duotone" />
+           : req.status === 'cancelled' ? <X size={18} weight="duotone" />
+           : <ClockCounterClockwise size={18} weight="duotone" />}
         </div>
-
-        <Field label="종류">
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {types.map((t) => (
-              <button key={t} type="button" onClick={() => setType(t)} style={{
-                padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                background: type === t ? 'var(--brand)' : 'var(--bg-card)',
-                color: type === t ? '#fff' : 'var(--text-main)',
-                border: `1px solid ${type === t ? 'var(--brand)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius)',
-                cursor: 'pointer',
-              }}>{ATTENDANCE_LABEL[t]}</button>
-            ))}
-          </div>
-        </Field>
-
-        <Field label={isRange ? '시작일' : '날짜'}>
-          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-            style={inputStyle()} />
-        </Field>
-
-        {isRange && (
-          <Field label="종료일 (선택 — 동일 일자면 비워두기)">
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-              min={fromDate} style={inputStyle()} />
-          </Field>
+        {canCancel && (
+          <button type="button" onClick={handleCancel} style={{
+            padding: '4px 10px', fontSize: 10.5, fontWeight: 600, fontFamily: 'inherit',
+            background: 'var(--bg-card)', color: 'var(--text-sub)',
+            border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+            cursor: 'pointer', touchAction: 'manipulation',
+          }}>취소</button>
         )}
-
-        {isEarly && (
-          <Field label="출발 시간">
-            <input type="time" value={earlyLeaveAt} onChange={(e) => setEarlyLeaveAt(e.target.value)}
-              style={inputStyle()} />
-          </Field>
-        )}
-
-        <Field label="사유 (선택)">
-          <textarea value={reason} onChange={(e) => setReason(e.target.value)}
-            placeholder="휴가·반차·조퇴 사유"
-            style={{ ...inputStyle(), minHeight: 80, resize: 'vertical', lineHeight: 1.5 }} />
-        </Field>
-
       </div>
-
-      <MobileSaveFooter
-        prevLabel="취소"
-        onPrev={onClose}
-        primaryLabel="신청"
-        primaryBusyLabel="신청 중..."
-        primaryBusy={saving}
-        primaryDisabled={!fromDate}
-        onPrimary={handleSubmit}
-      />
     </div>
   );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-sub)' }}>{label}</div>
-      {children}
-    </div>
-  );
-}
-function inputStyle(): React.CSSProperties {
-  return {
-    padding: '10px 12px', fontSize: 14, fontFamily: 'inherit',
-    background: 'var(--bg-card)', color: 'var(--text-main)',
-    border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-    outline: 'none', width: '100%',
-  };
 }

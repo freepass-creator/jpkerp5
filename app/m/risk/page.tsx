@@ -13,13 +13,14 @@ import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
 import { ageFromIdent } from '@/lib/ident';
 
-type RiskKind = 'unpaid' | 'overdue-return' | 'insurance-gap' | 'missing-ident';
+type RiskKind = 'unpaid' | 'overdue-return' | 'insurance-gap' | 'insurance-expiry' | 'missing-ident';
 
 const KINDS: { key: RiskKind; label: string; icon: React.ReactNode; tone: 'red' | 'orange' | 'amber' }[] = [
-  { key: 'unpaid',         label: '미수금',       icon: <CurrencyKrw size={16} weight="duotone" />,    tone: 'red' },
-  { key: 'overdue-return', label: '반납 지연',    icon: <ArrowUUpLeft size={16} weight="duotone" />,   tone: 'orange' },
-  { key: 'insurance-gap',  label: '보험 미커버',  icon: <ShieldWarning size={16} weight="duotone" />,  tone: 'red' },
-  { key: 'missing-ident',  label: '등록번호 결손', icon: <IdentificationCard size={16} weight="duotone" />, tone: 'amber' },
+  { key: 'unpaid',           label: '미수금',         icon: <CurrencyKrw size={16} weight="duotone" />,    tone: 'red' },
+  { key: 'overdue-return',   label: '반납 지연',      icon: <ArrowUUpLeft size={16} weight="duotone" />,   tone: 'orange' },
+  { key: 'insurance-gap',    label: '보험 미커버',    icon: <ShieldWarning size={16} weight="duotone" />,  tone: 'red' },
+  { key: 'insurance-expiry', label: '보험 만료 임박', icon: <ShieldWarning size={16} weight="duotone" />,  tone: 'amber' },
+  { key: 'missing-ident',    label: '등록번호 결손',  icon: <IdentificationCard size={16} weight="duotone" />, tone: 'amber' },
 ];
 
 export default function MobileRisk() {
@@ -31,10 +32,11 @@ export default function MobileRisk() {
     const todayDate = new Date();
     const dayMs = 24 * 60 * 60 * 1000;
     const out: Record<RiskKind, typeof contracts> = {
-      'unpaid':         [],
-      'overdue-return': [],
-      'insurance-gap':  [],
-      'missing-ident':  [],
+      'unpaid':           [],
+      'overdue-return':   [],
+      'insurance-gap':    [],
+      'insurance-expiry': [],
+      'missing-ident':    [],
     };
     for (const c of contracts) {
       const s = c.vehicleStatus;
@@ -61,6 +63,13 @@ export default function MobileRisk() {
       if (!inactive) {
         const d = (c.customerIdentNo ?? '').replace(/\D/g, '');
         if (c.customerKind !== '법인' && d.length !== 13) out['missing-ident'].push(c);
+
+        // 보험 만료 임박 D-30 (만료일 ≤ 30일 + 미만료)
+        if (c.insuranceExpiryDate) {
+          const exp = new Date(c.insuranceExpiryDate);
+          const diff = Math.floor((exp.getTime() - todayDate.getTime()) / dayMs);
+          if (diff >= 0 && diff <= 30) out['insurance-expiry'].push(c);
+        }
       }
     }
     return out;
@@ -143,6 +152,8 @@ export default function MobileRisk() {
                     ? <span style={{ color: 'var(--orange-text)' }}>반납예정 {c.returnScheduledDate}</span>
                   : kind.key === 'insurance-gap'
                     ? <span>보험연령 {c.insuranceAge ?? '-'}세</span>
+                  : kind.key === 'insurance-expiry' && c.insuranceExpiryDate
+                    ? <span style={{ color: 'var(--amber-text)' }}>만료 {c.insuranceExpiryDate}</span>
                   : kind.key === 'missing-ident'
                     ? <span style={{ color: 'var(--amber-text)' }}>등록번호 결손</span>
                   : null;

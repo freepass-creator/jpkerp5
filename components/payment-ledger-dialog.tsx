@@ -186,7 +186,7 @@ export function PaymentLedgerDialog({
                           return (
                             <tr key={l.id}>
                               <td className="center">
-                                <span className="chip" style={{ height: 18, padding: '0 8px', fontSize: 10 }}>{l.source}</span>
+                                <span className="chip" style={{ height: 16, padding: '0 6px', fontSize: 10 }}>{l.source}</span>
                               </td>
                               <td className="mono">{formatDateFull(l.date)}</td>
                               <td>{l.counterparty}</td>

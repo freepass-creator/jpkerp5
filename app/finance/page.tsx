@@ -14,6 +14,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { RECEIPT_SUBJECTS, EXPENSE_SUBJECTS, INTERNAL_SUBJECTS } from '@/lib/ledger-subjects';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
@@ -80,7 +81,7 @@ export default function FinancePage() {
       toast.error(`삭제 실패: ${(e as Error).message ?? String(e)}`);
     }
   }
-  const { contracts } = useContracts();
+  const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
 
   const [search, setSearch] = useState('');
@@ -219,8 +220,16 @@ export default function FinancePage() {
                     : viewMode === 'corpcard' ? '법인카드'
                     : undefined  /* daily = 전체 */
                   }
-                  onUpdateBank={(id, patch) => void updateBank(id, patch)}
-                  onUpdateCard={(id, patch) => void updateCard(id, patch)}
+                  onUpdateBank={(id, patch) => {
+                    const old = bankTx.find((t) => t.id === id);
+                    if (!old) return;
+                    void updateBankTxWithMatchSync(old, patch, contracts, updateBank, updateContract);
+                  }}
+                  onUpdateCard={(id, patch) => {
+                    const old = cardTx.find((t) => t.id === id);
+                    if (!old) return;
+                    void updateCardTxWithMatchSync(old, patch, contracts, updateCard, updateContract);
+                  }}
                 />
               )}
               {viewMode === 'account' && (

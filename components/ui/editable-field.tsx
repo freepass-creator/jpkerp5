@@ -53,6 +53,8 @@ export function EditableField({
         type="text"
         value={value ?? ''}
         onChange={(e) => onChange?.(e.target.value)}
+        // 포커스 시 자동 select-all — "0" 상태에서 즉시 새 값 타이핑 가능 (월대여료·보증금 등 숫자 필드 입력 사고 방지)
+        onFocus={(e) => e.currentTarget.select()}
         placeholder={placeholder}
         className={`detail-field-input ${mono ? 'mono' : ''}`}
       />
