@@ -274,6 +274,13 @@ a { color: var(--text-link); text-decoration: none; }
 .app > .dashboard,
 .app > .page-shell,
 .app > .penalty-body { flex: 1; min-height: 0; }
+/* topbar / bottom-bar / kpi 외 자유 content 영역 — 자동 세로 스크롤.
+   dispatch / attendance / activity / admin/* 처럼 wrapper div(no class) 사용 시 자동 적용. */
+.app > div:not(.dashboard):not(.page-shell):not(.penalty-body):not(.kpi-strip):not(.bottom-bar) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
 
 /* ────────────── Bottom Action Bar ────────────── */
 .bottom-bar {
