@@ -134,6 +134,61 @@ export default function FinancePage() {
 
   const contractById = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
 
+  // 총계정원장 — BottomBar 검증·엑셀용 (GL view 일 때만 활용)
+  const glStats = useMemo(() => {
+    if (viewMode !== 'gl') return { entries: 0, debit: 0, accounts: 0 };
+    const all = buildAllJournals(bankTx, cardTx);
+    const filtered = all.filter((j) => {
+      if (!inPeriod((j.date ?? '').slice(0, 10))) return false;
+      if (companyFilter !== 'all') {
+        const c = j.matchedContractId ? contractById.get(j.matchedContractId) : undefined;
+        const co = j.companyCode ?? c?.company;
+        if (co !== companyFilter) return false;
+      }
+      return true;
+    });
+    const debit = filtered.reduce((s, j) => s + j.amount, 0);
+    const accounts = new Set<string>();
+    for (const j of filtered) { accounts.add(j.debitAccount); accounts.add(j.creditAccount); }
+    return { entries: filtered.length, debit, accounts: accounts.size, journals: filtered };
+  }, [viewMode, bankTx, cardTx, companyFilter, contractById, periodMode, periodAnchor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleGlExcelExport() {
+    const j = (glStats as { journals?: import('@/lib/gl-entries').JournalEntry[] }).journals ?? [];
+    if (j.length === 0) { toast.info('내보낼 분개 없음'); return; }
+    const rows = j.map((x) => ({
+      거래일: (x.date ?? '').slice(0, 10),
+      구분: x.source === 'bank' ? '계좌' : '카드',
+      차변계정: `${ACCOUNTS[x.debitAccount]?.code} ${ACCOUNTS[x.debitAccount]?.name}`,
+      대변계정: `${ACCOUNTS[x.creditAccount]?.code} ${ACCOUNTS[x.creditAccount]?.name}`,
+      금액: x.amount,
+      거래상대: x.counterparty ?? '',
+      적요: x.memo ?? '',
+      회사코드: x.companyCode ?? '',
+      매칭계약: x.matchedContractId ?? '',
+    }));
+    void import('@/lib/excel-export').then(({ exportToExcel }) => {
+      const r = exportToExcel({
+        title: `총계정원장 ${periodLabel}`,
+        fileName: `총계정원장_${periodLabel}.xlsx`,
+        sheetName: '총계정원장',
+        columns: [
+          { key: '거래일', header: '거래일', type: 'date' },
+          { key: '구분', header: '구분', type: 'center' },
+          { key: '차변계정', header: '차변계정' },
+          { key: '대변계정', header: '대변계정' },
+          { key: '금액', header: '금액', type: 'number' },
+          { key: '거래상대', header: '거래상대' },
+          { key: '적요', header: '적요' },
+          { key: '회사코드', header: '회사코드', type: 'mono' },
+          { key: '매칭계약', header: '매칭계약', type: 'mono' },
+        ],
+        rows,
+      });
+      if (r.ok) toast.success(`총계정원장 ${rows.length}건 엑셀 저장`);
+    });
+  }
+
   const companyOptions = useMemo(
     () => buildCompanyOptions(bankTx, (t) => resolveCompanyKey(t, contractById)),
     [bankTx, contractById],
@@ -446,54 +501,78 @@ export default function FinancePage() {
 
         <BottomBar
           left={
-            <>
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={() => setCreateOpen(true)}
-                title="계좌/자동이체/카드매출/법인카드 1건 등록 (다이얼로그에서 종류 선택)"
-              >
-                <Plus size={14} weight="bold" /> 신규 등록
-              </button>
-              <span className="btn-sep" />
-              <button className="btn" type="button" disabled title="자금일보 view 에서 엑셀 다운로드 가능 — 우측 [자금일보] 탭 클릭">
-                <FileXls size={14} weight="bold" /> 엑셀
-              </button>
-              {viewMode === 'daily' && (
-                <>
-                  <span className="btn-sep" />
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={handleTaxInvoiceExport}
-                    title="세금계산서 발행 엑셀 — 전자세금계산서 시스템 일괄 업로드용"
-                  >
-                    세금계산서 엑셀
-                  </button>
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() => void handleCmsAutoMatch()}
-                    title="미매칭 CMS 집금건 ↔ 자동이체 자동 묶음 매칭 (일자 ±3일 + 수수료 0.05~0.3%)"
-                  >
-                    CMS 자동 매칭
-                  </button>
-                </>
-              )}
-              <span className="btn-sep" />
-              <button
-                className="btn"
-                type="button"
-                disabled={selectedIds.size === 0}
-                onClick={() => void handleBulkDelete()}
-                style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
-                title={selectedIds.size === 0 ? '체크박스로 거래내역 선택' : `선택 ${selectedIds.size}건 삭제`}
-              >
-                <Trash size={14} weight="bold" /> 선택 삭제{selectedIds.size > 0 && ` (${selectedIds.size})`}
-              </button>
-            </>
+            viewMode === 'gl' ? (
+              <>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={handleGlExcelExport}
+                  title="총계정원장 전체 분개 엑셀 다운로드 (회사·기간 필터 반영)"
+                >
+                  <FileXls size={14} weight="bold" /> 엑셀
+                </button>
+                <span className="btn-sep" />
+                <span className="dim" style={{ fontSize: 11 }}>
+                  총계정원장은 자동 분개 (계좌·자동이체·카드매출·법인카드에서 생성) — 수기 등록 불가
+                </span>
+              </>
+            ) : (
+              <>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  title="계좌/자동이체/카드매출/법인카드 1건 등록 (다이얼로그에서 종류 선택)"
+                >
+                  <Plus size={14} weight="bold" /> 신규 등록
+                </button>
+                <span className="btn-sep" />
+                <button className="btn" type="button" disabled title="자금일보 view 에서 엑셀 다운로드 가능 — 우측 [자금일보] 탭 클릭">
+                  <FileXls size={14} weight="bold" /> 엑셀
+                </button>
+                {viewMode === 'daily' && (
+                  <>
+                    <span className="btn-sep" />
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={handleTaxInvoiceExport}
+                      title="세금계산서 발행 엑셀 — 전자세금계산서 시스템 일괄 업로드용"
+                    >
+                      세금계산서 엑셀
+                    </button>
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={() => void handleCmsAutoMatch()}
+                      title="미매칭 CMS 집금건 ↔ 자동이체 자동 묶음 매칭 (일자 ±3일 + 수수료 0.05~0.3%)"
+                    >
+                      CMS 자동 매칭
+                    </button>
+                  </>
+                )}
+                <span className="btn-sep" />
+                <button
+                  className="btn"
+                  type="button"
+                  disabled={selectedIds.size === 0}
+                  onClick={() => void handleBulkDelete()}
+                  style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
+                  title={selectedIds.size === 0 ? '체크박스로 거래내역 선택' : `선택 ${selectedIds.size}건 삭제`}
+                >
+                  <Trash size={14} weight="bold" /> 선택 삭제{selectedIds.size > 0 && ` (${selectedIds.size})`}
+                </button>
+              </>
+            )
           }
-          right={null}
+          right={viewMode === 'gl' ? (
+            <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>
+              차변 합 ₩{fmtNum(glStats.debit)} = 대변 합 ₩{fmtNum(glStats.debit)}
+              <span className="dim" style={{ marginLeft: 8, fontWeight: 400 }}>
+                (복식부기 검증 · {glStats.entries}분개)
+              </span>
+            </span>
+          ) : null}
         />
 
         <CreateDialog
@@ -796,11 +875,8 @@ function GLView({
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 12, height: 'calc(100vh - 220px)', minHeight: 460 }}>
       <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
-          <div style={{ fontSize: 12, fontWeight: 700 }}>총계정원장 ({summary.length}계정 · {journals.length}분개)</div>
-          <div className="dim" style={{ fontSize: 11, marginTop: 2 }}>
-            차변 합 ₩{fmtNum(totalDebit)} = 대변 합 ₩{fmtNum(totalCredit)} (복식부기 검증)
-          </div>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)', fontSize: 12, fontWeight: 700 }}>
+          총계정원장 ({summary.length}계정 · {journals.length}분개)
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>
           {(['asset', 'liability', 'revenue', 'expense', 'equity'] as AccountClass[]).map((cls) => {
