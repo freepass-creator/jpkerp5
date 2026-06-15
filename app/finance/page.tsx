@@ -17,7 +17,8 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVendors } from '@/lib/firebase/vendors-store';
-import type { BankTransaction, Contract, Vendor, Company } from '@/lib/types';
+import type { BankTransaction, CardTransaction, Contract, Vendor, Company } from '@/lib/types';
+import { buildAllJournals, summarizeByAccount, ACCOUNTS, CLASS_LABEL, type LedgerSummary, type AccountClass } from '@/lib/gl-entries';
 import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
 import { displayCompanyName } from '@/lib/company-display';
@@ -90,7 +91,7 @@ export default function FinancePage() {
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:finance:company', 'all');
   const [directionFilter, setDirectionFilter] = usePersistentState<'all' | 'deposit' | 'withdraw'>('filter:finance:direction', 'all');
-  const [viewMode, setViewMode] = usePersistentState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily' | 'vendors'>('filter:finance:view', 'account');
+  const [viewMode, setViewMode] = usePersistentState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily' | 'vendors' | 'gl'>('filter:finance:view', 'account');
   const [createOpen, setCreateOpen] = useState(false);
   const [periodMode, setPeriodMode] = usePersistentState<'month' | 'quarter' | 'year'>('filter:finance:period', 'month');
   const [periodAnchor, setPeriodAnchor] = useState<{ y: number; m: number }>(() => {
@@ -225,6 +226,7 @@ export default function FinancePage() {
           <button type="button" className={`chip chip-nav ${viewMode === 'corpcard' ? 'active' : ''}`} onClick={() => setViewMode('corpcard')}>법인카드</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'daily' ? 'active' : ''}`} onClick={() => setViewMode('daily')} title="자금일보 — 4 종류 통합 + 계정과목·매칭 편집">자금일보</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'vendors' ? 'active' : ''}`} onClick={() => setViewMode('vendors')} title="거래처 보조원장 — 거래처별 지출 타임라인·누적">거래처</button>
+          <button type="button" className={`chip chip-nav ${viewMode === 'gl' ? 'active' : ''}`} onClick={() => setViewMode('gl')} title="총계정원장 — 계정과목별 차변·대변·잔액">GL</button>
         </>
       }
       bare
@@ -424,6 +426,15 @@ export default function FinancePage() {
                   companyMaster={companyMaster}
                   inPeriod={inPeriod}
                   search={search}
+                />
+              )}
+              {viewMode === 'gl' && (
+                <GLView
+                  bankTx={bankTx}
+                  cardTx={cardTx}
+                  contractById={contractById}
+                  companyFilter={companyFilter}
+                  inPeriod={inPeriod}
                 />
               )}
             </div>
@@ -687,6 +698,202 @@ function VendorSubLedgerView({
                         <td className="dim">{t.subject || '-'}</td>
                         <td className="dim">{t.memo || t.counterparty || '-'}</td>
                         <td className="mono dim" style={{ fontSize: 11 }}>{c ? c.contractNo : '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────── GL — 총계정원장 (자동분개) ─────────────────── */
+
+function GLView({
+  bankTx, cardTx, contractById, companyFilter, inPeriod,
+}: {
+  bankTx: BankTransaction[];
+  cardTx: CardTransaction[];
+  contractById: Map<string, Contract>;
+  companyFilter: string;
+  inPeriod: (date: string) => boolean;
+}) {
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+
+  const journals = useMemo(() => {
+    const all = buildAllJournals(bankTx, cardTx);
+    return all.filter((j) => {
+      if (!inPeriod((j.date ?? '').slice(0, 10))) return false;
+      if (companyFilter !== 'all') {
+        const c = j.matchedContractId ? contractById.get(j.matchedContractId) : undefined;
+        const co = j.companyCode ?? c?.company;
+        if (co !== companyFilter) return false;
+      }
+      return true;
+    });
+  }, [bankTx, cardTx, contractById, companyFilter, inPeriod]);
+
+  const summary = useMemo(() => summarizeByAccount(journals), [journals]);
+
+  const groupedSummary = useMemo(() => {
+    const groups = new Map<AccountClass, LedgerSummary[]>();
+    for (const s of summary) {
+      const arr = groups.get(s.account.class) ?? [];
+      arr.push(s);
+      groups.set(s.account.class, arr);
+    }
+    return groups;
+  }, [summary]);
+
+  const classTotals = useMemo(() => {
+    const totals = new Map<AccountClass, { debit: number; credit: number; balance: number }>();
+    for (const s of summary) {
+      const t = totals.get(s.account.class) ?? { debit: 0, credit: 0, balance: 0 };
+      t.debit += s.debit;
+      t.credit += s.credit;
+      t.balance += s.balance;
+      totals.set(s.account.class, t);
+    }
+    return totals;
+  }, [summary]);
+
+  const selectedJournals = useMemo(() => {
+    if (!selectedAccount) return [];
+    return journals
+      .filter((j) => j.debitAccount === selectedAccount || j.creditAccount === selectedAccount)
+      .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+  }, [journals, selectedAccount]);
+
+  const totalDebit = journals.reduce((s, j) => s + j.amount, 0);
+  const totalCredit = totalDebit;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 12, minHeight: 500 }}>
+      <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>총계정원장 ({summary.length}계정 · {journals.length}분개)</div>
+          <div className="dim" style={{ fontSize: 11, marginTop: 2 }}>
+            차변 합 ₩{fmtNum(totalDebit)} = 대변 합 ₩{fmtNum(totalCredit)} (복식부기 검증)
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          {(['asset', 'liability', 'revenue', 'expense', 'equity'] as AccountClass[]).map((cls) => {
+            const accounts = groupedSummary.get(cls) ?? [];
+            if (accounts.length === 0) return null;
+            const total = classTotals.get(cls) ?? { debit: 0, credit: 0, balance: 0 };
+            return (
+              <div key={cls}>
+                <div style={{
+                  display: 'flex', alignItems: 'baseline', gap: 8,
+                  padding: '6px 12px', background: 'var(--bg-page)',
+                  borderTop: '1px solid var(--border-soft)',
+                  borderBottom: '1px solid var(--border-soft)',
+                  fontSize: 11, fontWeight: 700, color: 'var(--text-sub)',
+                }}>
+                  <span>{CLASS_LABEL[cls]}</span>
+                  <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)' }}>
+                    잔액 ₩{fmtNum(Math.abs(total.balance))}
+                  </span>
+                </div>
+                {accounts.map((s) => {
+                  const isActive = selectedAccount === s.accountKey;
+                  return (
+                    <button
+                      key={s.accountKey}
+                      type="button"
+                      onClick={() => setSelectedAccount(isActive ? null : s.accountKey)}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '6px 12px',
+                        background: isActive ? 'var(--brand-bg)' : 'var(--bg-card)',
+                        color: isActive ? 'var(--brand)' : 'inherit',
+                        border: 'none', borderBottom: '1px solid var(--border-soft)',
+                        cursor: 'pointer', fontSize: 12,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="mono dim" style={{ fontSize: 11 }}>{s.account.code}</span>
+                        <span style={{ fontWeight: 600, flex: 1 }}>{s.account.name}</span>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
+                          color: s.balance === 0 ? 'var(--text-weak)'
+                            : (s.normalSide === 'debit' ? (s.balance > 0 ? 'var(--text-main)' : 'var(--red-text)')
+                              : (s.balance < 0 ? 'var(--text-main)' : 'var(--red-text)')),
+                        }}>
+                          {fmtNum(Math.abs(s.balance))}
+                        </span>
+                      </div>
+                      <div className="dim" style={{ fontSize: 10, display: 'flex', gap: 8, marginTop: 2 }}>
+                        <span>차변 {fmtNum(s.debit)}</span>
+                        <span>대변 {fmtNum(s.credit)}</span>
+                        <span style={{ marginLeft: 'auto' }}>{s.entryCount}건</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+          {summary.length === 0 && (
+            <div className="muted center" style={{ padding: 24, fontSize: 12 }}>
+              해당 기간 분개 없음
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {!selectedAccount ? (
+          <div className="muted center" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+            좌측에서 계정 선택 → 분개 타임라인
+          </div>
+        ) : (
+          <>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                <span className="mono dim">{ACCOUNTS[selectedAccount]?.code}</span>
+                <strong style={{ fontSize: 14 }}>{ACCOUNTS[selectedAccount]?.name}</strong>
+                <span className="dim" style={{ fontSize: 11 }}>{CLASS_LABEL[ACCOUNTS[selectedAccount]?.class]}</span>
+                <span style={{ flex: 1 }} />
+                <span className="dim" style={{ fontSize: 11 }}>{selectedJournals.length}분개</span>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <table className="table" style={{ fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 100 }}>거래일</th>
+                    <th style={{ width: 60 }}>구분</th>
+                    <th>적요/거래상대</th>
+                    <th className="num" style={{ width: 110 }}>차변</th>
+                    <th className="num" style={{ width: 110 }}>대변</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedJournals.length === 0 ? (
+                    <tr><td colSpan={5} className="muted center" style={{ padding: 24 }}>해당 계정 분개 없음</td></tr>
+                  ) : selectedJournals.map((j) => {
+                    const isDebit = j.debitAccount === selectedAccount;
+                    return (
+                      <tr key={j.txId}>
+                        <td className="mono">{(j.date ?? '').slice(0, 10)}</td>
+                        <td className="dim">{j.source === 'bank' ? '계좌' : '카드'}</td>
+                        <td>
+                          {j.memo || j.counterparty || '-'}
+                          {j.counterparty && j.memo && (
+                            <span className="dim" style={{ marginLeft: 6 }}>· {j.counterparty}</span>
+                          )}
+                        </td>
+                        <td className="num mono" style={{ color: isDebit ? 'var(--text-main)' : 'var(--text-weak)' }}>
+                          {isDebit ? fmtNum(j.amount) : '-'}
+                        </td>
+                        <td className="num mono" style={{ color: !isDebit ? 'var(--text-main)' : 'var(--text-weak)' }}>
+                          {!isDebit ? fmtNum(j.amount) : '-'}
+                        </td>
                       </tr>
                     );
                   })}
