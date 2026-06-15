@@ -676,147 +676,89 @@ export function DailyLedgerView({
 
             </td>
 
-            {/* 10. 거래泥???dropdown (계약 ?좏깮 + ??거래泥?吏곸젒 ?깅줉) */}
+            {/* 10. 거래처 — 매칭 정보 표시 + 거래처 추가 버튼 (드롭다운 폐기) */}
 
             <td>
 
               {r.source === 'bank' ? (
 
-                <select
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
 
-                  className="input"
+                  <span style={{
 
-                  style={{
-
-                    height: 24, fontSize: 11, padding: '0 4px', width: '100%',
+                    flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
 
                     background: matched ? 'var(--brand-bg, #eef2ff)' : r.linkedCustomerName ? '#fef9c3' : undefined,
 
-                  }}
-
-                  value={r.matchedContractId || (r.linkedCustomerName ? '__linked__' : '')}
-
-                  onChange={(e) => {
-
-                    const v = e.target.value;
-
-                    if (v === '__new__') {
-
-                      void handleQuickVendorAdd(r);
-
-                      e.target.value = r.matchedContractId || (r.linkedCustomerName ? `__vendor__${r.linkedCustomerName}` : '');
-
-                      return;
-
-                    }
-
-                    if (v.startsWith('__vendor__')) {
-
-                      const name = v.slice('__vendor__'.length);
-
-                      onUpdateBank(r.id, { linkedCustomerName: name, matchedContractId: undefined });
-
-                      return;
-
-                    }
-
-                    handleContractMatch(r, v);
+                    padding: '2px 4px', borderRadius: 3,
 
                   }}
 
-                  title={matched ? `현재 매칭: ${matched.contractNo} · ${matched.customerName}` : (r.linkedCustomerName ? `거래처: ${r.linkedCustomerName}` : '계약 검색 또는 새 거래처 등록')}
+                  title={matched ? `매칭: ${matched.contractNo} · ${matched.customerName}` : (r.linkedCustomerName ? `거래처: ${r.linkedCustomerName}` : '미매칭 — 12번 매칭 컬럼에서 🔍 검색')}
 
-                >
+                  >
 
-                  <option value="">미매칭</option>
+                    {matched ? matched.customerName : r.linkedCustomerName || <span className="muted">미매칭</span>}
 
-                  <optgroup label="계약 (검색)">
+                  </span>
 
-                    {contracts
+                  {!matched && (
 
-                      .filter((c) => !r.companyCode || c.company === r.companyCode)
+                    <button
 
-                      .map((c) => (
+                      type="button"
 
-                        <option key={c.id} value={c.id}>
+                      className="btn btn-sm"
 
-                          {c.customerName} · {c.vehiclePlate}
+                      title="거래처(공급사·정비공장) 빠른 등록"
 
-                        </option>
+                      onClick={() => void handleQuickVendorAdd(r)}
 
-                      ))}
+                      style={{ padding: '0 4px', height: 20, fontSize: 10 }}
 
-                  </optgroup>
+                    >
 
-                  <optgroup label="거래처 (정비공장·공급사 외)">
+                      +거래처
 
-                    {vendors
+                    </button>
 
-                      .filter((v) => !r.companyCode || !v.companyCode || v.companyCode === r.companyCode)
+                  )}
 
-                      .map((v) => (
-
-                        <option key={v.id} value={`__vendor__${v.name}`}>
-
-                          {v.name}{v.kind ? ` (${v.kind})` : ''}
-
-                        </option>
-
-                      ))}
-
-                  </optgroup>
-
-                  <option value="__new__">+ 새 거래처 등록...</option>
-
-                </select>
+                </div>
 
               ) : <span>{matched?.customerName || <span className="muted" style={{ fontSize: 11 }}>-</span>}</span>}
 
             </td>
 
-            {/* 11. 李⑤웾번호 ???숈씪 dropdown (계약 ?좏깮 ??李⑤웾/거래泥??④퍡 set) */}
+            {/* 11. 차량번호 — 매칭 결과 표시 (드롭다운 폐기) */}
 
             <td>
 
               {r.source === 'bank' ? (
 
-                <select
+                <span
 
-                  className="input mono"
+                  className="mono"
 
                   style={{
 
-                    height: 24, fontSize: 11, padding: '0 4px', width: '100%',
+                    display: 'inline-block', maxWidth: '100%',
 
-                    background: matched ? 'var(--brand-bg, #eef2ff)' : undefined,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+
+                    background: matched ? 'var(--brand-bg, #eef2ff)' : r.linkedVehiclePlate ? '#fef9c3' : undefined,
+
+                    padding: '2px 4px', borderRadius: 3, fontSize: 11,
 
                   }}
 
-                  value={r.matchedContractId}
-
-                  onChange={(e) => handleContractMatch(r, e.target.value)}
-
-                  title={matched ? `현재: ${matched.vehiclePlate} ${matched.vehicleModel ?? ''} — 다른 차량 선택 시 강제 변경` : '차량 선택'}
+                  title={matched ? `${matched.vehiclePlate} ${matched.vehicleModel ?? ''}` : (r.linkedVehiclePlate || '미매칭')}
 
                 >
 
-                  <option value="">미매칭{r.linkedVehiclePlate ? ` (직접 입력: ${r.linkedVehiclePlate})` : ''}</option>
+                  {matched?.vehiclePlate || r.linkedVehiclePlate || <span className="muted">-</span>}
 
-                  {contracts
-
-                    .filter((c) => !r.companyCode || c.company === r.companyCode)
-
-                    .map((c) => (
-
-                      <option key={c.id} value={c.id}>
-
-                        {c.vehiclePlate} · {c.customerName}
-
-                      </option>
-
-                    ))}
-
-                </select>
+                </span>
 
               ) : <span className="mono">{matched?.vehiclePlate || <span className="muted" style={{ fontSize: 11 }}>-</span>}</span>}
 
