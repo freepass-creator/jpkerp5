@@ -135,10 +135,16 @@ export default function FinancePage() {
     [bankTx, contractById],
   );
 
+  const isCms = (t: typeof bankTx[number]) =>
+    t.source === 'CMS' || t.method === 'CMS' || /CMS|자동이체/.test(`${t.source ?? ''}${t.method ?? ''}${t.memo ?? ''}`);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return bankTx
       .filter((t) => {
+        // 계좌 view = 자동이체(CMS) 제외한 일반 입출금
+        if (viewMode === 'account' && isCms(t)) return false;
+        if (viewMode === 'autopay' && !isCms(t)) return false;
         if (directionFilter === 'deposit' && !((t.amount ?? 0) > 0)) return false;
         if (directionFilter === 'withdraw' && !((t.withdraw ?? 0) > 0)) return false;
         if (!matchesCompanyFilter(resolveCompanyKey(t, contractById), companyFilter)) return false;
@@ -152,7 +158,26 @@ export default function FinancePage() {
         return true;
       })
       .sort((a, b) => (b.txDate ?? '').localeCompare(a.txDate ?? ''));
-  }, [bankTx, search, directionFilter, companyFilter, contractById, periodMode, periodAnchor]);
+  }, [bankTx, search, directionFilter, companyFilter, contractById, periodMode, periodAnchor, viewMode]);
+
+  const filteredCard = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return cardTx
+      .filter((t) => {
+        if (viewMode === 'card' && t.kind !== '매출') return false;
+        if (viewMode === 'corpcard' && t.kind !== '법인카드') return false;
+        const coKey = t.companyCode || resolveCompanyKey({ matchedContractId: t.matchedContractId } as never, contractById);
+        if (!matchesCompanyFilter(coKey, companyFilter)) return false;
+        if (!inPeriod((t.txDate ?? '').slice(0, 10))) return false;
+        if (q) {
+          const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
+          const hay = `${t.customerName ?? ''} ${t.merchant ?? ''} ${t.approvalNo ?? ''} ${t.cardLast4 ?? ''} ${t.source ?? ''} ${t.category ?? ''} ${t.usedBy ?? ''} ${c?.contractNo ?? ''} ${c?.customerName ?? ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (b.txDate ?? '').localeCompare(a.txDate ?? ''));
+  }, [cardTx, search, companyFilter, contractById, periodMode, periodAnchor, viewMode]);
 
 
   return (
@@ -204,7 +229,7 @@ export default function FinancePage() {
         <div className="dashboard" style={{ gridTemplateColumns: '1fr' }}>
           <div className="panel">
             <div className="panel-body">
-              {viewMode !== 'account' && (
+              {viewMode === 'daily' && (
                 <DailyLedgerView
                   bankTx={bankTx}
                   cardTx={cardTx}
@@ -214,12 +239,6 @@ export default function FinancePage() {
                   inPeriod={inPeriod}
                   search={search}
                   companyFilter={companyFilter}
-                  kindFilter={
-                    viewMode === 'autopay' ? '자동이체'
-                    : viewMode === 'card' ? '카드매출'
-                    : viewMode === 'corpcard' ? '법인카드'
-                    : undefined  /* daily = 전체 */
-                  }
                   onUpdateBank={(id, patch) => {
                     const old = bankTx.find((t) => t.id === id);
                     if (!old) return;
@@ -232,7 +251,7 @@ export default function FinancePage() {
                   }}
                 />
               )}
-              {viewMode === 'account' && (
+              {(viewMode === 'account' || viewMode === 'autopay') && (
               <table className="table">
                 <thead>
                   <tr>
@@ -315,6 +334,81 @@ export default function FinancePage() {
                   })}
                 </tbody>
               </table>
+              )}
+              {viewMode === 'card' && (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 60 }}>회사</th>
+                      <th style={{ width: 110 }}>거래일시</th>
+                      <th style={{ width: 70 }}>카드사</th>
+                      <th className="num" style={{ width: 110 }}>금액</th>
+                      <th style={{ width: 100 }}>끝4자리</th>
+                      <th>고객명</th>
+                      <th style={{ width: 140 }}>승인번호</th>
+                      <th style={{ width: 130 }}>단말기/가맹점</th>
+                      <th style={{ width: 110 }}>매칭 계약</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCard.length === 0 ? (
+                      <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>카드매출 내역 없음 — 우측 하단 [+ 신규 등록] 으로 추가</td></tr>
+                    ) : filteredCard.map((t) => {
+                      const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
+                      const co = t.companyCode || (c?.company);
+                      return (
+                        <tr key={t.id} onDoubleClick={() => { setViewMode('daily'); toast.info('자금일보 view 에서 매칭 편집'); }} style={{ cursor: 'pointer' }}>
+                          <td className="dim">{co ? displayCompanyName(co, companyMaster) : '-'}</td>
+                          <td className="mono">{(t.txDate ?? '').slice(0, 10)}</td>
+                          <td className="dim">{t.source || '-'}</td>
+                          <td className="num mono" style={{ color: 'var(--green-text)' }}>{fmtNum(t.amount ?? 0) || '-'}</td>
+                          <td className="mono dim">{t.cardLast4 || '-'}</td>
+                          <td>{t.customerName || '-'}</td>
+                          <td className="mono dim" style={{ fontSize: 11 }}>{t.approvalNo || '-'}</td>
+                          <td className="mono dim" style={{ fontSize: 11 }}>{t.terminalId || t.merchantNo || '-'}</td>
+                          <td className="mono dim" style={{ fontSize: 11 }}>{c ? c.contractNo : '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+              {viewMode === 'corpcard' && (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 60 }}>회사</th>
+                      <th style={{ width: 110 }}>거래일시</th>
+                      <th style={{ width: 110 }}>카드사·끝4자리</th>
+                      <th className="num" style={{ width: 110 }}>금액</th>
+                      <th>가맹점</th>
+                      <th style={{ width: 100 }}>카테고리</th>
+                      <th style={{ width: 120 }}>사용자</th>
+                      <th style={{ width: 70 }}>승인</th>
+                      <th style={{ width: 140 }}>승인번호</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCard.length === 0 ? (
+                      <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>법인카드 지출 내역 없음 — 우측 하단 [+ 신규 등록] 으로 추가</td></tr>
+                    ) : filteredCard.map((t) => {
+                      const co = t.companyCode;
+                      return (
+                        <tr key={t.id} onDoubleClick={() => { setViewMode('daily'); toast.info('자금일보 view 에서 매칭 편집'); }} style={{ cursor: 'pointer' }}>
+                          <td className="dim">{co ? displayCompanyName(co, companyMaster) : '-'}</td>
+                          <td className="mono">{(t.txDate ?? '').slice(0, 10)}</td>
+                          <td className="mono dim">{t.source || '-'}{t.cardLast4 ? ` ${t.cardLast4}` : ''}</td>
+                          <td className="num mono" style={{ color: 'var(--red-text)' }}>{fmtNum(t.amount ?? 0) || '-'}</td>
+                          <td>{t.merchant || t.customerName || '-'}</td>
+                          <td className="dim">{t.category || <span className="muted">미지정</span>}</td>
+                          <td className="dim">{t.usedBy || '-'}</td>
+                          <td className="dim">{t.approved ? '완료' : '대기'}</td>
+                          <td className="mono dim" style={{ fontSize: 11 }}>{t.approvalNo || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               )}
             </div>
           </div>
