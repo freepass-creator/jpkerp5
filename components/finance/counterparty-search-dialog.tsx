@@ -36,11 +36,13 @@ export type CounterpartySearchDialogProps = {
   onClear?: () => void;
   /** 새 거래처 빠른 등록 entry — 미리 채울 이름 받고 dialog 닫음 */
   onQuickAddVendor?: (suggestedName: string) => void;
+  /** 분할 매칭 진입점 — 거래 1건 ↔ 여러 계약 분할 (BankTx 전용) */
+  onSplitMatch?: () => void;
 };
 
 export function CounterpartySearchDialog({
   open, onClose, contracts, vendors, companyCode, initialQuery,
-  direction, currentContractId, currentVendorName, onPickContract, onPickVendor, onClear, onQuickAddVendor,
+  direction, currentContractId, currentVendorName, onPickContract, onPickVendor, onClear, onQuickAddVendor, onSplitMatch,
 }: CounterpartySearchDialogProps) {
   const [query, setQuery] = useState(initialQuery ?? '');
 
@@ -163,6 +165,16 @@ export function CounterpartySearchDialog({
         }}>
           <span className="dim" style={{ fontSize: 11 }}>행 클릭 → 매칭 적용 후 닫힘</span>
           <div style={{ display: 'flex', gap: 6 }}>
+            {onSplitMatch && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => { onSplitMatch(); onClose(); }}
+                title="이 거래를 여러 계약에 분할 매칭 (회사 일괄결제·가족 결합납부 등)"
+              >
+                분할 매칭
+              </button>
+            )}
             {onQuickAddVendor && (
               <button
                 type="button"

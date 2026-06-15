@@ -29,7 +29,10 @@ import { toast } from '@/lib/toast';
 import { MagnifyingGlass } from '@phosphor-icons/react';
 
 import { useVendors } from '@/lib/firebase/vendors-store';
+import { useContracts } from '@/lib/firebase/contracts-store';
+import { useBankTx } from '@/lib/firebase/transactions-store';
 import { CounterpartySearchDialog } from '@/components/finance/counterparty-search-dialog';
+import { MultiContractMatchDialog } from '@/components/finance/multi-contract-match-dialog';
 
 import type { BankTransaction, CardTransaction, Contract, Vendor } from '@/lib/types';
 
@@ -138,6 +141,8 @@ export function DailyLedgerView({
 }) {
 
   const { vendors, add: addVendor } = useVendors();
+  const { update: updateContract } = useContracts();
+  const { update: updateBankTxStore } = useBankTx();
 
 
 
@@ -145,6 +150,9 @@ export function DailyLedgerView({
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
+
+  /** 분할 매칭 다이얼로그 — 거래 1건 ↔ N개 계약 */
+  const [splitTx, setSplitTx] = useState<BankTransaction | null>(null);
   /** 거래상대(계약자/거래처) 통합 검색 다이얼로그 — 매칭 셀의 🔍에서 열기 */
   const [searchTarget, setSearchTarget] = useState<{
     rowId: string;
@@ -967,7 +975,24 @@ export function DailyLedgerView({
           void handleQuickVendorAdd(row);
         }
       }}
+      onSplitMatch={(() => {
+        const row = unified.find((r) => r.id === searchTarget?.rowId);
+        if (!row || row.source !== 'bank') return undefined;
+        const original = bankTx.find((t) => t.id === row.id);
+        if (!original) return undefined;
+        return () => setSplitTx(original);
+      })()}
     />
+
+    {splitTx && (
+      <MultiContractMatchDialog
+        tx={splitTx}
+        contracts={contracts}
+        updateBank={updateBankTxStore}
+        updateContract={updateContract}
+        onClose={() => setSplitTx(null)}
+      />
+    )}
 
     </>
 
