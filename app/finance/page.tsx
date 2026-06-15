@@ -226,7 +226,7 @@ export default function FinancePage() {
           <button type="button" className={`chip chip-nav ${viewMode === 'corpcard' ? 'active' : ''}`} onClick={() => setViewMode('corpcard')}>법인카드</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'daily' ? 'active' : ''}`} onClick={() => setViewMode('daily')} title="자금일보 — 4 종류 통합 + 계정과목·매칭 편집">자금일보</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'vendors' ? 'active' : ''}`} onClick={() => setViewMode('vendors')} title="거래처 보조원장 — 거래처별 지출 타임라인·누적">거래처</button>
-          <button type="button" className={`chip chip-nav ${viewMode === 'gl' ? 'active' : ''}`} onClick={() => setViewMode('gl')} title="총계정원장 — 계정과목별 차변·대변·잔액">GL</button>
+          <button type="button" className={`chip chip-nav ${viewMode === 'gl' ? 'active' : ''}`} onClick={() => setViewMode('gl')} title="총계정원장 — 계정과목별 차변·대변·잔액">총계정원장</button>
         </>
       }
       bare
