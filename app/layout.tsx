@@ -45,9 +45,8 @@ export const viewport: Viewport = {
   themeColor: '#1B2A4A',
 };
 
-// CDN/브라우저 캐시 금지 — 폰에서 옛 빌드가 계속 보이는 문제 차단
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// CDN 캐시 차단은 middleware 의 Vercel-CDN-Cache-Control: no-store 로 처리.
+// (force-dynamic 을 layout 에 두면 dev 서버 turbopack 이 stale 자주 빠지는 부작용)
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
