@@ -15,6 +15,7 @@ import type {
   BankTransaction,
   CardTransaction,
   Company,
+  Contract,
 } from '@/lib/types';
 
 const onlyDigits = (s?: string) => (s ?? '').replace(/\D+/g, '');
@@ -86,16 +87,58 @@ function matchCmsFromText(text: string, idx: ChannelIndex): string | undefined {
 }
 
 /** BankTx 한 건의 companyCode 추론. 기존 값이 있으면 보존. */
-export function resolveBankCompanyCode(tx: BankTransaction, idx: ChannelIndex): string | undefined {
-  if (tx.companyCode) return tx.companyCode;
+export function resolveBankCompanyCode(
+  tx: BankTransaction,
+  idx: ChannelIndex,
+  contractIdx?: ContractIndex,
+): { companyCode?: string; matchedContractId?: string } {
+  if (tx.companyCode) return { companyCode: tx.companyCode };
   const accountNo = onlyDigits(tx.account);
   if (accountNo) {
     const hit = idx.byAccountNo.get(accountNo);
-    if (hit) return hit;
+    if (hit) return { companyCode: hit };
+  }
+  // CMS 자동이체 입금 — counterparty 가 회원명(=계약자명)인 케이스
+  if (contractIdx && tx.counterparty) {
+    const hit = contractIdx.byName.get(tx.counterparty.trim());
+    if (hit) return { companyCode: hit.company, matchedContractId: hit.id };
   }
   // CMS 자동이체 입금 — counterparty/memo 에 사업자 식별자 포함
   const merged = `${tx.counterparty ?? ''} ${tx.memo ?? ''}`;
-  return matchCmsFromText(merged, idx);
+  const cms = matchCmsFromText(merged, idx);
+  return cms ? { companyCode: cms } : {};
+}
+
+export type ContractIndex = {
+  byName: Map<string, { id: string; company: string }>;
+  byAlias: Map<string, { id: string; company: string }>;
+};
+
+/** 계약 마스터에서 계약자명/별칭 → contract 역인덱스. CMS 명세 회원명 매칭용. */
+export function buildContractIndex(contracts: Contract[]): ContractIndex {
+  const byName = new Map<string, { id: string; company: string }>();
+  const byAlias = new Map<string, { id: string; company: string }>();
+  const ACTIVE = (c: Contract) => c.status === '운행' || c.status === '대기';
+  // 운행/대기 우선 (동명이인이 있을 때 최신 운행 계약 우선)
+  const sorted = [...contracts].sort((a, b) => {
+    const da = ACTIVE(a) ? 0 : 1;
+    const db = ACTIVE(b) ? 0 : 1;
+    if (da !== db) return da - db;
+    return (b.contractDate ?? '').localeCompare(a.contractDate ?? '');
+  });
+  for (const c of sorted) {
+    const name = (c.customerName ?? '').trim();
+    if (name && !byName.has(name)) {
+      byName.set(name, { id: c.id, company: c.company ?? '' });
+    }
+    for (const alias of c.payerAliases ?? []) {
+      const a = alias.trim();
+      if (a && !byAlias.has(a)) {
+        byAlias.set(a, { id: c.id, company: c.company ?? '' });
+      }
+    }
+  }
+  return { byName, byAlias };
 }
 
 /** CardTx 한 건의 companyCode 추론. 기존 값이 있으면 보존. */
@@ -120,23 +163,35 @@ export function resolveCardCompanyCode(tx: CardTransaction, idx: ChannelIndex): 
   return undefined;
 }
 
-export type EnrichStats = { matched: number; unmatched: number };
+export type EnrichStats = { matched: number; unmatched: number; contractMatched: number };
 
-/** 배치 enrichment — 업로드 직전에 호출. 새 객체를 반환(원본 불변). */
+/** 배치 enrichment — 업로드 직전에 호출. 새 객체를 반환(원본 불변).
+ *  contracts 가 주어지면 counterparty(회원명·계약자명) 로 contract 자동 매칭 + matchedContractId 부여.
+ */
 export function enrichBankTxBatch<T extends BankTransaction | Omit<BankTransaction, 'id'>>(
   txs: T[],
   companies: Company[],
+  contracts?: Contract[],
 ): { rows: T[]; stats: EnrichStats } {
   const idx = buildChannelIndex(companies);
-  let matched = 0, unmatched = 0;
+  const contractIdx = contracts && contracts.length > 0 ? buildContractIndex(contracts) : undefined;
+  let matched = 0, unmatched = 0, contractMatched = 0;
   const rows = txs.map((t) => {
-    if (t.companyCode) { matched++; return t; }
-    const code = resolveBankCompanyCode(t as BankTransaction, idx);
-    if (code) { matched++; return { ...t, companyCode: code }; }
+    if (t.companyCode && t.matchedContractId) { matched++; return t; }
+    const r = resolveBankCompanyCode(t as BankTransaction, idx, contractIdx);
+    if (r.companyCode || r.matchedContractId) {
+      matched++;
+      if (r.matchedContractId && !t.matchedContractId) contractMatched++;
+      return {
+        ...t,
+        companyCode: t.companyCode ?? r.companyCode,
+        matchedContractId: t.matchedContractId ?? r.matchedContractId,
+      };
+    }
     unmatched++;
     return t;
   });
-  return { rows, stats: { matched, unmatched } };
+  return { rows, stats: { matched, unmatched, contractMatched } };
 }
 
 export function enrichCardTxBatch<T extends CardTransaction | Omit<CardTransaction, 'id'>>(
@@ -152,5 +207,5 @@ export function enrichCardTxBatch<T extends CardTransaction | Omit<CardTransacti
     unmatched++;
     return t;
   });
-  return { rows, stats: { matched, unmatched } };
+  return { rows, stats: { matched, unmatched, contractMatched: 0 } };
 }

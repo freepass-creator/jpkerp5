@@ -200,11 +200,12 @@ export function CreateDialog({
       const bankSkipped = bankDedup.duplicates.length;
       const cardSkipped = cardDedup.duplicates.length;
 
-      // 회사 채널(계좌·CMS·단말기·법인카드) 자동 매핑 — companyCode 부여
-      const bankEnriched = enrichBankTxBatch(bankDedup.unique, companies);
+      // 회사 채널(계좌·CMS·단말기·법인카드) 자동 매핑 + CMS 회원명 → 계약 자동 매칭
+      const bankEnriched = enrichBankTxBatch(bankDedup.unique, companies, contracts);
       const cardEnriched = enrichCardTxBatch(cardDedup.unique, companies);
       const companyMatched = bankEnriched.stats.matched + cardEnriched.stats.matched;
       const companyUnmatched = bankEnriched.stats.unmatched + cardEnriched.stats.unmatched;
+      const contractAutoMatched = bankEnriched.stats.contractMatched;
 
       const bankSaved = await addBankTx(bankEnriched.rows);
       const cardSaved = await addCardTx(cardEnriched.rows);
@@ -221,9 +222,12 @@ export function CreateDialog({
       const companyNote = companyMatched > 0
         ? ` · 회사 자동분류 ${companyMatched}건${companyUnmatched > 0 ? ` (미분류 ${companyUnmatched})` : ''}`
         : '';
+      const contractNote = contractAutoMatched > 0
+        ? ` · 계약자명 자동매칭 ${contractAutoMatched}건`
+        : '';
       const total = bankSaved.length + cardSaved.length;
-      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)${companyNote}${skippedNote}`);
-      if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount} · 회사분류 ${companyMatched}`);
+      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)${companyNote}${contractNote}${skippedNote}`);
+      if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount} · 회사분류 ${companyMatched}${contractAutoMatched > 0 ? ` · 계약자 자동매칭 ${contractAutoMatched}` : ''}`);
       else if (bankSkipped + cardSkipped > 0) toast.warning(`전부 중복 — ${bankSkipped + cardSkipped}건 제외됨`);
       setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '카드'));
     } catch (e) {
@@ -2947,6 +2951,7 @@ function PaymentPastePane({ variant, onClose }: { variant: PaymentVariant; onClo
   const { addMany: addBankMany } = useBankTx();
   const { addMany: addCardMany } = useCardTx();
   const { companies } = useCompanies();
+  const { contracts: allContracts } = useContracts();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -2984,7 +2989,7 @@ function PaymentPastePane({ variant, onClose }: { variant: PaymentVariant; onClo
         const base = variant === '자동이체'
           ? items.map((it) => ({ ...it, source: 'CMS' as const, method: it.method || 'CMS' }))
           : items;
-        const enriched = enrichBankTxBatch(base, companies);
+        const enriched = enrichBankTxBatch(base, companies, allContracts);
         companyMatched = enriched.stats.matched;
         await addBankMany(enriched.rows);
         saved = enriched.rows.length;
