@@ -32,6 +32,8 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { balance as scheduleBalance } from '@/lib/payment-schedule';
+import { formatCurrency } from '@/lib/utils';
 
 type Filter =
   | '전체'           // 진행중 전체 (종결 제외)
@@ -110,6 +112,7 @@ export default function ReceivablesPage() {
   const { isAdmin: admin } = useRole();
   const [filter, setFilter] = usePersistentState<Filter>('filter:receivables:quick', '미납중');
   const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:receivables:company', 'all');
+  const [agingBucket, setAgingBucket] = usePersistentState<AgingBucket | 'all'>('filter:receivables:aging', 'all');
   const [search, setSearch] = useState('');
   const [contactOpen, setContactOpen] = useState<Contract | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Contract | null }>({ open: false, x: 0, y: 0, row: null });
@@ -184,10 +187,16 @@ export default function ReceivablesPage() {
       || (c.vehicleModel ?? '').toLowerCase().includes(q)
       || (c.manager ?? '').toLowerCase().includes(q),
     );
+
+    // AR 연령 bucket 필터 — 계약 단위로 가장 오래된 미결 회차 기준
+    const aged = agingBucket === 'all'
+      ? searched
+      : searched.filter((c) => contractAgingBucket(c, today) === agingBucket);
+
     // 기본 정렬: 미수금 큰 순 (가장 시급한 회수 대상 위로)
-    return [...searched].sort((a, b) => (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0));
+    return [...aged].sort((a, b) => (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, filter, companyFilter, search, noticeSentIds]);
+  }, [contracts, filter, companyFilter, search, noticeSentIds, agingBucket, today]);
 
   const counts = useMemo(() => {
     const base = contracts.filter((c) => c.id && !c.id.startsWith('vehicle-orphan-'));
@@ -336,6 +345,12 @@ export default function ReceivablesPage() {
         </header>
 
         <div className="dashboard">
+          <ArAgingPanel
+            contracts={filtered}
+            today={today}
+            activeBucket={agingBucket}
+            onBucketClick={(b) => setAgingBucket((cur) => cur === b ? 'all' : b)}
+          />
           <div className="panel">
             <div className="panel-body">
               <table className="table">
@@ -1018,5 +1033,148 @@ function SlaTag({ stage }: { stage: LatePayStage }) {
     }}>
       {m.label}
     </span>
+  );
+}
+
+/* ─────────────────── AR 연령분석 (open-item aging) ─────────────────── */
+
+type AgingBucket = '0-30' | '30-60' | '60-90' | '90+';
+
+const BUCKET_LABEL: Record<AgingBucket, string> = {
+  '0-30': '30일 이내',
+  '30-60': '30~60일',
+  '60-90': '60~90일',
+  '90+': '90일 초과',
+};
+
+const BUCKET_TONE: Record<AgingBucket, { bg: string; text: string }> = {
+  '0-30': { bg: 'var(--amber-bg)', text: 'var(--amber-text)' },
+  '30-60': { bg: 'var(--orange-bg)', text: 'var(--orange-text)' },
+  '60-90': { bg: '#fecaca', text: '#7f1d1d' },
+  '90+': { bg: 'var(--red-bg)', text: 'var(--red-text)' },
+};
+
+function bucketOf(days: number): AgingBucket {
+  if (days <= 30) return '0-30';
+  if (days <= 60) return '30-60';
+  if (days <= 90) return '60-90';
+  return '90+';
+}
+
+/** 한 계약의 가장 오래된 미결 회차의 bucket 반환 (null = 미결 없음) */
+function contractAgingBucket(c: Contract, today: string): AgingBucket | null {
+  const open = (c.schedules ?? []).filter((s) =>
+    (s.status === '연체' || s.status === '부분납') && s.dueDate
+  );
+  if (open.length === 0) return null;
+  const oldest = open.map((s) => s.dueDate).sort()[0];
+  const days = Math.max(0, Math.round(
+    (new Date(today).getTime() - new Date(oldest).getTime()) / 86400000
+  ));
+  return bucketOf(days);
+}
+
+function ArAgingPanel({
+  contracts, today, activeBucket, onBucketClick,
+}: {
+  contracts: Contract[];
+  today: string;
+  activeBucket: AgingBucket | 'all';
+  onBucketClick: (b: AgingBucket) => void;
+}) {
+  const stats = useMemo(() => {
+    const out: Record<AgingBucket, { amount: number; contracts: Set<string>; schedules: number }> = {
+      '0-30': { amount: 0, contracts: new Set(), schedules: 0 },
+      '30-60': { amount: 0, contracts: new Set(), schedules: 0 },
+      '60-90': { amount: 0, contracts: new Set(), schedules: 0 },
+      '90+': { amount: 0, contracts: new Set(), schedules: 0 },
+    };
+    let totalAmount = 0;
+    const totalContracts = new Set<string>();
+    let totalSchedules = 0;
+    for (const c of contracts) {
+      for (const s of c.schedules ?? []) {
+        if (s.status !== '연체' && s.status !== '부분납') continue;
+        const out_balance = scheduleBalance(s);
+        if (out_balance <= 0) continue;
+        const days = Math.max(0, Math.round(
+          (new Date(today).getTime() - new Date(s.dueDate).getTime()) / 86400000
+        ));
+        const b = bucketOf(days);
+        out[b].amount += out_balance;
+        out[b].contracts.add(c.id);
+        out[b].schedules += 1;
+        totalAmount += out_balance;
+        totalContracts.add(c.id);
+        totalSchedules += 1;
+      }
+    }
+    return { out, totalAmount, totalContracts: totalContracts.size, totalSchedules };
+  }, [contracts, today]);
+
+  const buckets: AgingBucket[] = ['0-30', '30-60', '60-90', '90+'];
+
+  return (
+    <div className="panel" style={{ marginBottom: 12 }}>
+      <div style={{
+        display: 'flex', alignItems: 'baseline', gap: 12,
+        padding: '10px 14px 4px',
+      }}>
+        <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>AR 연령분석</h3>
+        <span className="dim" style={{ fontSize: 11 }}>
+          미결 회차 · 발생일 기준 · 카드 클릭 → 해당 bucket 만 필터
+        </span>
+        <span style={{ flex: 1 }} />
+        <span className="dim" style={{ fontSize: 11 }}>
+          총 <strong className="mono">{formatCurrency(stats.totalAmount)}</strong>
+          {' · '}
+          <strong>{stats.totalContracts}</strong>계약 / <strong>{stats.totalSchedules}</strong>회차
+        </span>
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
+        padding: '4px 14px 14px',
+      }}>
+        {buckets.map((b) => {
+          const s = stats.out[b];
+          const tone = BUCKET_TONE[b];
+          const isActive = activeBucket === b;
+          return (
+            <button
+              key={b}
+              type="button"
+              onClick={() => onBucketClick(b)}
+              style={{
+                display: 'flex', flexDirection: 'column', gap: 4,
+                padding: '10px 12px',
+                background: isActive ? tone.bg : 'var(--bg-card)',
+                color: isActive ? tone.text : 'var(--text-main)',
+                border: `1px solid ${isActive ? tone.text : 'var(--border)'}`,
+                borderRadius: 'var(--radius)',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: tone.text, opacity: 0.8,
+                }} />
+                <span style={{ fontSize: 11, fontWeight: 700 }}>{BUCKET_LABEL[b]}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.7 }}>
+                  {s.schedules}회차 / {s.contracts.size}계약
+                </span>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+                {s.amount > 0 ? formatCurrency(s.amount) : '-'}
+              </div>
+              <div style={{ fontSize: 10, opacity: 0.7 }}>
+                전체 대비 {stats.totalAmount > 0 ? Math.round((s.amount / stats.totalAmount) * 100) : 0}%
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
