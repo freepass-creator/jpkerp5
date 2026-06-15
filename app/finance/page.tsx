@@ -232,9 +232,12 @@ export default function FinancePage() {
       bare
       noBottomBar
     >
-        <div className="dashboard" style={{ gridTemplateColumns: '1fr' }}>
-          <div className="panel">
-            <div className="panel-body">
+        <div className="dashboard" style={{
+          gridTemplateColumns: '1fr',
+          ...(viewMode === 'vendors' || viewMode === 'gl' ? { padding: 0 } : {}),
+        }}>
+          <div className="panel" style={(viewMode === 'vendors' || viewMode === 'gl') ? { background: 'transparent', border: 'none', padding: 0 } : undefined}>
+            <div className="panel-body" style={(viewMode === 'vendors' || viewMode === 'gl') ? { padding: 14 } : undefined}>
               {viewMode === 'daily' && (
                 <DailyLedgerView
                   bankTx={bankTx}
@@ -587,11 +590,17 @@ function VendorSubLedgerView({
       });
   }, [vendors, stats, search]);
 
+  // 첫 거래처 자동 선택 (현재 선택이 list 에 없으면)
+  useEffect(() => {
+    if (selectedVendor && vendorListRaw.some((v) => v.name === selectedVendor)) return;
+    setSelectedVendor(vendorListRaw[0]?.name ?? null);
+  }, [vendorListRaw, selectedVendor]);
+
   const selectedTx = selectedVendor ? (stats.get(selectedVendor)?.transactions ?? []) : [];
   const sortedTx = [...selectedTx].sort((a, b) => (b.txDate ?? '').localeCompare(a.txDate ?? ''));
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 12, minHeight: 500 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 12, height: 'calc(100vh - 220px)', minHeight: 460 }}>
       {/* 좌 — 거래처 목록 */}
       <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)', fontSize: 12, fontWeight: 700 }}>
@@ -739,6 +748,19 @@ function GLView({
 
   const summary = useMemo(() => summarizeByAccount(journals), [journals]);
 
+  // 첫 계정 자동 선택 — 우측 빈 화면 방지
+  useEffect(() => {
+    if (selectedAccount) {
+      const exists = summary.some((s) => s.accountKey === selectedAccount);
+      if (exists) return;
+    }
+    if (summary.length > 0) {
+      setSelectedAccount(summary[0].accountKey);
+    } else {
+      setSelectedAccount(null);
+    }
+  }, [summary, selectedAccount]);
+
   const groupedSummary = useMemo(() => {
     const groups = new Map<AccountClass, LedgerSummary[]>();
     for (const s of summary) {
@@ -772,7 +794,7 @@ function GLView({
   const totalCredit = totalDebit;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 12, minHeight: 500 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 12, height: 'calc(100vh - 220px)', minHeight: 460 }}>
       <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>총계정원장 ({summary.length}계정 · {journals.length}분개)</div>
