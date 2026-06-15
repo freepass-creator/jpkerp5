@@ -576,6 +576,12 @@ export type Vehicle = {
   // ─── 매입 정보 ───
   purchasePrice?: number;
   insuranceAge?: number;
+  /** 취득일 — 회사가 차량을 산 날 (신차/중고차 모두). 미입력 시 firstRegisteredDate fallback */
+  acquisitionDate?: string;
+  /** 매각가 — 처분 시점 받은 금액 */
+  salePrice?: number;
+  /** 매각일 — status='매각' 전환일 */
+  saleDate?: string;
 
   // ─── 자산 관리 정보 (보험/할부/GPS) — 자산관리 표 컬럼 ───
   insuranceCompany?: string;       // 보험사 (예: 삼성화재)

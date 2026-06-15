@@ -21,7 +21,7 @@ import { Car, MagnifyingGlass } from '@phosphor-icons/react';
 import { displayCompanyName } from '@/lib/company-display';
 import type { Company } from '@/lib/types';
 
-export type AssetTopbarPage = 'status' | 'registered' | 'insurance' | 'loan' | 'repair' | 'gps' | 'disposal';
+export type AssetTopbarPage = 'status' | 'registered' | 'insurance' | 'loan' | 'repair' | 'gps' | 'disposal' | 'ledger';
 
 export function AssetTopbar({
   currentPage,
@@ -102,6 +102,7 @@ export function AssetTopbar({
         <Link href="/asset/repair" className={`chip chip-nav ${currentPage === 'repair' ? 'active' : ''}`} title="수선내역 — 정비공장·이력·비용">수선내역</Link>
         <Link href="/asset/gps" className={`chip chip-nav ${currentPage === 'gps' ? 'active' : ''}`} title="GPS설치 — 공급사·단말번호·상태">GPS설치</Link>
         <Link href="/asset/disposal" className={`chip chip-nav ${currentPage === 'disposal' ? 'active' : ''}`} title="처분자산 — 매각·이전·폐차">처분자산</Link>
+        <Link href="/asset/ledger" className={`chip chip-nav ${currentPage === 'ledger' ? 'active' : ''}`} title="고정자산대장 — 취득가·감가·장부가·처분손익">자산대장</Link>
       </div>
     </header>
   );
