@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ChartBar, Car, ClipboardText, CurrencyKrw, Warning, ArrowRight,
+  Clock, Calendar as CalendarIcon, Megaphone, PaperPlaneTilt, CheckCircle,
 } from '@phosphor-icons/react';
+import { useAuth } from '@/lib/use-auth';
+import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, type DispatchOrder } from '@/lib/firebase/dispatch-store';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
@@ -32,6 +35,9 @@ export default function DashboardPage() {
   const { rows: bankTx } = useBankTx();
   const { rows: cardTx } = useCardTx();
   const { penalties } = usePenalties();
+  const { user } = useAuth();
+  const incomingOrders = useMyDispatchOrders(user?.uid);
+  const outgoingOrders = useSentDispatchOrders(user?.email);
   const detailContract = detailContractId ? contracts.find((c) => c.id === detailContractId) ?? null : null;
   // 시간 의존 KPI(가동률·미수율·D-Day 등) 자동 refresh —
   // 자정 통과 또는 탭 복귀 시점에 새로 계산되도록 dependency 로 사용.
@@ -123,6 +129,18 @@ export default function DashboardPage() {
         </header>
 
         <div style={{ padding: 16, overflow: 'auto', background: 'var(--bg-page)', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {/* 업무 카드 — 모바일 카드 스타일 5분류 (밀린/오늘/예정/받은/요청) */}
+          <Section title="업무 카드" right={<span className="dim" style={{ fontSize: 11 }}>본인 기준 · 항목 클릭 → 상세</span>}>
+            <TaskCardsGrid
+              contracts={contracts}
+              penalties={penalties}
+              incomingOrders={incomingOrders}
+              outgoingOrders={outgoingOrders}
+              today={today}
+              onOpenContract={setDetailContractId}
+            />
+          </Section>
+
           {/* 최상단 — 좌 달력 + 우 할 일 칠판. panel 박스로 공간 분리 + 좌우 높이 stretch */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
             <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column' }}>
@@ -1370,3 +1388,273 @@ function RecentActivityPanel() {
   );
 }
 
+
+
+/* ─────────────────── 업무 카드 — 모바일 카드 스타일 5분류 ─────────────────── */
+
+const daysBetween = (a: string, b: string) => {
+  if (!a || !b) return 0;
+  const da = new Date(a).getTime();
+  const db = new Date(b).getTime();
+  return Math.round((da - db) / 86400000);
+};
+
+type TaskTone = 'red' | 'brand' | 'purple' | 'amber' | 'gray';
+
+type TaskItem = {
+  key: string;
+  title: string;
+  sub?: string;
+  meta?: string;
+  href?: string;
+  onClick?: () => void;
+};
+
+function TaskCardsGrid({
+  contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract,
+}: {
+  contracts: ReturnType<typeof useContracts>['contracts'];
+  penalties: ReturnType<typeof usePenalties>['penalties'];
+  incomingOrders: DispatchOrder[];
+  outgoingOrders: DispatchOrder[];
+  today: string;
+  onOpenContract: (id: string) => void;
+}) {
+  const groups = useMemo(() => {
+    const overdue: TaskItem[] = [];
+    const todays: TaskItem[] = [];
+    const upcoming: TaskItem[] = [];
+
+    const d = new Date(today);
+    const in7 = new Date(d);
+    in7.setDate(d.getDate() + 7);
+    const upTo = in7.toISOString().slice(0, 10);
+
+    const unpaidList = contracts
+      .filter((c) => (c.unpaidAmount ?? 0) > 0)
+      .sort((a, b) => (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0))
+      .slice(0, 8);
+    for (const c of unpaidList) {
+      overdue.push({
+        key: `unpaid-${c.id}`,
+        title: c.customerName ?? '?',
+        sub: `${c.vehiclePlate ?? '-'} · 미수 ${formatCurrency(c.unpaidAmount ?? 0)}`,
+        onClick: () => onOpenContract(c.id),
+      });
+    }
+    const lateReturns = contracts.filter(
+      (c) => c.returnScheduledDate && !c.returnedDate && c.status === '운행' && c.returnScheduledDate < today
+    ).slice(0, 5);
+    for (const c of lateReturns) {
+      overdue.push({
+        key: `late-${c.id}`,
+        title: c.customerName ?? '?',
+        sub: `${c.vehiclePlate ?? '-'} · 반납 지연`,
+        meta: dDayLabel(daysBetween(c.returnScheduledDate ?? '', today)),
+        onClick: () => onOpenContract(c.id),
+      });
+    }
+    const openPenalty = penalties.filter((p) => p.status !== '납부완료' && p.status !== '회사납부').slice(0, 5);
+    for (const p of openPenalty) {
+      overdue.push({
+        key: `pen-${p.id}`,
+        title: p.carNumber ?? '?',
+        sub: `${p.docType} · ${p.description ?? '-'}`,
+        meta: p.dueDate ? dDayLabel(daysBetween(p.dueDate, today)) : undefined,
+        href: '/penalty',
+      });
+    }
+
+    const todayDeliveries = contracts.filter((c) =>
+      !c.deliveredDate && (c.deliveryScheduledDate ?? c.contractDate) === today
+    );
+    for (const c of todayDeliveries) {
+      todays.push({
+        key: `del-${c.id}`,
+        title: c.customerName ?? '?',
+        sub: `${c.vehiclePlate ?? '-'} 인도`,
+        meta: '오늘',
+        onClick: () => onOpenContract(c.id),
+      });
+    }
+    const todayReturns = contracts.filter((c) =>
+      !c.returnedDate && c.returnScheduledDate === today
+    );
+    for (const c of todayReturns) {
+      todays.push({
+        key: `ret-${c.id}`,
+        title: c.customerName ?? '?',
+        sub: `${c.vehiclePlate ?? '-'} 반납`,
+        meta: '오늘',
+        onClick: () => onOpenContract(c.id),
+      });
+    }
+
+    const futureDeliveries = contracts.filter((c) => {
+      const dd = c.deliveryScheduledDate ?? c.contractDate ?? '';
+      return !c.deliveredDate && dd > today && dd <= upTo;
+    }).slice(0, 6);
+    for (const c of futureDeliveries) {
+      upcoming.push({
+        key: `fdel-${c.id}`,
+        title: c.customerName ?? '?',
+        sub: `${c.vehiclePlate ?? '-'} 인도 예정`,
+        meta: dDayLabel(daysBetween(c.deliveryScheduledDate ?? c.contractDate ?? '', today)),
+        onClick: () => onOpenContract(c.id),
+      });
+    }
+    const futureReturns = contracts.filter((c) =>
+      !c.returnedDate && c.returnScheduledDate && c.returnScheduledDate > today && c.returnScheduledDate <= upTo
+    ).slice(0, 6);
+    for (const c of futureReturns) {
+      upcoming.push({
+        key: `fret-${c.id}`,
+        title: c.customerName ?? '?',
+        sub: `${c.vehiclePlate ?? '-'} 반납 예정`,
+        meta: dDayLabel(daysBetween(c.returnScheduledDate ?? '', today)),
+        onClick: () => onOpenContract(c.id),
+      });
+    }
+
+    const incoming: TaskItem[] = incomingOrders
+      .filter((o) => o.status === 'pending' || o.status === 'acknowledged')
+      .slice(0, 8)
+      .map((o) => ({
+        key: `in-${o.id}`,
+        title: o.title,
+        sub: `${DISPATCH_LABEL[o.kind]}${o.body ? ` · ${o.body.slice(0, 40)}` : ''}`,
+        meta: o.status === 'pending' ? '미확인' : '확인',
+        href: '/m/orders/received',
+      }));
+
+    const outgoing: TaskItem[] = outgoingOrders
+      .filter((o) => o.status !== 'done' && o.status !== 'cancelled')
+      .slice(0, 8)
+      .map((o) => ({
+        key: `out-${o.id}`,
+        title: o.title,
+        sub: `${o.assignedToName ?? '전체'} · ${DISPATCH_LABEL[o.kind]}`,
+        meta: o.status === 'pending' ? '대기' : o.status === 'acknowledged' ? '확인' : '진행중',
+        href: '/dispatch',
+      }));
+
+    return { overdue, todays, upcoming, incoming, outgoing };
+  }, [contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract]);
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+      gap: 12,
+    }}>
+      <TaskCard tone="red" icon={<Warning weight="duotone" />} title="밀린 업무" items={groups.overdue} emptyText="밀린 업무 없음" />
+      <TaskCard tone="brand" icon={<Clock weight="duotone" />} title="오늘 업무" items={groups.todays} emptyText="오늘 일정 없음" />
+      <TaskCard tone="purple" icon={<CalendarIcon weight="duotone" />} title="예정 업무 (7일)" items={groups.upcoming} emptyText="다가오는 일정 없음" />
+      <TaskCard tone="amber" icon={<Megaphone weight="duotone" />} title="받은 업무" items={groups.incoming} emptyText="받은 요청 없음" href="/m/orders/received" />
+      <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" href="/dispatch" />
+    </div>
+  );
+}
+
+function TaskCard({
+  tone, icon, title, items, emptyText, href,
+}: {
+  tone: TaskTone;
+  icon: React.ReactNode;
+  title: string;
+  items: TaskItem[];
+  emptyText: string;
+  href?: string;
+}) {
+  const toneVars = TASK_TONES[tone];
+  return (
+    <section style={{
+      display: 'flex', flexDirection: 'column',
+      background: 'var(--bg-card)',
+      border: `1px solid ${toneVars.border}`,
+      borderRadius: 'var(--radius-lg)',
+      overflow: 'hidden',
+      minHeight: 200,
+    }}>
+      <header style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '8px 12px',
+        background: toneVars.headerBg, color: toneVars.headerText,
+        fontSize: 12, fontWeight: 700,
+      }}>
+        {icon}
+        <span>{title}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11 }}>{items.length}</span>
+      </header>
+      {items.length === 0 ? (
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--text-weak)', fontSize: 11, padding: 16,
+          gap: 6, flexDirection: 'column',
+        }}>
+          <CheckCircle size={18} weight="duotone" style={{ opacity: 0.5 }} />
+          {emptyText}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', padding: 6, gap: 4, maxHeight: 320, overflow: 'auto' }}>
+          {items.map((it) => (
+            <TaskRow key={it.key} item={it} tone={tone} />
+          ))}
+        </div>
+      )}
+      {href && items.length > 0 && (
+        <Link href={href} style={{
+          padding: '6px 12px', borderTop: '1px solid var(--border-soft)',
+          fontSize: 11, color: 'var(--text-sub)', textDecoration: 'none',
+          textAlign: 'center',
+        }}>
+          전체 보기 →
+        </Link>
+      )}
+    </section>
+  );
+}
+
+function TaskRow({ item, tone }: { item: TaskItem; tone: TaskTone }) {
+  const toneVars = TASK_TONES[tone];
+  const inner = (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 2,
+      padding: '8px 10px',
+      background: 'var(--bg-page)',
+      border: '1px solid var(--border-soft)',
+      borderRadius: 'var(--radius)',
+      cursor: 'pointer',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {item.title}
+        </span>
+        {item.meta && (
+          <span style={{
+            fontSize: 10, fontWeight: 700,
+            color: toneVars.headerText,
+            padding: '1px 6px', borderRadius: 'var(--radius-sm)',
+            background: toneVars.headerBg,
+          }}>{item.meta}</span>
+        )}
+      </div>
+      {item.sub && (
+        <span className="dim" style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {item.sub}
+        </span>
+      )}
+    </div>
+  );
+  if (item.href) return <Link href={item.href} style={{ textDecoration: 'none', color: 'inherit' }}>{inner}</Link>;
+  if (item.onClick) return <div onClick={item.onClick} role="button">{inner}</div>;
+  return inner;
+}
+
+const TASK_TONES: Record<TaskTone, { headerBg: string; headerText: string; border: string }> = {
+  red:    { headerBg: 'var(--red-bg)',    headerText: 'var(--red-text)',    border: 'rgba(220,38,38,0.25)' },
+  brand:  { headerBg: 'var(--brand-bg)',  headerText: 'var(--brand)',       border: 'rgba(37,99,235,0.25)' },
+  purple: { headerBg: '#f3e8ff',          headerText: '#6b21a8',            border: 'rgba(107,33,168,0.25)' },
+  amber:  { headerBg: 'var(--amber-bg)',  headerText: 'var(--amber-text)',  border: 'rgba(161,98,7,0.25)' },
+  gray:   { headerBg: 'var(--bg-sunken)', headerText: 'var(--text-sub)',    border: 'var(--border)' },
+};
