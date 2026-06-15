@@ -322,6 +322,10 @@ export type CardTransaction = {
   cardLast4?: string;
   customerName?: string;       // 매출: 결제 고객명 / 법인카드: 가맹점명 가능
   source?: string;             // 카드사 (KB / 신한 / 현대 / BC 등)
+  /** 단말기 ID — 카드매출(매입) 채널 식별. Company.cardTerminals[].terminalId 와 매칭 */
+  terminalId?: string;
+  /** 가맹점 번호 — 보조 매칭 키 (Company.cardTerminals[].merchantNo) */
+  merchantNo?: string;
   companyCode?: string;        // 어느 회사의 거래·카드인지
   // ─── 법인카드 전용 ───
   merchant?: string;           // 가맹점명 (어디서 썼는지)

@@ -33,6 +33,7 @@ import {
 } from '@/lib/import-commit';
 import { todayKr } from '@/lib/mock-data';
 import { dedupAgainst } from '@/lib/dedup';
+import { enrichBankTxBatch, enrichCardTxBatch } from '@/lib/channel-matching';
 import { bankTxKeys, cardTxKeys, vehicleKeys, contractKeys } from '@/lib/dedup-keys';
 import { normalizePlateLoose } from '@/lib/customer-match';
 import { toast } from '@/lib/toast';
@@ -199,8 +200,14 @@ export function CreateDialog({
       const bankSkipped = bankDedup.duplicates.length;
       const cardSkipped = cardDedup.duplicates.length;
 
-      const bankSaved = await addBankTx(bankDedup.unique);
-      const cardSaved = await addCardTx(cardDedup.unique);
+      // 회사 채널(계좌·CMS·단말기·법인카드) 자동 매핑 — companyCode 부여
+      const bankEnriched = enrichBankTxBatch(bankDedup.unique, companies);
+      const cardEnriched = enrichCardTxBatch(cardDedup.unique, companies);
+      const companyMatched = bankEnriched.stats.matched + cardEnriched.stats.matched;
+      const companyUnmatched = bankEnriched.stats.unmatched + cardEnriched.stats.unmatched;
+
+      const bankSaved = await addBankTx(bankEnriched.rows);
+      const cardSaved = await addCardTx(cardEnriched.rows);
       // 매칭 (신규 저장된 것만 대상)
       const txList = [
         ...bankSaved.map((t) => ({ id: t.id, amount: t.amount, counterparty: t.counterparty })),
@@ -211,9 +218,12 @@ export function CreateDialog({
       if (patches.length > 0) await updateContracts(patches);
       const matchedCount = matches.filter((m) => m.contractId).length;
       const skippedNote = bankSkipped + cardSkipped > 0 ? ` (중복 ${bankSkipped + cardSkipped}건 제외)` : '';
+      const companyNote = companyMatched > 0
+        ? ` · 회사 자동분류 ${companyMatched}건${companyUnmatched > 0 ? ` (미분류 ${companyUnmatched})` : ''}`
+        : '';
       const total = bankSaved.length + cardSaved.length;
-      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)${skippedNote}`);
-      if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount}`);
+      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)${companyNote}${skippedNote}`);
+      if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount} · 회사분류 ${companyMatched}`);
       else if (bankSkipped + cardSkipped > 0) toast.warning(`전부 중복 — ${bankSkipped + cardSkipped}건 제외됨`);
       setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '카드'));
     } catch (e) {
@@ -2936,6 +2946,7 @@ function PaymentRegisterPane({
 function PaymentPastePane({ variant, onClose }: { variant: PaymentVariant; onClose: () => void }) {
   const { addMany: addBankMany } = useBankTx();
   const { addMany: addCardMany } = useCardTx();
+  const { companies } = useCompanies();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -2964,25 +2975,31 @@ function PaymentPastePane({ variant, onClose }: { variant: PaymentVariant; onClo
     setResult(null);
     try {
       let saved = 0;
+      let companyMatched = 0;
       if (isBank) {
         const items = parsed.rows
           .map((r) => parseBankRow(r, '텍스트 붙여넣기', variant === '자동이체' ? 'CMS' : undefined))
           .filter((x): x is NonNullable<typeof x> => !!x);
         // 자동이체는 source 강제 'CMS'
-        const final = variant === '자동이체'
+        const base = variant === '자동이체'
           ? items.map((it) => ({ ...it, source: 'CMS' as const, method: it.method || 'CMS' }))
           : items;
-        await addBankMany(final);
-        saved = final.length;
+        const enriched = enrichBankTxBatch(base, companies);
+        companyMatched = enriched.stats.matched;
+        await addBankMany(enriched.rows);
+        saved = enriched.rows.length;
       } else {
         const items = parsed.rows
           .map((r) => parseCardRow(r, '텍스트 붙여넣기'))
           .filter((x): x is NonNullable<typeof x> => !!x);
-        await addCardMany(items);
-        saved = items.length;
+        const enriched = enrichCardTxBatch(items, companies);
+        companyMatched = enriched.stats.matched;
+        await addCardMany(enriched.rows);
+        saved = enriched.rows.length;
       }
       const skipped = parsed.rows.length - saved;
-      setResult(`${saved}건 등록 완료${skipped > 0 ? ` · ${skipped}행은 필수 필드 부족으로 건너뜀` : ''}`);
+      const companyNote = companyMatched > 0 ? ` · 회사 자동분류 ${companyMatched}` : '';
+      setResult(`${saved}건 등록 완료${companyNote}${skipped > 0 ? ` · ${skipped}행은 필수 필드 부족으로 건너뜀` : ''}`);
       if (saved > 0) {
         setTimeout(() => onClose(), 1200);
       }
