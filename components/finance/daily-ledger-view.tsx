@@ -29,7 +29,7 @@ import { toast } from '@/lib/toast';
 import { MagnifyingGlass } from '@phosphor-icons/react';
 
 import { useVendors } from '@/lib/firebase/vendors-store';
-import { ContractSearchDialog } from '@/components/finance/contract-search-dialog';
+import { CounterpartySearchDialog } from '@/components/finance/counterparty-search-dialog';
 
 import type { BankTransaction, CardTransaction, Contract, Vendor } from '@/lib/types';
 
@@ -145,12 +145,14 @@ export function DailyLedgerView({
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  /** 계약 검색 다이얼로그 — 매칭 셀의 돋보기에서 열기 */
+  /** 거래상대(계약자/거래처) 통합 검색 다이얼로그 — 매칭 셀의 🔍에서 열기 */
   const [searchTarget, setSearchTarget] = useState<{
     rowId: string;
     companyCode?: string;
     initialQuery?: string;
+    direction?: 'deposit' | 'withdraw';
     currentContractId?: string;
+    currentVendorName?: string;
   } | null>(null);
 
   function toggleExpand(rowKey: string) {
@@ -514,8 +516,6 @@ export function DailyLedgerView({
 
           <th style={{ width: 116 }}>계정과목</th>
 
-          <th style={{ width: 96 }}>거래처</th>
-
           <th style={{ width: 84 }}>차량번호</th>
 
           <th style={{ width: 130 }}>매칭 계약</th>
@@ -676,60 +676,6 @@ export function DailyLedgerView({
 
             </td>
 
-            {/* 10. 거래처 — 매칭 정보 표시 + 거래처 추가 버튼 (드롭다운 폐기) */}
-
-            <td>
-
-              {r.source === 'bank' ? (
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-
-                  <span style={{
-
-                    flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-
-                    background: matched ? 'var(--brand-bg, #eef2ff)' : r.linkedCustomerName ? '#fef9c3' : undefined,
-
-                    padding: '2px 4px', borderRadius: 3,
-
-                  }}
-
-                  title={matched ? `매칭: ${matched.contractNo} · ${matched.customerName}` : (r.linkedCustomerName ? `거래처: ${r.linkedCustomerName}` : '미매칭 — 12번 매칭 컬럼에서 🔍 검색')}
-
-                  >
-
-                    {matched ? matched.customerName : r.linkedCustomerName || <span className="muted">미매칭</span>}
-
-                  </span>
-
-                  {!matched && (
-
-                    <button
-
-                      type="button"
-
-                      className="btn btn-sm"
-
-                      title="거래처(공급사·정비공장) 빠른 등록"
-
-                      onClick={() => void handleQuickVendorAdd(r)}
-
-                      style={{ padding: '0 4px', height: 20, fontSize: 10 }}
-
-                    >
-
-                      +거래처
-
-                    </button>
-
-                  )}
-
-                </div>
-
-              ) : <span>{matched?.customerName || <span className="muted" style={{ fontSize: 11 }}>-</span>}</span>}
-
-            </td>
-
             {/* 11. 차량번호 — 매칭 결과 표시 (드롭다운 폐기) */}
 
             <td>
@@ -794,7 +740,11 @@ export function DailyLedgerView({
 
                       initialQuery: r.linkedCustomerName || r.linkedVehiclePlate || '',
 
+                      direction: r.source === 'bank' && (r.withdraw ?? 0) > 0 ? 'withdraw' : 'deposit',
+
                       currentContractId: r.matchedContractId,
+
+                      currentVendorName: !r.matchedContractId ? r.linkedCustomerName : undefined,
 
                     })}
 
@@ -850,7 +800,7 @@ export function DailyLedgerView({
 
             <tr>
 
-              <td colSpan={13} style={{ background: 'var(--bg-sunken)', padding: '10px 14px' }}>
+              <td colSpan={12} style={{ background: 'var(--bg-sunken)', padding: '10px 14px' }}>
 
                 {settlementItems.length > 0 ? (
 
@@ -968,21 +918,54 @@ export function DailyLedgerView({
 
     </table>
 
-    <ContractSearchDialog
+    <CounterpartySearchDialog
       open={!!searchTarget}
       onClose={() => setSearchTarget(null)}
       contracts={contracts}
+      vendors={vendors}
       companyCode={searchTarget?.companyCode}
       initialQuery={searchTarget?.initialQuery}
+      direction={searchTarget?.direction}
       currentContractId={searchTarget?.currentContractId}
-      onPick={(contractId) => {
+      currentVendorName={searchTarget?.currentVendorName}
+      onPickContract={(contractId) => {
         const row = unified.find((r) => r.id === searchTarget?.rowId);
         if (row) handleContractMatch(row, contractId);
       }}
-      allowClear={!!searchTarget?.currentContractId}
+      onPickVendor={(vendorName) => {
+        if (!searchTarget) return;
+        onUpdateBank(searchTarget.rowId, { linkedCustomerName: vendorName, matchedContractId: undefined });
+      }}
       onClear={() => {
         const row = unified.find((r) => r.id === searchTarget?.rowId);
-        if (row) handleContractMatch(row, '');
+        if (!row) return;
+        if (row.source === 'bank') {
+          onUpdateBank(row.id, { matchedContractId: undefined, linkedCustomerName: undefined });
+        } else {
+          handleContractMatch(row, '');
+        }
+      }}
+      onQuickAddVendor={(suggested) => {
+        const row = unified.find((r) => r.id === searchTarget?.rowId);
+        if (!row) return;
+        if (suggested && row.source === 'bank') {
+          // 빠른 등록: 검색어를 vendor 이름으로 즉시 등록 + linkedCustomerName 설정
+          void (async () => {
+            try {
+              await addVendor({
+                name: suggested,
+                kind: '공급사',
+                companyCode: row.companyCode as Vendor['companyCode'] | undefined,
+                createdAt: new Date().toISOString(),
+              });
+              onUpdateBank(row.id, { linkedCustomerName: suggested, matchedContractId: undefined });
+            } catch (e) {
+              toast.error(`거래처 등록 실패: ${(e as Error).message ?? String(e)}`);
+            }
+          })();
+        } else {
+          void handleQuickVendorAdd(row);
+        }
       }}
     />
 
