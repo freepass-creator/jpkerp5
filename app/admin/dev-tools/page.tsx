@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { isDevToolUser } from '@/lib/admin-emails';
@@ -34,6 +34,13 @@ const TOOLS: ToolCard[] = [
     title: '감사 로그',
     desc: '누가 언제 무엇을 변경했는지 추적. 모든 entity 변경 기록.',
     icon: <ClipboardText size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/admin/bulk-deliver',
+    title: '미인도 일괄 인도완료',
+    desc: '계약자 있는데 인도일 비어있는 계약 검출 → 선택 → 일괄 인도완료 + Vehicle 마스터 status 동기화.',
+    icon: <Truck size={18} weight="duotone" />,
     variant: 'op',
   },
   {
