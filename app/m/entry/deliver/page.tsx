@@ -17,6 +17,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useAuth } from '@/lib/use-auth';
 import { addFieldLog } from '@/lib/firebase/field-logs-store';
+import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { toast } from '@/lib/toast';
 import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { todayKr } from '@/lib/mock-data';
@@ -26,7 +27,7 @@ export default function MobileDeliver() {
   const params = useSearchParams();
   const preContractId = params?.get('contractId') ?? '';
   const { contracts, update: updateContract } = useContracts();
-  const { vehicles } = useVehicles();
+  const { vehicles, update: updateVehicleMaster } = useVehicles();
   const { user } = useAuth();
   const [step, setStep] = useState<'pick' | 'form'>(preContractId ? 'form' : 'pick');
   const [contractId, setContractId] = useState(preContractId);
@@ -70,13 +71,13 @@ export default function MobileDeliver() {
     if (!contract || !deliveredDate) return;
     setSaving(true);
     try {
-      // 1. 계약 인도완료 처리
-      await updateContract({
-        ...contract,
-        deliveredDate,
-        status: '운행',
-        vehicleStatus: '운행',
-      });
+      // 1. 계약 인도완료 처리 (+ Vehicle 마스터 status 자동 동기화)
+      await syncContractAndVehicleStatus(
+        { ...contract, deliveredDate, status: '운행', vehicleStatus: '운행' },
+        vehicles,
+        updateContract,
+        updateVehicleMaster,
+      );
       // 2. field_logs delivery type (메모 있으면 본문에 포함, 메모 없어도 인도 기록 남김)
       const body = note.trim() || `인도 완료 (${deliveredDate})`;
       await addFieldLog(contract.id, {

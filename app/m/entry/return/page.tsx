@@ -17,6 +17,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useAuth } from '@/lib/use-auth';
 import { addFieldLog } from '@/lib/firebase/field-logs-store';
+import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { toast } from '@/lib/toast';
 import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { todayKr } from '@/lib/mock-data';
@@ -26,7 +27,7 @@ export default function MobileReturn() {
   const params = useSearchParams();
   const preContractId = params?.get('contractId') ?? '';
   const { contracts, update: updateContract } = useContracts();
-  const { vehicles } = useVehicles();
+  const { vehicles, update: updateVehicleMaster } = useVehicles();
   const { user } = useAuth();
   const [step, setStep] = useState<'pick' | 'form'>(preContractId ? 'form' : 'pick');
   const [contractId, setContractId] = useState(preContractId);
@@ -76,13 +77,13 @@ export default function MobileReturn() {
     if (!contract || !returnedDate) return;
     setSaving(true);
     try {
-      // 1. 계약 반납 처리
-      await updateContract({
-        ...contract,
-        returnedDate,
-        status: '반납',
-        vehicleStatus: '반납',
-      });
+      // 1. 계약 반납 처리 (+ Vehicle 마스터 status 자동 동기화)
+      await syncContractAndVehicleStatus(
+        { ...contract, returnedDate, status: '반납', vehicleStatus: '반납' },
+        vehicles,
+        updateContract,
+        updateVehicleMaster,
+      );
       // 2. field_logs return type
       const body = note.trim() || `반납 완료 (${returnedDate})`;
       await addFieldLog(contract.id, {

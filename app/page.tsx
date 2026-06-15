@@ -14,6 +14,7 @@ import { formatCurrency, formatDate, daysSince, shortDate, dateWithDow, formatRe
 import type { Contract } from '@/lib/types';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { downloadContractsExcel } from '@/lib/contract-export';
@@ -320,7 +321,7 @@ export default function Page() {
   });
 
   // Firebase RTDB 실시간 구독 — /jpkerp5/contracts
-  const { contracts: rawContracts, loading: contractsLoading, update: rtdbUpdate, updateMany: rtdbUpdateMany, remove: rtdbRemove } = useContracts();
+  const { contracts: rawContracts, loading: contractsLoading, update: rtdbUpdate, remove: rtdbRemove } = useContracts();
   const { vehicles, update: updateVehicleMaster } = useVehicles();
 
   /**
@@ -372,16 +373,10 @@ export default function Page() {
     [contracts, selectedId]
   );
 
+  // 계약+차량 마스터 상태 동기화 — lib/firebase/contract-status-sync 의 공용 헬퍼 사용
+  // 모바일(deliver/return) 과 같은 함수 호출 → 양립 보장
   const updateContract = useCallback((updated: Contract) => {
-    void rtdbUpdate(updated);
-    // 차량 마스터의 status 도 동기화 — Contract.vehicleStatus ↔ Vehicle.status 일치
-    // (자산관리/운영현황/리스크 어디서 보든 같은 상태로 표시되게)
-    if (updated.vehiclePlate && updated.vehicleStatus) {
-      const v = vehicles.find((x) => (x.plate ?? '').trim() === updated.vehiclePlate.trim());
-      if (v && v.status !== updated.vehicleStatus) {
-        void updateVehicleMaster({ ...v, status: updated.vehicleStatus });
-      }
-    }
+    void syncContractAndVehicleStatus(updated, vehicles, rtdbUpdate, updateVehicleMaster);
   }, [rtdbUpdate, vehicles, updateVehicleMaster]);
 
   // 우클릭 컨텍스트 메뉴 액션 — 빠른 인도/반납/연락/SMS/삭제
@@ -395,7 +390,7 @@ export default function Page() {
       return;
     }
     const today = new Date().toISOString().slice(0, 10);
-    void rtdbUpdate({ ...c, deliveredDate: today, status: '운행', vehicleStatus: '운행' });
+    updateContract({ ...c, deliveredDate: today, status: '운행', vehicleStatus: '운행' });
   }
   function ctxAction_markReturned(c: Contract) {
     if (c.returnedDate) {
@@ -404,7 +399,7 @@ export default function Page() {
     }
     if (!confirm(`${c.vehiclePlate} ${c.customerName} 을 오늘 반납 처리하시겠습니까?`)) return;
     const today = new Date().toISOString().slice(0, 10);
-    void rtdbUpdate({ ...c, returnedDate: today, status: '반납', vehicleStatus: '반납' });
+    updateContract({ ...c, returnedDate: today, status: '반납', vehicleStatus: '반납' });
   }
   function ctxAction_sendSms(c: Contract) {
     setSelectedIds(new Set([c.id]));
@@ -447,7 +442,8 @@ export default function Page() {
       status: '운행' as const,
       vehicleStatus: '운행' as const,
     }));
-    await rtdbUpdateMany(updated);
+    // updateContract 헬퍼 한 건씩 — Vehicle 마스터 status 도 함께 동기화 (양립 보장)
+    for (const c of updated) updateContract(c);
     toast.success(`${targets.length}건 일괄 인도완료 처리`);
   }
 
