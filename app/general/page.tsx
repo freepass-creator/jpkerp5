@@ -13,12 +13,12 @@ import {
   Folder, Users, Buildings, Wrench, MapPin, Plus, FileText, ChartLineUp, PencilSimple, Trash, Car, Package,
   Megaphone, Calendar, Pulse,
 } from '@phosphor-icons/react';
-import Link from 'next/link';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-apply';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-register-dialog';
+import { ActivityView } from '@/components/activity/activity-view';
 import { CompanyDetailDialog } from '@/components/companies/company-detail-dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { audit } from '@/lib/firebase/audit-store';
@@ -32,6 +32,7 @@ type GeneralView =
   | 'office' | 'garage' | 'parking'
   | 'supplies'
   | 'fleet_apply' | 'docs' | 'credentials'
+  | 'dispatch' | 'attendance' | 'activity'
   | 'profit';
 
 const VIEW_LABEL: Record<GeneralView, string> = {
@@ -44,6 +45,9 @@ const VIEW_LABEL: Record<GeneralView, string> = {
   fleet_apply: '증차 신청',
   docs: '공문·인감',
   credentials: '사이트 계정',
+  dispatch: '디스패치',
+  attendance: '근태 결재',
+  activity: '활동 피드',
   profit: '손익 (집계)',
 };
 
@@ -96,21 +100,15 @@ export default function GeneralPage() {
             <NavBtn label="사이트 계정" icon={<Wrench size={14} />} active={view === 'credentials'} onClick={() => setView('credentials')} />
 
             <div className="page-shell-nav-group-label" style={{ marginTop: 14 }}>운영 지원</div>
-            <Link href="/dispatch" className="page-shell-nav-item" title="디스패치 — 현장 직원 업무 지시 발송 + 처리 현황">
-              <Megaphone size={14} /><span>디스패치</span>
-            </Link>
-            <Link href="/attendance" className="page-shell-nav-item" title="근태 결재 — 휴가·반차·조퇴 신청 승인">
-              <Calendar size={14} /><span>근태 결재</span>
-            </Link>
-            <Link href="/activity" className="page-shell-nav-item" title="활동 피드 — 모바일·웹 입력 실시간 통합">
-              <Pulse size={14} /><span>활동 피드</span>
-            </Link>
+            <NavBtn label="디스패치" icon={<Megaphone size={14} />} active={view === 'dispatch'} onClick={() => setView('dispatch')} />
+            <NavBtn label="근태 결재" icon={<Calendar size={14} />} active={view === 'attendance'} onClick={() => setView('attendance')} />
+            <NavBtn label="활동 피드" icon={<Pulse size={14} />} active={view === 'activity'} onClick={() => setView('activity')} />
 
             <div className="page-shell-nav-group-label" style={{ marginTop: 14 }}>보고</div>
             <NavBtn label="손익 (집계)" icon={<ChartLineUp size={14} />} active={view === 'profit'} onClick={() => setView('profit')} />
           </nav>
 
-          <main className="page-shell-main" style={(view === 'company' || view === 'fleet_apply' || view === 'staff') ? { padding: 0, overflow: 'hidden' } : undefined}>
+          <main className="page-shell-main" style={(view === 'company' || view === 'fleet_apply' || view === 'staff' || view === 'activity') ? { padding: 0, overflow: 'hidden' } : undefined}>
             {view === 'company' && (
               <CompanyListView
                 onEdit={setEditCompanyId}
@@ -120,7 +118,8 @@ export default function GeneralPage() {
             )}
             {view === 'staff' && <StaffListView />}
             {view === 'fleet_apply' && <FleetApplyView companies={MOCK_COMPANIES} pendingByCompany={MOCK_PENDING} />}
-            {view !== 'company' && view !== 'staff' && view !== 'fleet_apply' && <ViewPlaceholder view={view} />}
+            {view === 'activity' && <ActivityView />}
+            {view !== 'company' && view !== 'staff' && view !== 'fleet_apply' && view !== 'activity' && <ViewPlaceholder view={view} />}
           </main>
         </div>
 
@@ -363,6 +362,9 @@ function ViewPlaceholder({ view }: { view: GeneralView }) {
     docs:        { title: '공문·인감',     desc: '발송 공문, 법인 인감, 사용 인감', sub: '회사명 + 발수신 + 사용 이력', perCompany: true },
     credentials: { title: '사이트 계정',   desc: 'GPS·자동이체·카드사·관청 등 사이트 ID/PW', sub: '회사명 + 사이트명 + URL + 아이디 + 비밀번호 (안전 저장)', perCompany: true },
     profit:      { title: '손익 (집계)',   desc: '매출·비용·순익 (월/분기/연)',     sub: '입출금관리 자동 집계 (회사별 분리)', perCompany: true },
+    dispatch:    { title: '디스패치',       desc: '현장 직원 업무 지시 발송 + 처리 현황', sub: '모바일 /m/orders 에서 받음' },
+    attendance:  { title: '근태 결재',     desc: '휴가·반차·조퇴 신청 승인',         sub: '모바일에서 신청 → 사무 승인' },
+    activity:    { title: '활동 피드',     desc: '모바일·웹 입력 실시간 통합',        sub: '메모·면허검증·근태 신청' },
   };
   const v = map[view];
   return (
