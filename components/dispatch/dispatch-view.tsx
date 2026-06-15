@@ -242,7 +242,7 @@ function KpiCard({ label, value, tone, icon }: { label: string; value: number; t
   );
 }
 
-function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void; creatorEmail?: string }) {
+export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void; creatorEmail?: string }) {
   const users = useUsers();
   const { contracts } = useContracts();
   const [assignedToUid, setAssignedToUid] = useState<string>('');

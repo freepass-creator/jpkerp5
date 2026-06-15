@@ -7,7 +7,9 @@ import {
   Clock, Calendar as CalendarIcon, Megaphone, PaperPlaneTilt, CheckCircle,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
-import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, type DispatchOrder } from '@/lib/firebase/dispatch-store';
+import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, updateDispatchStatus, type DispatchOrder } from '@/lib/firebase/dispatch-store';
+import { NewOrderDialog } from '@/components/dispatch/dispatch-view';
+import { toast } from '@/lib/toast';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
@@ -38,6 +40,15 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const incomingOrders = useMyDispatchOrders(user?.uid);
   const outgoingOrders = useSentDispatchOrders(user?.email);
+  const [newOrderOpen, setNewOrderOpen] = useState(false);
+  async function handleAckIncoming(orderId: string) {
+    try {
+      await updateDispatchStatus(orderId, { status: 'acknowledged', acknowledgedAt: new Date().toISOString() });
+      toast.success('확인 처리됨');
+    } catch (e) {
+      toast.error(`확인 실패: ${(e as Error).message}`);
+    }
+  }
   const detailContract = detailContractId ? contracts.find((c) => c.id === detailContractId) ?? null : null;
   // 시간 의존 KPI(가동률·미수율·D-Day 등) 자동 refresh —
   // 자정 통과 또는 탭 복귀 시점에 새로 계산되도록 dependency 로 사용.
@@ -138,6 +149,8 @@ export default function DashboardPage() {
               outgoingOrders={outgoingOrders}
               today={today}
               onOpenContract={setDetailContractId}
+              onCreateOutgoing={() => setNewOrderOpen(true)}
+              onAckIncoming={handleAckIncoming}
             />
           </Section>
 
@@ -241,6 +254,9 @@ export default function DashboardPage() {
           onOpenChange={(o) => { if (!o) setDetailContractId(null); }}
           onUpdate={(u) => { void updateContract(u); }}
         />
+        {newOrderOpen && (
+          <NewOrderDialog onClose={() => setNewOrderOpen(false)} creatorEmail={user?.email ?? undefined} />
+        )}
       </div>
     </div>
   );
@@ -1408,10 +1424,11 @@ type TaskItem = {
   meta?: string;
   href?: string;
   onClick?: () => void;
+  ackId?: string;          // 받은 업무 — 클릭 시 [확인] 처리
 };
 
 function TaskCardsGrid({
-  contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract,
+  contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract, onCreateOutgoing, onAckIncoming,
 }: {
   contracts: ReturnType<typeof useContracts>['contracts'];
   penalties: ReturnType<typeof usePenalties>['penalties'];
@@ -1419,6 +1436,8 @@ function TaskCardsGrid({
   outgoingOrders: DispatchOrder[];
   today: string;
   onOpenContract: (id: string) => void;
+  onCreateOutgoing?: () => void;
+  onAckIncoming?: (orderId: string) => void;
 }) {
   const groups = useMemo(() => {
     const overdue: TaskItem[] = [];
@@ -1525,6 +1544,7 @@ function TaskCardsGrid({
         sub: `${DISPATCH_LABEL[o.kind]}${o.body ? ` · ${o.body.slice(0, 40)}` : ''}`,
         meta: o.status === 'pending' ? '미확인' : '확인',
         href: '/m/orders/received',
+        ackId: o.status === 'pending' ? o.id : undefined,
       }));
 
     const outgoing: TaskItem[] = outgoingOrders
@@ -1550,14 +1570,28 @@ function TaskCardsGrid({
       <TaskCard tone="red" icon={<Warning weight="duotone" />} title="밀린 업무" items={groups.overdue} emptyText="밀린 업무 없음" />
       <TaskCard tone="brand" icon={<Clock weight="duotone" />} title="오늘 업무" items={groups.todays} emptyText="오늘 일정 없음" />
       <TaskCard tone="purple" icon={<CalendarIcon weight="duotone" />} title="예정 업무 (7일)" items={groups.upcoming} emptyText="다가오는 일정 없음" />
-      <TaskCard tone="amber" icon={<Megaphone weight="duotone" />} title="받은 업무" items={groups.incoming} emptyText="받은 요청 없음" href="/m/orders/received" />
-      <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" href="/dispatch" />
+      <TaskCard tone="amber" icon={<Megaphone weight="duotone" />} title="받은 업무" items={groups.incoming} emptyText="받은 요청 없음" href="/m/orders/received" onAck={onAckIncoming} />
+      <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" href="/dispatch" headerAction={onCreateOutgoing ? (
+        <button
+          type="button"
+          onClick={onCreateOutgoing}
+          style={{
+            padding: '2px 8px', fontSize: 11, fontWeight: 700,
+            background: 'var(--bg-card)', color: 'var(--text-main)',
+            border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer',
+          }}
+          title="새 업무 요청 — 회원에게 발송"
+        >
+          + 새 요청
+        </button>
+      ) : undefined} />
     </div>
   );
 }
 
 function TaskCard({
-  tone, icon, title, items, emptyText, href,
+  tone, icon, title, items, emptyText, href, headerAction, onAck,
 }: {
   tone: TaskTone;
   icon: React.ReactNode;
@@ -1565,6 +1599,8 @@ function TaskCard({
   items: TaskItem[];
   emptyText: string;
   href?: string;
+  headerAction?: React.ReactNode;
+  onAck?: (orderId: string) => void;
 }) {
   const toneVars = TASK_TONES[tone];
   return (
@@ -1585,6 +1621,7 @@ function TaskCard({
         {icon}
         <span>{title}</span>
         <span style={{ marginLeft: 'auto', fontSize: 11 }}>{items.length}</span>
+        {headerAction}
       </header>
       {items.length === 0 ? (
         <div style={{
@@ -1598,7 +1635,7 @@ function TaskCard({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', padding: 6, gap: 4, maxHeight: 320, overflow: 'auto' }}>
           {items.map((it) => (
-            <TaskRow key={it.key} item={it} tone={tone} />
+            <TaskRow key={it.key} item={it} tone={tone} onAck={onAck} />
           ))}
         </div>
       )}
@@ -1615,7 +1652,7 @@ function TaskCard({
   );
 }
 
-function TaskRow({ item, tone }: { item: TaskItem; tone: TaskTone }) {
+function TaskRow({ item, tone, onAck }: { item: TaskItem; tone: TaskTone; onAck?: (orderId: string) => void }) {
   const toneVars = TASK_TONES[tone];
   const inner = (
     <div style={{
@@ -1637,6 +1674,20 @@ function TaskRow({ item, tone }: { item: TaskItem; tone: TaskTone }) {
             padding: '1px 6px', borderRadius: 'var(--radius-sm)',
             background: toneVars.headerBg,
           }}>{item.meta}</span>
+        )}
+        {item.ackId && onAck && (
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAck(item.ackId!); }}
+            style={{
+              padding: '1px 8px', fontSize: 10, fontWeight: 700,
+              background: 'var(--brand)', color: 'white', border: 'none',
+              borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+            }}
+            title="확인 처리"
+          >
+            확인
+          </button>
         )}
       </div>
       {item.sub && (
