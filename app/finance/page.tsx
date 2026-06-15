@@ -16,6 +16,8 @@ import { RECEIPT_SUBJECTS, EXPENSE_SUBJECTS, INTERNAL_SUBJECTS } from '@/lib/led
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { useVendors } from '@/lib/firebase/vendors-store';
+import type { BankTransaction, Contract, Vendor, Company } from '@/lib/types';
 import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
 import { displayCompanyName } from '@/lib/company-display';
@@ -83,11 +85,12 @@ export default function FinancePage() {
   }
   const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
+  const { vendors } = useVendors();
 
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:finance:company', 'all');
   const [directionFilter, setDirectionFilter] = usePersistentState<'all' | 'deposit' | 'withdraw'>('filter:finance:direction', 'all');
-  const [viewMode, setViewMode] = usePersistentState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily'>('filter:finance:view', 'account');
+  const [viewMode, setViewMode] = usePersistentState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily' | 'vendors'>('filter:finance:view', 'account');
   const [createOpen, setCreateOpen] = useState(false);
   const [periodMode, setPeriodMode] = usePersistentState<'month' | 'quarter' | 'year'>('filter:finance:period', 'month');
   const [periodAnchor, setPeriodAnchor] = useState<{ y: number; m: number }>(() => {
@@ -221,6 +224,7 @@ export default function FinancePage() {
           <button type="button" className={`chip chip-nav ${viewMode === 'card' ? 'active' : ''}`} onClick={() => setViewMode('card')}>카드매출</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'corpcard' ? 'active' : ''}`} onClick={() => setViewMode('corpcard')}>법인카드</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'daily' ? 'active' : ''}`} onClick={() => setViewMode('daily')} title="자금일보 — 4 종류 통합 + 계정과목·매칭 편집">자금일보</button>
+          <button type="button" className={`chip chip-nav ${viewMode === 'vendors' ? 'active' : ''}`} onClick={() => setViewMode('vendors')} title="거래처 보조원장 — 거래처별 지출 타임라인·누적">거래처</button>
         </>
       }
       bare
@@ -410,6 +414,18 @@ export default function FinancePage() {
                   </tbody>
                 </table>
               )}
+              {viewMode === 'vendors' && (
+                <VendorSubLedgerView
+                  bankTx={bankTx}
+                  vendors={vendors}
+                  contracts={contracts}
+                  contractById={contractById}
+                  companyFilter={companyFilter}
+                  companyMaster={companyMaster}
+                  inPeriod={inPeriod}
+                  search={search}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -479,5 +495,207 @@ export default function FinancePage() {
           }
         />
     </PageShell>
+  );
+}
+
+/* ─────────────────── 거래처 보조원장 (vendor sub-ledger) ─────────────────── */
+
+function VendorSubLedgerView({
+  bankTx, vendors, contracts, contractById, companyFilter, companyMaster, inPeriod, search,
+}: {
+  bankTx: BankTransaction[];
+  vendors: Vendor[];
+  contracts: Contract[];
+  contractById: Map<string, Contract>;
+  companyFilter: string;
+  companyMaster: Company[];
+  inPeriod: (date: string) => boolean;
+  search: string;
+}) {
+  const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
+
+  const stats = useMemo(() => {
+    const byVendor = new Map<string, {
+      totalSpent: number;
+      totalReceived: number;
+      txCount: number;
+      lastTxDate: string;
+      transactions: BankTransaction[];
+    }>();
+    for (const t of bankTx) {
+      const linked = (t.linkedCustomerName ?? '').trim();
+      if (!linked) continue;
+      if (companyFilter !== 'all') {
+        const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
+        const co = t.companyCode ?? c?.company;
+        if (co !== companyFilter) continue;
+      }
+      if (!inPeriod((t.txDate ?? '').slice(0, 10))) continue;
+      const entry = byVendor.get(linked) ?? {
+        totalSpent: 0, totalReceived: 0, txCount: 0, lastTxDate: '', transactions: [],
+      };
+      entry.totalSpent += t.withdraw ?? 0;
+      entry.totalReceived += t.amount ?? 0;
+      entry.txCount += 1;
+      if ((t.txDate ?? '') > entry.lastTxDate) entry.lastTxDate = t.txDate ?? '';
+      entry.transactions.push(t);
+      byVendor.set(linked, entry);
+    }
+    return byVendor;
+  }, [bankTx, companyFilter, contractById, inPeriod]);
+
+  const vendorListRaw = useMemo(() => {
+    const known = new Set(vendors.map((v) => v.name.trim()));
+    const all = new Set<string>([...known, ...Array.from(stats.keys())]);
+    return Array.from(all)
+      .filter((name) => {
+        if (!search.trim()) return true;
+        const q = search.trim().toLowerCase();
+        return name.toLowerCase().includes(q);
+      })
+      .map((name) => {
+        const v = vendors.find((x) => x.name.trim() === name);
+        const s = stats.get(name);
+        return {
+          name,
+          kind: v?.kind,
+          companyCode: v?.companyCode,
+          bizNo: v?.bizNo,
+          totalSpent: s?.totalSpent ?? 0,
+          totalReceived: s?.totalReceived ?? 0,
+          txCount: s?.txCount ?? 0,
+          lastTxDate: s?.lastTxDate ?? '',
+          isUnregistered: !v,
+        };
+      })
+      .sort((a, b) => {
+        if ((b.txCount > 0 ? 1 : 0) !== (a.txCount > 0 ? 1 : 0)) {
+          return (b.txCount > 0 ? 1 : 0) - (a.txCount > 0 ? 1 : 0);
+        }
+        return b.totalSpent - a.totalSpent;
+      });
+  }, [vendors, stats, search]);
+
+  const selectedTx = selectedVendor ? (stats.get(selectedVendor)?.transactions ?? []) : [];
+  const sortedTx = [...selectedTx].sort((a, b) => (b.txDate ?? '').localeCompare(a.txDate ?? ''));
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 12, minHeight: 500 }}>
+      {/* 좌 — 거래처 목록 */}
+      <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)', fontSize: 12, fontWeight: 700 }}>
+          거래처 ({vendorListRaw.length})
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          {vendorListRaw.length === 0 ? (
+            <div className="muted center" style={{ padding: 24, fontSize: 12 }}>
+              등록된 거래처가 없습니다.
+            </div>
+          ) : vendorListRaw.map((v) => {
+            const isActive = selectedVendor === v.name;
+            return (
+              <button
+                key={v.name}
+                type="button"
+                onClick={() => setSelectedVendor(v.name)}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '8px 12px',
+                  background: isActive ? 'var(--brand-bg)' : 'var(--bg-card)',
+                  color: isActive ? 'var(--brand)' : 'inherit',
+                  border: 'none', borderBottom: '1px solid var(--border-soft)',
+                  cursor: 'pointer', fontSize: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {v.name}
+                  </span>
+                  {v.kind && <span className="dim" style={{ fontSize: 10 }}>{v.kind}</span>}
+                  {v.isUnregistered && <span style={{ fontSize: 10, color: 'var(--orange-text)' }}>미등록</span>}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 11, color: isActive ? 'inherit' : 'var(--text-sub)' }}>
+                  <span>지출 <strong className="mono">{fmtNum(v.totalSpent)}</strong></span>
+                  {v.totalReceived > 0 && <span>· 수입 <strong className="mono">{fmtNum(v.totalReceived)}</strong></span>}
+                  <span style={{ marginLeft: 'auto' }}>{v.txCount}건</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 우 — 선택된 거래처 타임라인 */}
+      <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {!selectedVendor ? (
+          <div className="muted center" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+            좌측에서 거래처 선택
+          </div>
+        ) : (
+          <>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                <strong style={{ fontSize: 14 }}>{selectedVendor}</strong>
+                {(() => {
+                  const v = vendors.find((x) => x.name.trim() === selectedVendor);
+                  return v ? (
+                    <>
+                      {v.kind && <span className="dim" style={{ fontSize: 11 }}>{v.kind}</span>}
+                      {v.bizNo && <span className="mono dim" style={{ fontSize: 11 }}>{v.bizNo}</span>}
+                    </>
+                  ) : <span style={{ fontSize: 11, color: 'var(--orange-text)' }}>마스터 미등록 — 자금일보 거래상대 검색에서 [+ 거래처 등록]</span>;
+                })()}
+                <span style={{ flex: 1 }} />
+                <span className="dim" style={{ fontSize: 11 }}>
+                  누적 지출 <strong className="mono">₩{fmtNum(stats.get(selectedVendor)?.totalSpent ?? 0)}</strong>
+                  {(stats.get(selectedVendor)?.totalReceived ?? 0) > 0 && (
+                    <> · 수입 <strong className="mono">₩{fmtNum(stats.get(selectedVendor)?.totalReceived ?? 0)}</strong></>
+                  )}
+                  {' · '}{sortedTx.length}건
+                </span>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <table className="table" style={{ fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 110 }}>거래일</th>
+                    <th style={{ width: 60 }}>회사</th>
+                    <th className="num" style={{ width: 110 }}>출금</th>
+                    <th className="num" style={{ width: 110 }}>입금</th>
+                    <th style={{ width: 100 }}>계정과목</th>
+                    <th>적요</th>
+                    <th style={{ width: 110 }}>매칭 계약</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedTx.length === 0 ? (
+                    <tr><td colSpan={7} className="muted center" style={{ padding: 24 }}>이 거래처와의 거래 내역 없음</td></tr>
+                  ) : sortedTx.map((t) => {
+                    const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
+                    const co = t.companyCode || c?.company;
+                    return (
+                      <tr key={t.id}>
+                        <td className="mono">{(t.txDate ?? '').slice(0, 10)}</td>
+                        <td className="dim">{co ? displayCompanyName(co, companyMaster) : '-'}</td>
+                        <td className="num mono" style={{ color: (t.withdraw ?? 0) > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>
+                          {fmtNum(t.withdraw ?? 0) || '-'}
+                        </td>
+                        <td className="num mono" style={{ color: (t.amount ?? 0) > 0 ? 'var(--green-text)' : 'var(--text-weak)' }}>
+                          {fmtNum(t.amount ?? 0) || '-'}
+                        </td>
+                        <td className="dim">{t.subject || '-'}</td>
+                        <td className="dim">{t.memo || t.counterparty || '-'}</td>
+                        <td className="mono dim" style={{ fontSize: 11 }}>{c ? c.contractNo : '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
