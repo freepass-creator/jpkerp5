@@ -778,6 +778,12 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
   const withdraw = toNum(get(row, '출금액', '출금', '지급액', '인출액', '낸돈', '출금금액', 'withdraw', 'debit'));
   const amountSingle = toNum(get(row, '거래금액', '금액', '거래액', '청구금액', 'amount'));
   if (!txDate) return null;
+
+  // CMS 명세 수납상태 — '완납'/'부분납' 만 자금일보에 입금 처리, 미납/연체 등은 skip
+  // (미납 청구건은 자금일보가 아니라 청구 ledger 에 속함)
+  const collectionStatus = toStr(get(row, '수납상태', '납부상태', '결제상태', 'status'));
+  if (collectionStatus && /미납|연체|미수|취소|정지|보류|실패/.test(collectionStatus)) return null;
+
   const useSingle = deposit <= 0 && withdraw <= 0 && Math.abs(amountSingle) > 0;
   const finalDeposit = useSingle ? (amountSingle > 0 ? amountSingle : 0) : deposit;
   const finalWithdraw = useSingle ? (amountSingle < 0 ? -amountSingle : 0) : withdraw;
@@ -799,6 +805,8 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
   // 내용·메모 (거래 메모) — fallback chain
   const memo = toStr(get(row,
     '내용', '거래내용', '거래메모', '메모', '용도', '비고',
+    // CMS/자동이체 명세 — 상품/청구타입을 분류 메모로 사용
+    '상품', '청구타입', '결제수단',
     'memo', 'description', 'note',
   ));
 
@@ -819,8 +827,10 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
     balance: balance > 0 ? balance : undefined,
     counterparty: cpFinal,
     memo: memo || summary || undefined,
-    source: toStr(get(row, '은행', '거래은행', '은행명', 'source')) || bankHint || fileName,
-    account: toStr(get(row, '계좌번호', '계좌', '나의계좌', '본인계좌', 'account')) || undefined,
+    // CMS 명세 결제수단 'CMS' 가 source 로 잡혀야 isCms 필터 동작
+    source: toStr(get(row, '결제수단', '은행', '거래은행', '은행명', 'source')) || bankHint || fileName,
+    // CMS 명세는 계좌 대신 회원번호로 식별 (계약 매칭 보조)
+    account: toStr(get(row, '계좌번호', '계좌', '나의계좌', '본인계좌', '회원번호', 'account')) || undefined,
     companyCode: toStr(get(row, '회사', '회사코드', 'companyCode')) || undefined,
     subject: subjectRaw || defaultSubject,
     method,
