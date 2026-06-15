@@ -11,7 +11,9 @@
 import { useState } from 'react';
 import {
   Folder, Users, Buildings, Wrench, MapPin, Plus, FileText, ChartLineUp, PencilSimple, Trash, Car, Package,
+  Megaphone, Calendar, Pulse,
 } from '@phosphor-icons/react';
+import Link from 'next/link';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-apply';
@@ -92,6 +94,17 @@ export default function GeneralPage() {
             <NavBtn label="증차 신청" icon={<Plus size={14} />} active={view === 'fleet_apply'} onClick={() => setView('fleet_apply')} />
             <NavBtn label="공문·인감" icon={<FileText size={14} />} active={view === 'docs'} onClick={() => setView('docs')} />
             <NavBtn label="사이트 계정" icon={<Wrench size={14} />} active={view === 'credentials'} onClick={() => setView('credentials')} />
+
+            <div className="page-shell-nav-group-label" style={{ marginTop: 14 }}>운영 지원</div>
+            <Link href="/dispatch" className="page-shell-nav-item" title="디스패치 — 현장 직원 업무 지시 발송 + 처리 현황">
+              <Megaphone size={14} /><span>디스패치</span>
+            </Link>
+            <Link href="/attendance" className="page-shell-nav-item" title="근태 결재 — 휴가·반차·조퇴 신청 승인">
+              <Calendar size={14} /><span>근태 결재</span>
+            </Link>
+            <Link href="/activity" className="page-shell-nav-item" title="활동 피드 — 모바일·웹 입력 실시간 통합">
+              <Pulse size={14} /><span>활동 피드</span>
+            </Link>
 
             <div className="page-shell-nav-group-label" style={{ marginTop: 14 }}>보고</div>
             <NavBtn label="손익 (집계)" icon={<ChartLineUp size={14} />} active={view === 'profit'} onClick={() => setView('profit')} />

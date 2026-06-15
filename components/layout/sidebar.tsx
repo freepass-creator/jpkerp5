@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Calendar, Pulse, Megaphone,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -180,18 +180,7 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
                 <span>일반 관리</span>
               </Link>
             )}
-            <Link href="/dispatch" className={`sb-item ${isActive('/dispatch') ? 'active' : ''}`} title="디스패치 — 현장 직원 업무 지시 발송 + 처리 현황">
-              <Megaphone size={14} weight={isActive('/dispatch') ? 'fill' : 'regular'} />
-              <span>디스패치</span>
-            </Link>
-            <Link href="/attendance" className={`sb-item ${isActive('/attendance') ? 'active' : ''}`} title="근태 결재 — 휴가·반차·조퇴 신청 승인">
-              <Calendar size={14} weight={isActive('/attendance') ? 'fill' : 'regular'} />
-              <span>근태 결재</span>
-            </Link>
-            <Link href="/activity" className={`sb-item ${isActive('/activity') ? 'active' : ''}`} title="활동 피드 — 모바일·웹 입력 실시간 통합">
-              <Pulse size={14} weight={isActive('/activity') ? 'fill' : 'regular'} />
-              <span>활동 피드</span>
-            </Link>
+            {/* 디스패치·근태·활동피드 → /general 좌측 nav 안으로 통합 (2026-06-15) */}
           </div>
           <div className="sb-divider" />
         </>
