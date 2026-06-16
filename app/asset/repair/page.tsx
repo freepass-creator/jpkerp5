@@ -24,6 +24,7 @@ import { useTableSelection } from '@/lib/use-table-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { exportToExcel } from '@/lib/excel-export';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 
 export default function RepairPage() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function RepairPage() {
   const { entries: history } = useHistoryEntries();
   const { vehicles, loading: vehiclesLoading } = useMergedVehicles();
   const { remove: removeVehicle } = useVehicles();
+  const { openVehicle } = useVehicleDialog();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-repair:company', 'all');
@@ -126,7 +128,7 @@ export default function RepairPage() {
                       <tr
                         key={v.id}
                         style={{ verticalAlign: 'middle', cursor: 'pointer' }}
-                        onDoubleClick={() => router.push(`/asset?view=registered&plate=${encodeURIComponent(v.plate ?? '')}`)}
+                        onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')}
                         onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }}
                         className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}
                       >

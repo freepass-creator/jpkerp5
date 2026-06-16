@@ -25,6 +25,7 @@ import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers'
 import { useTableSelection } from '@/lib/use-table-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
 import { exportToExcel } from '@/lib/excel-export';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 
 export default function AssetGpsPage() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function AssetGpsPage() {
 
   const { vehicles, loading: vehiclesLoading } = useMergedVehicles();
   const { remove: removeVehicle } = useVehicles();
+  const { openVehicle } = useVehicleDialog();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset-gps:company', 'all');
@@ -101,7 +103,7 @@ export default function AssetGpsPage() {
                   ) : filtered.map((v) => {
                     const installed = !!(v.gpsProvider || v.gpsDeviceId);
                     return (
-                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => router.push(`/asset?view=registered&plate=${encodeURIComponent(v.plate ?? '')}`)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
+                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                         <TableRowCheckbox id={v.id} selection={sel} />
                         <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                         <td className="mono">{v.plate || '-'}</td>

@@ -28,6 +28,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { exportToExcel } from '@/lib/excel-export';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 
 const DISPOSAL_STATUSES = ['매각검토', '매각대기', '매각'] as const;
 
@@ -37,6 +38,7 @@ export default function AssetDisposalPage() {
   useEffect(() => { if (!roleLoading && !master) router.replace('/'); }, [master, roleLoading, router]);
 
   const { vehicles, loading: vehiclesLoading } = useMergedVehicles();
+  const { openVehicle } = useVehicleDialog();
   const { update: updateVehicle, remove: removeVehicle } = useVehicles();
   const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
@@ -104,7 +106,7 @@ export default function AssetDisposalPage() {
                   {filtered.length === 0 ? (
                     <tr><td colSpan={7} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '처분 대상 차량 없음'}</td></tr>
                   ) : filtered.map((v) => (
-                    <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => router.push(`/asset?view=registered&plate=${encodeURIComponent(v.plate ?? '')}`)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
+                    <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                       <TableRowCheckbox id={v.id} selection={sel} />
                       <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                       <td className="mono">{v.plate || '-'}</td>
