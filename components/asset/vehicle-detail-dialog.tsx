@@ -671,7 +671,7 @@ export function VehicleDetailDialog({
               content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} />
             },
             { value: 'risk', label: `리스크 현황${incidentHistory.length > 0 ? ` (${incidentHistory.length})` : ''}`,
-              content: <RiskTab vehicle={vehicle} contracts={sortedContracts} incidentHistory={incidentHistory} />
+              content: <RiskTab vehicle={vehicle} contracts={sortedContracts} incidentHistory={incidentHistory} allHistory={sortedHistory} />
             },
             { value: 'asset', label: '자산 관리',
               content: <AssetTab vehicle={vehicle} repairHistory={repairHistory} contracts={sortedContracts} />
@@ -740,28 +740,93 @@ function AssetLedgerSection({ vehicle }: { vehicle: Vehicle }) {
   );
 }
 
-/* ─── 리스크 탭 — 미수 요약 + 사고·위반 이력 ─── */
+/* ─── 리스크 현황 탭 — 처리 상태 + 연락기록 + 발생 이력 + 사고·위반 ─── */
 function RiskTab({
-  vehicle, contracts, incidentHistory,
-}: { vehicle: Vehicle; contracts: Contract[]; incidentHistory: HistoryEntry[] }) {
+  vehicle, contracts, incidentHistory, allHistory,
+}: { vehicle: Vehicle; contracts: Contract[]; incidentHistory: HistoryEntry[]; allHistory: HistoryEntry[] }) {
   const unpaidContracts = contracts.filter((c) => (c.unpaidAmount ?? 0) > 0);
   const totalUnpaid = unpaidContracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
   const lockActive = contracts.some((c) => c.engineDisabled);
+  const debtActive = contracts.some((c) => c.status === '채권');
+
+  const contactHistory = allHistory.filter((h) => h.category === '연락기록');
+  const riskHistory = allHistory.filter((h) =>
+    ['분쟁', '클레임', '수납이슈', '법적조치'].includes(h.category as string)
+  );
+
   return (
     <Stack>
-      <Section title="미수 / 시동제어 / 채권화">
+      {/* 현재 처리 상태 */}
+      <Section title="현재 처리 상태">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+          {totalUnpaid > 0 && <StatusBadge tone="red">미수 ₩{totalUnpaid.toLocaleString()}</StatusBadge>}
+          {lockActive && <StatusBadge tone="red">시동제어</StatusBadge>}
+          {debtActive && <StatusBadge tone="red">채권화</StatusBadge>}
+          {totalUnpaid === 0 && !lockActive && !debtActive && <StatusBadge tone="green">정상</StatusBadge>}
+        </div>
         <Grid2>
-          <KV k="차량번호" v={vehicle.plate} mono />
           <KV k="미수 계약" v={unpaidContracts.length > 0 ? `${unpaidContracts.length}건` : '없음'} />
           <KV k="누적 미수" v={totalUnpaid > 0 ? <span style={{ color: 'var(--red-text)' }}>₩{totalUnpaid.toLocaleString()}</span> : '없음'} mono />
           <KV k="시동제어" v={lockActive ? <StatusBadge tone="red">활성</StatusBadge> : <span className="dim">없음</span>} />
-          <KV k="채권화 계약" v={contracts.some((c) => c.status === '채권') ? '있음' : '없음'} />
+          <KV k="채권화 계약" v={debtActive ? '있음' : '없음'} />
         </Grid2>
-        <div className="dim" style={{ fontSize: 11, marginTop: 8 }}>
-          상세: /receivables (리스크 현황) 에서 차량번호 검색 — 내용증명·법적조치 이력
-        </div>
       </Section>
 
+      {/* 연락 기록 */}
+      <Section title={`연락 기록 (${contactHistory.length})`}>
+        {contactHistory.length === 0 ? (
+          <div className="dim" style={{ fontSize: 12 }}>연락 기록 없음</div>
+        ) : (
+          <table className="table" style={{ fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 100 }}>일자</th>
+                <th style={{ width: 100 }}>방식</th>
+                <th>내용</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contactHistory.slice(0, 10).map((h) => (
+                <tr key={h.id}>
+                  <td className="mono dim">{h.date}</td>
+                  <td className="dim">{h.title || '-'}</td>
+                  <td>{h.description || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Section>
+
+      {/* 리스크 발생 이력 */}
+      <Section title={`리스크 발생 이력 (${riskHistory.length})`}>
+        {riskHistory.length === 0 ? (
+          <div className="dim" style={{ fontSize: 12 }}>리스크 발생 이력 없음</div>
+        ) : (
+          <table className="table" style={{ fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 100 }}>일자</th>
+                <th style={{ width: 90 }}>구분</th>
+                <th>제목</th>
+                <th style={{ width: 70 }}>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {riskHistory.slice(0, 15).map((h) => (
+                <tr key={h.id}>
+                  <td className="mono dim">{h.date}</td>
+                  <td className="dim">{h.category}</td>
+                  <td>{h.title || '-'}</td>
+                  <td className="dim">{h.status || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Section>
+
+      {/* 사고·위반 (기존 IncidentTab) */}
       <IncidentTab history={incidentHistory} />
     </Stack>
   );
