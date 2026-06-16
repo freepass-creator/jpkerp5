@@ -453,12 +453,13 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
               <th className="center" style={{ width: COL.term }}>약정</th>
               <th className="num" style={{ width: COL.money }}>월대여료</th>
               <th className="num" style={{ width: COL.money }}>보증금</th>
+              <th className="center" style={{ width: 90 }}>계약서</th>
               <th className="center" style={{ width: COL.status }}>상태</th>
             </tr>
           </thead>
           <tbody>
             {isEmpty ? (
-              <EmptyRow colSpan={7}>계약 이력 없음</EmptyRow>
+              <EmptyRow colSpan={8}>계약 이력 없음</EmptyRow>
             ) : contracts.map((c) => (
               <tr key={c.id}>
                 <td className="mono">{c.contractDate}</td>
@@ -467,6 +468,21 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
                 <td className="center mono dim">{c.termMonths ? `${c.termMonths}개월` : <span className="muted">-</span>}</td>
                 <td className="num mono">{c.monthlyRent ? `₩${c.monthlyRent.toLocaleString()}` : <span className="muted">-</span>}</td>
                 <td className="num mono">{c.deposit ? `₩${c.deposit.toLocaleString()}` : <span className="muted">-</span>}</td>
+                <td className="center">
+                  {c.contractDocUrl ? (
+                    <a
+                      href={c.contractDocUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: 'var(--brand)', fontSize: 11, textDecoration: 'none' }}
+                      title={c.contractDocFileName ?? '계약서 다운로드'}
+                    >
+                      열기 →
+                    </a>
+                  ) : (
+                    <span className="muted" style={{ fontSize: 11 }}>미첨부</span>
+                  )}
+                </td>
                 <td className="center"><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
               </tr>
             ))}
