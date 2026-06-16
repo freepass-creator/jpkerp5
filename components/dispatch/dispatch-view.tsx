@@ -305,14 +305,6 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
               ))}
             </select>
           </Field>
-          <Field label="종류">
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {KINDS.map((k) => (
-                <button key={k.key} type="button" className={`chip ${kind === k.key ? 'active' : ''}`}
-                  onClick={() => setKind(k.key)}>{k.label}</button>
-              ))}
-            </div>
-          </Field>
           <Field label="우선순위">
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {(['urgent', 'today', 'thisWeek', 'thisMonth'] as DispatchPriority[]).map((p) => (
