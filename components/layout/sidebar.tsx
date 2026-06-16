@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Megaphone,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -19,6 +19,7 @@ export type MenuKey =
   | 'dashboard' | 'receivables'
   | 'asset' | 'contract' | 'finance'
   | 'penalty' | 'general'
+  | 'notice'
   | 'devtools';
 
 export const MENU_LABELS: Record<MenuKey, string> = {
@@ -29,6 +30,7 @@ export const MENU_LABELS: Record<MenuKey, string> = {
   finance: '재무 관리',
   penalty: '과태료 업무',
   general: '일반 관리',
+  notice: '공지사항',
   devtools: '개발도구',
 };
 
@@ -42,6 +44,7 @@ export const DEFAULT_VISIBILITY: Record<MenuKey, boolean> = {
   finance: true,
   penalty: true,
   general: true,
+  notice: true,
   devtools: true,
 };
 
@@ -164,8 +167,8 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
         </>
       )}
 
-      {/* ④ 과태료·일반 (같은 그룹) — 손익은 일반관리 안으로 통합 */}
-      {(show('penalty') || show('general')) && (
+      {/* ④ 과태료·일반·공지사항 (같은 그룹) — 손익은 일반관리 안으로 통합 */}
+      {(show('penalty') || show('general') || show('notice')) && (
         <>
           <div className="sb-section">
             {show('penalty') && (
@@ -178,6 +181,12 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
               <Link href="/general" className={`sb-item ${isActive('/general') ? 'active' : ''}`} title="일반 관리 — 직원·법인·임대·시설·차고지·증차·공문·손익">
                 <Folder size={14} weight={isActive('/general') ? 'fill' : 'regular'} />
                 <span>일반 관리</span>
+              </Link>
+            )}
+            {show('notice') && (
+              <Link href="/notice" className={`sb-item ${isActive('/notice') ? 'active' : ''}`} title="공지사항 — 누구나 작성·댓글">
+                <Megaphone size={14} weight={isActive('/notice') ? 'fill' : 'regular'} />
+                <span>공지사항</span>
               </Link>
             )}
             {/* 디스패치·근태·활동피드 → /general 좌측 nav 안으로 통합 (2026-06-15) */}
