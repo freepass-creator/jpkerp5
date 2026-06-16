@@ -606,8 +606,13 @@ function IncidentTab({ history }: { history: HistoryEntry[] }) {
 }
 
 /* ─── 메인 다이얼로그 ─── */
+/** SSOT 차량 dialog 의 표준 탭 키 — 페이지 메뉴와 동일 5분류
+ *   operation / risk / asset / contract / finance */
+export type VehicleDialogTab =
+  | 'operation' | 'risk' | 'asset' | 'contract' | 'finance';
+
 export function VehicleDetailDialog({
-  vehicle, history, contracts, view, onUpdate, onClose, onEdit,
+  vehicle, history, contracts, view, onUpdate, onClose, onEdit, initialTab,
 }: {
   vehicle: Vehicle;
   history: HistoryEntry[];
@@ -616,6 +621,8 @@ export function VehicleDetailDialog({
   onUpdate: (v: Vehicle) => void;
   onClose: () => void;
   onEdit?: (v: Vehicle) => void;
+  /** 진입 페이지 컨텍스트별 default 탭. 미지정 시 view 별 첫 탭 */
+  initialTab?: VehicleDialogTab;
 }) {
   const sortedHistory = useMemo(() => [...history].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')), [history]);
   const sortedContracts = useMemo(() => [...contracts].sort((a, b) => (b.contractDate ?? '').localeCompare(a.contractDate ?? '')), [contracts]);
@@ -652,21 +659,29 @@ export function VehicleDetailDialog({
         </div>
       }
       onEdit={onEdit ? () => { onClose(); onEdit(vehicle); } : undefined}
+      defaultTab={initialTab}
       tabs={view === 'registered'
         ? [
             { value: 'summary', label: '등록차량', content: <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment={true} /> },
             { value: 'photos', label: '사진', content: <VehiclePhotosSection vehicleId={vehicle.id} readonly /> },
           ]
         : [
-            // 자산현황 view 첫 탭 — 운영 요약 (한 화면 KV 그리드: 등록상태/보험/구매방식/GPS/검사정비/운영현황)
-            { value: 'overview', label: '운영 요약', content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} /> },
-            { value: 'photos', label: '사진', content: <VehiclePhotosSection vehicleId={vehicle.id} readonly /> },
-            { value: 'loan', label: '할부스케줄', content: <LoanScheduleTab vehicle={vehicle} /> },
-            { value: 'compliance', label: '보험·검사', content: <ComplianceTab vehicle={vehicle} contracts={sortedContracts} /> },
-            { value: 'contract', label: `계약이력 (${sortedContracts.length})`, content: <ContractListTab contracts={sortedContracts} /> },
-            { value: 'payment', label: `수납이력 (${sortedContracts.reduce((n, c) => n + (c.schedules ?? []).reduce((m, s) => m + (s.payments ?? []).length, 0), 0)})`, content: <PaymentHistoryTab contracts={sortedContracts} /> },
-            { value: 'repair', label: `정비·수선 (${repairHistory.length})`, content: <RepairHistoryTab history={repairHistory} /> },
-            { value: 'incident', label: `사고·위반 (${incidentHistory.length})`, content: <IncidentTab history={incidentHistory} /> },
+            // 페이지 메뉴와 동일 5분류 — operation/risk/asset/contract/finance
+            { value: 'operation', label: '운영',
+              content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} />
+            },
+            { value: 'risk', label: `리스크 (${incidentHistory.length})`,
+              content: <RiskTab vehicle={vehicle} contracts={sortedContracts} incidentHistory={incidentHistory} />
+            },
+            { value: 'asset', label: '자산',
+              content: <AssetTab vehicle={vehicle} repairHistory={repairHistory} contracts={sortedContracts} />
+            },
+            { value: 'contract', label: `계약 (${sortedContracts.length})`,
+              content: <ContractListTab contracts={sortedContracts} />
+            },
+            { value: 'finance', label: `재무 (${sortedContracts.reduce((n, c) => n + (c.schedules ?? []).reduce((m, s) => m + (s.payments ?? []).length, 0), 0)})`,
+              content: <PaymentHistoryTab contracts={sortedContracts} />
+            },
           ]}
     />
   );
@@ -719,5 +734,48 @@ function AssetLedgerSection({ vehicle }: { vehicle: Vehicle }) {
         )}
       </Grid2>
     </Section>
+  );
+}
+
+/* ─── 리스크 탭 — 미수 요약 + 사고·위반 이력 ─── */
+function RiskTab({
+  vehicle, contracts, incidentHistory,
+}: { vehicle: Vehicle; contracts: Contract[]; incidentHistory: HistoryEntry[] }) {
+  const unpaidContracts = contracts.filter((c) => (c.unpaidAmount ?? 0) > 0);
+  const totalUnpaid = unpaidContracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
+  const lockActive = contracts.some((c) => c.engineDisabled);
+  return (
+    <Stack>
+      <Section title="미수 / 시동제어 / 채권화">
+        <Grid2>
+          <KV k="차량번호" v={vehicle.plate} mono />
+          <KV k="미수 계약" v={unpaidContracts.length > 0 ? `${unpaidContracts.length}건` : '없음'} />
+          <KV k="누적 미수" v={totalUnpaid > 0 ? <span style={{ color: 'var(--red-text)' }}>₩{totalUnpaid.toLocaleString()}</span> : '없음'} mono />
+          <KV k="시동제어" v={lockActive ? <StatusBadge tone="red">활성</StatusBadge> : <span className="dim">없음</span>} />
+          <KV k="채권화 계약" v={contracts.some((c) => c.status === '채권') ? '있음' : '없음'} />
+        </Grid2>
+        <div className="dim" style={{ fontSize: 11, marginTop: 8 }}>
+          상세: /receivables (리스크 현황) 에서 차량번호 검색 — 내용증명·법적조치 이력
+        </div>
+      </Section>
+
+      <IncidentTab history={incidentHistory} />
+    </Stack>
+  );
+}
+
+/* ─── 자산 탭 — 사진 + 할부 + 보험·검사 + 정비·수선 묶음 ─── */
+function AssetTab({
+  vehicle, repairHistory, contracts,
+}: { vehicle: Vehicle; repairHistory: HistoryEntry[]; contracts: Contract[] }) {
+  return (
+    <Stack>
+      <Section title="사진">
+        <VehiclePhotosSection vehicleId={vehicle.id} readonly />
+      </Section>
+      <LoanScheduleTab vehicle={vehicle} />
+      <ComplianceTab vehicle={vehicle} contracts={contracts} />
+      <RepairHistoryTab history={repairHistory} />
+    </Stack>
   );
 }
