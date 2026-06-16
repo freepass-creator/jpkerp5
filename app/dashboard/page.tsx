@@ -1328,6 +1328,15 @@ function activityHref(t: AuditEntityType, id?: string): string | null {
 function RecentActivityPanel() {
   const { rows, loading } = useAuditLogs(20);
 
+  // 상대 시간 — 활동의 신선도 한 눈에 (방금/5분 전/오늘/어제/...).
+  // 같은 today 의존이라 useLiveTodayKr 와 별개 — 활동은 분 단위 변화라 nowTick 사용.
+  // ⚠️ early return 위에 위치해야 — Hooks 규칙
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 60 * 1000);  // 1분 마다 refresh
+    return () => clearInterval(t);
+  }, []);
+
   if (loading) {
     return (
       <div className="panel" style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-weak)' }}>
@@ -1342,14 +1351,6 @@ function RecentActivityPanel() {
       </div>
     );
   }
-
-  // 상대 시간 — 활동의 신선도 한 눈에 (방금/5분 전/오늘/어제/...).
-  // 같은 today 의존이라 useLiveTodayKr 와 별개 — 활동은 분 단위 변화라 nowTick 사용.
-  const [nowTick, setNowTick] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNowTick(Date.now()), 60 * 1000);  // 1분 마다 refresh
-    return () => clearInterval(t);
-  }, []);
   function relTime(atIso: string): string {
     const diffMin = Math.round((nowTick - new Date(atIso).getTime()) / 60000);
     if (diffMin < 1) return '방금';
