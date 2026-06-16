@@ -150,7 +150,7 @@ export default function DashboardPage() {
           display: 'flex', flexDirection: 'column', gap: 10,
           flex: 1, minHeight: 0, overflow: 'hidden',
         }}>
-          {/* 업무 카드 — 모바일 카드 스타일 5분류 (밀린/오늘/예정/받은/요청) */}
+          {/* 업무 카드 — 본인 스케줄(좌, 1fr) + 디스패치(우, 280px) — 아래 row 와 column align */}
           <Section title="업무 카드" right={<span className="dim" style={{ fontSize: 11 }}>본인 기준 · 항목 클릭 → 상세</span>}>
             <TaskCardsGrid
               contracts={contracts}
@@ -161,6 +161,7 @@ export default function DashboardPage() {
               onOpenContract={setDetailContractId}
               onCreateOutgoing={() => setNewOrderOpen(true)}
               onAckIncoming={handleAckIncoming}
+              sideColumnWidth={280}
             />
           </Section>
 
@@ -1416,7 +1417,7 @@ type TaskItem = {
 };
 
 function TaskCardsGrid({
-  contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract, onCreateOutgoing, onAckIncoming,
+  contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract, onCreateOutgoing, onAckIncoming, sideColumnWidth,
 }: {
   contracts: ReturnType<typeof useContracts>['contracts'];
   penalties: ReturnType<typeof usePenalties>['penalties'];
@@ -1426,6 +1427,8 @@ function TaskCardsGrid({
   onOpenContract: (id: string) => void;
   onCreateOutgoing?: () => void;
   onAckIncoming?: (orderId: string) => void;
+  /** 우측 디스패치 영역 폭 — 아래 row 와 column align 위해 px 지정. 미지정 시 균등 grid */
+  sideColumnWidth?: number;
 }) {
   const groups = useMemo(() => {
     const overdue: TaskItem[] = [];
@@ -1568,6 +1571,40 @@ function TaskCardsGrid({
     return { overdue, todays, upcoming, incoming, outgoing };
   }, [contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract]);
 
+  const requestBtn = onCreateOutgoing ? (
+    <button
+      type="button"
+      onClick={onCreateOutgoing}
+      style={{
+        padding: '2px 8px', fontSize: 11, fontWeight: 700,
+        background: 'var(--bg-card)', color: 'var(--text-main)',
+        border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+        cursor: 'pointer',
+      }}
+      title="새 업무 요청 — 회원에게 발송"
+    >
+      + 새 요청
+    </button>
+  ) : undefined;
+
+  // sideColumnWidth 지정 시 — 좌(본인 스케줄 3 cards) + 우(디스패치 2 cards) 분리. 아래 row 와 column align
+  if (sideColumnWidth) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: `minmax(0, 1fr) ${sideColumnWidth}px`, gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+          <TaskCard tone="red" icon={<Warning weight="duotone" />} title="밀린 업무" items={groups.overdue} emptyText="밀린 업무 없음" />
+          <TaskCard tone="brand" icon={<Clock weight="duotone" />} title="오늘 업무" items={groups.todays} emptyText="오늘 일정 없음" />
+          <TaskCard tone="purple" icon={<CalendarIcon weight="duotone" />} title="예정 업무 (7일)" items={groups.upcoming} emptyText="다가오는 일정 없음" />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+          <TaskCard tone="amber" icon={<Megaphone weight="duotone" />} title="받은 업무" items={groups.incoming} emptyText="받은 요청 없음" href="/m/orders/received" onAck={onAckIncoming} />
+          <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" href="/dispatch" headerAction={requestBtn} />
+        </div>
+      </div>
+    );
+  }
+
+  // 미지정 — 5 cards 평면 grid
   return (
     <div style={{
       display: 'grid',
@@ -1578,21 +1615,7 @@ function TaskCardsGrid({
       <TaskCard tone="brand" icon={<Clock weight="duotone" />} title="오늘 업무" items={groups.todays} emptyText="오늘 일정 없음" />
       <TaskCard tone="purple" icon={<CalendarIcon weight="duotone" />} title="예정 업무 (7일)" items={groups.upcoming} emptyText="다가오는 일정 없음" />
       <TaskCard tone="amber" icon={<Megaphone weight="duotone" />} title="받은 업무" items={groups.incoming} emptyText="받은 요청 없음" href="/m/orders/received" onAck={onAckIncoming} />
-      <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" href="/dispatch" headerAction={onCreateOutgoing ? (
-        <button
-          type="button"
-          onClick={onCreateOutgoing}
-          style={{
-            padding: '2px 8px', fontSize: 11, fontWeight: 700,
-            background: 'var(--bg-card)', color: 'var(--text-main)',
-            border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-            cursor: 'pointer',
-          }}
-          title="새 업무 요청 — 회원에게 발송"
-        >
-          + 새 요청
-        </button>
-      ) : undefined} />
+      <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" href="/dispatch" headerAction={requestBtn} />
     </div>
   );
 }
