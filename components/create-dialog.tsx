@@ -2957,7 +2957,7 @@ function PaymentPastePane({ variant, onClose }: { variant: PaymentVariant; onClo
   const [result, setResult] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const isBank = variant !== '카드매출';
+  const isBank = variant === '입출금' || variant === '자동이체';
 
   const parsed = useMemo(() => {
     if (!text.trim()) return null;
@@ -2995,7 +2995,7 @@ function PaymentPastePane({ variant, onClose }: { variant: PaymentVariant; onClo
         saved = enriched.rows.length;
       } else {
         const items = parsed.rows
-          .map((r) => parseCardRow(r, '텍스트 붙여넣기'))
+          .map((r) => parseCardRow(r, '텍스트 붙여넣기', variant === '법인카드' ? '법인카드' : '매출'))
           .filter((x): x is NonNullable<typeof x> => !!x);
         const enriched = enrichCardTxBatch(items, companies);
         companyMatched = enriched.stats.matched;

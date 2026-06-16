@@ -840,22 +840,44 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
 
 /* ──────────────── 카드 매출 ──────────────── */
 
-export function parseCardTxRow(row: Row, fileName: string): Omit<CardTransaction, 'id'> | null {
+export function parseCardTxRow(
+  row: Row,
+  fileName: string,
+  /** 업로드 변형 — 카드매출/법인카드 구분 명시 (없으면 컬럼 또는 default 매출) */
+  variantHint?: '매출' | '법인카드',
+): Omit<CardTransaction, 'id'> | null {
   const txDate = toDate(get(row, '승인일', '거래일', 'txDate'));
   const approvalNo = toStr(get(row, '승인번호', 'approvalNo'));
-  const amount = toNum(get(row, '금액', '매입금액', 'amount'));
+  const amount = toNum(get(row, '금액', '매입금액', '거래금액', 'amount'));
   if (!txDate || amount <= 0 || !approvalNo) return null;
 
   const cardRaw = toStr(get(row, '카드번호', 'cardLast4'));
   const last4 = (cardRaw.match(/\d{4}\s*$/) ?? [''])[0].trim() || undefined;
 
+  // kind 우선순위: variantHint > 컬럼명 > default '매출'
+  const kindRaw = toStr(get(row, '구분', '종류', '거래종류', 'kind'));
+  const kind: '매출' | '법인카드' = variantHint
+    ?? (kindRaw === '법인카드' || kindRaw === '지출' ? '법인카드' : '매출');
+
+  const terminalId = toStr(get(row, '단말기ID', 'TID', '단말기번호', 'terminalId')) || undefined;
+  const merchantNo = toStr(get(row, '가맹점번호', 'MID', 'merchantNo')) || undefined;
+  const merchant = toStr(get(row, '가맹점명', '가맹점', 'merchant')) || undefined;
+  const category = toStr(get(row, '카테고리', '용도', '분류', 'category')) || undefined;
+  const usedBy = toStr(get(row, '사용자', '사용직원', 'usedBy')) || undefined;
+
   return {
+    kind,
     txDate,
     amount,
     approvalNo,
     cardLast4: last4,
     customerName: toStr(get(row, '고객명', 'customerName')) || undefined,
     source: toStr(get(row, '카드사', 'source')) || fileName,
+    terminalId,
+    merchantNo,
+    merchant,
+    category,
+    usedBy,
     raw: row,
   };
 }
