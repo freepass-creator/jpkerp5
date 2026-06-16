@@ -247,6 +247,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
   const users = useUsers();
   const { contracts } = useContracts();
   const [selectedUids, setSelectedUids] = useState<string[]>([]);
+  const [isBroadcast, setIsBroadcast] = useState(false);
   const toggle = (arr: string[], v: string): string[] =>
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
   const [kind, setKind] = useState<DispatchKind>('memo');
@@ -270,6 +271,10 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
 
   async function handleSubmit() {
     if (!title.trim()) { toast.warning('제목을 입력하세요'); return; }
+    if (!isBroadcast && selectedUids.length === 0) {
+      toast.warning('받는 사람을 선택하거나 [전체] 를 명시해주세요');
+      return;
+    }
     setSaving(true);
     try {
       const payload: Parameters<typeof createDispatchOrder>[0] = {
@@ -281,7 +286,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
         contractId: contractId || undefined,
         createdBy: creatorEmail,
       };
-      if (selectedUids.length > 0) {
+      if (!isBroadcast && selectedUids.length > 0) {
         payload.assignedToUids = selectedUids;
         if (selectedUids.length === 1) {
           payload.assignedToUid = selectedUids[0];
@@ -289,7 +294,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
           payload.assignedToName = target?.displayName ?? target?.email;
         }
       }
-      // 선택 없음 → broadcast
+      // isBroadcast=true 면 모든 array 비움 → broadcast
       await createDispatchOrder(payload);
       toast.success('요청 전송 완료');
       onClose();
@@ -304,9 +309,30 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
     <DialogRoot open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent title="새 요청 보내기" mode="new">
         <DialogBody style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Field label="받는 사람 (복수 선택, 비우면 전체 공지)">
+          <Field label="받는 사람 (사람 복수 선택 OR [전체] 명시)">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={`chip ${isBroadcast ? 'active' : ''}`}
+                  onClick={() => {
+                    setIsBroadcast((prev) => {
+                      const next = !prev;
+                      if (next) setSelectedUids([]);  // 전체 켜면 개인 선택 해제
+                      return next;
+                    });
+                  }}
+                  style={{
+                    background: isBroadcast ? 'var(--brand)' : undefined,
+                    color: isBroadcast ? 'white' : undefined,
+                    borderColor: isBroadcast ? 'var(--brand)' : undefined,
+                    fontWeight: 700,
+                  }}
+                  title="전 직원에게 broadcast"
+                >
+                  전체
+                </button>
+                <span className="dim" style={{ fontSize: 11, padding: '4px 4px', alignSelf: 'center' }}>또는</span>
                 {users.length === 0 ? (
                   <span className="dim" style={{ fontSize: 11 }}>등록된 직원 없음</span>
                 ) : users.map((u) => (
@@ -314,16 +340,23 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
                     key={u.uid}
                     type="button"
                     className={`chip ${selectedUids.includes(u.uid) ? 'active' : ''}`}
-                    onClick={() => setSelectedUids((prev) => toggle(prev, u.uid))}
+                    onClick={() => {
+                      if (isBroadcast) setIsBroadcast(false);  // 개인 선택 시 전체 해제
+                      setSelectedUids((prev) => toggle(prev, u.uid));
+                    }}
                     title={u.department ? `${u.department}` : undefined}
+                    disabled={isBroadcast}
+                    style={isBroadcast ? { opacity: 0.4 } : undefined}
                   >
                     {u.displayName ?? u.email}
                   </button>
                 ))}
               </div>
               <div className="dim" style={{ fontSize: 11, padding: '4px 0 0', borderTop: '1px dashed var(--border)' }}>
-                {selectedUids.length === 0 ? (
-                  <span style={{ color: 'var(--orange-text)' }}>선택 없음 → 전 직원 broadcast</span>
+                {isBroadcast ? (
+                  <span style={{ color: 'var(--brand)', fontWeight: 600 }}>전 직원 broadcast 발송</span>
+                ) : selectedUids.length === 0 ? (
+                  <span style={{ color: 'var(--orange-text)' }}>받는 사람을 선택하거나 [전체] 클릭</span>
                 ) : (
                   <>선택된 직원 <strong>{selectedUids.length}</strong>명</>
                 )}
