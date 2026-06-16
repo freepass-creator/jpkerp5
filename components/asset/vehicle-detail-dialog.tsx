@@ -606,10 +606,10 @@ function IncidentTab({ history }: { history: HistoryEntry[] }) {
 }
 
 /* ─── 메인 다이얼로그 ─── */
-/** SSOT 차량 dialog 의 표준 탭 키 — 5분류
- *   operation / risk / asset / contract / payment (수납) */
+/** SSOT 차량 dialog 의 표준 탭 키 — 6분류
+ *   operation / risk / asset / contract / payment / photos */
 export type VehicleDialogTab =
-  | 'operation' | 'risk' | 'asset' | 'contract' | 'payment';
+  | 'operation' | 'risk' | 'asset' | 'contract' | 'payment' | 'photos';
 
 export function VehicleDetailDialog({
   vehicle, history, contracts, view, onUpdate, onClose, onEdit, initialTab,
@@ -666,21 +666,24 @@ export function VehicleDetailDialog({
             { value: 'photos', label: '사진', content: <VehiclePhotosSection vehicleId={vehicle.id} readonly /> },
           ]
         : [
-            // 페이지 메뉴와 동일 5분류 — operation/risk/asset/contract/finance
-            { value: 'operation', label: '운영',
+            // 페이지 메뉴와 동일 6분류
+            { value: 'operation', label: '운영 현황',
               content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} />
             },
-            { value: 'risk', label: `리스크 (${incidentHistory.length})`,
+            { value: 'risk', label: `리스크 현황${incidentHistory.length > 0 ? ` (${incidentHistory.length})` : ''}`,
               content: <RiskTab vehicle={vehicle} contracts={sortedContracts} incidentHistory={incidentHistory} />
             },
-            { value: 'asset', label: '자산',
+            { value: 'asset', label: '자산 관리',
               content: <AssetTab vehicle={vehicle} repairHistory={repairHistory} contracts={sortedContracts} />
             },
-            { value: 'contract', label: `계약 (${sortedContracts.length})`,
+            { value: 'contract', label: `계약 관리${sortedContracts.length > 0 ? ` (${sortedContracts.length})` : ''}`,
               content: <ContractListTab contracts={sortedContracts} />
             },
-            { value: 'payment', label: `수납 (${sortedContracts.reduce((n, c) => n + (c.schedules ?? []).reduce((m, s) => m + (s.payments ?? []).length, 0), 0)})`,
+            { value: 'payment', label: '수납 관리',
               content: <PaymentHistoryTab contracts={sortedContracts} />
+            },
+            { value: 'photos', label: '사진',
+              content: <VehiclePhotosSection vehicleId={vehicle.id} readonly />
             },
           ]}
     />
@@ -764,15 +767,12 @@ function RiskTab({
   );
 }
 
-/* ─── 자산 탭 — 사진 + 할부 + 보험·검사 + 정비·수선 묶음 ─── */
+/* ─── 자산 관리 탭 — 할부 + 보험·검사 + 정비·수선 (사진은 별도 탭) ─── */
 function AssetTab({
   vehicle, repairHistory, contracts,
 }: { vehicle: Vehicle; repairHistory: HistoryEntry[]; contracts: Contract[] }) {
   return (
     <Stack>
-      <Section title="사진">
-        <VehiclePhotosSection vehicleId={vehicle.id} readonly />
-      </Section>
       <LoanScheduleTab vehicle={vehicle} />
       <ComplianceTab vehicle={vehicle} contracts={contracts} />
       <RepairHistoryTab history={repairHistory} />
