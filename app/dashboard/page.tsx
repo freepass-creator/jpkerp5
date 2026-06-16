@@ -145,7 +145,11 @@ export default function DashboardPage() {
           <span className="topbar-date">{dateWithDow(today)}</span>
         </header>
 
-        <div style={{ padding: 16, overflow: 'auto', background: 'var(--bg-page)', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{
+          padding: 12, background: 'var(--bg-page)',
+          display: 'flex', flexDirection: 'column', gap: 10,
+          flex: 1, minHeight: 0, overflow: 'hidden',
+        }}>
           {/* 업무 카드 — 모바일 카드 스타일 5분류 (밀린/오늘/예정/받은/요청) */}
           <Section title="업무 카드" right={<span className="dim" style={{ fontSize: 11 }}>본인 기준 · 항목 클릭 → 상세</span>}>
             <TaskCardsGrid
@@ -160,16 +164,16 @@ export default function DashboardPage() {
             />
           </Section>
 
-          {/* 좌 일자별 스케줄 + 우 전체 데이터 요약 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
-            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column' }}>
+          {/* 좌 일자별 스케줄 (메인) + 우 전체 데이터 요약 (사이드 280px, 값만 타이트) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 280px', gap: 12, alignItems: 'stretch', flex: '1 1 0', minHeight: 0 }}>
+            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
               <Section fill title="일자별 스케줄" right={<span className="dim" style={{ fontSize: 11 }}>{today.slice(0, 7)} · 더블클릭 → 상세</span>}>
                 <ScheduleCalendar contracts={contracts} today={today} onSelectContract={setDetailContractId} />
               </Section>
             </div>
-            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column' }}>
+            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
               <Section fill title="전체 데이터 요약" right={<span className="dim" style={{ fontSize: 11 }}>카드 클릭 → 상세</span>}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflow: 'auto', minHeight: 0, flex: 1 }}>
                   <CompactKpi
                     label="가동률"
                     value={`${kpi.utilization}%`}
@@ -1573,6 +1577,7 @@ function TaskCardsGrid({
       <TaskCard tone="red" icon={<Warning weight="duotone" />} title="밀린 업무" items={groups.overdue} emptyText="밀린 업무 없음" />
       <TaskCard tone="brand" icon={<Clock weight="duotone" />} title="오늘 업무" items={groups.todays} emptyText="오늘 일정 없음" />
       <TaskCard tone="purple" icon={<CalendarIcon weight="duotone" />} title="예정 업무 (7일)" items={groups.upcoming} emptyText="다가오는 일정 없음" />
+      <span style={{ width: 12, borderLeft: '1px dashed var(--border)', alignSelf: 'stretch' }} aria-hidden />
       <TaskCard tone="amber" icon={<Megaphone weight="duotone" />} title="받은 업무" items={groups.incoming} emptyText="받은 요청 없음" href="/m/orders/received" onAck={onAckIncoming} />
       <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" href="/dispatch" headerAction={onCreateOutgoing ? (
         <button
@@ -1613,7 +1618,7 @@ function TaskCard({
       border: `1px solid ${toneVars.border}`,
       borderRadius: 'var(--radius-lg)',
       overflow: 'hidden',
-      minHeight: 200,
+      minHeight: 0, flex: '1 1 0',
     }}>
       <header style={{
         display: 'flex', alignItems: 'center', gap: 6,
