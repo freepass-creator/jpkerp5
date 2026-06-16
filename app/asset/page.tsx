@@ -718,6 +718,7 @@ export default function AssetPage() {
             history={history.filter((h) => h.scope === 'vehicle' && h.vehiclePlate === vehicles.find((v) => v.id === openId)?.plate)}
             contracts={contracts.filter((c) => c.vehiclePlate === vehicles.find((v) => v.id === openId)?.plate)}
             view={assetView}
+            initialTab="asset"
             onUpdate={async (v) => {
               await updateVehicle(v);
               await syncContractStatusFromVehicle(v, contracts, updateContract);

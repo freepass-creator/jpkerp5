@@ -455,16 +455,29 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
               <th className="num" style={{ width: COL.money }}>보증금</th>
               <th className="center" style={{ width: 90 }}>계약서</th>
               <th className="center" style={{ width: COL.status }}>상태</th>
+              <th style={{ width: 130 }}>종료</th>
             </tr>
           </thead>
           <tbody>
             {isEmpty ? (
-              <EmptyRow colSpan={8}>계약 이력 없음</EmptyRow>
-            ) : contracts.map((c) => (
-              <tr key={c.id}>
+              <EmptyRow colSpan={9}>계약 이력 없음</EmptyRow>
+            ) : contracts.map((c) => {
+              const isActive = c.status === '운행' || c.status === '대기';
+              return (
+              <tr key={c.id} style={isActive ? { background: 'var(--brand-bg)' } : undefined}>
                 <td className="mono">{c.contractDate}</td>
                 <td className="mono dim">{c.contractNo || <span className="muted">-</span>}</td>
-                <td>{c.customerName || <span className="muted">-</span>}</td>
+                <td>
+                  {isActive && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700,
+                      padding: '1px 6px', marginRight: 4,
+                      background: 'var(--brand)', color: 'white',
+                      borderRadius: 'var(--radius-sm)',
+                    }}>현재</span>
+                  )}
+                  {c.customerName || <span className="muted">-</span>}
+                </td>
                 <td className="center mono dim">{c.termMonths ? `${c.termMonths}개월` : <span className="muted">-</span>}</td>
                 <td className="num mono">{c.monthlyRent ? `₩${c.monthlyRent.toLocaleString()}` : <span className="muted">-</span>}</td>
                 <td className="num mono">{c.deposit ? `₩${c.deposit.toLocaleString()}` : <span className="muted">-</span>}</td>
@@ -484,8 +497,32 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
                   )}
                 </td>
                 <td className="center"><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
+                <td>
+                  {isActive ? (
+                    <span className="dim" style={{ fontSize: 11 }}>진행중</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, fontSize: 11 }}>
+                      <span style={{
+                        color: c.endReason === '정상종료' ? 'var(--green-text)'
+                          : c.endReason === '중도해지' ? 'var(--orange-text)'
+                          : c.endReason === '채권보전' ? 'var(--red-text)'
+                          : 'var(--text-sub)',
+                        fontWeight: 600,
+                      }}>
+                        {c.endReason ?? c.status}
+                      </span>
+                      {c.endedAt && <span className="dim mono" style={{ fontSize: 10 }}>{c.endedAt}</span>}
+                      {(c.unpaidAtEnd ?? 0) > 0 && (
+                        <span style={{ fontSize: 10, color: 'var(--red-text)' }}>
+                          미수 ₩{(c.unpaidAtEnd ?? 0).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </Section>
