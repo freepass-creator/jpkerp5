@@ -36,6 +36,30 @@ const NEXT_ACTION: Record<VehicleStatus, string> = {
   '반납':       '점검 → 휴차대기',
   '임시배차':   '원본 차량 복귀 시 임시배차 해제',
 };
+
+/** 상태 전이 — 라이프사이클 자연 흐름. 클릭 시 confirm → vehicle.status update */
+const NEXT_STATES: Record<VehicleStatus, VehicleStatus[]> = {
+  '구매대기':   ['등록대기', '매각검토'],
+  '등록대기':   ['상품화대기', '매각검토'],
+  '상품화대기': ['상품화중'],
+  '상품화중':   ['상품대기'],
+  '상품대기':   ['재고', '인도대기'],
+  '재고':       ['상품대기', '인도대기'],
+  '인도대기':   ['운행'],
+  '운행':       ['연장대기', '종료대기', '정비', '사고'],
+  '연장대기':   ['운행', '종료대기'],
+  '종료대기':   ['반납'],
+  '반납':       ['휴차대기'],
+  '휴차대기':   ['재고', '매각검토', '휴차'],
+  '휴차':       ['재고', '매각검토'],
+  '정비':       ['운행', '휴차'],
+  '사고':       ['정비'],
+  '매각검토':   ['매각대기'],
+  '매각대기':   ['매각'],
+  '매각':       [],
+  '출고대기':   ['운행'],
+  '임시배차':   ['운행'],
+};
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -61,11 +85,12 @@ function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boo
 
 /* ─── 자산현황 탭1: 운영 요약 — 한 화면 운영 상태 한눈에 ─── */
 function OperationOverviewTab({
-  vehicle, contracts, history,
+  vehicle, contracts, history, onUpdate,
 }: {
   vehicle: Vehicle;
   contracts: Contract[];
   history: HistoryEntry[];
+  onUpdate: (v: Vehicle) => void;
 }) {
   const { companies } = useCompanies();
   // 등록 상태 — 자등증 입력 여부
@@ -84,20 +109,130 @@ function OperationOverviewTab({
   // 검사 만기
   const inspectExpiry = activeContract?.inspectionDueDate;
   const inspectDaysLeft = inspectExpiry ? Math.round((new Date(inspectExpiry).getTime() - Date.now()) / 86400000) : null;
+  // 자동차세
+  const taxExpiry = activeContract?.vehicleTaxDueDate;
+  const taxDaysLeft = taxExpiry ? Math.round((new Date(taxExpiry).getTime() - Date.now()) / 86400000) : null;
+  // 시동제어
+  const engineLocked = contracts.some((c) => c.engineDisabled);
+  // 큰 이슈 수집 — 부각 카드용
+  const issues: { tone: 'red' | 'orange'; label: string; value: string }[] = [];
+  if (unpaid > 0) issues.push({ tone: 'red', label: '미수금', value: `₩${unpaid.toLocaleString()}` });
+  if (engineLocked) issues.push({ tone: 'red', label: '시동제어', value: '활성' });
+  if (insDaysLeft != null && insDaysLeft < 0) issues.push({ tone: 'red', label: '보험만기', value: `D+${Math.abs(insDaysLeft)} 경과` });
+  else if (insDaysLeft != null && insDaysLeft < 30) issues.push({ tone: 'orange', label: '보험만기', value: `D-${insDaysLeft}` });
+  if (inspectDaysLeft != null && inspectDaysLeft < 0) issues.push({ tone: 'red', label: '정기검사', value: `D+${Math.abs(inspectDaysLeft)} 경과` });
+  else if (inspectDaysLeft != null && inspectDaysLeft < 30) issues.push({ tone: 'orange', label: '정기검사', value: `D-${inspectDaysLeft}` });
+  if (taxDaysLeft != null && taxDaysLeft < 0) issues.push({ tone: 'red', label: '자동차세', value: `D+${Math.abs(taxDaysLeft)} 경과` });
+  else if (taxDaysLeft != null && taxDaysLeft < 14) issues.push({ tone: 'orange', label: '자동차세', value: `D-${taxDaysLeft}` });
+  if (!regOk && vehicle.status !== '구매대기') issues.push({ tone: 'orange', label: '자등증', value: '미입력' });
+
+  // 가능한 다음 상태
+  const nextStates = NEXT_STATES[vehicle.status as VehicleStatus] ?? [];
+
+  function changeStatus(next: VehicleStatus) {
+    if (!window.confirm(`차량 상태를 [${vehicle.status}] → [${next}] 로 변경하시겠습니까?`)) return;
+    onUpdate({ ...vehicle, status: next });
+  }
+
+  // 등록 체크리스트 — 각 단계별 prerequisites
+  const checklist: { label: string; ok: boolean; hint?: string }[] = [
+    { label: '자동차등록증 정보', ok: !!(vehicle.vin && vehicle.manufacturedDate), hint: 'VIN + 제작연월' },
+    { label: '자동차등록증 첨부', ok: !!vehicle.registrationCertUrl },
+    { label: '자동차보험 가입', ok: !!(vehicle.insuranceCompany && vehicle.insurancePolicyNo) },
+    { label: '보험증권 첨부', ok: !!vehicle.insuranceCertUrl },
+    { label: '할부 정보 입력', ok: !!(vehicle.loanCompany && vehicle.loanMonths), hint: '할부사 + 개월수' },
+    { label: 'GPS 설치', ok: !!(vehicle.gpsProvider || vehicle.gpsDeviceId) },
+  ];
 
   return (
     <Stack>
-      <Section title="차량 라이프사이클">
+      {/* 큰 이슈 부각 — 있을 때만 빨강/주황 강조 카드 */}
+      {issues.length > 0 && (
+        <div style={{
+          background: 'var(--red-bg)',
+          border: '1px solid var(--red-text)',
+          borderRadius: 'var(--radius-md)',
+          padding: '10px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 700, color: 'var(--red-text)' }}>
+            <span>즉시 처리 필요</span>
+            <span style={{ fontSize: 10, color: 'var(--text-sub)', fontWeight: 500 }}>{issues.length}건</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {issues.map((it, i) => (
+              <span key={i} style={{
+                display: 'inline-flex', alignItems: 'baseline', gap: 4,
+                fontSize: 11, padding: '3px 8px',
+                background: it.tone === 'red' ? 'var(--red-text)' : 'var(--orange-text, #c2410c)',
+                color: 'white', borderRadius: 'var(--radius-sm)',
+              }}>
+                <span style={{ fontWeight: 600 }}>{it.label}</span>
+                <span className="mono" style={{ fontSize: 10, opacity: 0.95 }}>{it.value}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 차량 상태 + 다음 단계 chip — 클릭으로 진행 */}
+      <Section title="차량 상태">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
+          <StatusBadge tone={vehicleStatusTone(vehicle.status)}>
+            <span style={{ fontSize: 12, fontWeight: 700 }}>{vehicle.status}</span>
+          </StatusBadge>
+          <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>
+            {NEXT_ACTION[vehicle.status as VehicleStatus] ?? '-'}
+          </span>
+        </div>
+        {nextStates.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: 'var(--text-weak)', marginRight: 2 }}>→ 다음:</span>
+            {nextStates.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className="btn btn-sm"
+                onClick={() => changeStatus(s)}
+                style={{ fontSize: 11 }}
+                title={`상태 [${s}] 로 변경`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <Grid2>
-          <KV k="현재 상태" v={<StatusBadge tone={vehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusBadge>} />
-          <KV k="다음 액션" v={<span style={{ fontSize: 12 }}>{NEXT_ACTION[vehicle.status as VehicleStatus] ?? '-'}</span>} />
           <KV k="회사" v={vehicle.company ? displayCompanyName(vehicle.company, companies) : undefined} />
           <KV k="활성 계약" v={activeContract ? (
-            <a href={`/?q=${encodeURIComponent(vehicle.plate ?? '')}`} style={{ color: 'var(--brand)', textDecoration: 'none' }}>
-              {activeContract.contractNo ?? ''} · {activeContract.customerName ?? ''} →
-            </a>
+            <span>{activeContract.contractNo ?? ''} · {activeContract.customerName ?? ''}</span>
           ) : <span className="dim">없음</span>} />
         </Grid2>
+      </Section>
+
+      {/* 등록 체크리스트 — 자등증/보험/할부/GPS 입력·첨부 상태 */}
+      <Section title="등록 체크리스트">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {checklist.map((item, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              fontSize: 12, padding: '4px 0',
+            }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 16, height: 16, borderRadius: 3,
+                border: `1px solid ${item.ok ? 'var(--green-text)' : 'var(--border)'}`,
+                background: item.ok ? 'var(--green-bg)' : 'transparent',
+                color: item.ok ? 'var(--green-text)' : 'var(--text-weak)',
+                fontSize: 10, fontWeight: 700,
+              }}>{item.ok ? '✓' : ''}</span>
+              <span style={{ color: item.ok ? undefined : 'var(--text-sub)' }}>{item.label}</span>
+              {item.hint && <span className="dim" style={{ fontSize: 10 }}>({item.hint})</span>}
+            </div>
+          ))}
+        </div>
       </Section>
 
       <Section title="등록 상태">
@@ -156,23 +291,6 @@ function OperationOverviewTab({
           <KV k="정비 횟수" v={repairCount > 0 ? `${repairCount}회` : undefined} mono />
           <KV k="누적 비용" v={repairTotal > 0 ? `₩${repairTotal.toLocaleString()}` : undefined} mono />
           <KV k="최근 정비" v={repairLast ? `${repairLast.date} · ${repairLast.title}` : undefined} />
-        </Grid2>
-      </Section>
-
-      <Section title="운영 현황">
-        <Grid2>
-          <KV k="현재 상태" v={<StatusBadge tone={vehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusBadge>} />
-          <KV k="회사" v={vehicle.company ? displayCompanyName(vehicle.company, companies) : undefined} />
-          <KV k="활성 계약" v={activeContract ? (
-            <a href={`/?q=${encodeURIComponent(vehicle.plate ?? '')}`} style={{ color: 'var(--brand)', textDecoration: 'none' }} title="운영현황에서 이 차량 계약 보기">
-              {activeContract.contractNo ?? ''} · {activeContract.customerName ?? ''} →
-            </a>
-          ) : <span className="dim">없음</span>} />
-          <KV k="누적 미수" v={unpaid > 0 ? (
-            <a href={`/receivables?q=${encodeURIComponent(vehicle.plate ?? '')}`} style={{ color: 'var(--red-text)', textDecoration: 'none' }} title="미수 관리에서 이 차량 처리">
-              ₩{unpaid.toLocaleString()} →
-            </a>
-          ) : <span className="dim">없음</span>} mono />
         </Grid2>
       </Section>
 
@@ -779,7 +897,7 @@ export function VehicleDetailDialog({
         : [
             // 페이지 메뉴와 동일 6분류
             { value: 'operation', label: '운영 현황',
-              content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} />
+              content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} onUpdate={onUpdate} />
             },
             { value: 'risk', label: `리스크 현황${incidentHistory.length > 0 ? ` (${incidentHistory.length})` : ''}`,
               content: <RiskTab vehicle={vehicle} contracts={sortedContracts} incidentHistory={incidentHistory} allHistory={sortedHistory} />
