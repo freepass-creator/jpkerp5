@@ -24,7 +24,7 @@ export type MenuKey =
 
 export const MENU_LABELS: Record<MenuKey, string> = {
   dashboard: '대시보드',
-  receivables: '리스크 관리',
+  receivables: '리스크 현황',
   asset: '자산 관리',
   contract: '계약 관리',
   finance: '재무 관리',
@@ -167,8 +167,8 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
         </>
       )}
 
-      {/* ④ 과태료·일반·공지사항 (같은 그룹) — 손익은 일반관리 안으로 통합 */}
-      {(show('penalty') || show('general') || show('notice')) && (
+      {/* ④ 과태료·일반 (같은 그룹) — 손익은 일반관리 안으로 통합 */}
+      {(show('penalty') || show('general')) && (
         <>
           <div className="sb-section">
             {show('penalty') && (
@@ -183,12 +183,7 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
                 <span>일반 관리</span>
               </Link>
             )}
-            {show('notice') && (
-              <Link href="/notice" className={`sb-item ${isActive('/notice') ? 'active' : ''}`} title="공지사항 — 누구나 작성·댓글">
-                <Megaphone size={14} weight={isActive('/notice') ? 'fill' : 'regular'} />
-                <span>공지사항</span>
-              </Link>
-            )}
+            {/* 공지사항은 사이드바 메뉴 X — 대시보드 캘린더 옆 패널에서 노출 */}
             {/* 디스패치·근태·활동피드 → /general 좌측 nav 안으로 통합 (2026-06-15) */}
           </div>
           <div className="sb-divider" />

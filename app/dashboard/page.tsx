@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@/lib/use-auth';
 import { useMyOrgContext } from '@/lib/organization';
 import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, DISPATCH_PRIORITY_LABEL, DISPATCH_PRIORITY_ORDER, updateDispatchStatus, type DispatchOrder, type DispatchPriority } from '@/lib/firebase/dispatch-store';
+import { useNotices, createNotice, addComment as addNoticeComment } from '@/lib/firebase/notice-store';
 import dynamic from 'next/dynamic';
 const NewOrderDialog = dynamic(
   () => import('@/components/dispatch/dispatch-view').then((m) => m.NewOrderDialog),
@@ -18,6 +19,11 @@ const DispatchDetailDialog = dynamic(
   () => import('@/components/dispatch/dispatch-detail-dialog').then((m) => m.DispatchDetailDialog),
   { ssr: false },
 );
+const DispatchListDialog = dynamic(
+  () => import('@/components/dispatch/dispatch-list-dialog').then((m) => m.DispatchListDialog),
+  { ssr: false },
+);
+import type { DispatchListKind } from '@/components/dispatch/dispatch-list-dialog';
 import { toast } from '@/lib/toast';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -52,6 +58,7 @@ export default function DashboardPage() {
   const outgoingOrders = useSentDispatchOrders(user?.email);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+  const [listKind, setListKind] = useState<DispatchListKind | null>(null);
   const detailOrder = useMemo(() => {
     if (!detailOrderId) return null;
     return incomingOrders.find((o) => o.id === detailOrderId) ?? outgoingOrders.find((o) => o.id === detailOrderId) ?? null;
@@ -174,11 +181,16 @@ export default function DashboardPage() {
             />
           </Section>
 
-          {/* 위 5분할 grid 와 column align — 캘린더 span 4, 데이터 요약 span 1 */}
+          {/* 위 5분할 grid 와 column align — 캘린더 span 3 + 공지사항 span 1 + 데이터 요약 span 1 */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12, alignItems: 'stretch', flex: '1 1 0', minHeight: 0 }}>
-            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 4' }}>
+            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 3' }}>
               <Section fill title="일자별 스케줄" right={<span className="dim" style={{ fontSize: 11 }}>{today.slice(0, 7)} · 더블클릭 → 상세</span>}>
                 <ScheduleCalendar contracts={contracts} today={today} onSelectContract={setDetailContractId} />
+              </Section>
+            </div>
+            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 1' }}>
+              <Section fill title="공지사항" right={<span className="dim" style={{ fontSize: 11 }}>누구나 · 댓글</span>}>
+                <NoticeMiniPanel />
               </Section>
             </div>
             <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 1' }}>
@@ -1550,7 +1562,7 @@ function TaskCardsGrid({
     };
 
     const incoming: TaskItem[] = incomingOrders
-      .filter((o) => o.status === 'pending' || o.status === 'acknowledged')
+      .filter((o) => o.status === 'pending' || o.status === 'acknowledged' || o.status === 'in_progress')
       .sort((a, b) => priOrder(a.priority) - priOrder(b.priority))
       .slice(0, 8)
       .map((o) => {
@@ -1559,7 +1571,7 @@ function TaskCardsGrid({
           key: `in-${o.id}`,
           title: `${priPrefix(o.priority)}${o.title}`,
           sub: `${DISPATCH_LABEL[o.kind]}${badge ? ` · ${badge}` : ''}${o.body ? ` · ${o.body.slice(0, 40)}` : ''}`,
-          meta: o.status === 'pending' ? '미확인' : '확인',
+          meta: o.status === 'pending' ? '미확인' : o.status === 'acknowledged' ? '확인' : '진행중',
           onClick: onOpenOrder ? () => onOpenOrder(o.id) : undefined,
           ackId: o.status === 'pending' ? o.id : undefined,
           priority: o.priority,
@@ -1807,4 +1819,150 @@ function CompactKpi({
   };
   if (href) return <Link href={href} style={style}>{body}</Link>;
   return <div style={style}>{body}</div>;
+}
+
+/* ─── 공지사항 미니 패널 — 대시보드 캘린더 옆 ─── */
+function NoticeMiniPanel() {
+  const { user } = useAuth();
+  const { notices, loading } = useNotices();
+  const [composing, setComposing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftBody, setDraftBody] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  async function handleCreate() {
+    if (!draftTitle.trim() || !draftBody.trim()) { toast.warning('제목·내용 입력'); return; }
+    if (!user?.email) { toast.error('로그인 정보 없음'); return; }
+    try {
+      await createNotice({
+        title: draftTitle.trim(),
+        body: draftBody.trim(),
+        createdBy: user.email,
+        createdByName: user.displayName ?? undefined,
+      });
+      setDraftTitle(''); setDraftBody(''); setComposing(false);
+      toast.success('공지 등록');
+    } catch (e) {
+      toast.error(`등록 실패: ${(e as Error).message}`);
+    }
+  }
+
+  const openNotice = openId ? notices.find((n) => n.id === openId) ?? null : null;
+  const [reply, setReply] = useState('');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minHeight: 0 }}>
+      {/* 작성 토글 */}
+      {composing ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <input
+            className="input"
+            placeholder="공지 제목"
+            value={draftTitle}
+            onChange={(e) => setDraftTitle(e.target.value)}
+            style={{ fontSize: 12 }}
+          />
+          <textarea
+            className="input"
+            placeholder="내용"
+            value={draftBody}
+            onChange={(e) => setDraftBody(e.target.value)}
+            style={{ fontSize: 12, minHeight: 60, resize: 'vertical' }}
+          />
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button className="btn btn-primary btn-sm" type="button" onClick={() => void handleCreate()}>등록</button>
+            <button className="btn btn-sm" type="button" onClick={() => { setComposing(false); setDraftTitle(''); setDraftBody(''); }}>취소</button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => setComposing(true)}
+          style={{ fontSize: 11, justifyContent: 'center' }}
+        >
+          + 새 공지
+        </button>
+      )}
+
+      {/* 목록 */}
+      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {loading ? (
+          <div className="muted center" style={{ fontSize: 11, padding: 16 }}>불러오는 중…</div>
+        ) : notices.length === 0 ? (
+          <div className="muted center" style={{ fontSize: 11, padding: 16 }}>공지 없음</div>
+        ) : notices.slice(0, 10).map((n) => {
+          const cn = n.comments ? Object.keys(n.comments).length : 0;
+          const isOpen = openId === n.id;
+          return (
+            <div key={n.id} style={{
+              padding: '6px 8px',
+              background: isOpen ? 'var(--brand-bg)' : 'var(--bg-card)',
+              border: '1px solid var(--border-soft)',
+              borderRadius: 'var(--radius-sm)',
+            }}>
+              <button
+                type="button"
+                onClick={() => { setOpenId(isOpen ? null : n.id); setReply(''); }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  textAlign: 'left', width: '100%', padding: 0,
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 600, display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {n.title}
+                  </span>
+                  {cn > 0 && <span className="dim" style={{ fontSize: 10 }}>💬 {cn}</span>}
+                </div>
+                <div className="dim" style={{ fontSize: 10, marginTop: 2 }}>
+                  {n.createdByName ?? n.createdBy}
+                </div>
+              </button>
+              {isOpen && (
+                <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--border)' }}>
+                  <div style={{ fontSize: 11, whiteSpace: 'pre-wrap', lineHeight: 1.5, marginBottom: 6 }}>
+                    {n.body}
+                  </div>
+                  {n.comments && Object.values(n.comments).sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '')).map((c) => (
+                    <div key={c.id} style={{
+                      padding: '4px 6px', background: 'var(--bg-sunken)',
+                      borderRadius: 'var(--radius-sm)', marginBottom: 3, fontSize: 11,
+                    }}>
+                      <strong style={{ fontSize: 10 }}>{c.createdByName ?? c.createdBy}: </strong>
+                      <span style={{ whiteSpace: 'pre-wrap' }}>{c.body}</span>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+                    <input
+                      className="input"
+                      placeholder="댓글"
+                      value={reply}
+                      onChange={(e) => setReply(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && reply.trim() && user?.email) {
+                          e.preventDefault();
+                          void (async () => {
+                            try {
+                              await addNoticeComment(n.id, {
+                                body: reply.trim(),
+                                createdBy: user.email ?? '',
+                                createdByName: user.displayName ?? undefined,
+                              });
+                              setReply('');
+                            } catch (err) { toast.error((err as Error).message); }
+                          })();
+                        }
+                      }}
+                      style={{ flex: 1, fontSize: 11 }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
