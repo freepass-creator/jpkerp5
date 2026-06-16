@@ -8,7 +8,11 @@ import {
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, updateDispatchStatus, type DispatchOrder } from '@/lib/firebase/dispatch-store';
-import { NewOrderDialog } from '@/components/dispatch/dispatch-view';
+import dynamic from 'next/dynamic';
+const NewOrderDialog = dynamic(
+  () => import('@/components/dispatch/dispatch-view').then((m) => m.NewOrderDialog),
+  { ssr: false },
+);
 import { toast } from '@/lib/toast';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useContracts } from '@/lib/firebase/contracts-store';
