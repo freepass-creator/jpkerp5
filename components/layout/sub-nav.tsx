@@ -35,7 +35,7 @@ export const CONTRACT_SUB: SubNavItem[] = [
   { href: '/contract/expire', label: '만기임박' },
   { href: '/contract/return', label: '반납' },
   { href: '/contract/overdue', label: '미수금' },
-  { href: '/contract/schedule', label: '수납스케줄' },
+  { href: '/contract/schedule', label: '계약스케줄' },
   { href: '/contract/idle', label: '휴차' },
   { href: '/contract/ended', label: '종료' },
 ];
