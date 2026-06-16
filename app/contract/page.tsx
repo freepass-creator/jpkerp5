@@ -58,7 +58,7 @@ export default function ContractPage() {
     open: false, x: 0, y: 0, row: null,
   });
 
-  type QuickFilter = 'all' | 'active' | 'ended' | 'expire' | 'return' | 'overdue';
+  type QuickFilter = 'all' | 'active' | 'ended' | 'expire' | 'expired' | 'return' | 'overdue';
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:contract:company', 'all');
   const [quickFilter, setQuickFilter] = usePersistentState<QuickFilter>('filter:contract:quick', 'active');
@@ -119,11 +119,16 @@ export default function ContractPage() {
       } else if (quickFilter === 'ended') {
         if (!ENDED) return false;
       } else if (quickFilter === 'expire') {
-        // 만기임박: status='운행' && returnScheduledDate D-90 이내
+        // 만기도래: status='운행' && returnScheduledDate D-90 이내 (아직 안 지남)
         if (c.status !== '운행') return false;
         if (!c.returnScheduledDate) return false;
         const days = Math.round((new Date(c.returnScheduledDate).getTime() - new Date(today_).getTime()) / 86400000);
         if (days < 0 || days > 90) return false;
+      } else if (quickFilter === 'expired') {
+        // 만기경과: status='운행' && returnScheduledDate < today (지났는데 미반납)
+        if (c.status !== '운행') return false;
+        if (!c.returnScheduledDate) return false;
+        if (c.returnScheduledDate >= today_) return false;
       } else if (quickFilter === 'return') {
         if (c.status !== '반납') return false;
       } else if (quickFilter === 'overdue') {
@@ -141,7 +146,7 @@ export default function ContractPage() {
 
   // 각 퀵필터 카운트 — chip 라벨에 표시
   const counts = useMemo(() => {
-    let expire = 0, ret = 0, overdue = 0, ended = 0, active = 0, all = 0;
+    let expire = 0, expired = 0, ret = 0, overdue = 0, ended = 0, active = 0, all = 0;
     for (const c of contracts) {
       if (!matchesCompanyFilter(c.company, companyFilter)) continue;
       all++;
@@ -151,11 +156,12 @@ export default function ContractPage() {
       if (c.status === '운행' && c.returnScheduledDate) {
         const days = Math.round((new Date(c.returnScheduledDate).getTime() - new Date(today).getTime()) / 86400000);
         if (days >= 0 && days <= 90) expire++;
+        else if (days < 0) expired++;
       }
       if (c.status === '반납') ret++;
       if ((c.unpaidAmount ?? 0) > 0) overdue++;
     }
-    return { all, active, expire, return: ret, overdue, ended };
+    return { all, active, expire, expired, return: ret, overdue, ended };
   }, [contracts, companyFilter, today]);
 
   return (
@@ -167,10 +173,19 @@ export default function ContractPage() {
         <>
           <CompanyFilter value={companyFilter} onChange={setCompanyFilter} options={companyOptions} master={companyMaster} />
           <span className="filter-divider" />
-          {/* 보조 퀵필터 — count > 0 일 때만 표시 (반응형) */}
+          {/* 라이프사이클 — 맨 앞 (유지 default) */}
+          <button type="button" className={`chip ${quickFilter === 'active' ? 'active' : ''}`} onClick={() => setQuickFilter('active')}>
+            유지<span className="chip-count">{counts.active}</span>
+          </button>
+          {/* 보조 퀵필터 — count > 0 일 때만 표시 */}
           {counts.expire > 0 && (
             <button type="button" className={`chip ${quickFilter === 'expire' ? 'active' : ''}`} onClick={() => setQuickFilter('expire')}>
-              만기임박<span className="chip-count">{counts.expire}</span>
+              만기도래<span className="chip-count">{counts.expire}</span>
+            </button>
+          )}
+          {counts.expired > 0 && (
+            <button type="button" className={`chip ${quickFilter === 'expired' ? 'active' : ''}`} onClick={() => setQuickFilter('expired')}>
+              만기경과<span className="chip-count">{counts.expired}</span>
             </button>
           )}
           {counts.return > 0 && (
@@ -178,16 +193,6 @@ export default function ContractPage() {
               반납<span className="chip-count">{counts.return}</span>
             </button>
           )}
-          {counts.overdue > 0 && (
-            <button type="button" className={`chip ${quickFilter === 'overdue' ? 'active' : ''}`} onClick={() => setQuickFilter('overdue')}>
-              미수금<span className="chip-count">{counts.overdue}</span>
-            </button>
-          )}
-          {/* 라이프사이클 — 우측 push (필터 아닌 view 분류, 항상 표시) */}
-          <span style={{ marginLeft: 'auto' }} />
-          <button type="button" className={`chip ${quickFilter === 'active' ? 'active' : ''}`} onClick={() => setQuickFilter('active')}>
-            유지<span className="chip-count">{counts.active}</span>
-          </button>
           <button type="button" className={`chip ${quickFilter === 'ended' ? 'active' : ''}`} onClick={() => setQuickFilter('ended')}>
             종료<span className="chip-count">{counts.ended}</span>
           </button>
