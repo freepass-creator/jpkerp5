@@ -247,7 +247,7 @@ function KpiCard({ label, value, tone, icon }: { label: string; value: number; t
 export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void; creatorEmail?: string }) {
   const users = useUsers();
   const { contracts } = useContracts();
-  const [targetMode, setTargetMode] = useState<'broadcast' | 'division' | 'team' | 'person'>('team');
+  const [targetMode, setTargetMode] = useState<'broadcast' | 'division' | 'team' | 'person'>('person');
   const [assignedToUid, setAssignedToUid] = useState<string>('');
   const [assignedToTeam, setAssignedToTeam] = useState<string>('');
   const [assignedToDivision, setAssignedToDivision] = useState<string>('');
@@ -309,7 +309,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
         <DialogBody style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Field label="받는 곳">
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-              {(['team', 'person', 'division', 'broadcast'] as const).map((m) => (
+              {(['person', 'team', 'division', 'broadcast'] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
@@ -356,7 +356,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
               </div>
             )}
           </Field>
-          <Field label="우선순위">
+          <Field label="처리기한">
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {(['urgent', 'today', 'thisWeek', 'thisMonth'] as DispatchPriority[]).map((p) => (
                 <button
