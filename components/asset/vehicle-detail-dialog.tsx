@@ -606,10 +606,10 @@ function IncidentTab({ history }: { history: HistoryEntry[] }) {
 }
 
 /* ─── 메인 다이얼로그 ─── */
-/** SSOT 차량 dialog 의 표준 탭 키 — 페이지 메뉴와 동일 5분류
- *   operation / risk / asset / contract / finance */
+/** SSOT 차량 dialog 의 표준 탭 키 — 5분류
+ *   operation / risk / asset / contract / payment (수납) */
 export type VehicleDialogTab =
-  | 'operation' | 'risk' | 'asset' | 'contract' | 'finance';
+  | 'operation' | 'risk' | 'asset' | 'contract' | 'payment';
 
 export function VehicleDetailDialog({
   vehicle, history, contracts, view, onUpdate, onClose, onEdit, initialTab,
@@ -679,7 +679,7 @@ export function VehicleDetailDialog({
             { value: 'contract', label: `계약 (${sortedContracts.length})`,
               content: <ContractListTab contracts={sortedContracts} />
             },
-            { value: 'finance', label: `재무 (${sortedContracts.reduce((n, c) => n + (c.schedules ?? []).reduce((m, s) => m + (s.payments ?? []).length, 0), 0)})`,
+            { value: 'payment', label: `수납 (${sortedContracts.reduce((n, c) => n + (c.schedules ?? []).reduce((m, s) => m + (s.payments ?? []).length, 0), 0)})`,
               content: <PaymentHistoryTab contracts={sortedContracts} />
             },
           ]}
