@@ -275,7 +275,7 @@ export default function ReceivablesPage() {
         <header className="topbar">
           <div className="topbar-title">
             <Warning size={16} weight="fill" style={{ color: 'var(--red-text)' }} />
-            <span>리스크 관리</span>
+            <span>리스크 현황</span>
           </div>
           <div className="topbar-search">
             <MagnifyingGlass size={14} className="icon" />

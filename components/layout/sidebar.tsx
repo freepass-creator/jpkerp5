@@ -120,16 +120,16 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
       )}
       {show('dashboard') && <div className="sb-divider" />}
 
-      {/* ② 필수 운영 — 운영현황(항상 표시) · 리스크관리 */}
+      {/* ② 필수 운영 — 운영현황(항상 표시) · 리스크 현황 */}
       <div className="sb-section">
         <Link href="/" className={`sb-item ${pathname === '/' ? 'active' : ''}`} title="운영 현황 (필수)">
           <Car size={14} weight={pathname === '/' ? 'fill' : 'regular'} />
           <span>운영 현황</span>
         </Link>
         {show('receivables') && (
-          <Link href="/receivables" className={`sb-item ${isActive('/receivables') ? 'active' : ''}`} title="리스크 관리 — 미수/시동제어/검사지연 등">
+          <Link href="/receivables" className={`sb-item ${isActive('/receivables') ? 'active' : ''}`} title="리스크 현황 — 미수/시동제어/검사지연 등">
             <Warning size={14} weight={isActive('/receivables') ? 'fill' : 'regular'} />
-            <span>리스크 관리</span>
+            <span>리스크 현황</span>
           </Link>
         )}
       </div>
