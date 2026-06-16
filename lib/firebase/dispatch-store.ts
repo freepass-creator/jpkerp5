@@ -47,13 +47,19 @@ export const DISPATCH_PRIORITY_ORDER: Record<DispatchPriority, number> = {
 
 export type DispatchOrder = {
   id: string;
-  /** 대상 직원 uid (개인 발송). 비어있으면 팀/부 또는 전체 */
+  /** @deprecated 단일 uid — 호환 보존. 신규는 assignedToUids 사용 */
   assignedToUid?: string;
   assignedToName?: string;
-  /** 대상 팀 (팀 단위 발송) — UserProfile.department 매칭 */
+  /** @deprecated 단일 팀 — 호환 보존. 신규는 assignedToTeams */
   assignedToTeam?: string;
-  /** 대상 부 (부 단위 발송) — 산하 모든 팀의 직원 */
+  /** @deprecated 단일 부 — 호환 보존. 신규는 assignedToDivisions */
   assignedToDivision?: string;
+  /** 대상 직원 uid 복수 (개인 multi-select) */
+  assignedToUids?: string[];
+  /** 대상 팀 복수 (UserProfile.department 매칭) */
+  assignedToTeams?: string[];
+  /** 대상 부 복수 (산하 모든 팀 직원) */
+  assignedToDivisions?: string[];
   title: string;
   body?: string;
   contractId?: string;
@@ -140,11 +146,14 @@ export function useMyDispatchOrders(
       unsub = onValue(ref(db, PATH), (snap) => {
         const val = (snap.val() ?? {}) as Record<string, DispatchOrder>;
         const list = Object.values(val).filter((o) => {
-          const broadcast = !o.assignedToUid && !o.assignedToTeam && !o.assignedToDivision;
+          const uids = o.assignedToUids ?? (o.assignedToUid ? [o.assignedToUid] : []);
+          const teams = o.assignedToTeams ?? (o.assignedToTeam ? [o.assignedToTeam] : []);
+          const divs = o.assignedToDivisions ?? (o.assignedToDivision ? [o.assignedToDivision] : []);
+          const broadcast = uids.length === 0 && teams.length === 0 && divs.length === 0;
           return broadcast
-            || (o.assignedToUid && o.assignedToUid === uid)
-            || (o.assignedToTeam && myTeam && o.assignedToTeam === myTeam)
-            || (o.assignedToDivision && myDivision && o.assignedToDivision === myDivision);
+            || (!!uid && uids.includes(uid))
+            || (!!myTeam && teams.includes(myTeam))
+            || (!!myDivision && divs.includes(myDivision));
         });
         list.sort((a, b) => (b._meta?.at ?? '').localeCompare(a._meta?.at ?? ''));
         setData(list);

@@ -247,10 +247,11 @@ function KpiCard({ label, value, tone, icon }: { label: string; value: number; t
 export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void; creatorEmail?: string }) {
   const users = useUsers();
   const { contracts } = useContracts();
-  const [targetMode, setTargetMode] = useState<'broadcast' | 'division' | 'team' | 'person'>('person');
-  const [assignedToUid, setAssignedToUid] = useState<string>('');
-  const [assignedToTeam, setAssignedToTeam] = useState<string>('');
-  const [assignedToDivision, setAssignedToDivision] = useState<string>('');
+  const [selectedUids, setSelectedUids] = useState<string[]>([]);
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [selectedDivisions, setSelectedDivisions] = useState<string[]>([]);
+  const toggle = (arr: string[], v: string): string[] =>
+    arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
   const [kind, setKind] = useState<DispatchKind>('memo');
   const [priority, setPriority] = useState<DispatchPriority>('today');
   const [title, setTitle] = useState('');
@@ -274,7 +275,6 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
     if (!title.trim()) { toast.warning('제목을 입력하세요'); return; }
     setSaving(true);
     try {
-      const target: UserProfile | undefined = users.find((u) => u.uid === assignedToUid);
       const payload: Parameters<typeof createDispatchOrder>[0] = {
         title: title.trim(),
         body: body.trim() || undefined,
@@ -284,15 +284,18 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
         contractId: contractId || undefined,
         createdBy: creatorEmail,
       };
-      if (targetMode === 'person') {
-        payload.assignedToUid = assignedToUid || undefined;
-        payload.assignedToName = target?.displayName ?? target?.email;
-      } else if (targetMode === 'team') {
-        payload.assignedToTeam = assignedToTeam || undefined;
-      } else if (targetMode === 'division') {
-        payload.assignedToDivision = assignedToDivision || undefined;
+      if (selectedUids.length > 0) {
+        payload.assignedToUids = selectedUids;
+        // 호환 — 단일 선택이면 단수 필드도 함께 set, 표시 이름도
+        if (selectedUids.length === 1) {
+          payload.assignedToUid = selectedUids[0];
+          const target: UserProfile | undefined = users.find((u) => u.uid === selectedUids[0]);
+          payload.assignedToName = target?.displayName ?? target?.email;
+        }
       }
-      // broadcast: 모두 비움
+      if (selectedTeams.length > 0) payload.assignedToTeams = selectedTeams;
+      if (selectedDivisions.length > 0) payload.assignedToDivisions = selectedDivisions;
+      // 모두 비어있으면 broadcast
       await createDispatchOrder(payload);
       toast.success('요청 전송 완료');
       onClose();
@@ -307,54 +310,73 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
     <DialogRoot open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent title="새 요청 보내기" mode="new">
         <DialogBody style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Field label="받는 곳">
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-              {(['person', 'team', 'division', 'broadcast'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={`chip ${targetMode === m ? 'active' : ''}`}
-                  onClick={() => setTargetMode(m)}
-                >
-                  {m === 'team' ? '팀' : m === 'person' ? '개인' : m === 'division' ? '부 전체' : '전체 공지'}
-                </button>
-              ))}
-            </div>
-            {targetMode === 'team' && (
-              <select value={assignedToTeam} onChange={(e) => setAssignedToTeam(e.target.value)} className="input" style={{ width: '100%' }}>
-                <option value="">팀 선택…</option>
-                {ORGANIZATION.map((div) => (
-                  <optgroup key={div.name} label={div.name}>
-                    {div.teams.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            )}
-            {targetMode === 'division' && (
-              <select value={assignedToDivision} onChange={(e) => setAssignedToDivision(e.target.value)} className="input" style={{ width: '100%' }}>
-                <option value="">부 선택…</option>
-                {ORGANIZATION.map((div) => (
-                  <option key={div.name} value={div.name}>{div.name} (산하 전체)</option>
-                ))}
-              </select>
-            )}
-            {targetMode === 'person' && (
-              <select value={assignedToUid} onChange={(e) => setAssignedToUid(e.target.value)} className="input" style={{ width: '100%' }}>
-                <option value="">직원 선택…</option>
-                {users.map((u) => (
-                  <option key={u.uid} value={u.uid}>
-                    {u.displayName ?? u.email}{u.department ? ` (${u.department})` : ''}
-                  </option>
-                ))}
-              </select>
-            )}
-            {targetMode === 'broadcast' && (
-              <div className="dim" style={{ fontSize: 11, padding: '6px 0' }}>
-                전 직원에게 broadcast — 받은 업무 알림이 모두에게 갑니다
+          <Field label="받는 곳 (복수 선택, 모두 비우면 전체 공지)">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* 부 */}
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-sub)', fontWeight: 700, marginBottom: 4 }}>부 (산하 전체)</div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {ORGANIZATION.map((div) => (
+                    <button
+                      key={div.name}
+                      type="button"
+                      className={`chip ${selectedDivisions.includes(div.name) ? 'active' : ''}`}
+                      onClick={() => setSelectedDivisions((prev) => toggle(prev, div.name))}
+                    >
+                      {div.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
+              {/* 팀 */}
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-sub)', fontWeight: 700, marginBottom: 4 }}>팀</div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {ORGANIZATION.flatMap((d) => d.teams).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`chip ${selectedTeams.includes(t) ? 'active' : ''}`}
+                      onClick={() => setSelectedTeams((prev) => toggle(prev, t))}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* 개인 */}
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-sub)', fontWeight: 700, marginBottom: 4 }}>개인</div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {users.length === 0 ? (
+                    <span className="dim" style={{ fontSize: 11 }}>등록된 직원 없음</span>
+                  ) : users.map((u) => (
+                    <button
+                      key={u.uid}
+                      type="button"
+                      className={`chip ${selectedUids.includes(u.uid) ? 'active' : ''}`}
+                      onClick={() => setSelectedUids((prev) => toggle(prev, u.uid))}
+                      title={u.department ? `${u.department}` : undefined}
+                    >
+                      {u.displayName ?? u.email}
+                      {u.department && <span className="dim" style={{ fontSize: 9, marginLeft: 3 }}>· {u.department}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* 요약 */}
+              <div className="dim" style={{ fontSize: 11, padding: '4px 0 0', borderTop: '1px dashed var(--border)' }}>
+                {selectedUids.length + selectedTeams.length + selectedDivisions.length === 0 ? (
+                  <span style={{ color: 'var(--orange-text)' }}>선택 없음 → 전 직원 broadcast</span>
+                ) : (
+                  <>
+                    {selectedDivisions.length > 0 && <>부 <strong>{selectedDivisions.length}</strong> · </>}
+                    {selectedTeams.length > 0 && <>팀 <strong>{selectedTeams.length}</strong> · </>}
+                    {selectedUids.length > 0 && <>개인 <strong>{selectedUids.length}</strong></>}
+                  </>
+                )}
+              </div>
+            </div>
           </Field>
           <Field label="처리기한">
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
