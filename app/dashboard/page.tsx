@@ -1735,7 +1735,21 @@ function TaskCard({
           ))}
         </div>
       )}
-      {href && items.length > 0 && (
+      {onTitleClick && (
+        <button
+          type="button"
+          onClick={onTitleClick}
+          style={{
+            padding: '6px 12px', borderTop: '1px solid var(--border-soft)',
+            fontSize: 11, color: 'var(--text-sub)',
+            background: 'var(--bg-card)', border: 'none',
+            textAlign: 'center', cursor: 'pointer',
+          }}
+        >
+          전체 내역 보기 →
+        </button>
+      )}
+      {!onTitleClick && href && items.length > 0 && (
         <Link href={href} style={{
           padding: '6px 12px', borderTop: '1px solid var(--border-soft)',
           fontSize: 11, color: 'var(--text-sub)', textDecoration: 'none',
