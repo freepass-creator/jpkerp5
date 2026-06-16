@@ -20,6 +20,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { PageShell } from '@/components/ui/page-shell';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
 import { SmsDialog } from '@/components/sms-dialog';
@@ -322,6 +323,7 @@ export default function Page() {
 
   // Firebase RTDB 실시간 구독 — /jpkerp5/contracts
   const { contracts: rawContracts, loading: contractsLoading, update: rtdbUpdate, remove: rtdbRemove } = useContracts();
+  const { openVehicle } = useVehicleDialog();
   const { vehicles, update: updateVehicleMaster } = useVehicles();
 
   /**
@@ -557,8 +559,7 @@ export default function Page() {
   const returns = useMemo(() => buildReturns(scopedContracts, today, 30), [scopedContracts, today]);
 
   function handleRowDoubleClick(c: Contract) {
-    setSelectedId(c.id);
-    setDetailOpen(true);
+    openVehicle(c.vehiclePlate ?? '', 'operation');
   }
 
   function handleExtend(contractId: string, months: number) {

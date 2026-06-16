@@ -23,6 +23,7 @@ import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { CreateDialog } from '@/components/create-dialog';
 import { SmsDialog } from '@/components/sms-dialog';
 import { PageShell } from '@/components/ui/page-shell';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 import { CompanyFilter } from '@/components/ui/filter-bar';
 import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
@@ -44,6 +45,7 @@ export default function ContractPage() {
   }, [master, roleLoading, router]);
 
   const { contracts, loading: contractsLoading, update: updateContract, remove: removeContract } = useContracts();
+  const { openVehicle } = useVehicleDialog();
   const { vehicles, update: updateVehicleMaster } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -337,7 +339,7 @@ export default function ContractPage() {
                     ) : filtered.map((c) => (
                       <tr
                         key={c.id}
-                        onDoubleClick={() => setOpenId(c.id)}
+                        onDoubleClick={() => openVehicle(c.vehiclePlate ?? '', 'contract')}
                         onContextMenu={(e) => {
                           e.preventDefault();
                           setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c });

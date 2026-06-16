@@ -27,6 +27,8 @@ import type { DispatchListKind } from '@/components/dispatch/dispatch-list-dialo
 import { toast } from '@/lib/toast';
 import { Sidebar } from '@/components/layout/sidebar';
 import { AppTopbar } from '@/components/layout/app-topbar';
+import { useVehicleDialog } from '@/lib/global-dialogs';
+import { useCallback } from 'react';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
@@ -47,8 +49,13 @@ import { buildAllAlerts, alertColor, dDayLabel, type AlertItem } from '@/lib/ale
 import { StatusBadge } from '@/components/ui/status-badge';
 
 export default function DashboardPage() {
-  const [detailContractId, setDetailContractId] = useState<string | null>(null);
   const { contracts, update: updateContract } = useContracts();
+  const { openVehicle } = useVehicleDialog();
+  // 계약 id 받아 → 그 계약의 차량번호로 자산 dialog (운영 현황 탭) 열기
+  const handleOpenContract = useCallback((id: string) => {
+    const c = contracts.find((x) => x.id === id);
+    if (c) openVehicle(c.vehiclePlate ?? '', 'operation');
+  }, [contracts, openVehicle]);
   const { vehicles } = useVehicles();
   const { rows: bankTx } = useBankTx();
   const { rows: cardTx } = useCardTx();
@@ -73,7 +80,6 @@ export default function DashboardPage() {
       toast.error(`확인 실패: ${(e as Error).message}`);
     }
   }
-  const detailContract = detailContractId ? contracts.find((c) => c.id === detailContractId) ?? null : null;
   // 시간 의존 KPI(가동률·미수율·D-Day 등) 자동 refresh —
   // 자정 통과 또는 탭 복귀 시점에 새로 계산되도록 dependency 로 사용.
   // 5 분 tick + 탭 visible 전환 + window focus 트리거.
@@ -172,7 +178,7 @@ export default function DashboardPage() {
               incomingOrders={incomingOrders}
               outgoingOrders={outgoingOrders}
               today={today}
-              onOpenContract={setDetailContractId}
+              onOpenContract={handleOpenContract}
               onCreateOutgoing={() => setNewOrderOpen(true)}
               onAckIncoming={handleAckIncoming}
               onOpenOrder={setDetailOrderId}
@@ -184,7 +190,7 @@ export default function DashboardPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12, alignItems: 'stretch', flex: '1 1 0', minHeight: 0 }}>
             <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 3' }}>
               <Section fill title="일자별 스케줄" right={<span className="dim" style={{ fontSize: 11 }}>{today.slice(0, 7)} · 더블클릭 → 상세</span>}>
-                <ScheduleCalendar contracts={contracts} today={today} onSelectContract={setDetailContractId} />
+                <ScheduleCalendar contracts={contracts} today={today} onSelectContract={handleOpenContract} />
               </Section>
             </div>
             <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 1' }}>
@@ -264,12 +270,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <ContractDetailDialog
-          contract={detailContract}
-          open={!!detailContract}
-          onOpenChange={(o) => { if (!o) setDetailContractId(null); }}
-          onUpdate={(u) => { void updateContract(u); }}
-        />
+        {/* ContractDetailDialog 제거 — 통일된 자산 dialog (GlobalDialogsProvider) 사용 */}
         {newOrderOpen && (
           <NewOrderDialog onClose={() => setNewOrderOpen(false)} creatorEmail={user?.email ?? undefined} />
         )}
