@@ -18,7 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Field } from '@/components/ui/editable-field';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { Section, Stack, Grid2 } from '@/components/ui/detail-primitives';
-import { VehiclePhotosSection } from '@/components/vehicle-photos-section';
+import { VehiclePhotosSection, VehiclePhotosByKind } from '@/components/vehicle-photos-section';
 import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
 import { COL, COL_FLEX } from '@/lib/table-cols';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -683,7 +683,7 @@ export function VehicleDetailDialog({
               content: <PaymentHistoryTab contracts={sortedContracts} />
             },
             { value: 'photos', label: '사진',
-              content: <VehiclePhotosSection vehicleId={vehicle.id} readonly />
+              content: <VehiclePhotosTabSection vehicle={vehicle} contracts={sortedContracts} />
             },
           ]}
     />
@@ -832,15 +832,29 @@ function RiskTab({
   );
 }
 
-/* ─── 자산 관리 탭 — 할부 + 보험·검사 + 정비·수선 (사진은 별도 탭) ─── */
+/* ─── 자산 관리 탭 — 보험·검사 + 정비·수선 + 할부 (할부 맨 마지막) + 첨부 서류 ─── */
 function AssetTab({
   vehicle, repairHistory, contracts,
 }: { vehicle: Vehicle; repairHistory: HistoryEntry[]; contracts: Contract[] }) {
   return (
     <Stack>
-      <LoanScheduleTab vehicle={vehicle} />
       <ComplianceTab vehicle={vehicle} contracts={contracts} />
       <RepairHistoryTab history={repairHistory} />
+      <LoanScheduleTab vehicle={vehicle} />
+      <AttachmentSummary vehicle={vehicle} />
     </Stack>
+  );
+}
+
+/* ─── 사진 탭 — 운영현황 패턴 (반납/인도전/상품화 3종 stack) ─── */
+function VehiclePhotosTabSection({ vehicle, contracts }: { vehicle: Vehicle; contracts: Contract[] }) {
+  // 활성 계약(운행/대기) 우선 — contractId 가 있으면 사진 메타에 함께 보존
+  const active = contracts.find((c) => c.status === '운행' || c.status === '대기');
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <VehiclePhotosByKind vehicleId={vehicle.id} kind="return"   contractId={active?.id} title="최근 반납 사진" readonly />
+      <VehiclePhotosByKind vehicleId={vehicle.id} kind="delivery" contractId={active?.id} title="최근 인도전 사진" readonly />
+      <VehiclePhotosByKind vehicleId={vehicle.id} kind="product"  contractId={active?.id} title="최근 상품화 사진" readonly />
+    </div>
   );
 }
