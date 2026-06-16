@@ -17,7 +17,8 @@ import { getRtdb, dbPath, ensureAuth } from '@/lib/firebase/client';
 import {
   createDispatchOrder,
   DISPATCH_LABEL,
-  type DispatchOrder, type DispatchKind, type DispatchStatus,
+  DISPATCH_PRIORITY_LABEL,
+  type DispatchOrder, type DispatchKind, type DispatchStatus, type DispatchPriority,
 } from '@/lib/firebase/dispatch-store';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter } from '@/components/ui/dialog';
@@ -247,6 +248,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
   const { contracts } = useContracts();
   const [assignedToUid, setAssignedToUid] = useState<string>('');
   const [kind, setKind] = useState<DispatchKind>('memo');
+  const [priority, setPriority] = useState<DispatchPriority>('normal');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -275,6 +277,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
         title: title.trim(),
         body: body.trim() || undefined,
         kind,
+        priority,
         dueDate: dueDate || undefined,
         contractId: contractId || undefined,
         createdBy: creatorEmail,
@@ -307,6 +310,20 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
               {KINDS.map((k) => (
                 <button key={k.key} type="button" className={`chip ${kind === k.key ? 'active' : ''}`}
                   onClick={() => setKind(k.key)}>{k.label}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="우선순위">
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {(['urgent', 'normal', 'whenever'] as DispatchPriority[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className={`chip ${priority === p ? 'active' : ''} ${p === 'urgent' ? 'chip-tone-red' : p === 'whenever' ? 'chip-tone-gray' : ''}`}
+                  onClick={() => setPriority(p)}
+                >
+                  {DISPATCH_PRIORITY_LABEL[p]}
+                </button>
               ))}
             </div>
           </Field>

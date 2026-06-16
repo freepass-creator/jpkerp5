@@ -29,6 +29,13 @@ const PATH = dbPath('dispatch_orders');
 
 export type DispatchKind = 'inspection' | 'delivery' | 'return' | 'memo' | 'other';
 export type DispatchStatus = 'pending' | 'acknowledged' | 'in_progress' | 'done' | 'cancelled';
+/** 우선순위 — 긴급/보통(default)/시간될때 */
+export type DispatchPriority = 'urgent' | 'normal' | 'whenever';
+export const DISPATCH_PRIORITY_LABEL: Record<DispatchPriority, string> = {
+  urgent: '긴급',
+  normal: '보통',
+  whenever: '시간될때',
+};
 
 export type DispatchOrder = {
   id: string;
@@ -40,6 +47,8 @@ export type DispatchOrder = {
   contractId?: string;
   vehicleId?: string;
   kind: DispatchKind;
+  /** 우선순위 — 긴급/보통/시간될때. 미설정 시 'normal' 로 간주 */
+  priority?: DispatchPriority;
   /** 마감 일자 (선택) — YYYY-MM-DD */
   dueDate?: string;
   status: DispatchStatus;

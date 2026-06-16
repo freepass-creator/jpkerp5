@@ -7,7 +7,7 @@ import {
   Clock, Calendar as CalendarIcon, Megaphone, PaperPlaneTilt, CheckCircle,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
-import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, updateDispatchStatus, type DispatchOrder } from '@/lib/firebase/dispatch-store';
+import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, DISPATCH_PRIORITY_LABEL, updateDispatchStatus, type DispatchOrder } from '@/lib/firebase/dispatch-store';
 import dynamic from 'next/dynamic';
 const NewOrderDialog = dynamic(
   () => import('@/components/dispatch/dispatch-view').then((m) => m.NewOrderDialog),
@@ -1540,12 +1540,17 @@ function TaskCardsGrid({
       });
     }
 
+    // 우선순위 정렬: urgent → normal → whenever
+    const PRIORITY_ORDER: Record<string, number> = { urgent: 0, normal: 1, whenever: 2 };
+    const priLabel = (p?: string) => p && p !== 'normal' ? `[${DISPATCH_PRIORITY_LABEL[p as keyof typeof DISPATCH_PRIORITY_LABEL]}] ` : '';
+
     const incoming: TaskItem[] = incomingOrders
       .filter((o) => o.status === 'pending' || o.status === 'acknowledged')
+      .sort((a, b) => (PRIORITY_ORDER[a.priority ?? 'normal'] ?? 1) - (PRIORITY_ORDER[b.priority ?? 'normal'] ?? 1))
       .slice(0, 8)
       .map((o) => ({
         key: `in-${o.id}`,
-        title: o.title,
+        title: `${priLabel(o.priority)}${o.title}`,
         sub: `${DISPATCH_LABEL[o.kind]}${o.body ? ` · ${o.body.slice(0, 40)}` : ''}`,
         meta: o.status === 'pending' ? '미확인' : '확인',
         href: '/m/orders/received',
@@ -1554,10 +1559,11 @@ function TaskCardsGrid({
 
     const outgoing: TaskItem[] = outgoingOrders
       .filter((o) => o.status !== 'done' && o.status !== 'cancelled')
+      .sort((a, b) => (PRIORITY_ORDER[a.priority ?? 'normal'] ?? 1) - (PRIORITY_ORDER[b.priority ?? 'normal'] ?? 1))
       .slice(0, 8)
       .map((o) => ({
         key: `out-${o.id}`,
-        title: o.title,
+        title: `${priLabel(o.priority)}${o.title}`,
         sub: `${o.assignedToName ?? '전체'} · ${DISPATCH_LABEL[o.kind]}`,
         meta: o.status === 'pending' ? '대기' : o.status === 'acknowledged' ? '확인' : '진행중',
         href: '/dispatch',
