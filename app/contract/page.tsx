@@ -301,12 +301,14 @@ export default function ContractPage() {
                       <th style={{ width: 90 }}>만기일</th>
                       <th className="num" style={{ width: 100 }}>월대여료</th>
                       <th className="num" style={{ width: 100 }}>보증금</th>
+                      <th className="num" style={{ width: 100 }}>미수금</th>
+                      <th className="center" style={{ width: 90 }} title="계약서 · 면허증 · 면허상태">서류</th>
                       <th className="center" style={{ width: 76 }}>상태</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.length === 0 ? (
-                      <EmptyRow colSpan={11}>
+                      <EmptyRow colSpan={13}>
                         {contractsLoading ? '데이터 불러오는 중…' : '계약 없음 — 좌측 하단 [+ 신규 계약] 으로 시작하세요'}
                       </EmptyRow>
                     ) : filtered.map((c) => (
@@ -332,6 +334,24 @@ export default function ContractPage() {
                         <td className="mono dim">{c.returnScheduledDate || '-'}</td>
                         <td className="num mono">₩{(c.monthlyRent ?? 0).toLocaleString()}</td>
                         <td className="num mono">₩{(c.deposit ?? 0).toLocaleString()}</td>
+                        <td className="num mono" style={{ color: (c.unpaidAmount ?? 0) > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>
+                          {(c.unpaidAmount ?? 0) > 0 ? `₩${(c.unpaidAmount ?? 0).toLocaleString()}` : '-'}
+                        </td>
+                        <td className="center" title={[
+                          c.contractDocUrl ? '계약서 ✓' : '계약서 ✗',
+                          c.customerLicenseCertUrl ? '면허증 ✓' : '면허증 ✗',
+                          `면허상태: ${c.customerLicenseStatus ?? '미조회'}`,
+                        ].join(' / ')}>
+                          <div style={{ display: 'inline-flex', gap: 4, fontSize: 11 }}>
+                            <span style={{ color: c.contractDocUrl ? 'var(--green-text)' : 'var(--text-weak)' }} title="계약서">계</span>
+                            <span style={{ color: c.customerLicenseCertUrl ? 'var(--green-text)' : 'var(--text-weak)' }} title="면허증">면</span>
+                            <span style={{
+                              color: c.customerLicenseStatus === '정상' ? 'var(--green-text)'
+                                : c.customerLicenseStatus === '미조회' || !c.customerLicenseStatus ? 'var(--text-weak)'
+                                : 'var(--red-text)',
+                            }} title={`면허상태: ${c.customerLicenseStatus ?? '미조회'}`}>●</span>
+                          </div>
+                        </td>
                         <td className="center"><StatusBadge tone={contractStatusTone(c.status)}>{c.status}</StatusBadge></td>
                       </tr>
                     ))}
