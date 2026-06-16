@@ -1577,7 +1577,6 @@ function TaskCardsGrid({
       <TaskCard tone="red" icon={<Warning weight="duotone" />} title="밀린 업무" items={groups.overdue} emptyText="밀린 업무 없음" />
       <TaskCard tone="brand" icon={<Clock weight="duotone" />} title="오늘 업무" items={groups.todays} emptyText="오늘 일정 없음" />
       <TaskCard tone="purple" icon={<CalendarIcon weight="duotone" />} title="예정 업무 (7일)" items={groups.upcoming} emptyText="다가오는 일정 없음" />
-      <span style={{ width: 12, borderLeft: '1px dashed var(--border)', alignSelf: 'stretch' }} aria-hidden />
       <TaskCard tone="amber" icon={<Megaphone weight="duotone" />} title="받은 업무" items={groups.incoming} emptyText="받은 요청 없음" href="/m/orders/received" onAck={onAckIncoming} />
       <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" href="/dispatch" headerAction={onCreateOutgoing ? (
         <button
