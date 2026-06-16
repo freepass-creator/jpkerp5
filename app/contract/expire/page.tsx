@@ -18,6 +18,7 @@ import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { downloadContractsExcel } from '@/lib/contract-export';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 
 export default function ExpirePage() {
   const { contracts, loading: contractsLoading } = useContracts();
@@ -25,6 +26,7 @@ export default function ExpirePage() {
   const today = useLiveTodayKr();
   const [bucket, setBucket] = usePersistentState<'all' | 'expired' | 'd30' | 'd90'>('filter:contract-expire:quick', 'all');
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: typeof contracts[number] | null }>({ open: false, x: 0, y: 0, row: null });
+  const { openVehicle } = useVehicleDialog();
 
   const all = useMemo(() => {
     return contracts
@@ -111,7 +113,7 @@ export default function ExpirePage() {
             const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
             const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
             return (
-              <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'context-menu' }}>
+              <tr key={c.id} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'contract')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
                 <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                 <td className="mono">{c.vehiclePlate}</td>
                 <td>{c.customerName}</td>

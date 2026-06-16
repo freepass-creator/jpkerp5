@@ -17,11 +17,13 @@ import { displayCompanyName } from '@/lib/company-display';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { contractStatusTone } from '@/lib/status-tones';
 import { downloadContractsExcel } from '@/lib/contract-export';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 
 export default function ContractReturnPage() {
   const { contracts, loading: contractsLoading } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: typeof contracts[number] | null }>({ open: false, x: 0, y: 0, row: null });
+  const { openVehicle } = useVehicleDialog();
   const rows = useMemo(() => {
     return contracts
       .filter((c) => c.status === '반납' || !!c.returnedDate)
@@ -67,7 +69,7 @@ export default function ContractReturnPage() {
           {rows.length === 0 ? (
             <tr><td colSpan={8} className="muted center" style={{ padding: 32 }}>{contractsLoading ? '데이터 불러오는 중…' : '반납 계약 없음'}</td></tr>
           ) : rows.map((c) => (
-            <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'context-menu' }}>
+            <tr key={c.id} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'contract')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
               <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
               <td className="mono">{c.vehiclePlate}</td>
               <td>{c.customerName}</td>

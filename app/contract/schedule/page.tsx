@@ -24,6 +24,7 @@ import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers'
 import { sumPayments, sumDiscounts, balance } from '@/lib/payment-schedule';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 import { exportToExcel } from '@/lib/excel-export';
 import { toast } from '@/lib/toast';
 import type { Contract, PaymentScheduleInline, ScheduleStatus } from '@/lib/types';
@@ -56,6 +57,7 @@ export default function ContractSchedulePage() {
     return { y: d.getFullYear(), m: d.getMonth() + 1 };
   });
   const [openId, setOpenId] = useState<string | null>(null);
+  const { openVehicle } = useVehicleDialog();
 
   const companyOptions = useMemo(() => buildCompanyOptions(contracts, (c) => c.company), [contracts]);
 
@@ -274,7 +276,7 @@ export default function ContractSchedulePage() {
             return (
               <tr
                 key={`${r.contract.id}-${r.seq}`}
-                onDoubleClick={() => setOpenId(r.contract.id)}
+                onDoubleClick={() => r.contract.vehiclePlate && openVehicle(r.contract.vehiclePlate, 'payment')}
                 style={{ cursor: 'pointer' }}
               >
                 <td className="dim">{r.contract.company ? displayCompanyName(r.contract.company, companyMaster) : '-'}</td>
