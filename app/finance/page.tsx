@@ -241,7 +241,7 @@ export default function FinancePage() {
 
   return (
     <PageShell
-      title="입출금 관리"
+      menuKey="finance"
       icon={<Bank size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       topbarSearch={{ placeholder: '거래상대 / 적요 / 계좌 / 계정과목 / 계약자', value: search, onChange: setSearch }}
       topbarFilter={

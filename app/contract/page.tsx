@@ -178,7 +178,7 @@ export default function ContractPage() {
 
   return (
     <PageShell
-      title="계약 관리"
+      menuKey="contract"
       icon={<FileText size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       topbarSearch={{ placeholder: '계약자 / 차량 / 계약번호 / 연락처', value: search, onChange: setSearch }}
       topbarFilter={

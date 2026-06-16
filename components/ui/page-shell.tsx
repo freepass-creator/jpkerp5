@@ -24,10 +24,13 @@ import { type ReactNode } from 'react';
 import { MagnifyingGlass } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { MENU_LABELS, type MenuKey } from '@/components/layout/sidebar';
 
 export type PageShellProps = {
-  /** topbar title — 아이콘 + 제목 */
-  title: string;
+  /** topbar title — 명시 (legacy/sub-page). menuKey 와 함께 쓰면 sub-title 처럼 작동 */
+  title?: string;
+  /** 메뉴 키 — MENU_LABELS 자동 라벨 (메인 페이지는 이것만 쓰면 통일) */
+  menuKey?: MenuKey;
   icon?: ReactNode;
   /** topbar 검색창 (옵션). 없으면 표시 X */
   topbarSearch?: {
@@ -56,12 +59,13 @@ export type PageShellProps = {
 };
 
 export function PageShell({
-  title, icon,
+  title, menuKey, icon,
   topbarSearch, topbarFilter, topbarRight, topbarChips,
   children, dashboardGrid = '1fr',
   bottomBarLeft, bottomBarRight = null,
   noBottomBar = false, bare = false,
 }: PageShellProps) {
+  const headline = menuKey ? MENU_LABELS[menuKey] : (title ?? '');
   return (
     <div className="layout">
       <Sidebar />
@@ -69,7 +73,13 @@ export function PageShell({
         <header className="topbar">
           <div className="topbar-title">
             {icon}
-            <span>{title}</span>
+            <span>{headline}</span>
+            {menuKey && title && title !== headline && (
+              <>
+                <span style={{ color: 'var(--text-weak)', margin: '0 6px', fontSize: 11 }}>›</span>
+                <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{title}</span>
+              </>
+            )}
           </div>
           {topbarSearch && (
             <div className="topbar-search">
