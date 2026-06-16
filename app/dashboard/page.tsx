@@ -168,90 +168,73 @@ export default function DashboardPage() {
               </Section>
             </div>
             <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column' }}>
-              <Section fill title="할 일 보드" right={<span className="dim" style={{ fontSize: 11 }}>유관자가 함께 보는 공유 메모 · 더블클릭 → 상세</span>}>
-                <TodoBoard />
+              <Section fill title="전체 데이터 요약" right={<span className="dim" style={{ fontSize: 11 }}>지표 카드 클릭 → 상세 페이지</span>}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* 핵심 2개 — 가동률 / 미수율 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                    <MainKpi
+                      icon={<Car weight="duotone" />}
+                      label="가동률"
+                      value={`${kpi.utilization}%`}
+                      tone="green"
+                      href="/asset"
+                      hrefHint="자산현황"
+                      details={[
+                        { k: '총 차량', v: `${kpi.operatingFleet}대` },
+                        { k: '운행', v: `${kpi.runningVehicles}대` },
+                        { k: '휴차', v: `${kpi.idle}대` },
+                      ]}
+                    />
+                    <MainKpi
+                      icon={<CurrencyKrw weight="duotone" />}
+                      label="미수율"
+                      value={`${kpi.unpaidRate}%`}
+                      tone="red"
+                      href="/contract/overdue"
+                      hrefHint="미수금 관리"
+                      details={[
+                        { k: '월매출', v: formatCurrency(kpi.monthlyTarget) },
+                        { k: '미수금', v: formatCurrency(kpi.totalUnpaid) },
+                        { k: '미수건', v: `${kpi.unpaidCount}건` },
+                      ]}
+                    />
+                  </div>
+                  {/* 보조 KPI 4종 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+                    <SubKpi
+                      label="이번달 수금률"
+                      value={`${kpi.collectionProgress}%`}
+                      sub={`${formatCurrency(kpi.collectedThisMonth)} / ${formatCurrency(kpi.monthlyTarget)}`}
+                      tone={kpi.collectionProgress >= 90 ? 'green' : kpi.collectionProgress >= 70 ? 'brand' : 'orange'}
+                      href="/payments"
+                      trendPct={kpi.momGrowth}
+                    />
+                    <SubKpi
+                      label="반납 지연"
+                      value={`${kpi.overdueReturns}건`}
+                      sub="운행 중 · 만기 경과"
+                      tone={kpi.overdueReturns === 0 ? 'green' : 'red'}
+                      href="/contract/expire"
+                    />
+                    <SubKpi
+                      label="이번달 신규"
+                      value={`${kpi.newThisMonth}건`}
+                      sub={`다음달 만기 ${kpi.expiringNextMonth}건`}
+                      tone="brand"
+                      href="/contract"
+                    />
+                    <SubKpi
+                      label="과태료 미처리"
+                      value={`${kpi.penaltyOpen}건`}
+                      sub="고지서·매칭·통지"
+                      tone={kpi.penaltyOpen === 0 ? 'green' : 'orange'}
+                      href="/penalty"
+                    />
+                  </div>
+                </div>
               </Section>
             </div>
           </div>
-
-          {/* 운영현황 지표 — 가동률(총대수·휴차) / 미수율(매출·수금·미수) */}
-          <Section title="운영현황 지표">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-              <MainKpi
-                icon={<Car weight="duotone" />}
-                label="가동률"
-                value={`${kpi.utilization}%`}
-                tone="green"
-                href="/asset"
-                hrefHint="자산현황"
-                details={[
-                  { k: '총 차량', v: `${kpi.operatingFleet}대` },
-                  { k: '운행', v: `${kpi.runningVehicles}대` },
-                  { k: '휴차', v: `${kpi.idle}대` },
-                ]}
-              />
-              <MainKpi
-                icon={<CurrencyKrw weight="duotone" />}
-                label="미수율"
-                value={`${kpi.unpaidRate}%`}
-                tone="red"
-                href="/contract/overdue"
-                hrefHint="미수금 관리"
-                details={[
-                  { k: '월매출', v: formatCurrency(kpi.monthlyTarget) },
-                  { k: '미수금', v: formatCurrency(kpi.totalUnpaid) },
-                  { k: '미수건', v: `${kpi.unpaidCount}건` },
-                ]}
-              />
-            </div>
-            {/* 보조 KPI 4종 — 이번달 운영 흐름 한 줄 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 8 }}>
-              <SubKpi
-                label="이번달 수금률"
-                value={`${kpi.collectionProgress}%`}
-                sub={`${formatCurrency(kpi.collectedThisMonth)} / ${formatCurrency(kpi.monthlyTarget)}`}
-                tone={kpi.collectionProgress >= 90 ? 'green' : kpi.collectionProgress >= 70 ? 'brand' : 'orange'}
-                href="/payments"
-                trendPct={kpi.momGrowth}
-              />
-              <SubKpi
-                label="반납 지연"
-                value={`${kpi.overdueReturns}건`}
-                sub="운행 중 · 만기 경과"
-                tone={kpi.overdueReturns === 0 ? 'green' : 'red'}
-                href="/contract/expire"
-              />
-              <SubKpi
-                label="이번달 신규"
-                value={`${kpi.newThisMonth}건`}
-                sub={`다음달 만기 ${kpi.expiringNextMonth}건`}
-                tone="brand"
-                href="/contract"
-              />
-              <SubKpi
-                label="과태료 미처리"
-                value={`${kpi.penaltyOpen}건`}
-                sub="고지서·매칭·통지"
-                tone={kpi.penaltyOpen === 0 ? 'green' : 'orange'}
-                href="/penalty"
-              />
-            </div>
-          </Section>
-
-          {/* D-Day 임박 알림 — 정기검사·보험만기·자동차세·면허만기·반납임박 (D-30 이내) */}
-          <Section title="D-Day 임박 알림">
-            <AlertsPanel contracts={contracts} today={today} />
-          </Section>
-
-          {/* 법인별 운영 현황 — 관리 법인 단위 카드 */}
-          <Section title="법인별 운영 현황">
-            <CompanyKpiGrid contracts={contracts} vehicles={vehicles} bankTx={bankTx} cardTx={cardTx} today={today} />
-          </Section>
-
-          {/* 최근 활동 — 감사로그 최근 20건 (점프 가능) */}
-          <Section title="최근 활동" right={<Link href="/admin/audit" className="dim" style={{ fontSize: 11 }}>전체 보기 →</Link>}>
-            <RecentActivityPanel />
-          </Section>
         </div>
 
         <ContractDetailDialog
