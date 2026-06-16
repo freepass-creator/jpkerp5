@@ -91,7 +91,7 @@ export default function FinancePage() {
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:finance:company', 'all');
   const [directionFilter, setDirectionFilter] = usePersistentState<'all' | 'deposit' | 'withdraw'>('filter:finance:direction', 'all');
-  const [viewMode, setViewMode] = usePersistentState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily' | 'vendors' | 'gl'>('filter:finance:view', 'account');
+  const [viewMode, setViewMode] = usePersistentState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily' | 'vendors' | 'customers' | 'gl'>('filter:finance:view', 'account');
   const [createOpen, setCreateOpen] = useState(false);
   const [periodMode, setPeriodMode] = usePersistentState<'month' | 'quarter' | 'year'>('filter:finance:period', 'month');
   const [periodAnchor, setPeriodAnchor] = useState<{ y: number; m: number }>(() => {
@@ -281,6 +281,7 @@ export default function FinancePage() {
           <button type="button" className={`chip chip-nav ${viewMode === 'corpcard' ? 'active' : ''}`} onClick={() => setViewMode('corpcard')}>법인카드</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'daily' ? 'active' : ''}`} onClick={() => setViewMode('daily')} title="자금일보 — 4 종류 통합 + 계정과목·매칭 편집">자금일보</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'vendors' ? 'active' : ''}`} onClick={() => setViewMode('vendors')} title="거래처 보조원장 — 거래처별 지출 타임라인·누적">거래처</button>
+          <button type="button" className={`chip chip-nav ${viewMode === 'customers' ? 'active' : ''}`} onClick={() => setViewMode('customers')} title="임차인 보조원장 — 계약자별 결제·미수 타임라인 + 유지/정상종료/비정상종료 구분">임차인</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'gl' ? 'active' : ''}`} onClick={() => setViewMode('gl')} title="총계정원장 — 계정과목별 차변·대변·잔액">총계정원장</button>
         </>
       }
@@ -289,10 +290,10 @@ export default function FinancePage() {
     >
         <div className="dashboard" style={{
           gridTemplateColumns: '1fr',
-          ...(viewMode === 'vendors' || viewMode === 'gl' ? { padding: 0 } : {}),
+          ...(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl' ? { padding: 0 } : {}),
         }}>
-          <div className="panel" style={(viewMode === 'vendors' || viewMode === 'gl') ? { background: 'transparent', border: 'none', padding: 0 } : undefined}>
-            <div className="panel-body" style={(viewMode === 'vendors' || viewMode === 'gl') ? { padding: 14 } : undefined}>
+          <div className="panel" style={(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl') ? { background: 'transparent', border: 'none', padding: 0 } : undefined}>
+            <div className="panel-body" style={(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl') ? { padding: 14 } : undefined}>
               {viewMode === 'daily' && (
                 <DailyLedgerView
                   bankTx={bankTx}
@@ -478,6 +479,18 @@ export default function FinancePage() {
                 <VendorSubLedgerView
                   bankTx={bankTx}
                   vendors={vendors}
+                  contracts={contracts}
+                  contractById={contractById}
+                  companyFilter={companyFilter}
+                  companyMaster={companyMaster}
+                  inPeriod={inPeriod}
+                  search={search}
+                />
+              )}
+              {viewMode === 'customers' && (
+                <CustomerSubLedgerView
+                  bankTx={bankTx}
+                  cardTx={cardTx}
                   contracts={contracts}
                   contractById={contractById}
                   companyFilter={companyFilter}
@@ -992,6 +1005,319 @@ function GLView({
                         <td className="num mono" style={{ color: !isDebit ? 'var(--text-main)' : 'var(--text-weak)' }}>
                           {!isDebit ? fmtNum(j.amount) : '-'}
                         </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────── 임차인 보조원장 (customer sub-ledger) ─────────────────── */
+
+type CustomerStatus = '계약유지' | '정상종료' | '비정상종료';
+
+function customerStatusOf(c: Contract): CustomerStatus {
+  // 계약유지중 = 운행 OR 대기
+  if (c.status === '운행' || c.status === '대기') return '계약유지';
+  // 채권 또는 미수금 > 0 인 채로 종결 = 비정상종료
+  if (c.status === '채권') return '비정상종료';
+  if ((c.unpaidAmount ?? 0) > 0) return '비정상종료';
+  // 그 외 종료 (반납·해지·매각 등) + 미수 없음 = 정상종료
+  return '정상종료';
+}
+
+const STATUS_TONE: Record<CustomerStatus, { bg: string; text: string }> = {
+  '계약유지': { bg: 'var(--brand-bg)', text: 'var(--brand)' },
+  '정상종료': { bg: 'var(--green-bg)', text: 'var(--green-text)' },
+  '비정상종료': { bg: 'var(--red-bg)', text: 'var(--red-text)' },
+};
+
+function CustomerSubLedgerView({
+  bankTx, cardTx, contracts, contractById, companyFilter, companyMaster, inPeriod, search,
+}: {
+  bankTx: BankTransaction[];
+  cardTx: CardTransaction[];
+  contracts: Contract[];
+  contractById: Map<string, Contract>;
+  companyFilter: string;
+  companyMaster: Company[];
+  inPeriod: (date: string) => boolean;
+  search: string;
+}) {
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<CustomerStatus | 'all'>('all');
+
+  // 임차인(계약자) 단위 집계 — customerName 으로 그룹핑
+  const customers = useMemo(() => {
+    type Agg = {
+      name: string;
+      contractList: Contract[];
+      totalPaid: number;
+      totalUnpaid: number;
+      lastTxDate: string;
+      // 가장 진행 단계 우선 status
+      worstStatus: CustomerStatus;
+    };
+    const byName = new Map<string, Agg>();
+
+    for (const c of contracts) {
+      const name = (c.customerName ?? '').trim();
+      if (!name) continue;
+      if (companyFilter !== 'all' && c.company !== companyFilter) continue;
+      const agg = byName.get(name) ?? {
+        name,
+        contractList: [],
+        totalPaid: 0,
+        totalUnpaid: 0,
+        lastTxDate: '',
+        worstStatus: '정상종료' as CustomerStatus,
+      };
+      agg.contractList.push(c);
+      agg.totalUnpaid += c.unpaidAmount ?? 0;
+      const st = customerStatusOf(c);
+      // 비정상종료 > 계약유지 > 정상종료 우선
+      const priority = { '비정상종료': 0, '계약유지': 1, '정상종료': 2 };
+      if (priority[st] < priority[agg.worstStatus]) agg.worstStatus = st;
+      byName.set(name, agg);
+    }
+
+    // 결제 합계 — bankTx / cardTx 매칭된 거래만
+    const nameByContractId = new Map<string, string>();
+    for (const c of contracts) nameByContractId.set(c.id, (c.customerName ?? '').trim());
+    for (const t of bankTx) {
+      if (!t.matchedContractId) continue;
+      if (!inPeriod((t.txDate ?? '').slice(0, 10))) continue;
+      const name = nameByContractId.get(t.matchedContractId);
+      if (!name) continue;
+      const agg = byName.get(name);
+      if (!agg) continue;
+      agg.totalPaid += t.amount ?? 0;
+      if ((t.txDate ?? '') > agg.lastTxDate) agg.lastTxDate = t.txDate ?? '';
+    }
+    for (const t of cardTx) {
+      if (!t.matchedContractId) continue;
+      if (!inPeriod((t.txDate ?? '').slice(0, 10))) continue;
+      const name = nameByContractId.get(t.matchedContractId);
+      if (!name) continue;
+      const agg = byName.get(name);
+      if (!agg) continue;
+      agg.totalPaid += t.amount ?? 0;
+      if ((t.txDate ?? '') > agg.lastTxDate) agg.lastTxDate = t.txDate ?? '';
+    }
+
+    const arr = Array.from(byName.values());
+    // 검색 필터
+    const q = search.trim().toLowerCase();
+    const searched = q ? arr.filter((a) =>
+      a.name.toLowerCase().includes(q) ||
+      a.contractList.some((c) => (c.vehiclePlate ?? '').toLowerCase().includes(q))
+    ) : arr;
+    // 상태 필터
+    const filtered = statusFilter === 'all' ? searched : searched.filter((a) => a.worstStatus === statusFilter);
+
+    // 정렬: 비정상 위로, 미수 큰 순
+    const priority = { '비정상종료': 0, '계약유지': 1, '정상종료': 2 };
+    return filtered.sort((a, b) => {
+      const p = priority[a.worstStatus] - priority[b.worstStatus];
+      if (p !== 0) return p;
+      return b.totalUnpaid - a.totalUnpaid;
+    });
+  }, [contracts, bankTx, cardTx, companyFilter, inPeriod, search, statusFilter]);
+
+  useEffect(() => {
+    if (selectedCustomer && customers.some((c) => c.name === selectedCustomer)) return;
+    setSelectedCustomer(customers[0]?.name ?? null);
+  }, [customers, selectedCustomer]);
+
+  const counts = useMemo(() => {
+    const c = { all: 0, 계약유지: 0, 정상종료: 0, 비정상종료: 0 } as Record<string, number>;
+    for (const a of customers) {
+      c.all += 1;
+      c[a.worstStatus] += 1;
+    }
+    return c;
+  }, [customers]);
+
+  const selectedAgg = selectedCustomer ? customers.find((c) => c.name === selectedCustomer) : null;
+  // 선택 임차인의 모든 결제 거래 (bankTx + cardTx)
+  const selectedTx = useMemo(() => {
+    if (!selectedAgg) return [];
+    const contractIds = new Set(selectedAgg.contractList.map((c) => c.id));
+    type Row = { id: string; source: 'bank' | 'card'; txDate: string; amount: number; contractId: string; memo?: string };
+    const out: Row[] = [];
+    for (const t of bankTx) {
+      if (!t.matchedContractId || !contractIds.has(t.matchedContractId)) continue;
+      if (!inPeriod((t.txDate ?? '').slice(0, 10))) continue;
+      out.push({ id: t.id, source: 'bank', txDate: t.txDate, amount: t.amount ?? 0, contractId: t.matchedContractId, memo: t.memo || t.counterparty });
+    }
+    for (const t of cardTx) {
+      if (!t.matchedContractId || !contractIds.has(t.matchedContractId)) continue;
+      if (!inPeriod((t.txDate ?? '').slice(0, 10))) continue;
+      out.push({ id: t.id, source: 'card', txDate: t.txDate, amount: t.amount ?? 0, contractId: t.matchedContractId, memo: t.customerName ?? t.approvalNo });
+    }
+    return out.sort((a, b) => (b.txDate ?? '').localeCompare(a.txDate ?? ''));
+  }, [selectedAgg, bankTx, cardTx, inPeriod]);
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 12, height: 'calc(100vh - 220px)', minHeight: 460 }}>
+      {/* 좌 — 임차인 목록 + 상태 필터 */}
+      <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>임차인 ({customers.length})</div>
+          <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+            {(['all', '계약유지', '비정상종료', '정상종료'] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setStatusFilter(k as CustomerStatus | 'all')}
+                style={{
+                  fontSize: 10, padding: '2px 6px', borderRadius: 'var(--radius-sm)',
+                  background: statusFilter === k ? 'var(--brand)' : 'var(--bg-card)',
+                  color: statusFilter === k ? 'white' : 'var(--text-sub)',
+                  border: `1px solid ${statusFilter === k ? 'var(--brand)' : 'var(--border)'}`,
+                  cursor: 'pointer',
+                }}
+              >
+                {k === 'all' ? `전체 ${counts.all}` : `${k} ${counts[k] ?? 0}`}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          {customers.length === 0 ? (
+            <div className="muted center" style={{ padding: 24, fontSize: 12 }}>해당 조건의 임차인 없음</div>
+          ) : customers.map((c) => {
+            const isActive = selectedCustomer === c.name;
+            const tone = STATUS_TONE[c.worstStatus];
+            return (
+              <button
+                key={c.name}
+                type="button"
+                onClick={() => setSelectedCustomer(c.name)}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '8px 12px',
+                  background: isActive ? 'var(--brand-bg)' : 'var(--bg-card)',
+                  color: isActive ? 'var(--brand)' : 'inherit',
+                  border: 'none', borderBottom: '1px solid var(--border-soft)',
+                  cursor: 'pointer', fontSize: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.name}
+                  </span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700,
+                    padding: '1px 6px', borderRadius: 'var(--radius-sm)',
+                    background: tone.bg, color: tone.text,
+                  }}>{c.worstStatus}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 11, color: isActive ? 'inherit' : 'var(--text-sub)' }}>
+                  <span>계약 {c.contractList.length}건</span>
+                  {c.totalUnpaid > 0 && <span style={{ color: 'var(--red-text)' }}>미수 {fmtNum(c.totalUnpaid)}</span>}
+                  <span style={{ marginLeft: 'auto' }}>입금 {fmtNum(c.totalPaid)}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 우 — 선택 임차인의 계약 + 결제 타임라인 */}
+      <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {!selectedAgg ? (
+          <div className="muted center" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+            좌측에서 임차인 선택
+          </div>
+        ) : (
+          <>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                <strong style={{ fontSize: 14 }}>{selectedAgg.name}</strong>
+                <span style={{
+                  fontSize: 10, fontWeight: 700,
+                  padding: '2px 8px', borderRadius: 'var(--radius-sm)',
+                  background: STATUS_TONE[selectedAgg.worstStatus].bg,
+                  color: STATUS_TONE[selectedAgg.worstStatus].text,
+                }}>{selectedAgg.worstStatus}</span>
+                <span style={{ flex: 1 }} />
+                <span className="dim" style={{ fontSize: 11 }}>
+                  계약 <strong>{selectedAgg.contractList.length}</strong>건 · 누적 입금 <strong className="mono">₩{fmtNum(selectedAgg.totalPaid)}</strong>
+                  {selectedAgg.totalUnpaid > 0 && (
+                    <> · 미수 <strong className="mono" style={{ color: 'var(--red-text)' }}>₩{fmtNum(selectedAgg.totalUnpaid)}</strong></>
+                  )}
+                </span>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              {/* 임차인의 계약 목록 */}
+              <div style={{ padding: '8px 14px 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-sub)' }}>
+                계약 ({selectedAgg.contractList.length})
+              </div>
+              <table className="table" style={{ fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 100 }}>계약번호</th>
+                    <th style={{ width: 100 }}>차량번호</th>
+                    <th style={{ width: 60 }}>회사</th>
+                    <th style={{ width: 80 }}>계약상태</th>
+                    <th style={{ width: 100 }}>계약일</th>
+                    <th style={{ width: 100 }}>반납일</th>
+                    <th className="num" style={{ width: 110 }}>월 대여료</th>
+                    <th className="num" style={{ width: 110 }}>미수금</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedAgg.contractList.map((c) => (
+                    <tr key={c.id}>
+                      <td className="mono dim">{c.contractNo || '-'}</td>
+                      <td className="mono">{c.vehiclePlate || '-'}</td>
+                      <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
+                      <td className="dim">{c.status || '-'}</td>
+                      <td className="mono dim">{c.contractDate || '-'}</td>
+                      <td className="mono dim">{c.returnedDate || (c.returnScheduledDate ? `(예정 ${c.returnScheduledDate})` : '-')}</td>
+                      <td className="num mono">{c.monthlyRent ? fmtNum(c.monthlyRent) : '-'}</td>
+                      <td className="num mono" style={{ color: (c.unpaidAmount ?? 0) > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>
+                        {(c.unpaidAmount ?? 0) > 0 ? fmtNum(c.unpaidAmount ?? 0) : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* 결제 타임라인 */}
+              <div style={{ padding: '12px 14px 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-sub)' }}>
+                결제 이력 ({selectedTx.length})
+              </div>
+              <table className="table" style={{ fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 110 }}>거래일</th>
+                    <th style={{ width: 60 }}>구분</th>
+                    <th style={{ width: 100 }}>계약번호</th>
+                    <th className="num" style={{ width: 110 }}>입금액</th>
+                    <th>적요</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedTx.length === 0 ? (
+                    <tr><td colSpan={5} className="muted center" style={{ padding: 24 }}>이 임차인의 결제 거래 없음</td></tr>
+                  ) : selectedTx.map((t) => {
+                    const c = contractById.get(t.contractId);
+                    return (
+                      <tr key={t.id}>
+                        <td className="mono">{(t.txDate ?? '').slice(0, 10)}</td>
+                        <td className="dim">{t.source === 'bank' ? '계좌' : '카드'}</td>
+                        <td className="mono dim">{c?.contractNo || '-'}</td>
+                        <td className="num mono" style={{ color: 'var(--green-text)' }}>{fmtNum(t.amount)}</td>
+                        <td className="dim">{t.memo || '-'}</td>
                       </tr>
                     );
                   })}
