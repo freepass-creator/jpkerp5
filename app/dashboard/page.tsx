@@ -1430,6 +1430,8 @@ type TaskItem = {
   href?: string;
   onClick?: () => void;
   ackId?: string;          // 받은 업무 — 클릭 시 [확인] 처리
+  /** 시각적 우선순위 — 'urgent' = 강조, 'whenever' = dim */
+  priority?: 'urgent' | 'normal' | 'whenever';
 };
 
 function TaskCardsGrid({
@@ -1542,7 +1544,8 @@ function TaskCardsGrid({
 
     // 우선순위 정렬: urgent → normal → whenever
     const PRIORITY_ORDER: Record<string, number> = { urgent: 0, normal: 1, whenever: 2 };
-    const priLabel = (p?: string) => p && p !== 'normal' ? `[${DISPATCH_PRIORITY_LABEL[p as keyof typeof DISPATCH_PRIORITY_LABEL]}] ` : '';
+    // 긴급만 prefix 라벨로 강조. 보통은 표시 X (default). 시간될때는 카드 자체를 dim.
+    const urgentPrefix = (p?: string) => p === 'urgent' ? `[긴급] ` : '';
 
     const incoming: TaskItem[] = incomingOrders
       .filter((o) => o.status === 'pending' || o.status === 'acknowledged')
@@ -1550,11 +1553,12 @@ function TaskCardsGrid({
       .slice(0, 8)
       .map((o) => ({
         key: `in-${o.id}`,
-        title: `${priLabel(o.priority)}${o.title}`,
+        title: `${urgentPrefix(o.priority)}${o.title}`,
         sub: `${DISPATCH_LABEL[o.kind]}${o.body ? ` · ${o.body.slice(0, 40)}` : ''}`,
         meta: o.status === 'pending' ? '미확인' : '확인',
         href: '/m/orders/received',
         ackId: o.status === 'pending' ? o.id : undefined,
+        priority: o.priority,
       }));
 
     const outgoing: TaskItem[] = outgoingOrders
@@ -1563,10 +1567,11 @@ function TaskCardsGrid({
       .slice(0, 8)
       .map((o) => ({
         key: `out-${o.id}`,
-        title: `${priLabel(o.priority)}${o.title}`,
+        title: `${urgentPrefix(o.priority)}${o.title}`,
         sub: `${o.assignedToName ?? '전체'} · ${DISPATCH_LABEL[o.kind]}`,
         meta: o.status === 'pending' ? '대기' : o.status === 'acknowledged' ? '확인' : '진행중',
         href: '/dispatch',
+        priority: o.priority,
       }));
 
     return { overdue, todays, upcoming, incoming, outgoing };
@@ -1665,6 +1670,7 @@ function TaskCard({
 
 function TaskRow({ item, tone, onAck }: { item: TaskItem; tone: TaskTone; onAck?: (orderId: string) => void }) {
   const toneVars = TASK_TONES[tone];
+  const dimmed = item.priority === 'whenever';
   const inner = (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 2,
@@ -1673,6 +1679,7 @@ function TaskRow({ item, tone, onAck }: { item: TaskItem; tone: TaskTone; onAck?
       border: '1px solid var(--border-soft)',
       borderRadius: 'var(--radius)',
       cursor: 'pointer',
+      opacity: dimmed ? 0.55 : 1,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 12, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
