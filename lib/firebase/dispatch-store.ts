@@ -34,7 +34,7 @@ export type DispatchPriority = 'urgent' | 'normal' | 'whenever';
 export const DISPATCH_PRIORITY_LABEL: Record<DispatchPriority, string> = {
   urgent: '긴급',
   normal: '보통',
-  whenever: '시간될때',
+  whenever: '여유',
 };
 
 export type DispatchOrder = {
