@@ -7,6 +7,7 @@ import {
   Clock, Calendar as CalendarIcon, Megaphone, PaperPlaneTilt, CheckCircle,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
+import { useMyOrgContext } from '@/lib/organization';
 import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, DISPATCH_PRIORITY_LABEL, DISPATCH_PRIORITY_ORDER, updateDispatchStatus, type DispatchOrder, type DispatchPriority } from '@/lib/firebase/dispatch-store';
 import dynamic from 'next/dynamic';
 const NewOrderDialog = dynamic(
@@ -42,7 +43,8 @@ export default function DashboardPage() {
   const { rows: cardTx } = useCardTx();
   const { penalties } = usePenalties();
   const { user } = useAuth();
-  const incomingOrders = useMyDispatchOrders(user?.uid);
+  const org = useMyOrgContext();
+  const incomingOrders = useMyDispatchOrders(org.uid, org.team, org.division);
   const outgoingOrders = useSentDispatchOrders(user?.email);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   async function handleAckIncoming(orderId: string) {

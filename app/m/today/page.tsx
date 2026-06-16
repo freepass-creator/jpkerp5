@@ -14,8 +14,8 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { useAuth } from '@/lib/use-auth';
 import { useMyDispatchOrders, DISPATCH_LABEL, type DispatchOrder } from '@/lib/firebase/dispatch-store';
+import { useMyOrgContext } from '@/lib/organization';
 import { Calendar, Megaphone, Truck, ArrowUUpLeft, CaretRight, CheckCircle } from '@phosphor-icons/react';
 import { todayKr } from '@/lib/mock-data';
 
@@ -26,8 +26,8 @@ export default function MobileToday() {
 /** 내부 컴포넌트 — page.tsx 에서 named export 금지 (Next.js 15 규칙) */
 function SchedulePage({ targetDate, title }: { targetDate: string; title: string }) {
   const { contracts } = useContracts();
-  const { user } = useAuth();
-  const orders = useMyDispatchOrders(user?.uid);
+  const org = useMyOrgContext();
+  const orders = useMyDispatchOrders(org.uid, org.team, org.division);
 
   const data = useMemo(() => {
     const deliveryList = contracts.filter((c) =>

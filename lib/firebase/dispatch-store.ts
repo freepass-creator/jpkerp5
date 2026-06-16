@@ -47,9 +47,13 @@ export const DISPATCH_PRIORITY_ORDER: Record<DispatchPriority, number> = {
 
 export type DispatchOrder = {
   id: string;
-  /** 대상 직원 uid. 비어있으면 전체 broadcast */
+  /** 대상 직원 uid (개인 발송). 비어있으면 팀/부 또는 전체 */
   assignedToUid?: string;
   assignedToName?: string;
+  /** 대상 팀 (팀 단위 발송) — UserProfile.department 매칭 */
+  assignedToTeam?: string;
+  /** 대상 부 (부 단위 발송) — 산하 모든 팀의 직원 */
+  assignedToDivision?: string;
   title: string;
   body?: string;
   contractId?: string;
@@ -110,8 +114,19 @@ export async function updateDispatchStatus(
   await rtdbUpdate(ref(db, `${PATH}/${orderId}`), pruneUndefined(patch));
 }
 
-/** 본인 요청받은 업무 라이브 구독 — 모바일 홈/orders 페이지에서 사용 */
-export function useMyDispatchOrders(uid: string | null | undefined): DispatchOrder[] {
+/** 본인 요청받은 업무 라이브 구독 — 모바일 홈/orders 페이지에서 사용
+ *
+ *  매칭 조건 (OR):
+ *   1) assignedToUid === 본인 uid (개인 지정)
+ *   2) assignedToTeam === 본인 팀
+ *   3) assignedToDivision === 본인 부
+ *   4) 모든 assigned 비어있음 (전체 broadcast)
+ */
+export function useMyDispatchOrders(
+  uid: string | null | undefined,
+  myTeam?: string,
+  myDivision?: string,
+): DispatchOrder[] {
   const [data, setData] = useState<DispatchOrder[]>([]);
   useEffect(() => {
     if (uid === undefined) return;
@@ -124,15 +139,19 @@ export function useMyDispatchOrders(uid: string | null | undefined): DispatchOrd
       if (!db) return;
       unsub = onValue(ref(db, PATH), (snap) => {
         const val = (snap.val() ?? {}) as Record<string, DispatchOrder>;
-        const list = Object.values(val).filter((o) =>
-          !o.assignedToUid || o.assignedToUid === uid,
-        );
+        const list = Object.values(val).filter((o) => {
+          const broadcast = !o.assignedToUid && !o.assignedToTeam && !o.assignedToDivision;
+          return broadcast
+            || (o.assignedToUid && o.assignedToUid === uid)
+            || (o.assignedToTeam && myTeam && o.assignedToTeam === myTeam)
+            || (o.assignedToDivision && myDivision && o.assignedToDivision === myDivision);
+        });
         list.sort((a, b) => (b._meta?.at ?? '').localeCompare(a._meta?.at ?? ''));
         setData(list);
       });
     })();
     return () => { cancelled = true; if (unsub) unsub(); };
-  }, [uid]);
+  }, [uid, myTeam, myDivision]);
   return data;
 }
 

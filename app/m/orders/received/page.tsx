@@ -9,14 +9,14 @@
  */
 
 import { Megaphone } from '@phosphor-icons/react';
-import { useAuth } from '@/lib/use-auth';
 import { useMyDispatchOrders } from '@/lib/firebase/dispatch-store';
+import { useMyOrgContext } from '@/lib/organization';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { OrderRow } from '../_shared';
 
 export default function MobileReceivedOrders() {
-  const { user } = useAuth();
-  const orders = useMyDispatchOrders(user?.uid);
+  const org = useMyOrgContext();
+  const orders = useMyDispatchOrders(org.uid, org.team, org.division);
   const { contracts } = useContracts();
 
   const activeCount = orders.filter((o) =>

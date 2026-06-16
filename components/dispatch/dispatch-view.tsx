@@ -20,6 +20,7 @@ import {
   DISPATCH_PRIORITY_LABEL,
   type DispatchOrder, type DispatchKind, type DispatchStatus, type DispatchPriority,
 } from '@/lib/firebase/dispatch-store';
+import { ORGANIZATION, ALL_TEAMS, divisionOfTeam } from '@/lib/organization';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/lib/toast';
@@ -246,7 +247,10 @@ function KpiCard({ label, value, tone, icon }: { label: string; value: number; t
 export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void; creatorEmail?: string }) {
   const users = useUsers();
   const { contracts } = useContracts();
+  const [targetMode, setTargetMode] = useState<'broadcast' | 'division' | 'team' | 'person'>('team');
   const [assignedToUid, setAssignedToUid] = useState<string>('');
+  const [assignedToTeam, setAssignedToTeam] = useState<string>('');
+  const [assignedToDivision, setAssignedToDivision] = useState<string>('');
   const [kind, setKind] = useState<DispatchKind>('memo');
   const [priority, setPriority] = useState<DispatchPriority>('today');
   const [title, setTitle] = useState('');
@@ -271,9 +275,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
     setSaving(true);
     try {
       const target: UserProfile | undefined = users.find((u) => u.uid === assignedToUid);
-      await createDispatchOrder({
-        assignedToUid: assignedToUid || undefined,
-        assignedToName: target?.displayName ?? target?.email,
+      const payload: Parameters<typeof createDispatchOrder>[0] = {
         title: title.trim(),
         body: body.trim() || undefined,
         kind,
@@ -281,7 +283,17 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
         dueDate: dueDate || undefined,
         contractId: contractId || undefined,
         createdBy: creatorEmail,
-      });
+      };
+      if (targetMode === 'person') {
+        payload.assignedToUid = assignedToUid || undefined;
+        payload.assignedToName = target?.displayName ?? target?.email;
+      } else if (targetMode === 'team') {
+        payload.assignedToTeam = assignedToTeam || undefined;
+      } else if (targetMode === 'division') {
+        payload.assignedToDivision = assignedToDivision || undefined;
+      }
+      // broadcast: 모두 비움
+      await createDispatchOrder(payload);
       toast.success('요청 전송 완료');
       onClose();
     } catch (e) {
@@ -295,15 +307,54 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
     <DialogRoot open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent title="새 요청 보내기" mode="new">
         <DialogBody style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Field label="받을 사람 (비우면 전체 공지)">
-            <select value={assignedToUid} onChange={(e) => setAssignedToUid(e.target.value)} className="input" style={{ width: '100%' }}>
-              <option value="">전체 공지</option>
-              {users.map((u) => (
-                <option key={u.uid} value={u.uid}>
-                  {u.displayName ?? u.email}{u.department ? ` (${u.department})` : ''}
-                </option>
+          <Field label="받는 곳">
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+              {(['team', 'person', 'division', 'broadcast'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`chip ${targetMode === m ? 'active' : ''}`}
+                  onClick={() => setTargetMode(m)}
+                >
+                  {m === 'team' ? '팀' : m === 'person' ? '개인' : m === 'division' ? '부 전체' : '전체 공지'}
+                </button>
               ))}
-            </select>
+            </div>
+            {targetMode === 'team' && (
+              <select value={assignedToTeam} onChange={(e) => setAssignedToTeam(e.target.value)} className="input" style={{ width: '100%' }}>
+                <option value="">팀 선택…</option>
+                {ORGANIZATION.map((div) => (
+                  <optgroup key={div.name} label={div.name}>
+                    {div.teams.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            )}
+            {targetMode === 'division' && (
+              <select value={assignedToDivision} onChange={(e) => setAssignedToDivision(e.target.value)} className="input" style={{ width: '100%' }}>
+                <option value="">부 선택…</option>
+                {ORGANIZATION.map((div) => (
+                  <option key={div.name} value={div.name}>{div.name} (산하 전체)</option>
+                ))}
+              </select>
+            )}
+            {targetMode === 'person' && (
+              <select value={assignedToUid} onChange={(e) => setAssignedToUid(e.target.value)} className="input" style={{ width: '100%' }}>
+                <option value="">직원 선택…</option>
+                {users.map((u) => (
+                  <option key={u.uid} value={u.uid}>
+                    {u.displayName ?? u.email}{u.department ? ` (${u.department})` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            {targetMode === 'broadcast' && (
+              <div className="dim" style={{ fontSize: 11, padding: '6px 0' }}>
+                전 직원에게 broadcast — 받은 업무 알림이 모두에게 갑니다
+              </div>
+            )}
           </Field>
           <Field label="우선순위">
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>

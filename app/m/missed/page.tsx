@@ -11,15 +11,15 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
-import { useAuth } from '@/lib/use-auth';
 import { useMyDispatchOrders, DISPATCH_LABEL, type DispatchOrder } from '@/lib/firebase/dispatch-store';
+import { useMyOrgContext } from '@/lib/organization';
 import { Clock, Megaphone, Truck, ArrowUUpLeft, CaretRight, CheckCircle } from '@phosphor-icons/react';
 import { todayKr } from '@/lib/mock-data';
 
 export default function MobileBacklog() {
   const { contracts } = useContracts();
-  const { user } = useAuth();
-  const orders = useMyDispatchOrders(user?.uid);
+  const org = useMyOrgContext();
+  const orders = useMyDispatchOrders(org.uid, org.team, org.division);
   const today = todayKr();
 
   const data = useMemo(() => {
