@@ -38,6 +38,7 @@ type Filter =
   | '미납중'
   | '시동제어필요'   // 신규: D+3+ 미납 + 아직 시동제어 안 함
   | '내용증명필요'   // 신규: D+10+ 미납 + 아직 내용증명 발송 안 함
+  | '장기미수'       // 90일+ 미결 회차 (AR aging 90+)
   | '시동제어'        // 이미 ON 상태
   | '검사지연'
   | '기타'
@@ -45,11 +46,11 @@ type Filter =
   | '매각';
 
 /** 진행중 리스크 전체 */
-const ACTIVE_FILTERS: Filter[] = ['전체', '미납중', '시동제어필요', '내용증명필요', '시동제어', '검사지연', '기타'];
+const ACTIVE_FILTERS: Filter[] = ['전체', '미납중', '시동제어필요', '내용증명필요', '장기미수', '시동제어', '검사지연', '기타'];
 /** 자주 쓰는 4개 — chip 노출 */
 const QUICK_FILTERS: Filter[] = ['전체', '미납중', '시동제어필요', '내용증명필요'];
 /** 나머지 진행중 — dropdown 노출 */
-const MORE_ACTIVE: Filter[] = ['시동제어', '검사지연', '기타'];
+const MORE_ACTIVE: Filter[] = ['장기미수', '시동제어', '검사지연', '기타'];
 /** 종결 — dropdown 노출 */
 const CLOSED_FILTERS: Filter[] = ['종료', '매각'];
 const MORE_FILTERS: Filter[] = [...MORE_ACTIVE, ...CLOSED_FILTERS];
@@ -64,6 +65,11 @@ function hasOverdue(c: Contract): boolean {
 }
 function hasPartial(c: Contract): boolean {
   return (c.schedules ?? []).some((s) => s.status === '부분납');
+}
+
+/** 장기미수 — 가장 오래된 미결 회차가 90일 이상 경과 (ERP AR aging 90+) */
+function isLongOverdue(c: Contract, today: string): boolean {
+  return maxOverdueDays(c, today) >= 90;
 }
 
 function maxOverdueDays(c: Contract, today: string): number {
@@ -170,6 +176,7 @@ export default function ReceivablesPage() {
     else if (filter === '내용증명필요') list = base.filter(needsNotice);
     else if (filter === '시동제어') list = base.filter(isEngineLock);
     else if (filter === '검사지연') list = base.filter(isInspection);
+    else if (filter === '장기미수') list = base.filter((c) => isLongOverdue(c, today));
     else if (filter === '종료') list = base.filter(isClosed);
     else if (filter === '매각') list = base.filter(isSold);
     else if (filter === '기타') list = base.filter(isOther);
@@ -198,6 +205,7 @@ export default function ReceivablesPage() {
       내용증명필요: base.filter(needsNotice).length,
       시동제어: base.filter(isEngineLock).length,
       검사지연: base.filter(isInspection).length,
+      장기미수: base.filter((c) => isLongOverdue(c, today)).length,
       종료: base.filter(isClosed).length,
       매각: base.filter(isSold).length,
       기타: base.filter(isOther).length,
