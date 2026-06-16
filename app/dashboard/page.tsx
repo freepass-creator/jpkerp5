@@ -161,18 +161,17 @@ export default function DashboardPage() {
               onOpenContract={setDetailContractId}
               onCreateOutgoing={() => setNewOrderOpen(true)}
               onAckIncoming={handleAckIncoming}
-              sideColumnWidth={280}
             />
           </Section>
 
-          {/* 좌 일자별 스케줄 (메인) + 우 전체 데이터 요약 (사이드 280px, 값만 타이트) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 280px', gap: 12, alignItems: 'stretch', flex: '1 1 0', minHeight: 0 }}>
-            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          {/* 위 5분할 grid 와 column align — 캘린더 span 4, 데이터 요약 span 1 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12, alignItems: 'stretch', flex: '1 1 0', minHeight: 0 }}>
+            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 4' }}>
               <Section fill title="일자별 스케줄" right={<span className="dim" style={{ fontSize: 11 }}>{today.slice(0, 7)} · 더블클릭 → 상세</span>}>
                 <ScheduleCalendar contracts={contracts} today={today} onSelectContract={setDetailContractId} />
               </Section>
             </div>
-            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 1' }}>
               <Section fill title="전체 데이터 요약" right={<span className="dim" style={{ fontSize: 11 }}>카드 클릭 → 상세</span>}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflow: 'auto', minHeight: 0, flex: 1 }}>
                   <CompactKpi
