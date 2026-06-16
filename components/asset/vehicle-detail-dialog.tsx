@@ -51,6 +51,8 @@ import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
 import { todayKr } from '@/lib/mock-data';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { PaymentTab as ContractPaymentTab } from '@/components/contract-detail-dialog';
+import { CollectionStageProgress } from '@/components/risk-detail-dialog';
+import { daysSince } from '@/lib/utils';
 
 /** KV — 공용 Field wrap alias (시각 통일). */
 function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boolean }) {
@@ -846,6 +848,12 @@ function RiskTab({
     ['분쟁', '클레임', '수납이슈', '법적조치'].includes(h.category as string)
   );
 
+  const today = todayKr();
+  // 채권화 진행 단계 표시 대상: 미수 있거나 채권 상태인 계약 (운행/채권 우선)
+  const stageContracts = contracts
+    .filter((c) => (c.unpaidAmount ?? 0) > 0 || c.status === '채권' || c.engineDisabled)
+    .slice(0, 3);
+
   return (
     <Stack>
       {/* 현재 처리 상태 */}
@@ -863,6 +871,34 @@ function RiskTab({
           <KV k="채권화 계약" v={debtActive ? '있음' : '없음'} />
         </Grid2>
       </Section>
+
+      {/* 채권화 진행 단계 — 미수/채권/시동제어 계약별로 표시 */}
+      {stageContracts.length > 0 && (
+        <Section title="채권화 진행 단계">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {stageContracts.map((c) => {
+              const overdueSched = (c.schedules ?? []).filter((s) => s.status === '연체' || s.status === '부분납');
+              const overdueDays = overdueSched.length === 0
+                ? 0
+                : daysSince(overdueSched.map((s) => s.dueDate).sort()[0], today);
+              return (
+                <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 11 }}>
+                    <span>
+                      <span className="mono">{c.contractNo ?? c.id}</span>
+                      <span className="dim" style={{ marginLeft: 6 }}>{c.customerName ?? '-'}</span>
+                    </span>
+                    <span className="dim mono" style={{ fontSize: 10 }}>
+                      D+{overdueDays} · 미수 ₩{(c.unpaidAmount ?? 0).toLocaleString()} · 미납 {c.unpaidSeqCount ?? 0}회
+                    </span>
+                  </div>
+                  <CollectionStageProgress contract={c} overdueDays={overdueDays} />
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
 
       {/* 연락 기록 */}
       <Section title={`연락 기록 (${contactHistory.length})`}>

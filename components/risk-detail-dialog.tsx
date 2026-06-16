@@ -189,7 +189,7 @@ export function RiskDetailDialog({
  *  Stage 3: 내용증명 발송 (D+11~30)
  *  Stage 4: 채권화 / 법적조치 (D+31~ 또는 status='채권')
  */
-function CollectionStageProgress({ contract, overdueDays }: { contract: Contract; overdueDays: number }) {
+export function CollectionStageProgress({ contract, overdueDays }: { contract: Contract; overdueDays: number }) {
   const isDebt = contract.status === '채권';
   const currentStage = isDebt ? 4
     : overdueDays >= 31 ? 4
