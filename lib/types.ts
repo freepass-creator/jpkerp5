@@ -548,6 +548,14 @@ export type Vehicle = {
   loanContractUrl?: string;
   loanContractFileName?: string;
   loanContractUploadedAt?: string;
+  /** 제조사 견적서 — 신차 가격 산정 근거 */
+  manufacturerQuoteUrl?: string;
+  manufacturerQuoteFileName?: string;
+  manufacturerQuoteUploadedAt?: string;
+  /** 발주서 — 매입 발주 원본 */
+  purchaseOrderUrl?: string;
+  purchaseOrderFileName?: string;
+  purchaseOrderUploadedAt?: string;
   /** 정기검사증 첨부 */
   inspectionCertUrl?: string;
   inspectionCertFileName?: string;

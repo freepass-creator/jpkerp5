@@ -264,6 +264,23 @@ function SummaryTab({
         </Grid2>
       </Section>
 
+      {showAttachment && (vehicle.manufacturerQuoteUrl || vehicle.purchaseOrderUrl) && (
+        <>
+          <AttachedFilePreview
+            title="제조사 견적서"
+            url={vehicle.manufacturerQuoteUrl}
+            fileName={vehicle.manufacturerQuoteFileName}
+            uploadedAt={vehicle.manufacturerQuoteUploadedAt}
+          />
+          <AttachedFilePreview
+            title="발주서"
+            url={vehicle.purchaseOrderUrl}
+            fileName={vehicle.purchaseOrderFileName}
+            uploadedAt={vehicle.purchaseOrderUploadedAt}
+          />
+        </>
+      )}
+
       <Section title="자동차등록증 정보">
         <Grid2>
           <KV k="VIN" v={vehicle.vin} mono />
@@ -768,7 +785,7 @@ export function VehicleDetailDialog({
               content: <RiskTab vehicle={vehicle} contracts={sortedContracts} incidentHistory={incidentHistory} allHistory={sortedHistory} />
             },
             { value: 'asset', label: '자산 관리',
-              content: <AssetTab vehicle={vehicle} repairHistory={repairHistory} contracts={sortedContracts} />
+              content: <AssetTab vehicle={vehicle} repairHistory={repairHistory} contracts={sortedContracts} onUpdate={onUpdate} />
             },
             { value: 'contract', label: `계약 관리${sortedContracts.length > 0 ? ` (${sortedContracts.length})` : ''}`,
               content: <ContractListTab contracts={sortedContracts} />
@@ -960,16 +977,34 @@ function RiskTab({
   );
 }
 
-/* ─── 자산 관리 탭 — 보험·검사 + 정비·수선 + 할부 (할부 맨 마지막) + 첨부 서류 ─── */
+/* ─── 자산 관리 탭 — 제조사스펙+등록증 → 보험·검사 → 정비 → 할부 → 기타첨부 ─── */
 function AssetTab({
-  vehicle, repairHistory, contracts,
-}: { vehicle: Vehicle; repairHistory: HistoryEntry[]; contracts: Contract[] }) {
+  vehicle, repairHistory, contracts, onUpdate,
+}: { vehicle: Vehicle; repairHistory: HistoryEntry[]; contracts: Contract[]; onUpdate: (v: Vehicle) => void }) {
+  // 인라인 첨부 외 GPS·매도증 같은 기타 항목만 표시 (이미 각 섹션 inline 처리됨)
+  const hasOrphanAttachment = !!(vehicle.gpsInstallUrl || vehicle.disposalCertUrl);
   return (
     <Stack>
+      <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment />
       <ComplianceTab vehicle={vehicle} contracts={contracts} />
       <RepairHistoryTab history={repairHistory} />
       <LoanScheduleTab vehicle={vehicle} />
-      <AttachmentSummary vehicle={vehicle} />
+      {hasOrphanAttachment && (
+        <>
+          <AttachedFilePreview
+            title="GPS 설치 증빙"
+            url={vehicle.gpsInstallUrl}
+            fileName={vehicle.gpsInstallFileName}
+            uploadedAt={vehicle.gpsInstallUploadedAt}
+          />
+          <AttachedFilePreview
+            title="매도증·매각계약서"
+            url={vehicle.disposalCertUrl}
+            fileName={vehicle.disposalCertFileName}
+            uploadedAt={vehicle.disposalCertUploadedAt}
+          />
+        </>
+      )}
     </Stack>
   );
 }
