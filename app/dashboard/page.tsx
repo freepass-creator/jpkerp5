@@ -26,6 +26,7 @@ const DispatchListDialog = dynamic(
 import type { DispatchListKind } from '@/components/dispatch/dispatch-list-dialog';
 import { toast } from '@/lib/toast';
 import { Sidebar } from '@/components/layout/sidebar';
+import { AppTopbar } from '@/components/layout/app-topbar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
@@ -152,15 +153,11 @@ export default function DashboardPage() {
     <div className="layout">
       <Sidebar />
       <div className="app">
-        <header className="topbar">
-          <div className="topbar-title">
-            <ChartBar size={16} weight="fill" style={{ color: 'var(--brand)' }} />
-            <span>대시보드</span>
-          </div>
-          <span style={{ fontSize: 12, color: 'var(--text-weak)' }}>지표 카드 → 클릭 시 해당 페이지로 이동</span>
-          <div style={{ flex: 1 }} />
-          <span className="topbar-date">{dateWithDow(today)}</span>
-        </header>
+        <AppTopbar
+          menuKey="dashboard"
+          icon={<ChartBar size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
+          right={<span className="topbar-date">{dateWithDow(today)}</span>}
+        />
 
         <div style={{
           padding: 12, background: 'var(--bg-page)',

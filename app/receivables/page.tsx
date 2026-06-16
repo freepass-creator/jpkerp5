@@ -5,6 +5,7 @@ import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warnin
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { Sidebar } from '@/components/layout/sidebar';
+import { AppTopbar } from '@/components/layout/app-topbar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { SmsDialog } from '@/components/sms-dialog';
 import { EngineLockDialog } from '@/components/engine-lock-dialog';
@@ -272,76 +273,61 @@ export default function ReceivablesPage() {
     <div className="layout">
       <Sidebar />
       <div className="app">
-        <header className="topbar">
-          <div className="topbar-title">
-            <Warning size={16} weight="fill" style={{ color: 'var(--red-text)' }} />
-            <span>리스크 현황</span>
-          </div>
-          <div className="topbar-search">
-            <MagnifyingGlass size={14} className="icon" />
-            <input
-              className="input"
-              placeholder="고객 / 차량 / 차종 / 담당"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="filter-bar">
-            {/* 회사별 — 검색창 우측 맨 앞 dropdown */}
-            <select
-              className="input-compact"
-              data-w="md"
-              value={companyFilter}
-              onChange={(e) => setCompanyFilter(e.target.value)}
-              title="회사별 필터"
-            >
-              <option value="all">회사: 전체</option>
-              {companyOptions.map((co) => (
-                <option key={co} value={co}>{co}</option>
-              ))}
-            </select>
-            <span className="filter-divider" />
-            {/* 반응형 chip — 전체만 항상, 나머지는 count > 0 일 때만 (있는 거만 표시) */}
-            {QUICK_FILTERS.map((f) => {
-              if (f !== '전체' && (counts[f] ?? 0) === 0) return null;
-              return (
-                <button
-                  key={f}
-                  className={`chip chip-tone-${filterTone(f)} ${filter === f ? 'active' : ''}`}
-                  onClick={() => setFilter(f)}
-                >
-                  {f}
-                  <span className="chip-count">{counts[f] ?? 0}</span>
-                </button>
-              );
-            })}
-            {/* 나머지 상태 — dropdown */}
-            <select
-              className="input-compact"
-              data-w="md"
-              value={MORE_FILTERS.includes(filter) ? filter : ''}
-              onChange={(e) => { if (e.target.value) setFilter(e.target.value as Filter); }}
-              title="기타 상태"
-            >
-              <option value="">기타 상태…</option>
-              <optgroup label="진행중">
-                {MORE_ACTIVE.map((f) => (
-                  <option key={f} value={f}>{f}{counts[f] > 0 ? ` (${counts[f]})` : ''}</option>
+        <AppTopbar
+          menuKey="receivables"
+          icon={<Warning size={16} weight="fill" style={{ color: 'var(--red-text)' }} />}
+          search={{ placeholder: '고객 / 차량 / 차종 / 담당', value: search, onChange: setSearch }}
+          filter={
+            <>
+              <select
+                className="input-compact"
+                data-w="md"
+                value={companyFilter}
+                onChange={(e) => setCompanyFilter(e.target.value)}
+                title="회사별 필터"
+              >
+                <option value="all">회사: 전체</option>
+                {companyOptions.map((co) => (
+                  <option key={co} value={co}>{co}</option>
                 ))}
-              </optgroup>
-              <optgroup label="종결">
-                {CLOSED_FILTERS.map((f) => (
-                  <option key={f} value={f}>{f}{counts[f] > 0 ? ` (${counts[f]})` : ''}</option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-
-          <div className="topbar-right">
-            <span className="topbar-date">{today}</span>
-          </div>
-        </header>
+              </select>
+              <span className="filter-divider" />
+              {QUICK_FILTERS.map((f) => {
+                if (f !== '전체' && (counts[f] ?? 0) === 0) return null;
+                return (
+                  <button
+                    key={f}
+                    className={`chip chip-tone-${filterTone(f)} ${filter === f ? 'active' : ''}`}
+                    onClick={() => setFilter(f)}
+                  >
+                    {f}
+                    <span className="chip-count">{counts[f] ?? 0}</span>
+                  </button>
+                );
+              })}
+              <select
+                className="input-compact"
+                data-w="md"
+                value={MORE_FILTERS.includes(filter) ? filter : ''}
+                onChange={(e) => { if (e.target.value) setFilter(e.target.value as Filter); }}
+                title="기타 상태"
+              >
+                <option value="">기타 상태…</option>
+                <optgroup label="진행중">
+                  {MORE_ACTIVE.map((f) => (
+                    <option key={f} value={f}>{f}{counts[f] > 0 ? ` (${counts[f]})` : ''}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="종결">
+                  {CLOSED_FILTERS.map((f) => (
+                    <option key={f} value={f}>{f}{counts[f] > 0 ? ` (${counts[f]})` : ''}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </>
+          }
+          right={<span className="topbar-date">{today}</span>}
+        />
 
         <div className="dashboard">
           <div className="panel">
