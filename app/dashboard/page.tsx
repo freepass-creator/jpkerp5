@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
   const [listKind, setListKind] = useState<DispatchListKind | null>(null);
+  const [noticeComposing, setNoticeComposing] = useState(false);
   const detailOrder = useMemo(() => {
     if (!detailOrderId) return null;
     return incomingOrders.find((o) => o.id === detailOrderId) ?? outgoingOrders.find((o) => o.id === detailOrderId) ?? null;
@@ -178,6 +179,7 @@ export default function DashboardPage() {
               onCreateOutgoing={() => setNewOrderOpen(true)}
               onAckIncoming={handleAckIncoming}
               onOpenOrder={setDetailOrderId}
+              onOpenList={setListKind}
             />
           </Section>
 
@@ -189,8 +191,18 @@ export default function DashboardPage() {
               </Section>
             </div>
             <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 1' }}>
-              <Section fill title="공지사항" right={<span className="dim" style={{ fontSize: 11 }}>누구나 · 댓글</span>}>
-                <NoticeMiniPanel />
+              <Section fill title="공지사항" right={
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setNoticeComposing((v) => !v)}
+                  title={noticeComposing ? '작성 취소' : '새 공지'}
+                  style={{ padding: '0 6px', height: 22, fontSize: 12, lineHeight: 1 }}
+                >
+                  {noticeComposing ? '×' : '+'}
+                </button>
+              }>
+                <NoticeMiniPanel composing={noticeComposing} onClose={() => setNoticeComposing(false)} />
               </Section>
             </div>
             <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', gridColumn: 'span 1' }}>
@@ -266,6 +278,13 @@ export default function DashboardPage() {
         )}
         {detailOrder && (
           <DispatchDetailDialog order={detailOrder} onClose={() => setDetailOrderId(null)} />
+        )}
+        {listKind && (
+          <DispatchListDialog
+            kind={listKind}
+            orders={listKind === 'incoming' ? incomingOrders : outgoingOrders}
+            onClose={() => setListKind(null)}
+          />
         )}
       </div>
     </div>
@@ -1441,7 +1460,7 @@ type TaskItem = {
 };
 
 function TaskCardsGrid({
-  contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract, onCreateOutgoing, onAckIncoming, onOpenOrder, sideColumnWidth,
+  contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract, onCreateOutgoing, onAckIncoming, onOpenOrder, onOpenList, sideColumnWidth,
 }: {
   contracts: ReturnType<typeof useContracts>['contracts'];
   penalties: ReturnType<typeof usePenalties>['penalties'];
@@ -1453,6 +1472,8 @@ function TaskCardsGrid({
   onAckIncoming?: (orderId: string) => void;
   /** dispatch order 항목 클릭 → 상세 dialog */
   onOpenOrder?: (orderId: string) => void;
+  /** 받은/요청 카드 헤더 클릭 → 목록 dialog */
+  onOpenList?: (kind: DispatchListKind) => void;
   /** 우측 디스패치 영역 폭 — 아래 row 와 column align 위해 px 지정. 미지정 시 균등 grid */
   sideColumnWidth?: number;
 }) {
@@ -1623,8 +1644,8 @@ function TaskCardsGrid({
           <TaskCard tone="purple" icon={<CalendarIcon weight="duotone" />} title="예정 업무 (7일)" items={groups.upcoming} emptyText="다가오는 일정 없음" />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-          <TaskCard tone="amber" icon={<Megaphone weight="duotone" />} title="받은 업무" items={groups.incoming} emptyText="받은 요청 없음" href="/m/orders/received" onAck={onAckIncoming} />
-          <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" href="/dispatch" headerAction={requestBtn} />
+          <TaskCard tone="amber" icon={<Megaphone weight="duotone" />} title="받은 업무" items={groups.incoming} emptyText="받은 요청 없음" onAck={onAckIncoming} onTitleClick={onOpenList ? () => onOpenList('incoming') : undefined} />
+          <TaskCard tone="gray" icon={<PaperPlaneTilt weight="duotone" />} title="요청 업무" items={groups.outgoing} emptyText="요청한 업무 없음" headerAction={requestBtn} onTitleClick={onOpenList ? () => onOpenList('outgoing') : undefined} />
         </div>
       </div>
     );
@@ -1647,7 +1668,7 @@ function TaskCardsGrid({
 }
 
 function TaskCard({
-  tone, icon, title, items, emptyText, href, headerAction, onAck,
+  tone, icon, title, items, emptyText, href, headerAction, onAck, onTitleClick,
 }: {
   tone: TaskTone;
   icon: React.ReactNode;
@@ -1657,6 +1678,8 @@ function TaskCard({
   href?: string;
   headerAction?: React.ReactNode;
   onAck?: (orderId: string) => void;
+  /** 헤더 제목 클릭 → 목록 dialog 등 */
+  onTitleClick?: () => void;
 }) {
   const toneVars = TASK_TONES[tone];
   return (
@@ -1675,7 +1698,24 @@ function TaskCard({
         fontSize: 12, fontWeight: 700,
       }}>
         {icon}
-        <span>{title}</span>
+        {onTitleClick ? (
+          <button
+            type="button"
+            onClick={onTitleClick}
+            style={{
+              background: 'none', border: 'none', padding: 0,
+              cursor: 'pointer', color: 'inherit',
+              fontWeight: 700, fontSize: 12,
+              textDecoration: 'underline', textDecorationColor: 'currentColor',
+              textUnderlineOffset: 2,
+            }}
+            title="전체 내역 보기"
+          >
+            {title}
+          </button>
+        ) : (
+          <span>{title}</span>
+        )}
         <span style={{ marginLeft: 'auto', fontSize: 11 }}>{items.length}</span>
         {headerAction}
       </header>
@@ -1822,13 +1862,13 @@ function CompactKpi({
 }
 
 /* ─── 공지사항 미니 패널 — 대시보드 캘린더 옆 ─── */
-function NoticeMiniPanel() {
+function NoticeMiniPanel({ composing, onClose }: { composing: boolean; onClose: () => void }) {
   const { user } = useAuth();
   const { notices, loading } = useNotices();
-  const [composing, setComposing] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const [draftBody, setDraftBody] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [reply, setReply] = useState('');
 
   async function handleCreate() {
     if (!draftTitle.trim() || !draftBody.trim()) { toast.warning('제목·내용 입력'); return; }
@@ -1840,24 +1880,21 @@ function NoticeMiniPanel() {
         createdBy: user.email,
         createdByName: user.displayName ?? undefined,
       });
-      setDraftTitle(''); setDraftBody(''); setComposing(false);
+      setDraftTitle(''); setDraftBody('');
+      onClose();
       toast.success('공지 등록');
     } catch (e) {
       toast.error(`등록 실패: ${(e as Error).message}`);
     }
   }
 
-  const openNotice = openId ? notices.find((n) => n.id === openId) ?? null : null;
-  const [reply, setReply] = useState('');
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minHeight: 0 }}>
-      {/* 작성 토글 */}
-      {composing ? (
+      {composing && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <input
             className="input"
-            placeholder="공지 제목"
+            placeholder="제목"
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
             style={{ fontSize: 12 }}
@@ -1871,18 +1908,9 @@ function NoticeMiniPanel() {
           />
           <div style={{ display: 'flex', gap: 4 }}>
             <button className="btn btn-primary btn-sm" type="button" onClick={() => void handleCreate()}>등록</button>
-            <button className="btn btn-sm" type="button" onClick={() => { setComposing(false); setDraftTitle(''); setDraftBody(''); }}>취소</button>
+            <button className="btn btn-sm" type="button" onClick={() => { setDraftTitle(''); setDraftBody(''); onClose(); }}>취소</button>
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          className="btn btn-sm"
-          onClick={() => setComposing(true)}
-          style={{ fontSize: 11, justifyContent: 'center' }}
-        >
-          + 새 공지
-        </button>
       )}
 
       {/* 목록 */}

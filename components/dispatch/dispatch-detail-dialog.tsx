@@ -61,6 +61,13 @@ export function DispatchDetailDialog({
   const myEmail = user?.email ?? '';
   const myUid = user?.uid ?? '';
 
+  // ⚠️ 모든 hooks 는 early return 위에 — Hooks 규칙
+  const [commentBody, setCommentBody] = useState('');
+  const comments = useMemo<DispatchComment[]>(() => {
+    if (!order?.comments) return [];
+    return Object.values(order.comments).sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
+  }, [order?.comments]);
+
   if (!order) return null;
 
   const isCreator = order.createdBy === myEmail;
@@ -74,14 +81,6 @@ export function DispatchDetailDialog({
     return u?.displayName ?? email;
   };
   const creatorName = order.createdByName ?? nameByEmail(order.createdBy);
-
-  // 댓글 정렬
-  const comments = useMemo<DispatchComment[]>(() => {
-    if (!order.comments) return [];
-    return Object.values(order.comments).sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
-  }, [order.comments]);
-
-  const [commentBody, setCommentBody] = useState('');
 
   // 받는 사람 표시
   const recipientLabel = (() => {
