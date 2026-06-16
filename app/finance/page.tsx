@@ -194,16 +194,18 @@ export default function FinancePage() {
     [bankTx, contractById],
   );
 
-  const isCms = (t: typeof bankTx[number]) =>
-    t.source === 'CMS' || t.method === 'CMS' || /CMS|자동이체/.test(`${t.source ?? ''}${t.method ?? ''}${t.memo ?? ''}`);
+  // 자동이체 채널 = 자동이체 다이얼로그/엑셀 업로드로 들어온 것만 (source 가 엄밀히 'CMS'/'자동이체').
+  // memo·counterparty 에 '자동이체' 적혀 있다고 자동이체로 분류 X (계좌 입출금에 단순 적요).
+  const isAutopay = (t: typeof bankTx[number]) =>
+    t.source === 'CMS' || t.source === '자동이체' || t.method === 'CMS';
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return bankTx
       .filter((t) => {
-        // 계좌 view = 자동이체(CMS) 제외한 일반 입출금
-        if (viewMode === 'account' && isCms(t)) return false;
-        if (viewMode === 'autopay' && !isCms(t)) return false;
+        // 계좌 view = 계좌 채널(수동 입력/계좌 엑셀 업로드) 만. 자동이체는 자기 자리에서.
+        if (viewMode === 'account' && isAutopay(t)) return false;
+        if (viewMode === 'autopay' && !isAutopay(t)) return false;
         if (directionFilter === 'deposit' && !((t.amount ?? 0) > 0)) return false;
         if (directionFilter === 'withdraw' && !((t.withdraw ?? 0) > 0)) return false;
         if (!matchesCompanyFilter(resolveCompanyKey(t, contractById), companyFilter)) return false;

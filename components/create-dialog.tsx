@@ -142,7 +142,7 @@ export function CreateDialog({
   // '미분류' 만 차량 후보로 처리 — 차량 전용 분류('차량') 추가 시 OR 조건으로 확장
   const vehicleFiles = parsed.filter((p) => p.kind === '미분류');
   const contractFiles = parsed.filter((p) => p.kind === '계약');
-  const paymentFiles = parsed.filter((p) => p.kind === '계좌' || p.kind === '카드');
+  const paymentFiles = parsed.filter((p) => p.kind === '계좌' || p.kind === '자동이체' || p.kind === '카드');
 
   const contractsCount = contractFiles.reduce((s, p) => s + p.rows.length, 0);
   const paymentsCount = paymentFiles.reduce((s, p) => s + p.rows.length, 0);
@@ -189,10 +189,20 @@ export function CreateDialog({
   async function commitPaymentFiles() {
     setBusy(true);
     try {
-      const bankRows = paymentFiles.filter((p) => p.kind === '계좌').flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName, bank: p.bankHint })));
+      // 모드별 채널 라우팅 — 4 variant 가 같은 commit 함수를 공유하므로 mode 로 분기.
+      const isAutopay = mode === '자동이체';
+      const cardVariantHint: '매출' | '법인카드' | undefined =
+        mode === '법인카드' ? '법인카드' : mode === '카드매출' ? '매출' : undefined;
+      // 자동이체 모드: kind='자동이체' (탐지) 또는 kind='계좌' (fallback) 모두 bank 로 → source='CMS' 강제
+      // 입출금 모드:   kind='계좌' 만 bank
+      const bankKinds = isAutopay ? ['계좌', '자동이체'] : ['계좌'];
+      const bankRows = paymentFiles.filter((p) => bankKinds.includes(p.kind)).flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName, bank: p.bankHint })));
       const cardRows = paymentFiles.filter((p) => p.kind === '카드').flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName })));
-      const bankParsed = bankRows.map((x) => parseBankTxRow(x.row, x.file, x.bank)).filter((x): x is NonNullable<typeof x> => !!x);
-      const cardParsed = cardRows.map((x) => parseCardTxRow(x.row, x.file)).filter((x): x is NonNullable<typeof x> => !!x);
+      let bankParsed = bankRows.map((x) => parseBankTxRow(x.row, x.file, x.bank)).filter((x): x is NonNullable<typeof x> => !!x);
+      if (isAutopay) {
+        bankParsed = bankParsed.map((b) => ({ ...b, source: 'CMS' as const, method: b.method || 'CMS' }));
+      }
+      const cardParsed = cardRows.map((x) => parseCardTxRow(x.row, x.file, cardVariantHint)).filter((x): x is NonNullable<typeof x> => !!x);
 
       // 중복 검증 — DB 기존 거래 + 시트 내 중복 동시 처리
       const bankDedup = dedupAgainst(bankParsed, existingBankTx, bankTxKeys);
@@ -229,7 +239,7 @@ export function CreateDialog({
       setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)${companyNote}${contractNote}${skippedNote}`);
       if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount} · 회사분류 ${companyMatched}${contractAutoMatched > 0 ? ` · 계약자 자동매칭 ${contractAutoMatched}` : ''}`);
       else if (bankSkipped + cardSkipped > 0) toast.warning(`전부 중복 — ${bankSkipped + cardSkipped}건 제외됨`);
-      setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '카드'));
+      setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '자동이체' && p.kind !== '카드'));
     } catch (e) {
       const msg = friendlyError(e);
       setResult(`오류 — ${msg}`);
@@ -910,6 +920,7 @@ function SheetPreview({ sheet, onChangeKind }: { sheet: ParsedSheet; onChangeKin
         >
           <option value="계약">계약</option>
           <option value="계좌">계좌</option>
+          <option value="자동이체">자동이체</option>
           <option value="카드">카드</option>
           <option value="미분류">미분류</option>
         </select>
