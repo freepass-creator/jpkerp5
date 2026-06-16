@@ -23,6 +23,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 
 export default function AssetInspectionPage() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function AssetInspectionPage() {
   const today = useLiveTodayKr();
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; plate?: string; phone?: string; due?: string; customerName?: string } | null>(null);
   const sel = useTableSelection();
+  const { openVehicle } = useVehicleDialog();
 
   const upcoming = useMemo(() => {
     return contracts
@@ -155,7 +157,7 @@ export default function AssetInspectionPage() {
               const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
               const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
               return (
-                <tr key={c.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }); }} style={{ cursor: 'context-menu' }} className={sel.selectedIds.has(c.id) ? 'selected-row' : undefined}>
+                <tr key={c.id} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }); }} style={{ cursor: 'pointer' }} className={sel.selectedIds.has(c.id) ? 'selected-row' : undefined}>
                   <TableRowCheckbox id={c.id} selection={sel} />
                   <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                   <td className="mono">{c.vehiclePlate}</td>
@@ -187,7 +189,7 @@ export default function AssetInspectionPage() {
             {inspectionEvents.length === 0 ? (
               <EmptyRow colSpan={6}>검사 이력 없음</EmptyRow>
             ) : inspectionEvents.map((h) => (
-              <tr key={h.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: h.vehiclePlate }); }} style={{ cursor: 'context-menu' }}>
+              <tr key={h.id} onDoubleClick={() => h.vehiclePlate && openVehicle(h.vehiclePlate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: h.vehiclePlate }); }} style={{ cursor: 'pointer' }}>
                 <td className="mono">{h.date}</td>
                 <td className="mono">{h.vehiclePlate || '-'}</td>
                 <td>{h.title}</td>
@@ -207,7 +209,7 @@ export default function AssetInspectionPage() {
         onClose={() => setCtxMenu(null)}
         items={ctxMenu ? (() => {
           const it: ContextMenuItem[] = [
-            { label: '자산 상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.plate) router.push(`/asset?q=${encodeURIComponent(ctxMenu.plate)}`); }, disabled: !ctxMenu.plate },
+            { label: '차량 상세', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.plate) openVehicle(ctxMenu.plate, 'asset'); }, disabled: !ctxMenu.plate },
             { type: 'separator' },
           ];
           if (ctxMenu.plate) it.push({ label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => navigator.clipboard.writeText(ctxMenu.plate!) });

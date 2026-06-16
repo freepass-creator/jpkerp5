@@ -23,6 +23,7 @@ import { EmptyRow } from '@/components/ui/empty-row';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 
 export default function PurchasePage() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function PurchasePage() {
   const { companies: companyMaster } = useCompanies();
   const [busy, setBusy] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: { id: string; plate?: string; vin?: string } | null }>({ open: false, x: 0, y: 0, row: null });
+  const { openVehicle } = useVehicleDialog();
 
   /** 구매대기 → 상품대기 일괄 전환 (plate 가 있고 정상 형식인 것만) */
   async function bulkPromotePending() {
@@ -165,7 +167,7 @@ export default function PurchasePage() {
             {pending.length === 0 ? (
               <EmptyRow colSpan={6}>{vehiclesLoading ? '데이터 불러오는 중…' : '구매대기 차량 없음'}</EmptyRow>
             ) : pending.map((v) => (
-              <tr key={v.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'context-menu' }}>
+              <tr key={v.id} onDoubleClick={() => v.plate && v.plate !== '미정' && openVehicle(v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer' }}>
                 <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                 <td className="mono">{v.plate || '미정'}</td>
                 <td>{v.model || '-'}</td>
@@ -199,7 +201,7 @@ export default function PurchasePage() {
             {purchased.length === 0 ? (
               <EmptyRow colSpan={7}>{vehiclesLoading ? '데이터 불러오는 중…' : '매입 완료 차량 없음'}</EmptyRow>
             ) : purchased.map((v) => (
-              <tr key={v.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'context-menu' }}>
+              <tr key={v.id} onDoubleClick={() => v.plate && v.plate !== '미정' && openVehicle(v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer' }}>
                 <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                 <td className="mono">{v.plate}</td>
                 <td>{v.model}</td>
@@ -219,7 +221,7 @@ export default function PurchasePage() {
         y={ctxMenu.y}
         onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
         items={ctxMenu.row ? ([
-          { label: '자산 상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) router.push(`/asset?q=${encodeURIComponent(ctxMenu.row.plate)}`); }, disabled: !ctxMenu.row.plate || ctxMenu.row.plate === '미정' },
+          { label: '차량 상세', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) openVehicle(ctxMenu.row.plate, 'asset'); }, disabled: !ctxMenu.row?.plate || ctxMenu.row?.plate === '미정' },
           { type: 'separator' },
           { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); }, disabled: !ctxMenu.row.plate },
           { label: 'VIN 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vin) navigator.clipboard.writeText(ctxMenu.row.vin); }, disabled: !ctxMenu.row.vin },

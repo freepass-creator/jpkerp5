@@ -29,6 +29,7 @@ import { Plus, FileXls, Trash, MagnifyingGlass, Copy, ArrowSquareOut } from '@ph
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { toast } from '@/lib/toast';
 import type { Vehicle } from '@/lib/types';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 
 type QF = 'all' | 'missing' | 'expire' | 'expired';
 
@@ -42,6 +43,7 @@ export default function AssetInsurancePage() {
   const { companies: companyMaster } = useCompanies();
   const { policies, remove: removePolicy } = useInsurances();
   const { update: updateVehicle } = useVehicles();
+  const { openVehicle } = useVehicleDialog();
 
   /** 차량 plate → 활성 계약 (insuranceAge 비교용) */
   const activeContractByPlate = useMemo(() => {
@@ -232,7 +234,7 @@ export default function AssetInsurancePage() {
                   ) : filtered.map(({ v, insurer, policy, startDate, endDate, totalPremium, installmentCount, days, status }) => {
                     const tone = status === 'expired' ? 'red' : status === 'expire' ? 'orange' : status === 'missing' ? 'red' : '';
                     return (
-                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => setDetailVehicleId(v.id)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={selectedIds.has(v.id) ? 'selected-row' : undefined}>
+                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={selectedIds.has(v.id) ? 'selected-row' : undefined}>
                         <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} aria-label="행 선택" />
                         </td>
@@ -380,12 +382,12 @@ export default function AssetInsurancePage() {
           y={ctxMenu.y}
           onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
           items={ctxMenu.row ? ([
-            { label: '상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row) setDetailVehicleId(ctxMenu.row.id); } },
+            { label: '차량 상세', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) openVehicle(ctxMenu.row.plate, 'asset'); } },
+            { label: '보험증권 전체 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row) setDetailVehicleId(ctxMenu.row.id); } },
             { type: 'separator' },
             { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); } },
             { label: '증권번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.insurancePolicyNo) navigator.clipboard.writeText(ctxMenu.row.insurancePolicyNo); }, disabled: !ctxMenu.row.insurancePolicyNo },
             { type: 'separator' },
-            { label: '자산 상세 페이지', icon: <ArrowSquareOut size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) window.location.href = `/asset?q=${encodeURIComponent(ctxMenu.row.plate)}`; } },
             { label: '계약 이력', icon: <ArrowSquareOut size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) window.location.href = `/contract?q=${encodeURIComponent(ctxMenu.row.plate)}`; } },
           ] satisfies ContextMenuItem[]) : []}
         />

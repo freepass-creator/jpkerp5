@@ -231,7 +231,7 @@ export default function RepairPage() {
           y={ctxMenu.y}
           onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
           items={ctxMenu.row ? ([
-            { label: '자산 상세 보기', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) router.push(`/asset?q=${encodeURIComponent(ctxMenu.row.plate)}`); } },
+            { label: '차량 상세', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) openVehicle(ctxMenu.row.plate, 'asset'); }, disabled: !ctxMenu.row?.plate },
             { type: 'separator' },
             { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); } },
             { type: 'separator' },
