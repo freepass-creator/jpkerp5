@@ -20,7 +20,7 @@
  * 추후 데스크탑 사무 페이지 (/dispatch 또는 /m/orders 신규 신청 UI)에서 등록.
  */
 
-import { ref, push, onValue, update as rtdbUpdate, get } from 'firebase/database';
+import { ref, push, onValue, update as rtdbUpdate, get, remove as rtdbRemove } from 'firebase/database';
 import { useEffect, useState } from 'react';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from './client';
 import { withMeta, type WriteMeta } from '../write-meta';
@@ -43,6 +43,14 @@ export const DISPATCH_PRIORITY_ORDER: Record<DispatchPriority, number> = {
   today: 1,
   thisWeek: 2,
   thisMonth: 3,
+};
+
+export type DispatchComment = {
+  id: string;
+  body: string;
+  createdBy: string;       // email
+  createdByName?: string;
+  createdAt: string;       // ISO
 };
 
 export type DispatchOrder = {
@@ -71,9 +79,12 @@ export type DispatchOrder = {
   dueDate?: string;
   status: DispatchStatus;
   createdBy?: string;
+  createdByName?: string;
   acknowledgedAt?: string;
   startedAt?: string;
   doneAt?: string;
+  /** 댓글 dictionary (commentId → DispatchComment) */
+  comments?: Record<string, DispatchComment>;
   _meta?: WriteMeta;
 };
 
@@ -108,6 +119,35 @@ export async function createDispatchOrder(
   );
   await rtdbUpdate(ref(db, `${PATH}/${id}`), pruneUndefined(stamped as unknown as Record<string, unknown>));
   return id;
+}
+
+export async function removeDispatchOrder(orderId: string): Promise<void> {
+  await ensureAuth();
+  const db = getRtdb();
+  if (!db) return;
+  await rtdbRemove(ref(db, `${PATH}/${orderId}`));
+}
+
+export async function addDispatchComment(
+  orderId: string,
+  input: Omit<DispatchComment, 'id' | 'createdAt'>,
+): Promise<string> {
+  await ensureAuth();
+  const db = getRtdb();
+  if (!db) throw new Error('Firebase 미설정');
+  const newRef = push(ref(db, `${PATH}/${orderId}/comments`));
+  const id = newRef.key;
+  if (!id) throw new Error('push failed');
+  const stamped: DispatchComment = { ...input, id, createdAt: new Date().toISOString() };
+  await rtdbUpdate(ref(db, `${PATH}/${orderId}/comments/${id}`), pruneUndefined(stamped as unknown as Record<string, unknown>));
+  return id;
+}
+
+export async function removeDispatchComment(orderId: string, commentId: string): Promise<void> {
+  await ensureAuth();
+  const db = getRtdb();
+  if (!db) return;
+  await rtdbRemove(ref(db, `${PATH}/${orderId}/comments/${commentId}`));
 }
 
 export async function updateDispatchStatus(

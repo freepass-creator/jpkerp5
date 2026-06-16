@@ -14,6 +14,10 @@ const NewOrderDialog = dynamic(
   () => import('@/components/dispatch/dispatch-view').then((m) => m.NewOrderDialog),
   { ssr: false },
 );
+const DispatchDetailDialog = dynamic(
+  () => import('@/components/dispatch/dispatch-detail-dialog').then((m) => m.DispatchDetailDialog),
+  { ssr: false },
+);
 import { toast } from '@/lib/toast';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -47,6 +51,11 @@ export default function DashboardPage() {
   const incomingOrders = useMyDispatchOrders(org.uid, org.team, org.division);
   const outgoingOrders = useSentDispatchOrders(user?.email);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+  const detailOrder = useMemo(() => {
+    if (!detailOrderId) return null;
+    return incomingOrders.find((o) => o.id === detailOrderId) ?? outgoingOrders.find((o) => o.id === detailOrderId) ?? null;
+  }, [detailOrderId, incomingOrders, outgoingOrders]);
   async function handleAckIncoming(orderId: string) {
     try {
       await updateDispatchStatus(orderId, { status: 'acknowledged', acknowledgedAt: new Date().toISOString() });
@@ -161,6 +170,7 @@ export default function DashboardPage() {
               onOpenContract={setDetailContractId}
               onCreateOutgoing={() => setNewOrderOpen(true)}
               onAckIncoming={handleAckIncoming}
+              onOpenOrder={setDetailOrderId}
             />
           </Section>
 
@@ -241,6 +251,9 @@ export default function DashboardPage() {
         />
         {newOrderOpen && (
           <NewOrderDialog onClose={() => setNewOrderOpen(false)} creatorEmail={user?.email ?? undefined} />
+        )}
+        {detailOrder && (
+          <DispatchDetailDialog order={detailOrder} onClose={() => setDetailOrderId(null)} />
         )}
       </div>
     </div>
@@ -1416,7 +1429,7 @@ type TaskItem = {
 };
 
 function TaskCardsGrid({
-  contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract, onCreateOutgoing, onAckIncoming, sideColumnWidth,
+  contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract, onCreateOutgoing, onAckIncoming, onOpenOrder, sideColumnWidth,
 }: {
   contracts: ReturnType<typeof useContracts>['contracts'];
   penalties: ReturnType<typeof usePenalties>['penalties'];
@@ -1426,6 +1439,8 @@ function TaskCardsGrid({
   onOpenContract: (id: string) => void;
   onCreateOutgoing?: () => void;
   onAckIncoming?: (orderId: string) => void;
+  /** dispatch order 항목 클릭 → 상세 dialog */
+  onOpenOrder?: (orderId: string) => void;
   /** 우측 디스패치 영역 폭 — 아래 row 와 column align 위해 px 지정. 미지정 시 균등 grid */
   sideColumnWidth?: number;
 }) {
@@ -1545,7 +1560,7 @@ function TaskCardsGrid({
           title: `${priPrefix(o.priority)}${o.title}`,
           sub: `${DISPATCH_LABEL[o.kind]}${badge ? ` · ${badge}` : ''}${o.body ? ` · ${o.body.slice(0, 40)}` : ''}`,
           meta: o.status === 'pending' ? '미확인' : '확인',
-          href: '/m/orders/received',
+          onClick: onOpenOrder ? () => onOpenOrder(o.id) : undefined,
           ackId: o.status === 'pending' ? o.id : undefined,
           priority: o.priority,
         };
@@ -1562,7 +1577,7 @@ function TaskCardsGrid({
           title: `${priPrefix(o.priority)}${o.title}`,
           sub: `${o.assignedToName ?? '전체'} · ${DISPATCH_LABEL[o.kind]}${badge ? ` · ${badge}` : ''}`,
           meta: o.status === 'pending' ? '대기' : o.status === 'acknowledged' ? '확인' : '진행중',
-          href: '/dispatch',
+          onClick: onOpenOrder ? () => onOpenOrder(o.id) : undefined,
           priority: o.priority,
         };
       });
