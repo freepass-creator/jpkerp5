@@ -160,74 +160,72 @@ export default function DashboardPage() {
             />
           </Section>
 
-          {/* 전체 데이터 요약 — KPI 풀폭 (좌우 칸 좁아 글자 줄넘김 방지) */}
-          <Section title="전체 데이터 요약" right={<span className="dim" style={{ fontSize: 11 }}>지표 카드 클릭 → 상세 페이지</span>}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-              <MainKpi
-                icon={<Car weight="duotone" />}
-                label="가동률"
-                value={`${kpi.utilization}%`}
-                tone="green"
-                href="/asset"
-                hrefHint="자산현황"
-                details={[
-                  { k: '총 차량', v: `${kpi.operatingFleet}대` },
-                  { k: '운행', v: `${kpi.runningVehicles}대` },
-                  { k: '휴차', v: `${kpi.idle}대` },
-                ]}
-              />
-              <MainKpi
-                icon={<CurrencyKrw weight="duotone" />}
-                label="미수율"
-                value={`${kpi.unpaidRate}%`}
-                tone="red"
-                href="/contract/overdue"
-                hrefHint="미수금 관리"
-                details={[
-                  { k: '월매출', v: formatCurrency(kpi.monthlyTarget) },
-                  { k: '미수금', v: formatCurrency(kpi.totalUnpaid) },
-                  { k: '미수건', v: `${kpi.unpaidCount}건` },
-                ]}
-              />
+          {/* 좌 일자별 스케줄 + 우 전체 데이터 요약 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
+            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column' }}>
+              <Section fill title="일자별 스케줄" right={<span className="dim" style={{ fontSize: 11 }}>{today.slice(0, 7)} · 더블클릭 → 상세</span>}>
+                <ScheduleCalendar contracts={contracts} today={today} onSelectContract={setDetailContractId} />
+              </Section>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 10 }}>
-              <SubKpi
-                label="이번달 수금률"
-                value={`${kpi.collectionProgress}%`}
-                sub={`${formatCurrency(kpi.collectedThisMonth)} / ${formatCurrency(kpi.monthlyTarget)}`}
-                tone={kpi.collectionProgress >= 90 ? 'green' : kpi.collectionProgress >= 70 ? 'brand' : 'orange'}
-                href="/payments"
-                trendPct={kpi.momGrowth}
-              />
-              <SubKpi
-                label="반납 지연"
-                value={`${kpi.overdueReturns}건`}
-                sub="운행 중 · 만기 경과"
-                tone={kpi.overdueReturns === 0 ? 'green' : 'red'}
-                href="/contract/expire"
-              />
-              <SubKpi
-                label="이번달 신규"
-                value={`${kpi.newThisMonth}건`}
-                sub={`다음달 만기 ${kpi.expiringNextMonth}건`}
-                tone="brand"
-                href="/contract"
-              />
-              <SubKpi
-                label="과태료 미처리"
-                value={`${kpi.penaltyOpen}건`}
-                sub="고지서·매칭·통지"
-                tone={kpi.penaltyOpen === 0 ? 'green' : 'orange'}
-                href="/penalty"
-              />
+            <div className="panel" style={{ padding: 14, display: 'flex', flexDirection: 'column' }}>
+              <Section fill title="전체 데이터 요약" right={<span className="dim" style={{ fontSize: 11 }}>카드 클릭 → 상세</span>}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <CompactKpi
+                    label="가동률"
+                    value={`${kpi.utilization}%`}
+                    tone="green"
+                    href="/asset"
+                    details={[
+                      { k: '총차량', v: `${kpi.operatingFleet}대` },
+                      { k: '운행', v: `${kpi.runningVehicles}대` },
+                      { k: '휴차', v: `${kpi.idle}대` },
+                    ]}
+                  />
+                  <CompactKpi
+                    label="미수율"
+                    value={`${kpi.unpaidRate}%`}
+                    tone="red"
+                    href="/contract/overdue"
+                    details={[
+                      { k: '월매출', v: formatCurrency(kpi.monthlyTarget) },
+                      { k: '미수금', v: formatCurrency(kpi.totalUnpaid) },
+                      { k: '미수건', v: `${kpi.unpaidCount}건` },
+                    ]}
+                  />
+                  <CompactKpi
+                    label="이번달 수금률"
+                    value={`${kpi.collectionProgress}%`}
+                    tone={kpi.collectionProgress >= 90 ? 'green' : kpi.collectionProgress >= 70 ? 'brand' : 'orange'}
+                    href="/payments"
+                    details={[
+                      { k: '수금', v: formatCurrency(kpi.collectedThisMonth) },
+                      { k: '목표', v: formatCurrency(kpi.monthlyTarget) },
+                    ]}
+                  />
+                  <CompactKpi
+                    label="반납 지연"
+                    value={`${kpi.overdueReturns}건`}
+                    tone={kpi.overdueReturns === 0 ? 'green' : 'red'}
+                    href="/contract/expire"
+                    details={[{ k: '운행 중', v: '만기 경과' }]}
+                  />
+                  <CompactKpi
+                    label="이번달 신규 계약"
+                    value={`${kpi.newThisMonth}건`}
+                    tone="brand"
+                    href="/contract"
+                    details={[{ k: '다음달 만기', v: `${kpi.expiringNextMonth}건` }]}
+                  />
+                  <CompactKpi
+                    label="과태료 미처리"
+                    value={`${kpi.penaltyOpen}건`}
+                    tone={kpi.penaltyOpen === 0 ? 'green' : 'orange'}
+                    href="/penalty"
+                    details={[{ k: '고지서', v: '매칭·통지 대기' }]}
+                  />
+                </div>
+              </Section>
             </div>
-          </Section>
-
-          {/* 일자별 스케줄 — 풀폭 (충분한 캘린더 공간) */}
-          <div className="panel" style={{ padding: 14 }}>
-            <Section title="일자별 스케줄" right={<span className="dim" style={{ fontSize: 11 }}>{today.slice(0, 7)} · 더블클릭 → 상세</span>}>
-              <ScheduleCalendar contracts={contracts} today={today} onSelectContract={setDetailContractId} />
-            </Section>
           </div>
         </div>
 
@@ -1716,3 +1714,56 @@ const TASK_TONES: Record<TaskTone, { headerBg: string; headerText: string; borde
   amber:  { headerBg: 'var(--amber-bg)',  headerText: 'var(--amber-text)',  border: 'rgba(161,98,7,0.25)' },
   gray:   { headerBg: 'var(--bg-sunken)', headerText: 'var(--text-sub)',    border: 'var(--border)' },
 };
+
+/* ─── CompactKpi — 한 줄 작은 박스 (확인·인지용) ─── */
+function CompactKpi({
+  label, value, tone, href, details,
+}: {
+  label: string;
+  value: string;
+  tone: 'brand' | 'red' | 'orange' | 'green' | 'zinc';
+  href?: string;
+  details?: Array<{ k: string; v: string }>;
+}) {
+  const colorMap = {
+    brand: 'var(--brand)', red: 'var(--red-text)', orange: 'var(--orange-text)',
+    green: 'var(--green-text)', zinc: 'var(--text-sub)',
+  } as const;
+  const body = (
+    <>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-sub)', fontWeight: 600 }}>{label}</span>
+        <span style={{
+          marginLeft: 'auto',
+          fontSize: 14, fontWeight: 700,
+          color: colorMap[tone],
+          fontVariantNumeric: 'tabular-nums',
+        }}>{value}</span>
+      </div>
+      {details && details.length > 0 && (
+        <div style={{
+          fontSize: 10, color: 'var(--text-weak)',
+          display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2,
+        }}>
+          {details.map((d) => (
+            <span key={d.k} style={{ whiteSpace: 'nowrap' }}>
+              {d.k} <strong className="mono" style={{ color: 'var(--text-main)' }}>{d.v}</strong>
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  );
+  const style: React.CSSProperties = {
+    padding: '8px 12px',
+    display: 'flex', flexDirection: 'column',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-soft)',
+    borderLeft: `3px solid ${colorMap[tone]}`,
+    borderRadius: 'var(--radius-sm)',
+    textDecoration: 'none', color: 'inherit',
+    cursor: href ? 'pointer' : 'default',
+  };
+  if (href) return <Link href={href} style={style}>{body}</Link>;
+  return <div style={style}>{body}</div>;
+}
