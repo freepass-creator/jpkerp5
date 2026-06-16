@@ -1913,7 +1913,7 @@ function NoticeMiniPanel() {
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {n.title}
                   </span>
-                  {cn > 0 && <span className="dim" style={{ fontSize: 10 }}>💬 {cn}</span>}
+                  {cn > 0 && <span className="dim" style={{ fontSize: 10 }}>답글 {cn}</span>}
                 </div>
                 <div className="dim" style={{ fontSize: 10, marginTop: 2 }}>
                   {n.createdByName ?? n.createdBy}
