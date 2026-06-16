@@ -990,7 +990,7 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
         title="처리·진행"
         action={null}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: 'var(--text-weak)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             처리일
           </span>
@@ -999,6 +999,52 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
             onChange={setActionDate}
             style={{ width: 200 }}
           />
+          {/* 빠른 상태 변경 — dropdown 으로 직접 전환 (흐름 거치지 않고). 부수효과는 sync 헬퍼가 처리 */}
+          <span style={{ width: 1, height: 18, background: 'var(--border)' }} />
+          <span style={{ fontSize: 11, color: 'var(--text-weak)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            상태 직접 변경
+          </span>
+          <select
+            className="input"
+            value=""
+            onChange={(e) => {
+              const next = e.target.value as VehicleStatus;
+              if (!next) return;
+              if (!confirm(`차량 상태를 '${next}' 로 변경합니다.\n진행할까요?`)) return;
+              onUpdate({ ...c, vehicleStatus: next });
+              toast.success(`상태 변경: ${c.vehicleStatus} → ${next}`);
+            }}
+            style={{ width: 160 }}
+          >
+            <option value="">선택…</option>
+            <optgroup label="운영 라이프사이클">
+              <option value="구매대기">구매대기</option>
+              <option value="등록대기">등록대기</option>
+              <option value="상품화대기">상품화대기</option>
+              <option value="상품화중">상품화중</option>
+              <option value="상품대기">상품대기</option>
+              <option value="운행">운행 (계약중)</option>
+            </optgroup>
+            <optgroup label="만기·반납">
+              <option value="연장대기">연장대기</option>
+              <option value="종료대기">종료대기</option>
+              <option value="반납">반납</option>
+            </optgroup>
+            <optgroup label="휴차·매각">
+              <option value="휴차대기">휴차대기</option>
+              <option value="휴차">휴차</option>
+              <option value="매각검토">매각검토</option>
+              <option value="매각대기">매각대기</option>
+              <option value="매각">매각</option>
+            </optgroup>
+            <optgroup label="기타">
+              <option value="정비">정비</option>
+              <option value="사고">사고</option>
+              <option value="인도대기">인도대기</option>
+              <option value="출고대기">출고대기</option>
+              <option value="임시배차">임시배차</option>
+            </optgroup>
+          </select>
         </div>
 
         {/* 임시배차 picker */}
@@ -2246,7 +2292,7 @@ function VehiclePaymentsTab({ c }: { c: Contract }) {
 
 /* ─────────────── 수납내역 탭 (스케줄 + 입금 + 추가) ─────────────── */
 
-function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+export function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const totalDiscount = (c.schedules ?? []).reduce(
     (sum, s) => sum + ((s.discounts ?? []).reduce((d, x) => d + x.amount, 0)),
     0,

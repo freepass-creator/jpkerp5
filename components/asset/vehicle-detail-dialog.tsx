@@ -49,6 +49,8 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
 import { todayKr } from '@/lib/mock-data';
+import { useContracts } from '@/lib/firebase/contracts-store';
+import { PaymentTab as ContractPaymentTab } from '@/components/contract-detail-dialog';
 
 /** KV — 공용 Field wrap alias (시각 통일). */
 function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boolean }) {
@@ -770,7 +772,7 @@ export function VehicleDetailDialog({
               content: <ContractListTab contracts={sortedContracts} />
             },
             { value: 'payment', label: '수납 관리',
-              content: <PaymentHistoryTab contracts={sortedContracts} />
+              content: <PaymentManagementTab contracts={sortedContracts} />
             },
             { value: 'photos', label: '사진',
               content: <VehiclePhotosTabSection vehicle={vehicle} contracts={sortedContracts} />
@@ -932,6 +934,31 @@ function AssetTab({
       <RepairHistoryTab history={repairHistory} />
       <LoanScheduleTab vehicle={vehicle} />
       <AttachmentSummary vehicle={vehicle} />
+    </Stack>
+  );
+}
+
+/* ─── 수납 관리 탭 — 활성 계약 = 입력 가능 PaymentTab, 종료 계약 = read-only 이력 ─── */
+function PaymentManagementTab({ contracts }: { contracts: Contract[] }) {
+  const { update: updateContract } = useContracts();
+  const active = contracts.find((c) => c.status === '운행' || c.status === '대기');
+  const ended = contracts.filter((c) => c !== active);
+  return (
+    <Stack>
+      {active ? (
+        <Section title={`현재 계약 수납 — ${active.customerName ?? ''} ${active.contractNo ?? ''}`}>
+          <ContractPaymentTab c={active} onUpdate={(u) => void updateContract(u)} />
+        </Section>
+      ) : (
+        <Section title="현재 계약 수납">
+          <div className="dim" style={{ fontSize: 12, padding: 8 }}>활성 계약 없음</div>
+        </Section>
+      )}
+      {ended.length > 0 && (
+        <Section title={`이전 계약 수납 이력 (${ended.length})`}>
+          <PaymentHistoryTab contracts={ended} />
+        </Section>
+      )}
     </Stack>
   );
 }
