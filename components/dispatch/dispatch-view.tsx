@@ -112,14 +112,14 @@ export function DispatchView() {
         <div className="page-header-title-group">
           <h1 className="page-header-title">
             <Megaphone size={18} weight="duotone" />
-            디스패치 (업무 지시)
+디스패치 (업무 요청)
           </h1>
           <div className="page-header-title-sub">
-            현장 직원에게 업무 지시 보내기 + 처리 현황 모니터링. 모바일 /m/orders 에서 받음.
+            현장 직원에게 업무 요청 보내기 + 처리 현황 모니터링. 모바일 /m/orders 에서 받음.
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => setNewOpen(true)} style={{ height: 36 }}>
-          <Plus size={14} weight="bold" /> 새 지시 보내기
+          <Plus size={14} weight="bold" /> 새 요청 보내기
         </button>
       </header>
 
@@ -160,7 +160,7 @@ export function DispatchView() {
 
       <section className="detail-section" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <div className="detail-section-header" style={{ flexShrink: 0 }}>
-          <span className="title">지시 ({filtered.length})</span>
+          <span className="title">요청 ({filtered.length})</span>
         </div>
         <div className="detail-section-body" style={{ padding: 0, flex: 1, minHeight: 0, overflow: 'auto' }}>
           <table className="table">
@@ -177,7 +177,7 @@ export function DispatchView() {
             <tbody>
               {filtered.length === 0 && (
                 <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-weak)' }}>
-                  해당 조건의 지시 없음
+                  해당 조건의 요청 없음
                 </td></tr>
               )}
               {filtered.map((o) => (
@@ -282,7 +282,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
         contractId: contractId || undefined,
         createdBy: creatorEmail,
       });
-      toast.success('지시 전송 완료');
+      toast.success('요청 전송 완료');
       onClose();
     } catch (e) {
       toast.error(`전송 실패: ${(e as Error).message}`);
@@ -293,7 +293,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
 
   return (
     <DialogRoot open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent title="새 지시 보내기" mode="new">
+      <DialogContent title="새 요청 보내기" mode="new">
         <DialogBody style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Field label="받을 사람 (비우면 전체 공지)">
             <select value={assignedToUid} onChange={(e) => setAssignedToUid(e.target.value)} className="input" style={{ width: '100%' }}>
@@ -377,7 +377,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
         <DialogFooter>
           <button type="button" className="btn" onClick={onClose}>취소</button>
           <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={!title.trim() || saving}>
-            {saving ? '전송 중...' : '지시 보내기'}
+            {saving ? '전송 중...' : '요청 보내기'}
           </button>
         </DialogFooter>
       </DialogContent>
