@@ -11,7 +11,31 @@
  */
 
 import React, { useMemo } from 'react';
-import type { Vehicle, Contract, HistoryEntry } from '@/lib/types';
+import type { Vehicle, Contract, HistoryEntry, VehicleStatus } from '@/lib/types';
+
+/** VehicleStatus 별 다음 액션 안내 — 운영 현황 탭 라이프사이클 가이드 */
+const NEXT_ACTION: Record<VehicleStatus, string> = {
+  '구매대기':   '자동차 등록증 입력 + 보험 가입 → 등록대기',
+  '등록대기':   '상품화 진행 (외관·내부·점검) → 상품화대기',
+  '상품화대기': '상품화 항목 시작 → 상품화중',
+  '상품화중':   '상품화 완료 → 상품대기',
+  '상품대기':   '계약 체결 → 인도 → 운행',
+  '운행':       '정기검사·보험만기·미수 추적',
+  '연장대기':   '연장 조건 확정 → 운행',
+  '종료대기':   '반납일 도래 → 반납 → 휴차대기',
+  '휴차':       '복귀 사유 확정 또는 매각 검토',
+  '휴차대기':   '재상품화 또는 매각 검토',
+  '정비':       '정비 완료 → 휴차 또는 운행 복귀',
+  '사고':       '사고 처리 → 정비 → 복귀',
+  '매각검토':   '매각 결정 → 매각대기',
+  '매각대기':   '매각 완료 → 처분손익 확정',
+  '매각':       '종료 (자산대장 기록)',
+  '인도대기':   '인도 처리 → 운행',
+  '출고대기':   '출고 처리 → 운행',
+  '재고':       '계약 매칭',
+  '반납':       '점검 → 휴차대기',
+  '임시배차':   '원본 차량 복귀 시 임시배차 해제',
+};
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -59,6 +83,19 @@ function OperationOverviewTab({
 
   return (
     <Stack>
+      <Section title="차량 라이프사이클">
+        <Grid2>
+          <KV k="현재 상태" v={<StatusBadge tone={vehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusBadge>} />
+          <KV k="다음 액션" v={<span style={{ fontSize: 12 }}>{NEXT_ACTION[vehicle.status as VehicleStatus] ?? '-'}</span>} />
+          <KV k="회사" v={vehicle.company ? displayCompanyName(vehicle.company, companies) : undefined} />
+          <KV k="활성 계약" v={activeContract ? (
+            <a href={`/?q=${encodeURIComponent(vehicle.plate ?? '')}`} style={{ color: 'var(--brand)', textDecoration: 'none' }}>
+              {activeContract.contractNo ?? ''} · {activeContract.customerName ?? ''} →
+            </a>
+          ) : <span className="dim">없음</span>} />
+        </Grid2>
+      </Section>
+
       <Section title="등록 상태">
         <Grid2>
           <KV k="자등증 입력" v={regOk ? <StatusBadge tone="green">완료</StatusBadge> : <StatusBadge tone="orange">미입력</StatusBadge>} />
