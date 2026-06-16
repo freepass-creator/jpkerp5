@@ -6,6 +6,7 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { Sidebar } from '@/components/layout/sidebar';
 import { AppTopbar } from '@/components/layout/app-topbar';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { SmsDialog } from '@/components/sms-dialog';
 import { EngineLockDialog } from '@/components/engine-lock-dialog';
@@ -115,6 +116,7 @@ export default function ReceivablesPage() {
   const { entries: history, add: addHistory } = useHistoryEntries();
   const { user } = useAuth();
   const { isAdmin: admin } = useRole();
+  const { openVehicle } = useVehicleDialog();
   const [filter, setFilter] = usePersistentState<Filter>('filter:receivables:quick', '미납중');
   const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:receivables:company', 'all');
   const [search, setSearch] = useState('');
@@ -390,7 +392,7 @@ export default function ReceivablesPage() {
                       const showLockNeeded = needsLock(c);
                       const showNoticeNeeded = needsNotice(c);
                       return (
-                        <tr key={c.id} onDoubleClick={() => setDetailContract(c)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
+                        <tr key={c.id} onDoubleClick={() => openVehicle(c.vehiclePlate ?? '', 'risk')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
                           <td className="checkbox-col">
                             <input
                               type="checkbox"

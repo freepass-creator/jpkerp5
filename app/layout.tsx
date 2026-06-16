@@ -6,6 +6,7 @@ import { GlobalSearch } from '@/components/global-search';
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour';
 import { ToastContainer } from '@/components/toast-container';
 import { DataProvider } from '@/lib/data-context';
+import { GlobalDialogsProvider } from '@/lib/global-dialogs';
 
 /** 제품(프로젝트) 정체성 — 사용 회사명·도메인과 무관 */
 const SITE_NAME = '렌터카매니저';
@@ -87,9 +88,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SettingsInit />
         <AuthGate>
           <DataProvider>
-            {children}
-            <GlobalSearch />
-            <OnboardingTour />
+            <GlobalDialogsProvider>
+              {children}
+              <GlobalSearch />
+              <OnboardingTour />
+            </GlobalDialogsProvider>
           </DataProvider>
         </AuthGate>
         <ToastContainer />
