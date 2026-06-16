@@ -29,12 +29,20 @@ const PATH = dbPath('dispatch_orders');
 
 export type DispatchKind = 'inspection' | 'delivery' | 'return' | 'memo' | 'other';
 export type DispatchStatus = 'pending' | 'acknowledged' | 'in_progress' | 'done' | 'cancelled';
-/** 우선순위 — 긴급/보통(default)/시간될때 */
-export type DispatchPriority = 'urgent' | 'normal' | 'whenever';
+/** 우선순위 — 긴급(즉시)/오늘(today, default)/이번주/이번달 */
+export type DispatchPriority = 'urgent' | 'today' | 'thisWeek' | 'thisMonth';
 export const DISPATCH_PRIORITY_LABEL: Record<DispatchPriority, string> = {
   urgent: '긴급',
-  normal: '보통',
-  whenever: '여유',
+  today: '오늘',
+  thisWeek: '이번주',
+  thisMonth: '이번달',
+};
+/** 정렬 우선순위 — 작을수록 위 */
+export const DISPATCH_PRIORITY_ORDER: Record<DispatchPriority, number> = {
+  urgent: 0,
+  today: 1,
+  thisWeek: 2,
+  thisMonth: 3,
 };
 
 export type DispatchOrder = {

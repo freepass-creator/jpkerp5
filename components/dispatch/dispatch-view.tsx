@@ -248,7 +248,7 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
   const { contracts } = useContracts();
   const [assignedToUid, setAssignedToUid] = useState<string>('');
   const [kind, setKind] = useState<DispatchKind>('memo');
-  const [priority, setPriority] = useState<DispatchPriority>('normal');
+  const [priority, setPriority] = useState<DispatchPriority>('today');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -315,11 +315,11 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
           </Field>
           <Field label="우선순위">
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {(['urgent', 'normal', 'whenever'] as DispatchPriority[]).map((p) => (
+              {(['urgent', 'today', 'thisWeek', 'thisMonth'] as DispatchPriority[]).map((p) => (
                 <button
                   key={p}
                   type="button"
-                  className={`chip ${priority === p ? 'active' : ''} ${p === 'urgent' ? 'chip-tone-red' : p === 'whenever' ? 'chip-tone-gray' : ''}`}
+                  className={`chip ${priority === p ? 'active' : ''} ${p === 'urgent' ? 'chip-tone-red' : p === 'thisMonth' ? 'chip-tone-gray' : ''}`}
                   onClick={() => setPriority(p)}
                 >
                   {DISPATCH_PRIORITY_LABEL[p]}

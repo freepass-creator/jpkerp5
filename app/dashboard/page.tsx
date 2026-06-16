@@ -7,7 +7,7 @@ import {
   Clock, Calendar as CalendarIcon, Megaphone, PaperPlaneTilt, CheckCircle,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
-import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, DISPATCH_PRIORITY_LABEL, updateDispatchStatus, type DispatchOrder } from '@/lib/firebase/dispatch-store';
+import { useMyDispatchOrders, useSentDispatchOrders, DISPATCH_LABEL, DISPATCH_PRIORITY_LABEL, DISPATCH_PRIORITY_ORDER, updateDispatchStatus, type DispatchOrder, type DispatchPriority } from '@/lib/firebase/dispatch-store';
 import dynamic from 'next/dynamic';
 const NewOrderDialog = dynamic(
   () => import('@/components/dispatch/dispatch-view').then((m) => m.NewOrderDialog),
@@ -1430,8 +1430,8 @@ type TaskItem = {
   href?: string;
   onClick?: () => void;
   ackId?: string;          // 받은 업무 — 클릭 시 [확인] 처리
-  /** 시각적 우선순위 — 'urgent' = 강조, 'whenever' = dim */
-  priority?: 'urgent' | 'normal' | 'whenever';
+  /** 시각적 우선순위 — 'urgent' = 강조, 'thisMonth' = dim */
+  priority?: DispatchPriority;
 };
 
 function TaskCardsGrid({
@@ -1542,37 +1542,47 @@ function TaskCardsGrid({
       });
     }
 
-    // 우선순위 정렬: urgent → normal → whenever
-    const PRIORITY_ORDER: Record<string, number> = { urgent: 0, normal: 1, whenever: 2 };
-    // 긴급만 prefix 라벨로 강조. 보통은 표시 X (default). 시간될때는 카드 자체를 dim.
-    const urgentPrefix = (p?: string) => p === 'urgent' ? `[긴급] ` : '';
+    // 우선순위 정렬: 긴급 → 오늘 → 이번주 → 이번달
+    const priOrder = (p?: DispatchPriority): number => DISPATCH_PRIORITY_ORDER[p ?? 'today'] ?? 1;
+    // 라벨: 긴급=강조 prefix, 오늘=default (표시 X), 이번주/이번달=메타에 작게
+    const priPrefix = (p?: DispatchPriority): string => p === 'urgent' ? `[긴급] ` : '';
+    const priBadge = (p?: DispatchPriority): string | undefined => {
+      if (!p || p === 'urgent' || p === 'today') return undefined;
+      return DISPATCH_PRIORITY_LABEL[p];
+    };
 
     const incoming: TaskItem[] = incomingOrders
       .filter((o) => o.status === 'pending' || o.status === 'acknowledged')
-      .sort((a, b) => (PRIORITY_ORDER[a.priority ?? 'normal'] ?? 1) - (PRIORITY_ORDER[b.priority ?? 'normal'] ?? 1))
+      .sort((a, b) => priOrder(a.priority) - priOrder(b.priority))
       .slice(0, 8)
-      .map((o) => ({
-        key: `in-${o.id}`,
-        title: `${urgentPrefix(o.priority)}${o.title}`,
-        sub: `${DISPATCH_LABEL[o.kind]}${o.body ? ` · ${o.body.slice(0, 40)}` : ''}`,
-        meta: o.status === 'pending' ? '미확인' : '확인',
-        href: '/m/orders/received',
-        ackId: o.status === 'pending' ? o.id : undefined,
-        priority: o.priority,
-      }));
+      .map((o) => {
+        const badge = priBadge(o.priority);
+        return {
+          key: `in-${o.id}`,
+          title: `${priPrefix(o.priority)}${o.title}`,
+          sub: `${DISPATCH_LABEL[o.kind]}${badge ? ` · ${badge}` : ''}${o.body ? ` · ${o.body.slice(0, 40)}` : ''}`,
+          meta: o.status === 'pending' ? '미확인' : '확인',
+          href: '/m/orders/received',
+          ackId: o.status === 'pending' ? o.id : undefined,
+          priority: o.priority,
+        };
+      });
 
     const outgoing: TaskItem[] = outgoingOrders
       .filter((o) => o.status !== 'done' && o.status !== 'cancelled')
-      .sort((a, b) => (PRIORITY_ORDER[a.priority ?? 'normal'] ?? 1) - (PRIORITY_ORDER[b.priority ?? 'normal'] ?? 1))
+      .sort((a, b) => priOrder(a.priority) - priOrder(b.priority))
       .slice(0, 8)
-      .map((o) => ({
-        key: `out-${o.id}`,
-        title: `${urgentPrefix(o.priority)}${o.title}`,
-        sub: `${o.assignedToName ?? '전체'} · ${DISPATCH_LABEL[o.kind]}`,
-        meta: o.status === 'pending' ? '대기' : o.status === 'acknowledged' ? '확인' : '진행중',
-        href: '/dispatch',
-        priority: o.priority,
-      }));
+      .map((o) => {
+        const badge = priBadge(o.priority);
+        return {
+          key: `out-${o.id}`,
+          title: `${priPrefix(o.priority)}${o.title}`,
+          sub: `${o.assignedToName ?? '전체'} · ${DISPATCH_LABEL[o.kind]}${badge ? ` · ${badge}` : ''}`,
+          meta: o.status === 'pending' ? '대기' : o.status === 'acknowledged' ? '확인' : '진행중',
+          href: '/dispatch',
+          priority: o.priority,
+        };
+      });
 
     return { overdue, todays, upcoming, incoming, outgoing };
   }, [contracts, penalties, incomingOrders, outgoingOrders, today, onOpenContract]);
@@ -1670,7 +1680,7 @@ function TaskCard({
 
 function TaskRow({ item, tone, onAck }: { item: TaskItem; tone: TaskTone; onAck?: (orderId: string) => void }) {
   const toneVars = TASK_TONES[tone];
-  const dimmed = item.priority === 'whenever';
+  const dimmed = item.priority === 'thisMonth';
   const inner = (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 2,
