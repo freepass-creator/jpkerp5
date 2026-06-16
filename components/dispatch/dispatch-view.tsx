@@ -20,7 +20,6 @@ import {
   DISPATCH_PRIORITY_LABEL,
   type DispatchOrder, type DispatchKind, type DispatchStatus, type DispatchPriority,
 } from '@/lib/firebase/dispatch-store';
-import { ORGANIZATION, ALL_TEAMS, divisionOfTeam } from '@/lib/organization';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/lib/toast';
@@ -247,10 +246,7 @@ function KpiCard({ label, value, tone, icon }: { label: string; value: number; t
 export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void; creatorEmail?: string }) {
   const users = useUsers();
   const { contracts } = useContracts();
-  const [recipientMode, setRecipientMode] = useState<'team' | 'person'>('person');
   const [selectedUids, setSelectedUids] = useState<string[]>([]);
-  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-  const [selectedDivisions, setSelectedDivisions] = useState<string[]>([]);
   const toggle = (arr: string[], v: string): string[] =>
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
   const [kind, setKind] = useState<DispatchKind>('memo');
@@ -285,17 +281,13 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
         contractId: contractId || undefined,
         createdBy: creatorEmail,
       };
-      // 현재 mode 의 선택만 전송 (다른 mode 선택은 무시)
-      if (recipientMode === 'person' && selectedUids.length > 0) {
+      if (selectedUids.length > 0) {
         payload.assignedToUids = selectedUids;
         if (selectedUids.length === 1) {
           payload.assignedToUid = selectedUids[0];
           const target: UserProfile | undefined = users.find((u) => u.uid === selectedUids[0]);
           payload.assignedToName = target?.displayName ?? target?.email;
         }
-      } else if (recipientMode === 'team') {
-        if (selectedTeams.length > 0) payload.assignedToTeams = selectedTeams;
-        if (selectedDivisions.length > 0) payload.assignedToDivisions = selectedDivisions;
       }
       // 선택 없음 → broadcast
       await createDispatchOrder(payload);
@@ -312,82 +304,28 @@ export function NewOrderDialog({ onClose, creatorEmail }: { onClose: () => void;
     <DialogRoot open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent title="새 요청 보내기" mode="new">
         <DialogBody style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Field label="받는 곳">
+          <Field label="받는 사람 (복수 선택, 비우면 전체 공지)">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* mode toggle */}
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button
-                  type="button"
-                  className={`chip ${recipientMode === 'person' ? 'active' : ''}`}
-                  onClick={() => setRecipientMode('person')}
-                >
-                  개인
-                </button>
-                <button
-                  type="button"
-                  className={`chip ${recipientMode === 'team' ? 'active' : ''}`}
-                  onClick={() => setRecipientMode('team')}
-                >
-                  팀
-                </button>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {users.length === 0 ? (
+                  <span className="dim" style={{ fontSize: 11 }}>등록된 직원 없음</span>
+                ) : users.map((u) => (
+                  <button
+                    key={u.uid}
+                    type="button"
+                    className={`chip ${selectedUids.includes(u.uid) ? 'active' : ''}`}
+                    onClick={() => setSelectedUids((prev) => toggle(prev, u.uid))}
+                    title={u.department ? `${u.department}` : undefined}
+                  >
+                    {u.displayName ?? u.email}
+                  </button>
+                ))}
               </div>
-              {/* mode 별 buttons */}
-              {recipientMode === 'person' && (
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {users.length === 0 ? (
-                    <span className="dim" style={{ fontSize: 11 }}>등록된 직원 없음</span>
-                  ) : users.map((u) => (
-                    <button
-                      key={u.uid}
-                      type="button"
-                      className={`chip ${selectedUids.includes(u.uid) ? 'active' : ''}`}
-                      onClick={() => setSelectedUids((prev) => toggle(prev, u.uid))}
-                      title={u.department ? `${u.department}` : undefined}
-                    >
-                      {u.displayName ?? u.email}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {recipientMode === 'team' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {ORGANIZATION.map((div) => (
-                    <div key={div.name} style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        className={`chip ${selectedDivisions.includes(div.name) ? 'active' : ''}`}
-                        onClick={() => setSelectedDivisions((prev) => toggle(prev, div.name))}
-                        title={`${div.name} 산하 전체 (${div.teams.join('·')})`}
-                      >
-                        {div.name} 전체
-                      </button>
-                      <span className="dim" style={{ fontSize: 11 }}>·</span>
-                      {div.teams.map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          className={`chip ${selectedTeams.includes(t) ? 'active' : ''}`}
-                          onClick={() => setSelectedTeams((prev) => toggle(prev, t))}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {/* 요약 */}
               <div className="dim" style={{ fontSize: 11, padding: '4px 0 0', borderTop: '1px dashed var(--border)' }}>
-                {(recipientMode === 'person' ? selectedUids.length : selectedTeams.length + selectedDivisions.length) === 0 ? (
+                {selectedUids.length === 0 ? (
                   <span style={{ color: 'var(--orange-text)' }}>선택 없음 → 전 직원 broadcast</span>
-                ) : recipientMode === 'person' ? (
-                  <>선택된 직원 <strong>{selectedUids.length}</strong>명</>
                 ) : (
-                  <>
-                    {selectedDivisions.length > 0 && <>부 <strong>{selectedDivisions.length}</strong></>}
-                    {selectedDivisions.length > 0 && selectedTeams.length > 0 && <> · </>}
-                    {selectedTeams.length > 0 && <>팀 <strong>{selectedTeams.length}</strong></>}
-                  </>
+                  <>선택된 직원 <strong>{selectedUids.length}</strong>명</>
                 )}
               </div>
             </div>
