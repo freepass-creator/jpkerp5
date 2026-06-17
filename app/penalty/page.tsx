@@ -19,6 +19,7 @@ import { exportToExcel } from '@/lib/excel-export';
 import { PERIODS, type Period, periodRange, isInRange } from '@/lib/period-filter';
 import { useAuth } from '@/lib/use-auth';
 import { toast } from '@/lib/toast';
+import { useVehicleDialog } from '@/lib/global-dialogs';
 
 /**
  * 과태료 변경부과 — 처리중 / 처리완료 두 단계로 분리.
@@ -82,6 +83,7 @@ export default function PenaltyPage() {
   const [phase, setPhase] = useState<Phase>('in-progress');
   /** 체크박스로 선택된 항목 ID — bulk 처리완료/다운로드용 */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const { openVehicle } = useVehicleDialog();
   /** 처리완료 탭 기간 필터 */
   const [period, setPeriod] = useState<Period>('이번달');
   /** 처리완료 탭 기준 날짜 — 처리일자(_processedAt) 또는 단속일자(date) */
@@ -644,7 +646,7 @@ export default function PenaltyPage() {
                     : null;
                   const violClass = inRange === false ? 'text-red' : 'mono';
                   return (
-                    <tr key={it.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: it }); }} style={{ cursor: 'context-menu' }}>
+                    <tr key={it.id} onDoubleClick={() => it.car_number && openVehicle(it.car_number, 'risk')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: it }); }} style={{ cursor: 'pointer' }}>
                       <td className="checkbox-col sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH, background: 'var(--bg-card)' }}>
                         <input
                           type="checkbox"
@@ -763,6 +765,9 @@ export default function PenaltyPage() {
           const it: ContextMenuItem[] = [
             { label: '미리보기', icon: <Eye size={12} weight="bold" />, onClick: () => handlePreview(r) },
           ];
+          if (r.car_number) {
+            it.push({ label: '차량 상세 (리스크)', icon: <Warning size={12} weight="bold" />, onClick: () => openVehicle(r.car_number, 'risk') });
+          }
           if (isInProg && matched) {
             it.push({ label: '처리완료로 이동', icon: <CheckCircle size={12} weight="bold" />, onClick: () => markCompleted(r.id) });
           }
