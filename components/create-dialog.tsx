@@ -117,7 +117,17 @@ export function CreateDialog({
           console.error('parse fail', f.name, e);
         }
       }
-      const fallback: UploadKind = mode === '이력' || mode === '차량' || mode === '현황' ? '미분류' : (mode as UploadKind);
+      // Mode → UploadKind 매핑.
+      // 입출금/자동이체/카드매출/법인카드 같은 Mode 값은 UploadKind 와 1:1 매칭 안 되므로 정의 필수.
+      // 매핑 누락 시 fallback='미분류' → 파일이 paymentFiles 필터를 통과 못 해 업로드 동작 X.
+      const KIND_BY_MODE: Partial<Record<typeof mode, UploadKind>> = {
+        '계약':     '계약',
+        '입출금':   '계좌',
+        '자동이체': '자동이체',
+        '카드매출': '카드',
+        '법인카드': '카드',
+      };
+      const fallback: UploadKind = KIND_BY_MODE[mode] ?? '미분류';
       setParsed((prev) => [
         ...prev,
         ...results.map((r) => ({ ...r, kind: r.kind === '미분류' ? fallback : r.kind })),
