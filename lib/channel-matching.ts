@@ -100,8 +100,27 @@ export function resolveBankCompanyCode(
   }
   // CMS 자동이체 입금 — counterparty 가 회원명(=계약자명)인 케이스
   if (contractIdx && tx.counterparty) {
-    const hit = contractIdx.byName.get(tx.counterparty.trim());
-    if (hit) return { companyCode: hit.company, matchedContractId: hit.id };
+    const cp = tx.counterparty.trim();
+    // 1) 풀 이름 정확 일치
+    const exact = contractIdx.byName.get(cp);
+    if (exact) return { companyCode: exact.company, matchedContractId: exact.id };
+    // 2) 별칭 정확 일치
+    const alias = contractIdx.byAlias.get(cp);
+    if (alias) return { companyCode: alias.company, matchedContractId: alias.id };
+    // 3) 차량번호 끝 4자리 매칭 — '박영협8309' 패턴
+    const suffixMatch = cp.match(/(\d{4})\s*$/);
+    if (suffixMatch) {
+      const hitSuffix = contractIdx.byPlateSuffix.get(suffixMatch[1]);
+      if (hitSuffix) return { companyCode: hitSuffix.company, matchedContractId: hitSuffix.id };
+    }
+    // 4) 끝 4자리 떼고 prefix 가 이름과 일치 — '박영협8309' 의 '박영협'
+    if (suffixMatch) {
+      const prefix = cp.replace(/\d{4}\s*$/, '').trim();
+      if (prefix) {
+        const hitPrefix = contractIdx.byName.get(prefix);
+        if (hitPrefix) return { companyCode: hitPrefix.company, matchedContractId: hitPrefix.id };
+      }
+    }
   }
   // CMS 자동이체 입금 — counterparty/memo 에 사업자 식별자 포함
   const merged = `${tx.counterparty ?? ''} ${tx.memo ?? ''}`;
@@ -112,14 +131,17 @@ export function resolveBankCompanyCode(
 export type ContractIndex = {
   byName: Map<string, { id: string; company: string }>;
   byAlias: Map<string, { id: string; company: string }>;
+  /** 차량번호 끝 4자리 → 계약 (운행/대기 우선). '박영협8309' 같은 입금자명 매칭용. */
+  byPlateSuffix: Map<string, { id: string; company: string }>;
 };
 
-/** 계약 마스터에서 계약자명/별칭 → contract 역인덱스. CMS 명세 회원명 매칭용. */
+/** 계약 마스터에서 계약자명/별칭/차량번호4자리 → contract 역인덱스. */
 export function buildContractIndex(contracts: Contract[]): ContractIndex {
   const byName = new Map<string, { id: string; company: string }>();
   const byAlias = new Map<string, { id: string; company: string }>();
+  const byPlateSuffix = new Map<string, { id: string; company: string }>();
   const ACTIVE = (c: Contract) => c.status === '운행' || c.status === '대기';
-  // 운행/대기 우선 (동명이인이 있을 때 최신 운행 계약 우선)
+  // 운행/대기 우선 (동명이인 또는 동일 plate 끝자리 차량이 있을 때 최신 운행 계약 우선)
   const sorted = [...contracts].sort((a, b) => {
     const da = ACTIVE(a) ? 0 : 1;
     const db = ACTIVE(b) ? 0 : 1;
@@ -137,8 +159,12 @@ export function buildContractIndex(contracts: Contract[]): ContractIndex {
         byAlias.set(a, { id: c.id, company: c.company ?? '' });
       }
     }
+    const suffix = (c.vehiclePlate ?? '').replace(/[^0-9]/g, '').slice(-4);
+    if (suffix.length === 4 && !byPlateSuffix.has(suffix)) {
+      byPlateSuffix.set(suffix, { id: c.id, company: c.company ?? '' });
+    }
   }
-  return { byName, byAlias };
+  return { byName, byAlias, byPlateSuffix };
 }
 
 /** CardTx 한 건의 companyCode 추론. 기존 값이 있으면 보존. */

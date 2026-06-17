@@ -23,6 +23,19 @@ function normName(s: string): string {
   return (s ?? '').replace(/\s+/g, '').toLowerCase();
 }
 
+/** 차량번호 끝 4자리 추출 — '12가1234'/'서울12가1234'/'1234' 모두 '1234' 반환. */
+function plateSuffix4(plate: string): string {
+  const digits = (plate ?? '').replace(/[^0-9]/g, '');
+  return digits.slice(-4);
+}
+
+/** 입금자명에서 끝 4자리 숫자 추출 — '박영협8309' → '8309'.
+ *  렌터카 손님이 차량번호 끝자리를 입금자명에 붙이는 관행 매칭용. */
+function counterpartySuffix4(name: string): string {
+  const m = (name ?? '').match(/(\d{4})\s*$/);
+  return m ? m[1] : '';
+}
+
 export type MatchCandidate = {
   contract: Contract;
   scheduleSeq: number;
@@ -37,11 +50,14 @@ type ScheduleRef = { c: Contract; s: PaymentScheduleInline };
 export type MatchIndex = {
   byName: Map<string, Contract[]>;
   byAmount: Map<number, ScheduleRef[]>;
+  /** 차량번호 끝 4자리 → 계약 N개. '박영협8309' 같은 입금자명 매칭. */
+  byPlateSuffix: Map<string, Contract[]>;
 };
 
 export function buildMatchIndex(contracts: Contract[]): MatchIndex {
   const byName = new Map<string, Contract[]>();
   const byAmount = new Map<number, ScheduleRef[]>();
+  const byPlateSuffix = new Map<string, Contract[]>();
   for (const c of contracts) {
     if (c.status === '해지') continue;
     const names = new Set<string>();
@@ -61,6 +77,13 @@ export function buildMatchIndex(contracts: Contract[]): MatchIndex {
       if (arr) arr.push(c);
       else byName.set(n, [c]);
     }
+    // 차량번호 끝 4자리 색인 — '박영협8309' 입금자명 매칭용
+    const suffix = plateSuffix4(c.vehiclePlate ?? '');
+    if (suffix.length === 4) {
+      const arr = byPlateSuffix.get(suffix);
+      if (arr) arr.push(c);
+      else byPlateSuffix.set(suffix, [c]);
+    }
     for (const s of c.schedules ?? []) {
       if (s.status === '완료') continue;
       const remaining = s.status === '부분납' ? (s.amount - s.paidAmount) : s.amount;
@@ -73,7 +96,7 @@ export function buildMatchIndex(contracts: Contract[]): MatchIndex {
       }
     }
   }
-  return { byName, byAmount };
+  return { byName, byAmount, byPlateSuffix };
 }
 
 /**
@@ -87,41 +110,54 @@ function findCandidatesIndexed(
 ): MatchCandidate[] {
   const out: MatchCandidate[] = [];
   const cpName = normName(txCounterparty);
+  const cpSuffix = counterpartySuffix4(txCounterparty);
+  // 입금자명에서 4자리 숫자 추출했으면, 그 4자리 제거한 prefix 도 이름 매칭에 사용
+  // 예: '박영협8309' → cpName='박영협8309', cpNamePrefix='박영협'
+  const cpNamePrefix = cpSuffix ? normName(txCounterparty.replace(/\d{4}\s*$/, '')) : '';
 
-  // 이름 매칭 후보 — exact + substring 양방향
+  // 이름 매칭 후보 — exact + substring 양방향 (prefix 도 시도)
   const nameMatched = new Set<Contract>();
-  if (cpName) {
-    const exact = index.byName.get(cpName);
+  const tryName = (q: string) => {
+    if (!q) return;
+    const exact = index.byName.get(q);
     if (exact) for (const c of exact) nameMatched.add(c);
-    // substring 양방향 (cName.includes(cpName) / cpName.includes(cName))
     for (const [k, arr] of index.byName) {
-      if (k.includes(cpName) || cpName.includes(k)) {
+      if (k.includes(q) || q.includes(k)) {
         for (const c of arr) nameMatched.add(c);
       }
     }
+  };
+  tryName(cpName);
+  if (cpNamePrefix && cpNamePrefix !== cpName) tryName(cpNamePrefix);
+
+  // 차량번호 끝 4자리 매칭 — '박영협8309' suffix='8309' → 그 plate 의 계약
+  const plateMatched = new Set<Contract>();
+  if (cpSuffix.length === 4) {
+    const arr = index.byPlateSuffix.get(cpSuffix);
+    if (arr) for (const c of arr) plateMatched.add(c);
   }
 
   // 금액 일치 schedule
   const amountSchedules = index.byAmount.get(txAmount) ?? [];
 
-  // 이름 매칭 contract × 그 contract의 모든 미납 회차 (이름만 매칭, 금액 무관) → medium
-  // 금액 매칭 schedule × (이름도 매칭됨? high : low)
   const seen = new Set<string>();
+  // 금액 매칭 schedule × (이름 또는 plate 매칭? high : low)
   for (const ref of amountSchedules) {
     const key = `${ref.c.id}:${ref.s.seq}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const isNameMatch = nameMatched.has(ref.c);
+    const strong = nameMatched.has(ref.c) || plateMatched.has(ref.c);
     out.push({
       contract: ref.c,
       scheduleSeq: ref.s.seq,
       scheduleAmount: ref.s.amount,
       scheduleDueDate: ref.s.dueDate,
-      confidence: isNameMatch ? 'high' : 'low',
+      confidence: strong ? 'high' : 'low',
     });
   }
-  // 이름은 일치하지만 금액이 안 맞는 schedule들 → medium
-  for (const c of nameMatched) {
+  // 이름 또는 plate 매칭 contract × 미납 회차 (금액 무관) → medium
+  const strongCandidates = new Set<Contract>([...nameMatched, ...plateMatched]);
+  for (const c of strongCandidates) {
     for (const s of c.schedules ?? []) {
       if (s.status === '완료') continue;
       const key = `${c.id}:${s.seq}`;
