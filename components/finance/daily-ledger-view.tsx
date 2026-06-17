@@ -283,7 +283,7 @@ export function DailyLedgerView({
 
         note: '',  // CardTx ?먮뒗 note ?꾨뱶 ?놁쓬 ??추후 추?
 
-        linkedVehiclePlate: '',
+        linkedVehiclePlate: t.linkedVehiclePlate ?? '',
 
         linkedCustomerName: '',
 
@@ -338,27 +338,29 @@ export function DailyLedgerView({
 
   function handleVehiclePlateInput(row: UnifiedRow, plate: string) {
 
-    if (row.source !== 'bank') return;
-
     const v = plate.trim();
 
-    if (!v) {
+    if (row.source === 'bank') {
 
-      onUpdateBank(row.id, { linkedVehiclePlate: undefined });
+      if (!v) { onUpdateBank(row.id, { linkedVehiclePlate: undefined }); return; }
+
+      const matched = contracts.find((c) => c.vehiclePlate === v && (!row.companyCode || c.company === row.companyCode));
+
+      if (matched) onUpdateBank(row.id, { matchedContractId: matched.id, linkedVehiclePlate: undefined });
+
+      else onUpdateBank(row.id, { linkedVehiclePlate: v });
 
       return;
 
     }
 
-    const matched = contracts.find((c) => c.vehiclePlate === v && (!row.companyCode || c.company === row.companyCode));
+    if (row.source === 'card') {
 
-    if (matched) {
+      if (!v) { onUpdateCard(row.id, { linkedVehiclePlate: undefined }); return; }
 
-      onUpdateBank(row.id, { matchedContractId: matched.id, linkedVehiclePlate: undefined });
+      // 법인카드 차량 매칭은 contract 자동 매칭 X (영수증·정비비라 일대일 의미 약함). plate 만 저장.
 
-    } else {
-
-      onUpdateBank(row.id, { linkedVehiclePlate: v });
+      onUpdateCard(row.id, { linkedVehiclePlate: v });
 
     }
 
@@ -684,11 +686,11 @@ export function DailyLedgerView({
 
             </td>
 
-            {/* 11. 차량번호 — 매칭 결과 표시 (드롭다운 폐기) */}
+            {/* 11. 차량번호 — 매칭된 계약이 있으면 그 plate (읽기), 없으면 직접 입력 (linkedVehiclePlate). */}
 
             <td>
 
-              {r.source === 'bank' ? (
+              {matched ? (
 
                 <span
 
@@ -700,21 +702,57 @@ export function DailyLedgerView({
 
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
 
-                    background: matched ? 'var(--brand-bg, #eef2ff)' : r.linkedVehiclePlate ? '#fef9c3' : undefined,
+                    background: 'var(--brand-bg, #eef2ff)',
 
                     padding: '2px 4px', borderRadius: 3, fontSize: 11,
 
                   }}
 
-                  title={matched ? `${matched.vehiclePlate} ${matched.vehicleModel ?? ''}` : (r.linkedVehiclePlate || '미매칭')}
+                  title={`${matched.vehiclePlate} ${matched.vehicleModel ?? ''}`}
 
                 >
 
-                  {matched?.vehiclePlate || r.linkedVehiclePlate || <span className="muted">-</span>}
+                  {matched.vehiclePlate}
 
                 </span>
 
-              ) : <span className="mono">{matched?.vehiclePlate || <span className="muted" style={{ fontSize: 11 }}>-</span>}</span>}
+              ) : (
+
+                <input
+
+                  type="text"
+
+                  className="input-bare mono"
+
+                  defaultValue={r.linkedVehiclePlate ?? ''}
+
+                  placeholder="차량번호"
+
+                  onBlur={(e) => {
+
+                    const v = e.target.value.trim();
+
+                    if (v !== (r.linkedVehiclePlate ?? '')) handleVehiclePlateInput(r, v);
+
+                  }}
+
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+
+                  style={{
+
+                    width: '100%', fontSize: 11, padding: '2px 4px',
+
+                    background: r.linkedVehiclePlate ? '#fef9c3' : 'transparent',
+
+                    border: '1px solid transparent', borderRadius: 3,
+
+                  }}
+
+                  title={`${r.kind} — 차량번호 입력 시 plate 일치 계약 자동 매칭 (없으면 차량 비용으로만 기록)`}
+
+                />
+
+              )}
 
             </td>
 

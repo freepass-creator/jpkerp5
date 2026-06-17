@@ -333,6 +333,9 @@ export type CardTransaction = {
   usedBy?: string;             // 사용 직원 (이메일 또는 이름)
   approver?: string;           // 승인자 (관리자 검토 후)
   approved?: boolean;          // 결재 완료 여부
+  /** 차량번호 직접 입력 — 법인카드 지출(특히 정비/주유/세차) 이 어느 차량 비용인지 매칭.
+   *  Vehicle.plate 와 매칭되면 차량 dialog 자산탭 누적 지출에 포함. BankTx.linkedVehiclePlate 와 같은 패턴. */
+  linkedVehiclePlate?: string;
   // ─── 매칭 ───
   matchedContractId?: string;
   matchedScheduleId?: string;
