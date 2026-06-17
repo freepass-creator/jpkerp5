@@ -1488,10 +1488,15 @@ input[type="radio"]:disabled {
 .table td.muted { color: var(--text-weak); }
 .table td.dim { color: var(--text-sub); }
 
-/* 체크박스 열 — 좌측 첫 칸, 폭 32px 고정, 절대 가운데 정렬 (텍스트 아닌 고정 위치).
-   sticky 로 좌우 스크롤 시에도 맨 앞 고정. 우측 border 제거. */
+/* 체크박스 열 — 2026-06-17 사용자 정책: 컬럼 자체 hide.
+   (selection state·일괄 작업은 유지, SelectionToolbar 로 전체 선택/해제 노출)
+   복원하려면 아래 display:none 만 제거하면 기존 sticky 정렬 그대로 동작. */
 .table th.checkbox-col,
 .table td.checkbox-col {
+  display: none;
+}
+.table th.checkbox-col--legacy,
+.table td.checkbox-col--legacy {
   width: 32px;
   min-width: 32px;
   max-width: 32px;
