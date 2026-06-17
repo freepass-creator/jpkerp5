@@ -32,6 +32,7 @@ import {
   parseReceivablesRow, isHorizontalReceivablesSheet, inferSeqFromDate, mapPaymentMethodToSource,
 } from '@/lib/import-commit';
 import { todayKr } from '@/lib/mock-data';
+import { generateSchedules } from '@/lib/payment-schedule';
 import { dedupAgainst } from '@/lib/dedup';
 import { enrichBankTxBatch, enrichCardTxBatch } from '@/lib/channel-matching';
 import { bankTxKeys, cardTxKeys, vehicleKeys, contractKeys } from '@/lib/dedup-keys';
@@ -2180,6 +2181,16 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
       const mm = contractDate.slice(5, 7);
       const contractNo = `ICR-${yy}${mm}-${genCode(4)}`;
 
+      // 회차 자동 생성 — termMonths 만큼 monthlyRent 청구 (paymentDay 기준).
+      // 누락 시 수납 탭 빈 화면 + autoMatch 동작 불가 → 등록 시점에 즉시 생성.
+      const generatedRaw = generateSchedules({
+        contractDate, termMonths, monthlyRent: monthly, paymentDay: payDay,
+      });
+      const inlineSchedules = generatedRaw.map((s) => ({
+        seq: s.seq, dueDate: s.dueDate, amount: s.amount,
+        status: s.status, paidAmount: s.paidAmount,
+      }));
+
       // Phosphor types CompanyCode 가 alias 라 그대로 사용
       const newContractId = await addContract({
         contractNo,
@@ -2222,6 +2233,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
         paymentMethod,
         manager: manager.trim() || undefined,
         notes: notes.trim() || undefined,
+        schedules: inlineSchedules,
         currentSeq: 1,
         totalSeq: termMonths,
         unpaidAmount: 0,
