@@ -74,6 +74,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
 import { todayKr } from '@/lib/mock-data';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { PaymentTab as ContractPaymentTab } from '@/components/contract-detail-dialog';
 import { CollectionStageProgress } from '@/components/risk-detail-dialog';
 import { daysSince } from '@/lib/utils';
@@ -1106,6 +1107,7 @@ function AssetTab({
       <SummaryTab vehicle={vehicle} onUpdate={onUpdate} showAttachment />
       <ComplianceTab vehicle={vehicle} contracts={contracts} />
       <RepairHistoryTab history={repairHistory} />
+      <OperatingCostSection vehicle={vehicle} contracts={contracts} repairHistory={repairHistory} />
       <LoanScheduleTab vehicle={vehicle} />
       {hasOrphanAttachment && (
         <>
@@ -1124,6 +1126,76 @@ function AssetTab({
         </>
       )}
     </Stack>
+  );
+}
+
+/* ─── 누적 운영비 — 이 차량에 귀속된 카드 지출 + 계좌 출금 + History cost 합산 ─── */
+function OperatingCostSection({
+  vehicle, contracts, repairHistory,
+}: { vehicle: Vehicle; contracts: Contract[]; repairHistory: HistoryEntry[] }) {
+  const { rows: bankTx } = useBankTx();
+  const { rows: cardTx } = useCardTx();
+  // plate (현행 + plateHistory) 모두 매칭
+  const plates = new Set<string>([vehicle.plate, ...(vehicle.plateHistory ?? [])].filter(Boolean));
+  const contractIds = new Set(contracts.map((c) => c.id));
+
+  // 법인카드 — linkedVehiclePlate 가 이 차량인 것
+  const corpCards = cardTx.filter((t) => t.kind === '법인카드' && t.linkedVehiclePlate && plates.has(t.linkedVehiclePlate));
+  const corpSum = corpCards.reduce((s, t) => s + (t.amount ?? 0), 0);
+  // 계좌 출금 — linkedVehiclePlate 이 이 차량 OR 매칭된 계약이 이 차량 OR linkedCustomerName 으로 차량 표시
+  const bankOuts = bankTx.filter((t) => {
+    if (!(t.withdraw ?? 0)) return false;
+    if (t.linkedVehiclePlate && plates.has(t.linkedVehiclePlate)) return true;
+    if (t.matchedContractId && contractIds.has(t.matchedContractId)) return true;
+    return false;
+  });
+  const bankSum = bankOuts.reduce((s, t) => s + (t.withdraw ?? 0), 0);
+  // 정비·검사·사고 cost (HistoryEntry)
+  const histCostEntries = repairHistory.filter((h) => (h.cost ?? 0) > 0);
+  const histSum = histCostEntries.reduce((s, h) => s + (h.cost ?? 0), 0);
+
+  // 카테고리 분류 (법인카드 카테고리 기준)
+  const byCategory = new Map<string, { count: number; sum: number }>();
+  for (const t of corpCards) {
+    const cat = t.category || '미분류';
+    const cur = byCategory.get(cat) ?? { count: 0, sum: 0 };
+    cur.count += 1;
+    cur.sum += t.amount ?? 0;
+    byCategory.set(cat, cur);
+  }
+  const categories = Array.from(byCategory.entries()).sort((a, b) => b[1].sum - a[1].sum);
+
+  const totalSum = corpSum + bankSum + histSum;
+  if (totalSum === 0) {
+    return (
+      <Section title="누적 운영비">
+        <div className="dim" style={{ fontSize: 12, padding: 8 }}>
+          이 차량에 귀속된 지출 없음 — 자금일보에서 차량번호 입력 시 자동 집계
+        </div>
+      </Section>
+    );
+  }
+  return (
+    <Section title={`누적 운영비 — 합계 ₩${totalSum.toLocaleString()}`}>
+      <Grid2>
+        <KV k="법인카드" v={corpCards.length > 0 ? `${corpCards.length}건 · ₩${corpSum.toLocaleString()}` : '없음'} mono />
+        <KV k="계좌 출금" v={bankOuts.length > 0 ? `${bankOuts.length}건 · ₩${bankSum.toLocaleString()}` : '없음'} mono />
+        <KV k="정비·검사 비용" v={histCostEntries.length > 0 ? `${histCostEntries.length}건 · ₩${histSum.toLocaleString()}` : '없음'} mono />
+        <KV k="자료 기간" v={`${corpCards.length + bankOuts.length + histCostEntries.length}건 누적`} />
+      </Grid2>
+      {categories.length > 0 && (
+        <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--bg-soft)', borderRadius: 'var(--radius-md)', fontSize: 11 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>법인카드 카테고리별</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {categories.map(([cat, { count, sum }]) => (
+              <span key={cat} className="mono">
+                {cat} <span className="dim">{count}건</span> ₩{sum.toLocaleString()}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 
