@@ -19,7 +19,7 @@ import { getAuth, signOut } from 'firebase/auth';
 import { getFirebaseApp } from '@/lib/firebase/client';
 import {
   User, SignOut, Bell, BellSlash, ShareNetwork, Copy, Check,
-  Calendar, Sun, Moon, CircleHalf, GearSix,
+  Calendar, Sun, Moon, CircleHalf,
 } from '@phosphor-icons/react';
 import { toast } from '@/lib/toast';
 

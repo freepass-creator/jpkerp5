@@ -8,7 +8,6 @@
  */
 
 import { useParams, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import {
   useFieldLogs, useVehicleFieldLogs, useCustomerFieldLogs,
@@ -19,7 +18,7 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useMemo, useRef } from 'react';
 import {
   Phone, ChatCircle, Paperclip, NotePencil,
-  Truck, ArrowUUpLeft, ShieldWarning, IdentificationCard, CurrencyKrw, Warning,
+  ArrowUUpLeft, ShieldWarning, IdentificationCard, CurrencyKrw,
   CheckCircle, Circle,
 } from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';

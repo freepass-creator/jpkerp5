@@ -11,8 +11,8 @@
  *   · 엑셀 다운로드
  */
 
-import { useMemo, useState, Fragment } from 'react';
-import { ChartBar, DownloadSimple, CaretRight, FileXls } from '@phosphor-icons/react';
+import { useMemo, useState } from 'react';
+import { ChartBar, FileXls } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { FINANCE_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -20,7 +20,7 @@ import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
-import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
+import { buildCompanyOptions } from '@/lib/filter-helpers';
 import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { formatCurrency } from '@/lib/utils';
 import { DailyLedgerView } from '@/components/finance/daily-ledger-view';

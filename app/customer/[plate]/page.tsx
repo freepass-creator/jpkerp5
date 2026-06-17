@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Car, CurrencyKrw, Calendar, Phone, MapPin, Receipt, Warning, CheckCircle, ShieldCheck, DownloadSimple, FileText, ChatCircleDots, Headset } from '@phosphor-icons/react';
+import { ArrowLeft, Car, CurrencyKrw, Calendar, Phone, Receipt, Warning, CheckCircle, ShieldCheck, DownloadSimple, FileText, ChatCircleDots, Headset } from '@phosphor-icons/react';
 import { maskAddress, maskPhone } from '@/lib/customer-match';
 
 const SESSION_KEY = 'jpk-customer-lookup';

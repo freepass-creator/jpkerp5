@@ -10,13 +10,11 @@
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Plus, Trash, FileXls, MagnifyingGlass, Copy, X } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { exportToExcel } from '@/lib/excel-export';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
-import * as Tabs from '@radix-ui/react-tabs';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import type { VehicleStatus } from '@/lib/types';

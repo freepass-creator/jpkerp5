@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react';
 import {
-  Buildings, Plus, CheckCircle, Camera, Trash, CircleNotch, Bank, Pencil, X, Warning, CreditCard, FileXls,
+  Buildings, Plus, Camera, Trash, CircleNotch, Bank, Pencil, X, Warning, CreditCard, FileXls,
   MapPin, FileText, Garage, Car, ArrowLeft, FloppyDisk,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';

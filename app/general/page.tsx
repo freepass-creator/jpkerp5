@@ -10,7 +10,7 @@
 
 import { useState } from 'react';
 import {
-  Folder, Users, Buildings, Wrench, MapPin, Plus, FileText, ChartLineUp, PencilSimple, Trash, Car, Package,
+  Folder, Users, Buildings, Wrench, MapPin, Plus, FileText, ChartLineUp, Trash, Car, Package,
   Megaphone, Calendar, Pulse,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -22,11 +22,9 @@ import { ActivityView } from '@/components/activity/activity-view';
 import { DispatchView } from '@/components/dispatch/dispatch-view';
 import { AttendanceView } from '@/components/attendance/attendance-view';
 import { CompanyDetailDialog } from '@/components/companies/company-detail-dialog';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { audit } from '@/lib/firebase/audit-store';
 import { useStaffList } from '@/lib/use-staff-list';
 import { displayCompanyShort } from '@/lib/company-display';
-import type { Company } from '@/lib/types';
 import { usePersistentState } from '@/lib/use-persistent-state';
 
 type GeneralView =

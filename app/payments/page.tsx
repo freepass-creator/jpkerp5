@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import {
-  CurrencyKrw, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar, DownloadSimple, FileXls,
+  CurrencyKrw, CreditCard, CheckCircle, Warning, LinkSimple, MagnifyingGlass, Plus, ListChecks, ChartBar, FileXls,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -12,7 +12,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { displayCompanyName } from '@/lib/company-display';
-import { applicableSubjects, ALL_SUBJECTS } from '@/lib/ledger-subjects';
+import { applicableSubjects } from '@/lib/ledger-subjects';
 import { autoMatchAll, applyMatch, reverseMatch, applyFifoPayment, autoMatchCardAll, applyCardMatch } from '@/lib/receipt-match';
 import { findAllSettlements, buildSettlementPatch } from '@/lib/settlement-match';
 import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
