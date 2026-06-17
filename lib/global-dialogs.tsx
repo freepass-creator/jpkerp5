@@ -15,6 +15,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
+import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
 import { VehicleDetailDialog, type VehicleDialogTab } from '@/components/asset/vehicle-detail-dialog';
 import { toast } from '@/lib/toast';
 import type { Vehicle } from '@/lib/types';
@@ -33,7 +34,7 @@ export function useVehicleDialog(): Ctx {
 
 export function GlobalDialogsProvider({ children }: { children: ReactNode }) {
   const { vehicles, update: updateVehicle } = useVehicles();
-  const { contracts } = useContracts();
+  const { contracts, update: updateContract } = useContracts();
   const { entries: history } = useHistoryEntries();
   const [openState, setOpenState] = useState<{ vehicle: Vehicle; initialTab?: VehicleDialogTab } | null>(null);
 
@@ -73,7 +74,11 @@ export function GlobalDialogsProvider({ children }: { children: ReactNode }) {
           contracts={vehicleContracts}
           view="status"
           initialTab={openState.initialTab}
-          onUpdate={(v) => void updateVehicle(v)}
+          onUpdate={async (v) => {
+            await updateVehicle(v);
+            // Vehicle 상태 변경 시 linked Contract.vehicleStatus 도 동기화 (자산 페이지 패턴 일치).
+            await syncContractStatusFromVehicle(v, contracts, updateContract);
+          }}
           onClose={() => setOpenState(null)}
         />
       )}
