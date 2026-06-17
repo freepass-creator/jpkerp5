@@ -383,14 +383,8 @@ export default function ContractPage() {
         open={openId != null}
         onOpenChange={(v) => !v && setOpenId(null)}
         onUpdate={(updated) => {
-          void updateContract(updated);
-          // Vehicle.status 자동 동기 — 운영현황 패턴과 동일 (양방향 동기)
-          if (updated.vehiclePlate && updated.vehicleStatus) {
-            const v = vehicles.find((x) => (x.plate ?? '').trim() === updated.vehiclePlate.trim());
-            if (v && v.status !== updated.vehicleStatus) {
-              void updateVehicleMaster({ ...v, status: updated.vehicleStatus });
-            }
-          }
+          // Vehicle.status 동기 + 반납 일할 자동 적용 (반납 시 마지막 회차 prorate).
+          void syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster);
         }}
       />
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['계약']} initialMode="계약" />
