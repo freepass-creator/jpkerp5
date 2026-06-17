@@ -27,6 +27,7 @@ import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers'
 import { displayCompanyName } from '@/lib/company-display';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { downloadContractsExcel } from '@/lib/contract-export';
+import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { toast } from '@/lib/toast';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -433,7 +434,8 @@ export default function ContractPage() {
               const r = ctxMenu.row;
               if (!r) return;
               if (!confirm(`${r.contractNo} 반납 처리하시겠습니까? (반납일=오늘)`)) return;
-              void updateContract({ ...r, returnedDate: new Date().toISOString().slice(0, 10), status: '반납' });
+              const updated = { ...r, returnedDate: new Date().toISOString().slice(0, 10), status: '반납' as const, vehicleStatus: '반납' as const };
+              void syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster);
             },
             disabled: !!ctxMenu.row.returnedDate,
           },
