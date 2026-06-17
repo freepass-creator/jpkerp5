@@ -22,7 +22,7 @@ import { toast } from '@/lib/toast';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone, contractStatusTone, scheduleStatusTone } from '@/lib/status-tones';
 import { DateInput } from '@/components/ui/date-input';
-import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus, AdditionalDriver } from '@/lib/types';
+import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus, AdditionalDriver, DepositDeduction } from '@/lib/types';
 import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
 import { contractIdentMasked, birthFromIdent, inferKind } from '@/lib/ident';
 import { displayCompanyName } from '@/lib/company-display';
@@ -2332,6 +2332,8 @@ export function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contrac
         </div>
       </Section>
 
+      <DepositSection c={c} onUpdate={onUpdate} />
+
       <Section icon={<CurrencyKrw size={12} weight="duotone" />} title="회차별 스케줄" bodyPadding={0}>
         <ScheduleTable c={c} onUpdate={onUpdate} />
       </Section>
@@ -2357,6 +2359,147 @@ export function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contrac
         );
       })()}
     </div>
+  );
+}
+
+/* ─────────────── 보증금 관리 섹션 ─────────────── */
+function DepositSection({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+  const due = c.deposit ?? 0;
+  const received = c.depositReceived ?? 0;
+  const refunded = c.depositRefunded ?? 0;
+  const deductions = c.depositDeductions ?? [];
+  const deductSum = deductions.reduce((s, d) => s + (d.amount ?? 0), 0);
+  // 미수령 보증금 = 청구 - 받음
+  const unreceived = Math.max(0, due - received);
+  // 환불 예정액 = 받은 금액 - 차감 - 이미 환불
+  const refundable = Math.max(0, received - deductSum - refunded);
+
+  function patchNum(field: 'depositReceived' | 'depositRefunded', raw: string) {
+    const n = Number(raw.replace(/[,\s]/g, '')) || 0;
+    onUpdate({ ...c, [field]: n });
+  }
+  function patchDate(field: 'depositReceivedDate' | 'depositRefundedDate', d: string) {
+    onUpdate({ ...c, [field]: d || undefined });
+  }
+  function addDeduction() {
+    const reason = window.prompt('차감 사유 (예: 미납 회차, 차량 손상, 클리닝):');
+    if (!reason) return;
+    const amountStr = window.prompt('차감 금액 (원):');
+    if (!amountStr) return;
+    const amount = Number(amountStr.replace(/[,\s]/g, '')) || 0;
+    if (amount <= 0) return;
+    const next: DepositDeduction = {
+      id: `dd-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      date: new Date().toISOString().slice(0, 10),
+      amount, reason,
+    };
+    onUpdate({ ...c, depositDeductions: [...deductions, next] });
+  }
+  function removeDeduction(id: string) {
+    if (!confirm('차감 내역을 삭제하시겠습니까?')) return;
+    onUpdate({ ...c, depositDeductions: deductions.filter((d) => d.id !== id) });
+  }
+
+  return (
+    <Section
+      icon={<CurrencyKrw size={12} weight="duotone" />}
+      title={`보증금 — 청구 ₩${formatCurrency(due)} · 받음 ₩${formatCurrency(received)} · 환불 ₩${formatCurrency(refunded)}`}
+    >
+      <div className="detail-grid-2" style={{ marginTop: 4 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '4px 0', fontSize: 12 }}>
+            <span style={{ minWidth: 90, color: 'var(--text-sub)' }}>받은 금액</span>
+            <input
+              type="text"
+              className="input-bare mono"
+              defaultValue={received ? received.toLocaleString() : ''}
+              placeholder="0"
+              onBlur={(e) => patchNum('depositReceived', e.target.value)}
+              style={{ flex: 1, textAlign: 'right' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '4px 0', fontSize: 12 }}>
+            <span style={{ minWidth: 90, color: 'var(--text-sub)' }}>입금일</span>
+            <input
+              type="date"
+              className="input-bare mono"
+              defaultValue={c.depositReceivedDate ?? ''}
+              onChange={(e) => patchDate('depositReceivedDate', e.target.value)}
+              style={{ flex: 1 }}
+            />
+          </div>
+          <Field label="미수령" value={
+            unreceived > 0
+              ? <span style={{ color: 'var(--red-text)' }}>₩{formatCurrency(unreceived)}</span>
+              : received >= due && due > 0
+                ? <StatusBadge tone="green">완납</StatusBadge>
+                : <span className="muted">-</span>
+          } mono />
+        </div>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '4px 0', fontSize: 12 }}>
+            <span style={{ minWidth: 90, color: 'var(--text-sub)' }}>환불 금액</span>
+            <input
+              type="text"
+              className="input-bare mono"
+              defaultValue={refunded ? refunded.toLocaleString() : ''}
+              placeholder="0"
+              onBlur={(e) => patchNum('depositRefunded', e.target.value)}
+              style={{ flex: 1, textAlign: 'right' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '4px 0', fontSize: 12 }}>
+            <span style={{ minWidth: 90, color: 'var(--text-sub)' }}>환불일</span>
+            <input
+              type="date"
+              className="input-bare mono"
+              defaultValue={c.depositRefundedDate ?? ''}
+              onChange={(e) => patchDate('depositRefundedDate', e.target.value)}
+              style={{ flex: 1 }}
+            />
+          </div>
+          <Field label="환불 예정" value={
+            refundable > 0
+              ? <span style={{ color: 'var(--brand)' }}>₩{formatCurrency(refundable)}</span>
+              : refunded > 0
+                ? <span className="muted">정산 완료</span>
+                : <span className="muted">-</span>
+          } mono />
+        </div>
+      </div>
+
+      <div style={{
+        marginTop: 8, padding: '8px 10px',
+        background: 'var(--bg-soft)', borderRadius: 'var(--radius-md)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 600 }}>
+            차감 내역 {deductions.length > 0 && <span className="dim" style={{ marginLeft: 4 }}>합 ₩{formatCurrency(deductSum)}</span>}
+          </span>
+          <button type="button" className="btn btn-sm" onClick={addDeduction}>+ 차감 추가</button>
+        </div>
+        {deductions.length === 0 ? (
+          <div className="dim" style={{ fontSize: 11 }}>없음</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {deductions.map((d) => (
+              <div key={d.id} style={{
+                display: 'flex', alignItems: 'baseline', gap: 8,
+                fontSize: 11, padding: '4px 6px',
+                background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
+              }}>
+                <span className="mono dim" style={{ width: 90 }}>{d.date}</span>
+                <span style={{ flex: 1 }}>{d.reason}</span>
+                <span className="mono" style={{ color: 'var(--red-text)' }}>-₩{formatCurrency(d.amount)}</span>
+                <button type="button" className="btn-icon" onClick={() => removeDeduction(d.id)} title="삭제">
+                  <Trash size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Section>
   );
 }
 

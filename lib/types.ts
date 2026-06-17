@@ -104,7 +104,15 @@ export type Contract = {
   longTerm: boolean;
   // 금액
   monthlyRent: number;
-  deposit: number;
+  deposit: number;             // 계약상 보증금 (청구액)
+  /** 실제 받은 보증금 금액 — 계약 보증금과 다를 수 있음 (분납·일부수령). 빈 값 = 미수령 */
+  depositReceived?: number;
+  depositReceivedDate?: string;     // 보증금 입금일 (YYYY-MM-DD)
+  /** 보증금 차감 내역 — 반납 시 미납·손상·정비비 등으로 환불액에서 차감 */
+  depositDeductions?: DepositDeduction[];
+  /** 실제 환불한 보증금 금액 (반납 시점). 빈 값 = 미환불 */
+  depositRefunded?: number;
+  depositRefundedDate?: string;
   paymentDay: number;          // 매월 결제일 (1~31)
   paymentMethod: PaymentMethod;
   /**
@@ -230,6 +238,17 @@ export type DiscountEntry = {
   memo?: string;
   by?: string;
   at?: string;
+};
+
+/** 보증금 차감 1건 — 반납 시점에 미납·손상·세금 등으로 환불액에서 차감.
+ *  reason 예: '미납 회차 충당', '차량 손상 수리비', '미정산 자동차세', '클리닝 비용' 등. */
+export type DepositDeduction = {
+  id: string;
+  date: string;                  // YYYY-MM-DD — 차감 결정일
+  amount: number;                // 차감 금액 (원)
+  reason: string;                // 차감 사유
+  createdBy?: string;
+  createdAt?: string;
 };
 
 /** Contract에 인라인으로 박는 회차. (PaymentSchedule 전체 모델의 contract-scope subset) */
