@@ -23,9 +23,8 @@ import { usePersistentState } from '@/lib/use-persistent-state';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
-import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
-import { Plus, FileXls, Trash, MagnifyingGlass, Copy, ArrowSquareOut } from '@phosphor-icons/react';
+import { Plus, FileXls, Trash, MagnifyingGlass, Copy } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { toast } from '@/lib/toast';
 import type { Vehicle } from '@/lib/types';
@@ -388,7 +387,7 @@ export default function AssetInsurancePage() {
             { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); } },
             { label: '증권번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.insurancePolicyNo) navigator.clipboard.writeText(ctxMenu.row.insurancePolicyNo); }, disabled: !ctxMenu.row.insurancePolicyNo },
             { type: 'separator' },
-            { label: '계약 이력', icon: <ArrowSquareOut size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) window.location.href = `/contract?q=${encodeURIComponent(ctxMenu.row.plate)}`; } },
+            { label: '계약 이력', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) openVehicle(ctxMenu.row.plate, 'contract'); } },
           ] satisfies ContextMenuItem[]) : []}
         />
       </div>

@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useImperativeHandle, forwardRef, Fragment } from 'react';
-import * as Tabs from '@radix-ui/react-tabs';
 import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
   Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch, Trash,
   Upload, Warning as WarningIcon, X as XIcon, X, CaretRight,
   Pencil,
 } from '@phosphor-icons/react';
-import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';

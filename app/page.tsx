@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, Warning, X, Plus, PaperPlaneTilt, DownloadSimple, Car, Upload, FileXls } from '@phosphor-icons/react';
-import { Sidebar } from '@/components/layout/sidebar';
+import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, X, Plus, PaperPlaneTilt, DownloadSimple, Car, Upload, FileXls } from '@phosphor-icons/react';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import {
   todayKr,
@@ -10,7 +9,7 @@ import {
   buildReturns,
 } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
-import { formatCurrency, formatDate, daysSince, shortDate, dateWithDow, formatRemainingHuman } from '@/lib/utils';
+import { formatCurrency, formatDate, daysSince, dateWithDow, formatRemainingHuman } from '@/lib/utils';
 import type { Contract } from '@/lib/types';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
@@ -33,7 +32,7 @@ import { ageFromIdent } from '@/lib/ident';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone } from '@/lib/status-tones';
 import {
-  getExpiryDate, daysToExpiry,
+  getExpiryDate,
   getVehicleState, getContractState, getPaymentState,
   type VehicleState, type ContractState, type PaymentState,
 } from '@/lib/contract-stage';

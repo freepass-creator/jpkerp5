@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, DownloadSimple, PaperPlaneTilt, FileText, Copy, FloppyDisk } from '@phosphor-icons/react';
+import { Power, FileXls, ChatCircleDots, X, MagnifyingGlass, Plus, Gavel, Warning, PaperPlaneTilt, FileText, Copy, FloppyDisk } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -32,7 +32,6 @@ import type { Contract, RiskIssue } from '@/lib/types';
 import { computeActiveIssues, pickPrimaryIssue, computeLatePayStage, ISSUE_COLOR, ISSUE_LABEL, type LatePayStage, needsEngineLockAction, needsNoticeAction } from '@/lib/risk-issues';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
-import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { usePersistentState } from '@/lib/use-persistent-state';
 
 type Filter =

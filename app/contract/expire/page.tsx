@@ -14,7 +14,6 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
-import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { downloadContractsExcel } from '@/lib/contract-export';

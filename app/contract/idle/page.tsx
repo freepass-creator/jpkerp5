@@ -17,7 +17,6 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { useRole } from '@/lib/use-role';
-import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { IdleLocationDialog } from '@/components/idle-location-dialog';
 import type { Contract } from '@/lib/types';

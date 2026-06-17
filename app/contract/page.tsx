@@ -10,12 +10,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileText, MagnifyingGlass, ArrowLeft, FileXls, Trash, PaperPlaneTilt, Copy, ArrowUDownLeft, X } from '@phosphor-icons/react';
+import { FileText, MagnifyingGlass, FileXls, Trash, PaperPlaneTilt, Copy, ArrowUDownLeft, X } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
-import { Sidebar } from '@/components/layout/sidebar';
-import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -28,7 +25,6 @@ import { CompanyFilter } from '@/components/ui/filter-bar';
 import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import { displayCompanyName } from '@/lib/company-display';
-import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { toast } from '@/lib/toast';

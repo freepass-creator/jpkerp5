@@ -8,11 +8,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bank, MagnifyingGlass, ArrowLeft, Plus, Trash, FileXls } from '@phosphor-icons/react';
-import { Sidebar } from '@/components/layout/sidebar';
+import { Bank, Plus, Trash, FileXls } from '@phosphor-icons/react';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
-import { RECEIPT_SUBJECTS, EXPENSE_SUBJECTS, INTERNAL_SUBJECTS } from '@/lib/ledger-subjects';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';

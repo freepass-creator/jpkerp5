@@ -23,7 +23,6 @@ import { CompanyFilter } from '@/components/ui/filter-bar';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import { sumPayments, sumDiscounts, balance } from '@/lib/payment-schedule';
 import { usePersistentState } from '@/lib/use-persistent-state';
-import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { exportToExcel } from '@/lib/excel-export';
 import { toast } from '@/lib/toast';
@@ -47,7 +46,7 @@ type Row = {
 const fmt = (v: number) => v ? v.toLocaleString('ko-KR') : '';
 
 export default function ContractSchedulePage() {
-  const { contracts, loading, update: updateContract } = useContracts();
+  const { contracts, loading } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:contract-schedule:company', 'all');
   const [bucket, setBucket] = usePersistentState<Bucket>('filter:contract-schedule:bucket', 'all');
@@ -56,7 +55,6 @@ export default function ContractSchedulePage() {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() + 1 };
   });
-  const [openId, setOpenId] = useState<string | null>(null);
   const { openVehicle } = useVehicleDialog();
 
   const companyOptions = useMemo(() => buildCompanyOptions(contracts, (c) => c.company), [contracts]);
@@ -309,12 +307,6 @@ export default function ContractSchedulePage() {
         </tbody>
       </table>
 
-      <ContractDetailDialog
-        contract={openId ? contracts.find((c) => c.id === openId) ?? null : null}
-        open={openId != null}
-        onOpenChange={(v) => !v && setOpenId(null)}
-        onUpdate={(u) => { void updateContract(u); }}
-      />
     </MasterPageShell>
   );
 }

@@ -7,7 +7,6 @@
  */
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ShoppingCart, FileXls, MagnifyingGlass, Copy, ArrowRight } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { exportToExcel } from '@/lib/excel-export';
@@ -26,7 +25,6 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 
 export default function PurchasePage() {
-  const router = useRouter();
   const { vehicles, loading: vehiclesLoading, update: updateVehicle } = useVehicles();
   const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();

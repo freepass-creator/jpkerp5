@@ -6,7 +6,6 @@
  */
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ClipboardText, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { useTableSelection } from '@/lib/use-table-selection';
@@ -21,12 +20,10 @@ import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
-import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 
 export default function AssetInspectionPage() {
-  const router = useRouter();
   const { contracts, loading: contractsLoading } = useContracts();
   const { entries: history } = useHistoryEntries();
   const { vehicles } = useVehicles();

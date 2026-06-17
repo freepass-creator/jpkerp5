@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileXls, MagnifyingGlass, Copy, ArrowSquareOut, Trash } from '@phosphor-icons/react';
+import { Plus, FileXls, MagnifyingGlass, Copy, Trash } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { toast } from '@/lib/toast';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
