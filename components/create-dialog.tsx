@@ -13,7 +13,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { parseExcelFile, type ParsedSheet, type UploadKind } from '@/lib/excel-detect';
 import { formatCurrency, cn } from '@/lib/utils';
 import { MAKERS, MODELS_BY_MAKER, buildVehicleFullName } from '@/lib/vehicle-master';
-import type { Contract, HistoryCategory, HistoryScope, AdditionalDriver } from '@/lib/types';
+import type { Contract, HistoryCategory, HistoryScope, AdditionalDriver, BankTransaction, CardTransaction } from '@/lib/types';
 import {
   VEHICLE_COLUMNS, CONTRACT_COLUMNS, BANK_TX_COLUMNS, CARD_TX_COLUMNS, SNAPSHOT_COLUMNS,
   type ColumnSpec,
@@ -33,6 +33,7 @@ import {
 } from '@/lib/import-commit';
 import { todayKr } from '@/lib/mock-data';
 import { generateSchedules } from '@/lib/payment-schedule';
+import { autoMatchAll, autoMatchCardAll, applyMatch, applyCardMatch, applyFifoPayment } from '@/lib/receipt-match';
 import { dedupAgainst } from '@/lib/dedup';
 import { enrichBankTxBatch, enrichCardTxBatch } from '@/lib/channel-matching';
 import { bankTxKeys, cardTxKeys, vehicleKeys, contractKeys } from '@/lib/dedup-keys';
@@ -96,8 +97,8 @@ export function CreateDialog({
   // RTDB stores
   const { contracts, addMany: addContracts, updateMany: updateContracts } = useContracts();
   const { vehicles, add: addVehicle, addMany: addVehicles, update: updateVehicle } = useVehicles();
-  const { rows: existingBankTx, addMany: addBankTx } = useBankTx();
-  const { rows: existingCardTx, addMany: addCardTx } = useCardTx();
+  const { rows: existingBankTx, addMany: addBankTx, update: updateBankTx } = useBankTx();
+  const { rows: existingCardTx, addMany: addCardTx, update: updateCardTx } = useCardTx();
   const { companies } = useCompanies();
 
   const reset = useCallback(() => {
@@ -230,15 +231,78 @@ export function CreateDialog({
 
       const bankSaved = await addBankTx(bankEnriched.rows);
       const cardSaved = await addCardTx(cardEnriched.rows);
-      // 매칭 (신규 저장된 것만 대상)
-      const txList = [
-        ...bankSaved.map((t) => ({ id: t.id, amount: t.amount, counterparty: t.counterparty })),
-        ...cardSaved.map((t) => ({ id: t.id, amount: t.amount, counterparty: t.customerName ?? '' })),
-      ];
-      const matches = matchTransactions(txList, contracts);
-      const patches = applyPaymentsToContracts(contracts, matches);
-      if (patches.length > 0) await updateContracts(patches);
-      const matchedCount = matches.filter((m) => m.contractId).length;
+
+      // ─── 회차 반영 매칭 (실제 schedule.payments[] 에 entry 추가) ───
+      // 이전: matchTransactions + applyPaymentsToContracts → unpaidAmount 캐시만 갱신, schedule 미반영 (스케줄 표 + autoMatch 후속 동작 깨짐).
+      // 이번: receipt-match 의 applyMatch / applyFifoPayment 호출 → schedule.status/paidAmount/payments[] 까지 완전 반영.
+      const contractById = new Map(contracts.map((c) => [c.id, c]));
+      const updatedContractMap = new Map<string, Contract>();
+      const bankTxPatches: Array<{ id: string; patch: Partial<BankTransaction> }> = [];
+      const cardTxPatches: Array<{ id: string; patch: Partial<CardTransaction> }> = [];
+      const getCurrent = (cid: string) => updatedContractMap.get(cid) ?? contractById.get(cid);
+
+      // 1. enrich 단계에서 matchedContractId 잡힌 bank tx → 정확 회차 or FIFO 자동 분배
+      for (const tx of bankSaved) {
+        if (!tx.matchedContractId) continue;
+        const c = getCurrent(tx.matchedContractId);
+        if (!c) continue;
+        const schedules = c.schedules ?? [];
+        // 정확 회차 매칭 시도 (미납 중 amount 또는 잔액 일치)
+        const exact = schedules.find((s) =>
+          s.status !== '완료' && s.status !== '면제' &&
+          (s.amount === tx.amount || Math.max(0, s.amount - (s.paidAmount ?? 0)) === tx.amount)
+        );
+        try {
+          if (exact) {
+            const { txPatch, contractPatch } = applyMatch(tx, c, exact.seq);
+            bankTxPatches.push({ id: tx.id, patch: txPatch });
+            updatedContractMap.set(c.id, { ...c, ...contractPatch });
+          } else {
+            const { txPatch, contractPatch } = applyFifoPayment(tx, c);
+            bankTxPatches.push({ id: tx.id, patch: txPatch });
+            updatedContractMap.set(c.id, { ...c, ...contractPatch });
+          }
+        } catch (e) {
+          console.error('[upload bank match] failed', tx.id, e);
+        }
+      }
+
+      // 2. 미매칭 bank tx → autoMatchAll high confidence (이름/4자리 + amount 정확)
+      const unmatchedBank = bankSaved.filter((t) => !t.matchedContractId);
+      const liveContracts = contracts.map((c) => updatedContractMap.get(c.id) ?? c);
+      const bankAutoMatches = autoMatchAll(unmatchedBank, liveContracts);
+      for (const m of bankAutoMatches) {
+        const c = getCurrent(m.candidate.contract.id);
+        if (!c) continue;
+        try {
+          const { txPatch, contractPatch } = applyMatch(m.tx, c, m.candidate.scheduleSeq);
+          bankTxPatches.push({ id: m.tx.id, patch: txPatch });
+          updatedContractMap.set(c.id, { ...c, ...contractPatch });
+        } catch (e) {
+          console.error('[upload bank auto] failed', m.tx.id, e);
+        }
+      }
+
+      // 3. 카드 tx → autoMatchCardAll
+      const liveContracts2 = contracts.map((c) => updatedContractMap.get(c.id) ?? c);
+      const cardAutoMatches = autoMatchCardAll(cardSaved, liveContracts2);
+      for (const m of cardAutoMatches) {
+        const c = getCurrent(m.candidate.contract.id);
+        if (!c) continue;
+        try {
+          const { txPatch, contractPatch } = applyCardMatch(m.tx, c, m.candidate.scheduleSeq);
+          cardTxPatches.push({ id: m.tx.id, patch: txPatch });
+          updatedContractMap.set(c.id, { ...c, ...contractPatch });
+        } catch (e) {
+          console.error('[upload card auto] failed', m.tx.id, e);
+        }
+      }
+
+      // Persist tx patches + contract patches
+      for (const { id, patch } of bankTxPatches) { try { await updateBankTx(id, patch); } catch (e) { console.error('[upload bankTx update]', e); } }
+      for (const { id, patch } of cardTxPatches) { try { await updateCardTx(id, patch); } catch (e) { console.error('[upload cardTx update]', e); } }
+      if (updatedContractMap.size > 0) await updateContracts(Array.from(updatedContractMap.values()));
+      const matchedCount = bankTxPatches.length + cardTxPatches.length;
       const skippedNote = bankSkipped + cardSkipped > 0 ? ` (중복 ${bankSkipped + cardSkipped}건 제외)` : '';
       const companyNote = companyMatched > 0
         ? ` · 회사 자동분류 ${companyMatched}건${companyUnmatched > 0 ? ` (미분류 ${companyUnmatched})` : ''}`
@@ -247,7 +311,7 @@ export function CreateDialog({
         ? ` · 계약자명 자동매칭 ${contractAutoMatched}건`
         : '';
       const total = bankSaved.length + cardSaved.length;
-      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${patches.length}건 갱신)${companyNote}${contractNote}${skippedNote}`);
+      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${updatedContractMap.size}건 갱신)${companyNote}${contractNote}${skippedNote}`);
       if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount} · 회사분류 ${companyMatched}${contractAutoMatched > 0 ? ` · 계약자 자동매칭 ${contractAutoMatched}` : ''}`);
       else if (bankSkipped + cardSkipped > 0) toast.warning(`전부 중복 — ${bankSkipped + cardSkipped}건 제외됨`);
       setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '자동이체' && p.kind !== '카드'));
