@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  ChartBar, Car, ClipboardText, CurrencyKrw, Warning, ArrowRight,
+  ChartBar, Warning, ArrowRight,
   Clock, Calendar as CalendarIcon, Megaphone, PaperPlaneTilt, CheckCircle,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
@@ -41,7 +41,6 @@ import { useTodos, isTodoAllDone } from '@/lib/firebase/todos-store';
 import { useSchedules } from '@/lib/firebase/schedules-store';
 import { StaffMultiPicker } from '@/components/ui/staff-multi-picker';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
-import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { formatCurrency, dateWithDow, formatDate } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
@@ -49,7 +48,7 @@ import { buildAllAlerts, alertColor, dDayLabel, type AlertItem } from '@/lib/ale
 import { StatusBadge } from '@/components/ui/status-badge';
 
 export default function DashboardPage() {
-  const { contracts, update: updateContract } = useContracts();
+  const { contracts } = useContracts();
   const { openVehicle } = useVehicleDialog();
   // 계약 id 받아 → 그 계약의 차량번호로 자산 dialog (운영 현황 탭) 열기
   const handleOpenContract = useCallback((id: string) => {
