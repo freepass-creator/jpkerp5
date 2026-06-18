@@ -846,12 +846,22 @@ export function parseCardTxRow(
   /** 업로드 변형 — 카드매출/법인카드 구분 명시 (없으면 컬럼 또는 default 매출) */
   variantHint?: '매출' | '법인카드',
 ): Omit<CardTransaction, 'id'> | null {
-  const txDate = toDate(get(row, '승인일', '거래일', 'txDate'));
-  const approvalNo = toStr(get(row, '승인번호', 'approvalNo'));
-  const amount = toNum(get(row, '금액', '매입금액', '거래금액', 'amount'));
-  if (!txDate || amount <= 0 || !approvalNo) return null;
+  const txDate = toDate(get(row,
+    '승인일', '승인일자', '승인일시', '거래일', '거래일자',
+    '매출일', '매출일자', '이용일', '이용일자', '사용일', '사용일자',
+    'txDate', 'date',
+  ));
+  // 승인번호 — 여러 alias 시도. 법인카드 명세는 종종 '거래번호'/'관리번호'.
+  const approvalNo = toStr(get(row,
+    '승인번호', '거래번호', '전표번호', '관리번호',
+    '승인NO', '거래NO', 'No', 'NO',
+    'approvalNo', 'transactionId',
+  ));
+  const amount = toNum(get(row, '금액', '매입금액', '거래금액', '매출액', '이용금액', '사용금액', '결제금액', 'amount'));
+  if (!txDate || amount <= 0) return null;
 
-  const cardRaw = toStr(get(row, '카드번호', 'cardLast4'));
+  // 카드뒤4 — 두 가지 alias: 카드번호(앞 마스킹, 뒤 4자리), 별도 끝4자리 컬럼
+  const cardRaw = toStr(get(row, '카드번호', '카드No', 'cardLast4', 'last4'));
   const last4 = (cardRaw.match(/\d{4}\s*$/) ?? [''])[0].trim() || undefined;
 
   // kind 우선순위: variantHint > 컬럼명 > default '매출'
@@ -859,20 +869,35 @@ export function parseCardTxRow(
   const kind: '매출' | '법인카드' = variantHint
     ?? (kindRaw === '법인카드' || kindRaw === '지출' ? '법인카드' : '매출');
 
+  // 법인카드 — 승인번호 없으면 (txDate, amount, merchant, last4) 조합으로 pseudo-key 만들어 통과.
+  // 매출은 승인번호 필수 (취소·정산 추적 필요).
+  if (!approvalNo) {
+    if (kind === '법인카드') {
+      const merchantFallback = toStr(get(row, '가맹점명', '가맹점', 'merchant'));
+      const pseudoKey = `pseudo-${txDate}-${amount}-${(merchantFallback || '미상').slice(0, 16)}-${last4 ?? ''}`;
+      // 아래에서 approvalNo 자리에 채워 넣음
+      // eslint-disable-next-line no-param-reassign
+      Object.assign(row, { __pseudoApproval: pseudoKey });
+    } else {
+      return null;
+    }
+  }
+  const finalApprovalNo = approvalNo || (toStr(get(row, '__pseudoApproval')) || `pseudo-${txDate}-${amount}`);
+
   const terminalId = toStr(get(row, '단말기ID', 'TID', '단말기번호', 'terminalId')) || undefined;
   const merchantNo = toStr(get(row, '가맹점번호', 'MID', 'merchantNo')) || undefined;
   const merchant = toStr(get(row, '가맹점명', '가맹점', 'merchant')) || undefined;
-  const category = toStr(get(row, '카테고리', '용도', '분류', 'category')) || undefined;
-  const usedBy = toStr(get(row, '사용자', '사용직원', 'usedBy')) || undefined;
+  const category = toStr(get(row, '카테고리', '용도', '분류', '업종', 'category')) || undefined;
+  const usedBy = toStr(get(row, '사용자', '사용직원', '결제자', '사용회원명', 'usedBy')) || undefined;
 
   return {
     kind,
     txDate,
     amount,
-    approvalNo,
+    approvalNo: finalApprovalNo,
     cardLast4: last4,
-    customerName: toStr(get(row, '고객명', 'customerName')) || undefined,
-    source: toStr(get(row, '카드사', 'source')) || fileName,
+    customerName: toStr(get(row, '고객명', '회원명', '결제고객', 'customerName')) || undefined,
+    source: toStr(get(row, '카드사', '발급사', '카드회사', 'source')) || fileName,
     terminalId,
     merchantNo,
     merchant,

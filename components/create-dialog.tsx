@@ -210,11 +210,16 @@ export function CreateDialog({
       const bankKinds = isAutopay ? ['계좌', '자동이체'] : ['계좌'];
       const bankRows = paymentFiles.filter((p) => bankKinds.includes(p.kind)).flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName, bank: p.bankHint })));
       const cardRows = paymentFiles.filter((p) => p.kind === '카드').flatMap((p) => p.rows.map((r) => ({ row: r, file: p.fileName })));
-      let bankParsed = bankRows.map((x) => parseBankTxRow(x.row, x.file, x.bank)).filter((x): x is NonNullable<typeof x> => !!x);
+      // parse + 실패 행 카운트 (사용자 피드백용)
+      const bankParseAll = bankRows.map((x) => parseBankTxRow(x.row, x.file, x.bank));
+      const bankParseFail = bankParseAll.filter((x) => x === null).length;
+      let bankParsed = bankParseAll.filter((x): x is NonNullable<typeof x> => !!x);
       if (isAutopay) {
         bankParsed = bankParsed.map((b) => ({ ...b, source: 'CMS' as const, method: b.method || 'CMS' }));
       }
-      const cardParsed = cardRows.map((x) => parseCardTxRow(x.row, x.file, cardVariantHint)).filter((x): x is NonNullable<typeof x> => !!x);
+      const cardParseAll = cardRows.map((x) => parseCardTxRow(x.row, x.file, cardVariantHint));
+      const cardParseFail = cardParseAll.filter((x) => x === null).length;
+      const cardParsed = cardParseAll.filter((x): x is NonNullable<typeof x> => !!x);
 
       // 중복 검증 — DB 기존 거래 + 시트 내 중복 동시 처리
       const bankDedup = dedupAgainst(bankParsed, existingBankTx, bankTxKeys);
@@ -322,8 +327,14 @@ export function CreateDialog({
       const leftoverNote = leftoverCount > 0
         ? ` · 잉여 ${leftoverCount}건 ${leftoverTotal.toLocaleString('ko-KR')}원 (수동 매칭 필요)`
         : '';
-      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${updatedContractMap.size}건 갱신)${fifoNote}${leftoverNote}${companyNote}${contractNote}${skippedNote}`);
-      if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount} · 회사분류 ${companyMatched}${contractAutoMatched > 0 ? ` · 계약자 자동매칭 ${contractAutoMatched}` : ''}`);
+      const parseFailNote = (bankParseFail + cardParseFail) > 0
+        ? ` · parse 실패 ${bankParseFail + cardParseFail}행 (필수 컬럼 누락: 거래일/금액/입금자)`
+        : '';
+      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${updatedContractMap.size}건 갱신)${fifoNote}${leftoverNote}${parseFailNote}${companyNote}${contractNote}${skippedNote}`);
+      if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount} · 회사분류 ${companyMatched}${contractAutoMatched > 0 ? ` · 계약자 자동매칭 ${contractAutoMatched}` : ''}${parseFailNote ? ` · ${bankParseFail + cardParseFail}행 미반영` : ''}`);
+      if (bankParseFail + cardParseFail > 0) {
+        toast.warning(`parse 실패 ${bankParseFail + cardParseFail}행 — 필수 컬럼 (거래일·금액·입금자) 누락 또는 형식 오류. 시트 헤더명 확인 필요.`);
+      }
       else if (bankSkipped + cardSkipped > 0) toast.warning(`전부 중복 — ${bankSkipped + cardSkipped}건 제외됨`);
       // 잉여 발생 시 별도 경고 토스트 (수동 매칭 동선 안내)
       if (leftoverCount > 0) {
