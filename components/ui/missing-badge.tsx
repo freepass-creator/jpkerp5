@@ -20,35 +20,29 @@
 import type { CSSProperties, ReactNode } from 'react';
 
 export function MissingBadge({
-  label, title, compact = false, suffix, style,
+  label, title, compact = false, style,
 }: {
-  /** 짧은 라벨 — 예: '회사', '운전자', '보험연령' */
-  label: string;
+  /** 필드명 — 본문에 표기 X, title 툴팁에만 사용. 예: '회사', '운전자' */
+  label?: string;
   /** 마우스 hover 시 상세 안내 */
   title?: string;
   /** true 면 더 작게 (셀 내 좁은 공간) */
   compact?: boolean;
-  /** 라벨 뒤 추가 아이콘 또는 텍스트 (예: ⚠) */
-  suffix?: ReactNode;
   style?: CSSProperties;
 }) {
   return (
     <span
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 3,
-        fontSize: compact ? 10 : 11, fontWeight: 600,
-        padding: compact ? '1px 5px' : '2px 6px',
-        borderRadius: 4,
-        background: 'var(--red-bg)',
+        fontSize: compact ? 10 : 11, fontWeight: 700,
         color: 'var(--red-text)',
-        border: '1px solid var(--red-text)',
         lineHeight: 1.2,
         whiteSpace: 'nowrap',
         ...style,
       }}
-      title={title ?? `${label} 미입력 — 즉시 입력 필요`}
+      title={title ?? (label ? `${label} 미입력 — 즉시 입력 필요` : '미입력 — 즉시 입력 필요')}
     >
-      {label} 미입력{suffix}
+      미입력 ⚠
     </span>
   );
 }
