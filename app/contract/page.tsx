@@ -29,6 +29,8 @@ import { CompanyCell } from '@/components/ui/company-cell';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
+import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
+import type { TableSelection } from '@/lib/use-table-selection';
 import { toast } from '@/lib/toast';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -76,6 +78,15 @@ export default function ContractPage() {
       return next;
     });
   }
+
+  // 행 선택 어댑터 — Ctrl/Shift+click + Ctrl+A
+  const selAdapter = useMemo<TableSelection>(() => ({
+    selectedIds, setSelectedIds,
+    toggleRow,
+    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
+    clear: () => setSelectedIds(new Set()),
+    size: selectedIds.size,
+  }), [selectedIds]);
 
   function handleExcelAll() {
     if (filtered.length === 0) { toast.info('내보낼 계약 없음'); return; }
@@ -151,6 +162,10 @@ export default function ContractPage() {
     // 기본 정렬: 계약일 최신 우선 (직원이 가장 자주 보고 싶은 순)
     .sort((a, b) => (b.contractDate ?? '').localeCompare(a.contractDate ?? ''));
   }, [contracts, search, quickFilter, companyFilter, today]);
+
+  // Ctrl/Shift+click 행선택 + Ctrl+A
+  const rowSel = useRowSelection({ ids: filtered.map((c) => c.id), selection: selAdapter });
+  useCtrlASelectAll(rowSel, selAdapter);
 
   // 각 퀵필터 카운트 — chip 라벨에 표시
   const counts = useMemo(() => {
@@ -334,14 +349,12 @@ export default function ContractPage() {
                       <EmptyRow colSpan={12}>
                         {contractsLoading ? '데이터 불러오는 중…' : '계약 없음 — 좌측 하단 [+ 신규 계약] 으로 시작하세요'}
                       </EmptyRow>
-                    ) : filtered.map((c) => (
+                    ) : filtered.map((c, idx) => (
                       <tr
                         key={c.id}
+                        onClick={(e) => rowSel.onRowClick(e, c.id, idx)}
                         onDoubleClick={() => openVehicle(c.vehiclePlate ?? '', 'contract')}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c });
-                        }}
+                        onContextMenu={(e) => rowSel.onRowContextMenu(e, c.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }))}
                         style={{ cursor: 'pointer' }}
                         className={selectedIds.has(c.id) ? 'selected-row' : undefined}
                       >

@@ -17,6 +17,8 @@ import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-syn
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
+import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
+import type { TableSelection } from '@/lib/use-table-selection';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { PageShell } from '@/components/ui/page-shell';
@@ -471,6 +473,15 @@ export default function Page() {
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
+  // 행 선택 어댑터 — Ctrl/Shift+click + Ctrl+A
+  const selAdapter = useMemo<TableSelection>(() => ({
+    selectedIds, setSelectedIds,
+    toggleRow,
+    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
+    clear: () => setSelectedIds(new Set()),
+    size: selectedIds.size,
+  }), [selectedIds, toggleRow]);
+
   // 퀵필터 변경 시 수동 정렬·선택 초기화 (필터 의도된 자동 정렬 우선)
   useEffect(() => { setManualSort(null); setSelectedIds(new Set()); }, [view]);
 
@@ -587,6 +598,10 @@ export default function Page() {
       notes: `${c.notes ?? ''}${c.notes ? ' / ' : ''}${todayKr()} ${months}개월 연장`.trim(),
     });
   }
+
+  // Ctrl/Shift+click 행선택 + Ctrl+A
+  const rowSel = useRowSelection({ ids: filteredContracts.map((c) => c.id), selection: selAdapter });
+  useCtrlASelectAll(rowSel, selAdapter);
 
   return (
     <PageShell
@@ -721,12 +736,16 @@ export default function Page() {
                         key={c.id}
                         onDoubleClick={() => handleRowDoubleClick(c)}
                         onContextMenu={(e) => {
-                          e.preventDefault();
                           setSelectedId(c.id);
-                          setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c });
+                          const idx = filteredContracts.findIndex((x) => x.id === c.id);
+                          rowSel.onRowContextMenu(e, c.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }));
                         }}
                         className={`status-row ${alertClass} ${selected?.id === c.id ? 'selected' : ''} ${isChecked ? 'selected-row' : ''}`}
-                        onClick={() => setSelectedId(c.id)}
+                        onClick={(e) => {
+                          setSelectedId(c.id);
+                          const idx = filteredContracts.findIndex((x) => x.id === c.id);
+                          rowSel.onRowClick(e, c.id, idx);
+                        }}
                       >
                         {/* 체크박스 */}
                         <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>

@@ -20,6 +20,8 @@ import { PERIODS, type Period, periodRange, isInRange } from '@/lib/period-filte
 import { useAuth } from '@/lib/use-auth';
 import { toast } from '@/lib/toast';
 import { useVehicleDialog } from '@/lib/global-dialogs';
+import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
+import type { TableSelection } from '@/lib/use-table-selection';
 
 /**
  * 과태료 변경부과 — 처리중 / 처리완료 두 단계로 분리.
@@ -166,6 +168,15 @@ export default function PenaltyPage() {
       return next;
     });
   }
+
+  // 행 선택 어댑터 — Ctrl/Shift+click + Ctrl+A
+  const selAdapter = useMemo<TableSelection>(() => ({
+    selectedIds, setSelectedIds,
+    toggleRow: toggleSelect,
+    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
+    clear: () => setSelectedIds(new Set()),
+    size: selectedIds.size,
+  }), [selectedIds]);
 
   /** 선택된 매칭 완료건 일괄 처리완료 */
   function markSelectedCompleted() {
@@ -371,6 +382,11 @@ export default function PenaltyPage() {
       rows: visible as unknown as Record<string, unknown>[],
     });
   }
+
+  // 행 선택 - 현재 visible (in-progress 또는 completed) 기준
+  const visibleRows = phase === 'in-progress' ? inProgress : completed;
+  const rowSel = useRowSelection({ ids: visibleRows.map((i) => i.id), selection: selAdapter });
+  useCtrlASelectAll(rowSel, selAdapter);
 
   return (
     <>
@@ -646,7 +662,7 @@ export default function PenaltyPage() {
                     : null;
                   const violClass = inRange === false ? 'text-red' : 'mono';
                   return (
-                    <tr key={it.id} onDoubleClick={() => it.car_number && openVehicle(it.car_number, 'risk')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: it }); }} style={{ cursor: 'pointer' }}>
+                    <tr key={it.id} onClick={(e) => rowSel.onRowClick(e, it.id, visibleRows.findIndex((x) => x.id === it.id))} onDoubleClick={() => it.car_number && openVehicle(it.car_number, 'risk')} onContextMenu={(e) => rowSel.onRowContextMenu(e, it.id, visibleRows.findIndex((x) => x.id === it.id), () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: it }))} style={{ cursor: 'pointer' }}>
                       <td className="checkbox-col sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH, background: 'var(--bg-card)' }}>
                         <input
                           type="checkbox"
