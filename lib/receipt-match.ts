@@ -317,11 +317,22 @@ export function autoMatchAll(
     const high = candidates.filter((c) => c.confidence === 'high' && !used.has(`${c.contract.id}:${c.scheduleSeq}`));
     if (high.length === 0) continue;
     // 동명이인·금액 충돌 안전장치 — high 후보가 여러 계약을 가리키면 자동매칭 격하 (수동 검토 유도).
-    // 같은 계약 내 여러 회차는 OK (가장 오래된 미납 우선).
     const uniqueContracts = new Set(high.map((h) => h.contract.id));
     if (uniqueContracts.size > 1) continue;
-    // 가장 오래된 미납 회차 우선 (findCandidatesIndexed 가 이미 dueDate 정렬)
-    const pick = high[0];
+    // CMS·자동이체 는 회차 dueDate 근처에 출금 → dueDate proximity 우선 매칭 (의도된 회차 자동 식별).
+    // 일반 입금은 기본 정렬 (오래된 미납 우선 = FIFO 회계 표준).
+    const isAutopay = t.source === 'CMS' || t.source === '자동이체' || t.method === 'CMS';
+    let pick: MatchCandidate;
+    if (isAutopay && high.length > 1) {
+      const txTime = new Date(t.txDate).getTime();
+      pick = [...high].sort((a, b) => {
+        const da = Math.abs(new Date(a.scheduleDueDate).getTime() - txTime);
+        const db = Math.abs(new Date(b.scheduleDueDate).getTime() - txTime);
+        return da - db;
+      })[0];
+    } else {
+      pick = high[0];
+    }
     used.add(`${pick.contract.id}:${pick.scheduleSeq}`);
     results.push({ tx: t, candidate: pick });
   }

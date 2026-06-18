@@ -11,16 +11,24 @@ type Recipient = {
   customerName: string;
   vehiclePlate: string;
   phone: string;
+  unpaidAmount: number;
+  unpaidSeqCount: number;
+  currentSeq: number;
+  monthlyRent: number;
+  depositDue: number;
+  depositReceived: number;
+  depositUnreceived: number;
+  depositRefund: number;
 };
 
 const TEMPLATES = [
   {
     label: '미납 1차 안내',
-    body: '[jpk] {{고객명}} 님, {{차량번호}} 차량 대여료가 미납 상태입니다. 금일 중 입금 부탁드립니다. 문의: 02-XXXX-XXXX',
+    body: '[jpk] {{고객명}} 님, {{차량번호}} 미수금 {{미수금}} ({{미납회차}}). 금일 중 입금 부탁드립니다. 문의: 02-XXXX-XXXX',
   },
   {
     label: '미납 2차 독촉',
-    body: '[jpk] {{고객명}} 님, {{차량번호}} 미납 건이 계속됨에 따라 시동제어 등 조치가 진행될 수 있습니다. 즉시 입금 또는 연락 부탁드립니다.',
+    body: '[jpk] {{고객명}} 님, {{차량번호}} 미수금 {{미수금}} ({{미납회차}}) 미납이 계속되어 시동제어 등 조치가 진행될 수 있습니다. 즉시 입금 또는 연락 부탁드립니다.',
   },
   {
     label: '시동제어 예고',
@@ -47,6 +55,22 @@ const TEMPLATES = [
     body: '[jpk] {{고객명}} 님, {{차량번호}} 차량 정기점검 일정 안내드립니다. 가까운 영업소 방문 부탁드립니다.',
   },
   {
+    label: '대여료 청구',
+    body: '[jpk] {{고객명}} 님, {{차량번호}} {{이번회차}} 대여료 {{월대여료}} 결제일이 도래했습니다. 입금 부탁드립니다.',
+  },
+  {
+    label: '보증금 입금 안내',
+    body: '[jpk] {{고객명}} 님, {{차량번호}} 계약 보증금 {{보증금}} 입금 부탁드립니다 (미수령 {{보증금미수령}}). 입금 후 출고 일정 안내드리겠습니다.',
+  },
+  {
+    label: '보증금 입금 확인',
+    body: '[jpk] {{고객명}} 님, {{차량번호}} 보증금 {{보증금수령}} 입금 확인되었습니다. 출고 일정 별도 안내드리겠습니다.',
+  },
+  {
+    label: '반납 정산 안내',
+    body: '[jpk] {{고객명}} 님, {{차량번호}} 반납 정산 — 보증금 {{보증금수령}} 중 차감액 제외 후 환불 {{보증금환불}} 예정입니다. 환불계좌 확인 부탁드립니다.',
+  },
+  {
     label: '직접 입력',
     body: '',
   },
@@ -63,12 +87,26 @@ export function SmsDialog({
   const recipients: Recipient[] = useMemo(() => {
     const arr = contracts
       .filter((c) => (selectedIds.size > 0 ? selectedIds.has(c.id) : true))
-      .map((c) => ({
-        contractId: c.id,
-        customerName: c.customerName,
-        vehiclePlate: c.vehiclePlate,
-        phone: c.customerPhone1,
-      }));
+      .map((c) => {
+        const due = c.deposit ?? 0;
+        const received = c.depositReceived ?? 0;
+        const deductSum = (c.depositDeductions ?? []).reduce((s, d) => s + (d.amount ?? 0), 0);
+        const refunded = c.depositRefunded ?? 0;
+        return {
+          contractId: c.id,
+          customerName: c.customerName,
+          vehiclePlate: c.vehiclePlate,
+          phone: c.customerPhone1,
+          unpaidAmount: c.unpaidAmount ?? 0,
+          unpaidSeqCount: c.unpaidSeqCount ?? 0,
+          currentSeq: c.currentSeq ?? 0,
+          monthlyRent: c.monthlyRent ?? 0,
+          depositDue: due,
+          depositReceived: received,
+          depositUnreceived: Math.max(0, due - received),
+          depositRefund: Math.max(0, received - deductSum - refunded),
+        };
+      });
     return arr;
   }, [contracts, selectedIds]);
 
@@ -177,7 +215,7 @@ export function SmsDialog({
 
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>본문 · 변수: <code>{'{{고객명}}'}</code> <code>{'{{차량번호}}'}</code></span>
+                  <span>본문 · 변수: <code>{'{{고객명}}'}</code> <code>{'{{차량번호}}'}</code> <code>{'{{미수금}}'}</code> <code>{'{{미납회차}}'}</code> <code>{'{{이번회차}}'}</code> <code>{'{{월대여료}}'}</code> <code>{'{{보증금}}'}</code> <code>{'{{보증금수령}}'}</code> <code>{'{{보증금미수령}}'}</code> <code>{'{{보증금환불}}'}</code></span>
                   <span className="mono" style={{ color: isLong ? 'var(--orange-text)' : 'var(--text-sub)' }}>
                     {bodyLen}자 {isLong ? '· LMS' : '· SMS'}
                   </span>
@@ -220,5 +258,16 @@ export function SmsDialog({
 }
 
 function preview(body: string, r: Recipient): string {
-  return body.replace(/\{\{고객명\}\}/g, r.customerName).replace(/\{\{차량번호\}\}/g, r.vehiclePlate);
+  const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
+  return body
+    .replace(/\{\{고객명\}\}/g, r.customerName)
+    .replace(/\{\{차량번호\}\}/g, r.vehiclePlate)
+    .replace(/\{\{미수금\}\}/g, won(r.unpaidAmount))
+    .replace(/\{\{미납회차\}\}/g, `${r.unpaidSeqCount}회`)
+    .replace(/\{\{이번회차\}\}/g, `${r.currentSeq}회차`)
+    .replace(/\{\{월대여료\}\}/g, won(r.monthlyRent))
+    .replace(/\{\{보증금\}\}/g, won(r.depositDue))
+    .replace(/\{\{보증금수령\}\}/g, won(r.depositReceived))
+    .replace(/\{\{보증금미수령\}\}/g, won(r.depositUnreceived))
+    .replace(/\{\{보증금환불\}\}/g, won(r.depositRefund));
 }
