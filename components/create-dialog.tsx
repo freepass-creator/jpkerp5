@@ -3133,7 +3133,11 @@ function PaymentPastePane({ variant, onClose }: { variant: PaymentVariant; onClo
       const companyNote = companyMatched > 0 ? ` · 회사 자동분류 ${companyMatched}` : '';
       setResult(`${saved}건 등록 완료${companyNote}${skipped > 0 ? ` · ${skipped}행은 필수 필드 부족으로 건너뜀` : ''}`);
       if (saved > 0) {
+        toast.success(`텍스트 붙여넣기 ${saved}건 등록${companyMatched > 0 ? ` · 회사분류 ${companyMatched}` : ''}`);
         setTimeout(() => onClose(), 1200);
+      }
+      if (skipped > 0) {
+        toast.warning(`${skipped}행 미반영 — 필수 필드 (거래일/금액/입금자) 누락. 헤더 행이 있는지 확인.`);
       }
     } catch (e) {
       console.error('[paste] commit error', e);
