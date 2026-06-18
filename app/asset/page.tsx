@@ -35,6 +35,7 @@ import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
+import { MissingText } from '@/components/ui/missing-badge';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import type { TableSelection } from '@/lib/use-table-selection';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
@@ -474,7 +475,7 @@ export default function AssetPage() {
                       <td className="dim" style={{ fontSize: 11 }}>
                         {missing.length === 0
                           ? <span style={{ color: 'var(--green-text)' }}>✓ 모두 입력 완료</span>
-                          : <span style={{ color: 'var(--red-text)' }}>● {missing.join(' · ')} 미입력</span>}
+                          : <MissingText label={missing.join(' · ')} tone="red" />}
                       </td>
                       <td className="center"><StatusBadge tone={vehicleStatusTone(v.status)}>{v.status}</StatusBadge></td>
                     </tr>
@@ -535,7 +536,7 @@ export default function AssetPage() {
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
                       <td className="dim">{v.vehicleSubModel || '-'}</td>
                       <td className="dim">{v.vehicleTrim || '-'}</td>
-                      <td className="mono dim">{v.vin || <span className="muted">미입력</span>}</td>
+                      <td className="mono dim">{v.vin || <MissingText label="VIN" />}</td>
                       <td className="mono dim">{v.manufacturedDate || '-'}</td>
                       <td className="num mono">{v.displacementCc ? `${v.displacementCc.toLocaleString()}cc` : '-'}</td>
                       <td className="num mono dim">{v.seatingCapacity ? `${v.seatingCapacity}인` : '-'}</td>

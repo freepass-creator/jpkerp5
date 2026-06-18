@@ -76,25 +76,33 @@ export function MissingBadgeMini({ title, style }: { title: string; style?: CSSP
 }
 
 /**
- * 미입력 — 텍스트 강조 (회색·dim). 운영 막히지 않는 정보 누락용.
+ * 미입력 — 텍스트 강조. 박스 X. 강도 단계:
  *
- *   <MissingText label="위치" />          → "위치 미입력" (dim)
- *   <MissingText label="매입가" suffix="?" /> → "매입가 미입력?"
+ *   <MissingText label="위치" />                → 회색 (default·informational)
+ *   <MissingText label="자등증" tone="red" />   → 빨강 (강조·중간 긴급도, 운영 막진 않음)
+ *   <MissingText label="비고" tone="muted" />   → 회색 (=default, 명시 가능)
  *
- * 정책: muted (var(--text-weak)) — 시각 부담 X. 운영자가 시간 두고 보완 가능.
+ * 3단계 구분 (전체 미입력 표시 통일):
+ *   1. <MissingBadge>           — 빨강 박스 [필수, 즉시]
+ *   2. <MissingText tone='red'> — 빨강 텍스트 [강조, 시간 두고 OK]
+ *   3. <MissingText>            — 회색 텍스트 [정보 누락, 무방]
  */
 export function MissingText({
-  label, title, suffix, style,
+  label, title, suffix, tone = 'muted', style,
 }: {
   label: string;
   title?: string;
   suffix?: ReactNode;
+  tone?: 'muted' | 'red';
   style?: CSSProperties;
 }) {
+  const colorStyle: CSSProperties = tone === 'red'
+    ? { color: 'var(--red-text)', fontWeight: 600 }
+    : {};
   return (
     <span
-      className="muted"
-      style={{ fontSize: 11, ...style }}
+      className={tone === 'muted' ? 'muted' : undefined}
+      style={{ fontSize: 11, ...colorStyle, ...style }}
       title={title ?? `${label} 미입력`}
     >
       {label} 미입력{suffix}
