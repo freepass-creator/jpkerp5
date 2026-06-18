@@ -92,7 +92,7 @@ export function useRowSelection({
   return { onRowMouseDown, onRowClick, onRowContextMenu, ids };
 }
 
-/** Ctrl/Cmd+A 키보드 단축키 — 보이는 행 전체 선택.
+/** Ctrl/Cmd+A 키보드 단축키 — 토글: 전체 선택 ↔ 전체 해제.
  *  Input/textarea/contenteditable 에 focus 있을 땐 무시 (기본 동작 보장). */
 export function useCtrlASelectAll(rowSel: RowSelection, selection: TableSelection): void {
   useEffect(() => {
@@ -105,7 +105,10 @@ export function useCtrlASelectAll(rowSel: RowSelection, selection: TableSelectio
       // 다이얼로그·모달 안에 있으면 그쪽에 양보
       if (tgt.closest('[role="dialog"]')) return;
       e.preventDefault();
-      selection.selectAll(rowSel.ids);
+      // 토글: 보이는 행이 전부 선택돼 있으면 해제, 아니면 전체 선택.
+      const allSelected = rowSel.ids.length > 0 && rowSel.ids.every((id) => selection.selectedIds.has(id));
+      if (allSelected) selection.clear();
+      else selection.selectAll(rowSel.ids);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
