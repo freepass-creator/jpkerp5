@@ -159,7 +159,7 @@ export default function AssetInspectionPage() {
               const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
               const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
               return (
-                <tr key={c.id} onClick={(e) => rowSel.onRowClick(e, c.id, upcoming.findIndex((u) => u.c.id === c.id))} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, c.id, upcoming.findIndex((u) => u.c.id === c.id), () => setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }))} style={{ cursor: 'pointer' }} className={sel.selectedIds.has(c.id) ? 'selected-row' : undefined}>
+                <tr key={c.id} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, c.id, upcoming.findIndex((u) => u.c.id === c.id))} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, c.id, upcoming.findIndex((u) => u.c.id === c.id), () => setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }))} style={{ cursor: 'pointer' }} className={sel.selectedIds.has(c.id) ? 'selected-row' : undefined}>
                   <TableRowCheckbox id={c.id} selection={sel} />
                   <td className="dim"><CompanyCell raw={c.company} master={companyMaster} /></td>
                   <td className="mono">{c.vehiclePlate}</td>

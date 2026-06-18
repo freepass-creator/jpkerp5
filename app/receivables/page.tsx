@@ -411,7 +411,7 @@ export default function ReceivablesPage() {
                       const showLockNeeded = needsLock(c);
                       const showNoticeNeeded = needsNotice(c);
                       return (
-                        <tr key={c.id} onClick={(e) => rowSel.onRowClick(e, c.id, filtered.findIndex((x) => x.id === c.id))} onDoubleClick={() => openVehicle(c.vehiclePlate ?? '', 'risk')} onContextMenu={(e) => rowSel.onRowContextMenu(e, c.id, filtered.findIndex((x) => x.id === c.id), () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }))} style={{ cursor: 'pointer' }}>
+                        <tr key={c.id} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, c.id, filtered.findIndex((x) => x.id === c.id))} onDoubleClick={() => openVehicle(c.vehiclePlate ?? '', 'risk')} onContextMenu={(e) => rowSel.onRowContextMenu(e, c.id, filtered.findIndex((x) => x.id === c.id), () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }))} style={{ cursor: 'pointer' }}>
                           <td className="checkbox-col">
                             <input
                               type="checkbox"

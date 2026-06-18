@@ -352,7 +352,7 @@ export default function ContractPage() {
                     ) : filtered.map((c, idx) => (
                       <tr
                         key={c.id}
-                        onClick={(e) => rowSel.onRowClick(e, c.id, idx)}
+                        onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, c.id, idx)}
                         onDoubleClick={() => openVehicle(c.vehiclePlate ?? '', 'contract')}
                         onContextMenu={(e) => rowSel.onRowContextMenu(e, c.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }))}
                         style={{ cursor: 'pointer' }}

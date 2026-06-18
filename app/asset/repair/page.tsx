@@ -134,7 +134,7 @@ export default function RepairPage() {
                       <tr
                         key={v.id}
                         style={{ verticalAlign: 'middle', cursor: 'pointer' }}
-                        onClick={(e) => rowSel.onRowClick(e, v.id, idx)}
+                        onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, v.id, idx)}
                         onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')}
                         onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))}
                         className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}

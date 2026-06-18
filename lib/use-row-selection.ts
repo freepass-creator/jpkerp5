@@ -25,6 +25,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { TableSelection } from './use-table-selection';
 
 export type RowSelection = {
+  /** Shift+click 시 텍스트 선택 방지 (다른 키 조합은 평소대로 드래그 선택 가능). */
+  onRowMouseDown: (e: React.MouseEvent) => void;
   onRowClick: (e: React.MouseEvent, id: string, index: number) => void;
   onRowContextMenu: (
     e: React.MouseEvent,
@@ -43,6 +45,12 @@ export function useRowSelection({
 }): RowSelection {
   const lastIdxRef = useRef<number | null>(null);
 
+  // Shift+mousedown 시 텍스트 선택 anchor 가 생기는 것 막기 — Shift 클릭 자체 동작은 click 핸들러에서 처리.
+  // 그 외 평클릭/Ctrl/드래그는 그대로 → cell 내 텍스트 드래그 선택 정상 동작.
+  const onRowMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.shiftKey) e.preventDefault();
+  }, []);
+
   const onRowClick = useCallback((e: React.MouseEvent, id: string, index: number) => {
     if (e.shiftKey && lastIdxRef.current != null) {
       // range select — last 부터 index 까지 토글 없이 add
@@ -55,6 +63,8 @@ export function useRowSelection({
         if (rid) next.add(rid);
       }
       selection.setSelectedIds(next);
+      // mousedown 에서 preventDefault 했지만, 혹시 잔류한 텍스트 selection 도 제거 (안전망).
+      if (typeof window !== 'undefined') window.getSelection()?.removeAllRanges();
       return;
     }
     if (e.ctrlKey || e.metaKey) {
@@ -79,7 +89,7 @@ export function useRowSelection({
     showCtxMenu();
   }, [selection]);
 
-  return { onRowClick, onRowContextMenu, ids };
+  return { onRowMouseDown, onRowClick, onRowContextMenu, ids };
 }
 
 /** Ctrl/Cmd+A 키보드 단축키 — 보이는 행 전체 선택.

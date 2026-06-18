@@ -662,7 +662,7 @@ export default function PenaltyPage() {
                     : null;
                   const violClass = inRange === false ? 'text-red' : 'mono';
                   return (
-                    <tr key={it.id} onClick={(e) => rowSel.onRowClick(e, it.id, visibleRows.findIndex((x) => x.id === it.id))} onDoubleClick={() => it.car_number && openVehicle(it.car_number, 'risk')} onContextMenu={(e) => rowSel.onRowContextMenu(e, it.id, visibleRows.findIndex((x) => x.id === it.id), () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: it }))} style={{ cursor: 'pointer' }}>
+                    <tr key={it.id} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, it.id, visibleRows.findIndex((x) => x.id === it.id))} onDoubleClick={() => it.car_number && openVehicle(it.car_number, 'risk')} onContextMenu={(e) => rowSel.onRowContextMenu(e, it.id, visibleRows.findIndex((x) => x.id === it.id), () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: it }))} style={{ cursor: 'pointer' }}>
                       <td className="checkbox-col sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH, background: 'var(--bg-card)' }}>
                         <input
                           type="checkbox"

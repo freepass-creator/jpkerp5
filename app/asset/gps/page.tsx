@@ -108,7 +108,7 @@ export default function AssetGpsPage() {
                   ) : filtered.map((v, idx) => {
                     const installed = !!(v.gpsProvider || v.gpsDeviceId);
                     return (
-                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onClick={(e) => rowSel.onRowClick(e, v.id, idx)} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
+                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, v.id, idx)} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                         <TableRowCheckbox id={v.id} selection={sel} />
                         <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                         <td className="mono">{v.plate || '-'}</td>

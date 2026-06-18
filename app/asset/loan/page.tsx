@@ -105,7 +105,7 @@ export default function AssetLoanPage() {
                   {filtered.length === 0 ? (
                     <tr><td colSpan={10} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</td></tr>
                   ) : filtered.map((v, idx) => (
-                    <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onClick={(e) => rowSel.onRowClick(e, v.id, idx)} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
+                    <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, v.id, idx)} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                       <TableRowCheckbox id={v.id} selection={sel} />
                       <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                       <td className="mono">{v.plate || '-'}</td>

@@ -734,6 +734,7 @@ export default function Page() {
                     return (
                       <tr
                         key={c.id}
+                        onMouseDown={rowSel.onRowMouseDown}
                         onDoubleClick={() => handleRowDoubleClick(c)}
                         onContextMenu={(e) => {
                           setSelectedId(c.id);
