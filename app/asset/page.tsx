@@ -35,6 +35,8 @@ import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
+import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
+import type { TableSelection } from '@/lib/use-table-selection';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import type { Vehicle, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -155,6 +157,15 @@ export default function AssetPage() {
       return next;
     });
   }
+
+  // 행 선택 hook 어댑터 — 기존 selectedIds/setSelectedIds 를 TableSelection 인터페이스로
+  const selAdapter = useMemo<TableSelection>(() => ({
+    selectedIds, setSelectedIds,
+    toggleRow,
+    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
+    clear: () => setSelectedIds(new Set()),
+    size: selectedIds.size,
+  }), [selectedIds]);
 
   const selected = useMemo(() => vehicles.find((v) => v.id === selectedId) ?? null, [vehicles, selectedId]);
 
@@ -282,6 +293,10 @@ export default function AssetPage() {
     }).sort((a, b) => (a.plate ?? '').localeCompare(b.plate ?? ''));
   }, [vehicles, search, companyFilter, statusFilter, assetQF, isMissing]);
 
+  // Ctrl/Shift+click 행선택 + Ctrl+A 전체선택
+  const rowSel = useRowSelection({ ids: filtered.map((v) => v.id), selection: selAdapter });
+  useCtrlASelectAll(rowSel, selAdapter);
+
   return (
     <div className="layout">
       <Sidebar />
@@ -381,7 +396,7 @@ export default function AssetPage() {
                     if (loanMissing) missing.push('구매방식');
                     if (gpsMissing) missing.push('GPS');
                     return (
-                    <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => { setOpenTab('asset'); setOpenId(v.id); }} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
+                    <tr key={v.id} onClick={(e) => { setSelectedId(v.id); const idx = filtered.findIndex((x) => x.id === v.id); rowSel.onRowClick(e, v.id, idx); }} onDoubleClick={() => { setOpenTab('asset'); setOpenId(v.id); }} onContextMenu={(e) => { const idx = filtered.findIndex((x) => x.id === v.id); rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v })); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedIds.has(v.id) || selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
                       <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                       <td className="mono">{v.plate || '-'}</td>
@@ -512,7 +527,7 @@ export default function AssetPage() {
                       </td>
                     </tr>
                   ) : filtered.map((v) => (
-                    <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => { setOpenTab('asset'); setOpenId(v.id); }} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
+                    <tr key={v.id} onClick={(e) => { setSelectedId(v.id); const idx = filtered.findIndex((x) => x.id === v.id); rowSel.onRowClick(e, v.id, idx); }} onDoubleClick={() => { setOpenTab('asset'); setOpenId(v.id); }} onContextMenu={(e) => { const idx = filtered.findIndex((x) => x.id === v.id); rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v })); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedIds.has(v.id) || selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
                       <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                       <td className="mono">{v.plate || '-'}</td>
