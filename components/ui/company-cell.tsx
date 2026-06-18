@@ -13,6 +13,7 @@
 
 import type { Company } from '@/lib/types';
 import { displayCompanyName } from '@/lib/company-display';
+import { MissingBadge } from './missing-badge';
 
 export function CompanyCell({
   raw, master, fallbackBizRegNo, fallbackCorpRegNo, mono = false,
@@ -26,19 +27,11 @@ export function CompanyCell({
   const name = displayCompanyName(raw, master ?? [], fallbackBizRegNo, fallbackCorpRegNo);
   if (!name) {
     return (
-      <span
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontSize: 10, fontWeight: 600,
-          padding: '2px 6px', borderRadius: 4,
-          background: 'var(--red-bg)', color: 'var(--red-text)',
-          border: '1px solid var(--red-text)',
-          lineHeight: 1.2,
-        }}
+      <MissingBadge
+        label="회사"
         title="이 계약에 회사가 입력되지 않았습니다 — 매출·세금·감사 분류 누락. 즉시 입력 필요."
-      >
-        회사 미입력
-      </span>
+        compact
+      />
     );
   }
   return <span className={mono ? 'mono' : undefined}>{name}</span>;

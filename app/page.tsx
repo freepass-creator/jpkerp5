@@ -17,6 +17,7 @@ import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-syn
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
+import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import type { TableSelection } from '@/lib/use-table-selection';
 import { downloadContractsExcel } from '@/lib/contract-export';
@@ -776,7 +777,7 @@ export default function Page() {
                             if (isIdle) {
                               return c.idleLocation?.trim()
                                 ? <span title={`현재 위치 — ${c.idleLocation}`}>{c.idleLocation}</span>
-                                : <span className="muted">위치 미입력</span>;
+                                : <MissingText label="위치" />;
                             }
                             return c.customerName || <span className="muted">-</span>;
                           })()}
@@ -799,10 +800,11 @@ export default function Page() {
                             const ia = c.insuranceAge ?? 0;
                             if (a == null) {
                               return (
-                                <span
-                                  style={{ color: 'var(--red-text)', fontWeight: 700, fontSize: 11 }}
+                                <MissingBadge
+                                  label="운전자"
                                   title={ia > 0 ? `운전자 미입력 — 보험연령 ${ia}세 커버 대상 불명` : '운전자 미입력 — 등록번호 확인 필요'}
-                                >미입력 ⚠</span>
+                                  compact
+                                />
                               );
                             }
                             const blocked = ia > 0 && a < ia;
@@ -830,10 +832,11 @@ export default function Page() {
                             const ia = c.insuranceAge ?? 0;
                             if (!ia) {
                               return (
-                                <span
-                                  style={{ color: 'var(--red-text)', fontWeight: 700, fontSize: 11 }}
+                                <MissingBadge
+                                  label="보험연령"
                                   title="보험연령 미입력 — 보험증권 확인 후 등록 필요"
-                                >미입력 ⚠</span>
+                                  compact
+                                />
                               );
                             }
                             // 추가운전자 중 보험연령 미커버 (보험연령보다 어림) 검사
