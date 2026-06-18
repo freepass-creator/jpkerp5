@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Section, Grid2, Stack } from '@/components/ui/detail-primitives';
-import { Field, EditableField } from '@/components/ui/editable-field';
+import { EditableField } from '@/components/ui/editable-field';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { useCompanies } from '@/lib/firebase/companies-store';

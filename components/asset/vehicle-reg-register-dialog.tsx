@@ -12,7 +12,7 @@
  *   4) [모두 등록] — 일괄 commit
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Plus, X, CircleNotch, CheckCircle, Warning, Upload, Keyboard, FileXls } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';

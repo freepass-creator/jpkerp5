@@ -26,7 +26,6 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import { ReceiptDocument, RECEIPT_PRINT_CSS } from './receipt-document';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import type { Contract } from '@/lib/types';
-import { displayCompanyName } from '@/lib/company-display';
 
 export function ReceiptPrintDialog({
   open, onOpenChange,

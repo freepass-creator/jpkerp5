@@ -21,7 +21,6 @@ import { InsuranceDetailDialog } from '@/components/insurance/insurance-detail-d
 import { StatusBadge } from '@/components/ui/status-badge';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { useRole } from '@/lib/use-role';
-import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useLiveTodayKr } from '@/lib/use-live-today';
