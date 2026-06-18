@@ -12,6 +12,7 @@
 
 import type { Contract, Company } from '@/lib/types';
 import { stripCorpSuffix } from '@/lib/company-display';
+import { monthsBetween } from '@/lib/utils';
 
 export type CertDocProps = {
   contract: Contract;
@@ -62,25 +63,11 @@ export function CertDocument({
   const deposit = contract.deposit ?? 0;
   const unpaid = contract.unpaidAmount ?? 0;
   // 계약 진행 개월수 — 1년 미만 30%, 1년 이상 20% (통상 룰)
-  const monthsServed = (() => {
-    if (!contract.contractDate || !terminationDate) return 0;
-    const a = new Date(contract.contractDate);
-    const b = new Date(terminationDate);
-    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 0;
-    const m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
-    return Math.max(0, m);
-  })();
+  const monthsServed = monthsBetween(contract.contractDate, terminationDate);
   const effectivePenaltyRate = penaltyRate ?? (monthsServed < 12 ? 0.3 : 0.2);
   const penaltyAmount = Math.round(deposit * effectivePenaltyRate);
   // 잔여 계약기간 위약금 — 해지일 기준 약정종료일까지 남은 개월수 × 월대여료 × 비율
-  const monthsRemaining = (() => {
-    const end = contract.returnScheduledDate;
-    if (!end || !terminationDate) return 0;
-    const a = new Date(terminationDate).getTime();
-    const b = new Date(end).getTime();
-    if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return 0;
-    return Math.max(0, Math.round((b - a) / (86400000 * 30)));
-  })();
+  const monthsRemaining = monthsBetween(terminationDate, contract.returnScheduledDate ?? '');
   const earlyTermPenalty = Math.round(monthsRemaining * (contract.monthlyRent ?? 0) * earlyTerminationRate);
   const totalCharged = unpaid + penaltyAmount + earlyTermPenalty + repairCost + overrunCost + towingCost;
   const totalNet = Math.max(0, totalCharged - deposit);
