@@ -683,10 +683,10 @@ export default function ReceivablesPage() {
                 className="btn"
                 type="button"
                 onClick={() => setSmsOpen(true)}
-                disabled={selectedIds.size === 0}
-                title={selectedIds.size === 0 ? '체크박스로 행을 선택하세요' : '선택 계약 문자 발송'}
+                disabled={filtered.length === 0}
+                title={selectedIds.size === 0 ? `필터 표시된 ${filtered.length}건 전체 발송 (확인창에서 취소 가능)` : `선택 ${selectedIds.size}건 발송`}
               >
-                <PaperPlaneTilt size={14} /> 문자 발송{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+                <PaperPlaneTilt size={14} /> 문자 발송 ({selectedIds.size > 0 ? selectedIds.size : `전체 ${filtered.length}`})
               </button>
               <button
                 className="btn"

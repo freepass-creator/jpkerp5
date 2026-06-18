@@ -241,6 +241,11 @@ export function CreateDialog({
       const cardTxPatches: Array<{ id: string; patch: Partial<CardTransaction> }> = [];
       const getCurrent = (cid: string) => updatedContractMap.get(cid) ?? contractById.get(cid);
 
+      // 부분납·잉여(leftover) 통계 — 사용자에게 사후 알림용
+      let fifoApplied = 0;        // FIFO 분배로 적용된 거래 수
+      let leftoverTotal = 0;      // 회차 잔액보다 많이 들어온 잉여 합계 (미매칭 보충 필요)
+      let leftoverCount = 0;      // leftover 발생 거래 수
+
       // 1. enrich 단계에서 matchedContractId 잡힌 bank tx → 정확 회차 or FIFO 자동 분배
       for (const tx of bankSaved) {
         if (!tx.matchedContractId) continue;
@@ -258,9 +263,11 @@ export function CreateDialog({
             bankTxPatches.push({ id: tx.id, patch: txPatch });
             updatedContractMap.set(c.id, { ...c, ...contractPatch });
           } else {
-            const { txPatch, contractPatch } = applyFifoPayment(tx, c);
+            const { txPatch, contractPatch, leftover } = applyFifoPayment(tx, c);
             bankTxPatches.push({ id: tx.id, patch: txPatch });
             updatedContractMap.set(c.id, { ...c, ...contractPatch });
+            fifoApplied += 1;
+            if (leftover > 0) { leftoverTotal += leftover; leftoverCount += 1; }
           }
         } catch (e) {
           console.error('[upload bank match] failed', tx.id, e);
@@ -311,9 +318,17 @@ export function CreateDialog({
         ? ` · 계약자명 자동매칭 ${contractAutoMatched}건`
         : '';
       const total = bankSaved.length + cardSaved.length;
-      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${updatedContractMap.size}건 갱신)${companyNote}${contractNote}${skippedNote}`);
+      const fifoNote = fifoApplied > 0 ? ` · FIFO 분배 ${fifoApplied}건` : '';
+      const leftoverNote = leftoverCount > 0
+        ? ` · 잉여 ${leftoverCount}건 ${leftoverTotal.toLocaleString('ko-KR')}원 (수동 매칭 필요)`
+        : '';
+      setResult(`수납 ${total}건 저장 / 자동매칭 ${matchedCount}건 (계약 ${updatedContractMap.size}건 갱신)${fifoNote}${leftoverNote}${companyNote}${contractNote}${skippedNote}`);
       if (total > 0) toast.success(`수납 ${total}건 저장 · 자동매칭 ${matchedCount} · 회사분류 ${companyMatched}${contractAutoMatched > 0 ? ` · 계약자 자동매칭 ${contractAutoMatched}` : ''}`);
       else if (bankSkipped + cardSkipped > 0) toast.warning(`전부 중복 — ${bankSkipped + cardSkipped}건 제외됨`);
+      // 잉여 발생 시 별도 경고 토스트 (수동 매칭 동선 안내)
+      if (leftoverCount > 0) {
+        toast.warning(`잉여 ${leftoverCount}건 ${leftoverTotal.toLocaleString('ko-KR')}원 — /payments 매칭 dialog 에서 잔여분 계약 매칭 필요`);
+      }
       setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '자동이체' && p.kind !== '카드'));
     } catch (e) {
       const msg = friendlyError(e);
