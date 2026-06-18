@@ -2777,6 +2777,15 @@ kbd {
 .input-compact[data-w="md"] { min-width: 110px; }
 .input-compact[data-w="lg"] { min-width: 140px; }
 
+/* 퀵필터 영역 input-compact — chip 과 같은 폰트(12) + radius(4px) 로 통일.
+   다이얼로그·폼 안의 input-compact 는 영향 없음 (scoped). */
+.filter-bar .input-compact,
+.quick-filters .input-compact,
+.topbar .input-compact {
+  font-size: 12px;
+  border-radius: var(--radius);
+}
+
 /* ════════════════════════════════════════════════════════════════════
  *  Notice box — 페이지 내 인포·에러·경고·성공 알림 패널
  *  대체 대상: <div style={{ padding: 14, background: var(--red-bg), borderRadius: 6, fontSize: 13 }}>

@@ -249,7 +249,7 @@ export default function FinancePage() {
         <>
           <CompanyFilter value={companyFilter} onChange={setCompanyFilter} options={companyOptions} master={companyMaster} />
           <select
-            className="input-compact" data-w="sm"
+            className="input-compact" data-w="md"
             value={directionFilter}
             onChange={(e) => setDirectionFilter(e.target.value as 'all' | 'deposit' | 'withdraw')}
             title="입출금 방향"
