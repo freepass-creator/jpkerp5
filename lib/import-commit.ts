@@ -37,18 +37,26 @@ function pickVehicleStatus(v: unknown, hasDelivered: boolean): VehicleStatus {
 /* ──────────────── 차량 (자산) ──────────────── */
 
 export function parseVehicleRow(row: Row): Omit<Vehicle, 'id'> | null {
-  const plate = toStr(get(row, '차량번호', 'plate', '번호'));
-  const model = toStr(get(row, '차종', '차명', 'model'));
+  const plate = toStr(get(row, '차량번호', '번호판', '번호', 'plate'));
+  const model = toStr(get(row, '차종', '차명', '모델', '모델명', 'model'));
   if (!plate && !model) return null;
+  const vin = toStr(get(row, '차대번호', 'VIN', 'vin')) || undefined;
   return {
     plate: plate || '미정',
     model: model || '미정',
-    company: pickCompany(get(row, '회사', '법인', 'company')),
-    status: pickVehicleStatus(get(row, '차량상태', 'status'), false),
-    purchasedDate: toDate(get(row, '매입일', 'purchasedDate')) || undefined,
-    registeredDate: toDate(get(row, '등록일', 'registeredDate')) || undefined,
-    readiedDate: toDate(get(row, '상품화일', 'readiedDate')) || undefined,
-    notes: toStr(get(row, '비고', 'notes')) || undefined,
+    company: pickCompany(get(row, '회사', '법인', '소속', 'company')),
+    status: pickVehicleStatus(get(row, '차량상태', '상태', 'status'), false),
+    purchasedDate: toDate(get(row, '매입일', '매입일자', '구매일', 'purchasedDate')) || undefined,
+    registeredDate: toDate(get(row, '등록일', '등록일자', '최초등록일', 'registeredDate')) || undefined,
+    readiedDate: toDate(get(row, '상품화일', '상품화일자', '상품화완료일', 'readiedDate')) || undefined,
+    vin,
+    vehicleMaker: toStr(get(row, '제조사', '메이커', 'vehicleMaker')) || undefined,
+    vehicleModelLine: toStr(get(row, '모델라인', 'vehicleModelLine')) || undefined,
+    vehicleSubModel: toStr(get(row, '세부모델', 'vehicleSubModel')) || undefined,
+    vehicleTrim: toStr(get(row, '트림', 'vehicleTrim')) || undefined,
+    fuelType: toStr(get(row, '연료', '연료종류', 'fuelType')) || undefined,
+    purchasePrice: toNum(get(row, '매입가', '매입금액', '구매가', 'purchasePrice')) || undefined,
+    notes: toStr(get(row, '비고', '메모', 'notes')) || undefined,
     createdAt: new Date().toISOString(),
   };
 }
@@ -56,20 +64,23 @@ export function parseVehicleRow(row: Row): Omit<Vehicle, 'id'> | null {
 /* ──────────────── 계약 ──────────────── */
 
 export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
-  const customerName = toStr(get(row, '계약자명', '계약자', '고객명', 'customerName'));
-  const contractDate = toDate(get(row, '계약일', 'contractDate'));
-  const monthlyRent = toNum(get(row, '월대여료', '월렌트료', '월 대여료', 'monthlyRent'));
-  if (!customerName || !contractDate || monthlyRent <= 0) return null;
+  const customerName = toStr(get(row, '계약자명', '계약자', '고객명', '임차인', '임차인명', 'customerName'));
+  const contractDate = toDate(get(row, '계약일', '계약일자', '체결일', '계약체결일', 'contractDate'));
+  const monthlyRent = toNum(get(row, '월대여료', '월렌트료', '월 대여료', '월대여', '월 렌트', '대여료', '렌트료', '월임대료', 'monthlyRent'));
+  // 통과 기준 완화 — 데이터 일단 올린 후 편집. 계약자명 또는 차량번호 둘 중 하나라도 있으면 통과.
+  const platePeek = toStr(get(row, '차량번호', 'vehiclePlate', '번호'));
+  if (!customerName && !platePeek) return null;
+  if (!contractDate) return null; // 계약일은 회차 자동 생성에 필수 → 그것만 강제
 
-  const plate = toStr(get(row, '차량번호', 'vehiclePlate')) || '미정';
+  const plate = platePeek || '미정';
   const model = toStr(get(row, '차종', '차명', 'vehicleModel')) || '미정';
   const company = pickCompany(get(row, '회사', '법인', 'company'));
-  const phone1 = toStr(get(row, '연락처', '연락처1', 'customerPhone1'));
-  const returnScheduled = toDate(get(row, '반납예정일', '반납예정', 'returnScheduledDate'));
-  const deliveredDate = toDate(get(row, '인도일', '출고일', 'deliveredDate'));
-  const paymentDay = Math.min(31, Math.max(1, toNum(get(row, '결제일', 'paymentDay')) || 1));
-  const deposit = toNum(get(row, '보증금', 'deposit'));
-  const paymentMethod = toStr(get(row, '결제방법', 'paymentMethod')) || '이체';
+  const phone1 = toStr(get(row, '연락처', '연락처1', '전화', '핸드폰', '휴대폰', 'customerPhone1'));
+  const returnScheduled = toDate(get(row, '반납예정일', '반납예정', '만기일', 'returnScheduledDate'));
+  const deliveredDate = toDate(get(row, '인도일', '출고일', '출고일자', 'deliveredDate'));
+  const paymentDay = Math.min(31, Math.max(1, toNum(get(row, '결제일', '납기일', '청구일', 'paymentDay')) || 1));
+  const deposit = toNum(get(row, '보증금', '예치금', 'deposit'));
+  const paymentMethod = toStr(get(row, '결제방법', '결제수단', 'paymentMethod')) || '이체';
 
   // termMonths 자동 계산
   let termMonths = toNum(get(row, '약정개월', '약정', 'termMonths'));
@@ -107,7 +118,7 @@ export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
     contractNo,
     company,
     manager: toStr(get(row, '담당자', 'manager')) || undefined,
-    customerName,
+    customerName: customerName || '미입력',
     customerKind,
     customerIdentNo: identDigits || undefined,
     customerRegNoMasked: regNoMasked,

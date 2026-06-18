@@ -188,6 +188,7 @@ export function CreateDialog({
       const msg = `계약 ${n}건 저장 완료 (전체 ${rows.length}행${note ? ` · 제외: ${note}` : ''})`;
       setResult(msg);
       toast.success(`계약 ${n}건 저장`);
+      if (invalid > 0) toast.warning(`${invalid}행 미반영 — 계약일·차량번호·계약자 중 핵심 누락. 시트 헤더 확인 필요 (이후 수기 편집 가능).`);
       setParsed((all) => all.filter((p) => p.kind !== '계약'));
     } catch (e) {
       const msg = friendlyError(e);
@@ -540,6 +541,8 @@ export function CreateDialog({
         `스냅샷 반영 완료 — 계약 갱신 ${updates.length}, 계약 신규 ${created}, 휴차 차량 신규 ${vehiclesAdded}`
         + (invalid > 0 ? ` (오류 ${invalid}건 제외)` : ''),
       );
+      if (invalid > 0) toast.warning(`${invalid}행 미반영 — 필수 컬럼 (차량번호·계약자명·계약일) 누락 또는 형식 오류. 시트 헤더 확인 필요.`);
+      else toast.success(`스냅샷 ${updates.length + created + vehiclesAdded}건 처리 완료`);
     } catch (e) {
       const msg = friendlyError(e);
       setResult(`오류 — ${msg}`);
@@ -575,6 +578,7 @@ export function CreateDialog({
       setResult(`차량 ${n}건 등록 (전체 ${rows.length}행${note ? ` · 제외: ${note}` : ''})`);
       if (n > 0) toast.success(`차량 ${n}건 등록`);
       else if (skipped > 0) toast.warning(`전부 중복 — ${skipped}건 제외됨`);
+      if (invalid > 0) toast.warning(`${invalid}행 미반영 — 차량번호·차종 모두 비어있음. 시트 헤더 확인 필요.`);
     } catch (e) {
       const msg = friendlyError(e);
       setResult(`오류 — ${msg}`);
