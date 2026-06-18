@@ -101,19 +101,33 @@ export function resolveBankCompanyCode(
   // CMS 자동이체 입금 — counterparty 가 회원명(=계약자명)인 케이스
   if (contractIdx && tx.counterparty) {
     const cp = tx.counterparty.trim();
-    // 1) 풀 이름 정확 일치
+    const suffixMatch = cp.match(/(\d{4})\s*$/);
+    // 1) plate suffix + prefix(이름) 모두 일치 → 가장 신뢰도 높음 (동명이인도 분간)
+    //    예: '박영협8309' → 8309 차량의 계약자 가 박영협? 둘 다 같으면 확정
+    if (suffixMatch) {
+      const hitSuffix = contractIdx.byPlateSuffix.get(suffixMatch[1]);
+      const prefix = cp.replace(/\d{4}\s*$/, '').trim();
+      if (hitSuffix && prefix) {
+        // prefix 이름이 그 계약의 customerName 또는 alias 와 일치하는지 확인
+        const nameHit = contractIdx.byName.get(prefix);
+        const aliasHit = contractIdx.byAlias.get(prefix);
+        if (nameHit?.id === hitSuffix.id || aliasHit?.id === hitSuffix.id) {
+          return { companyCode: hitSuffix.company, matchedContractId: hitSuffix.id };
+        }
+      }
+    }
+    // 2) 풀 이름 정확 일치 (동명이인이면 byName 이 운행/대기 우선 정렬 첫번째 반환)
     const exact = contractIdx.byName.get(cp);
     if (exact) return { companyCode: exact.company, matchedContractId: exact.id };
-    // 2) 별칭 정확 일치
+    // 3) 별칭 정확 일치
     const alias = contractIdx.byAlias.get(cp);
     if (alias) return { companyCode: alias.company, matchedContractId: alias.id };
-    // 3) 차량번호 끝 4자리 매칭 — '박영협8309' 패턴
-    const suffixMatch = cp.match(/(\d{4})\s*$/);
+    // 4) plate suffix 단독 (이름 prefix 없거나 안 맞아도 차량 확정)
     if (suffixMatch) {
       const hitSuffix = contractIdx.byPlateSuffix.get(suffixMatch[1]);
       if (hitSuffix) return { companyCode: hitSuffix.company, matchedContractId: hitSuffix.id };
     }
-    // 4) 끝 4자리 떼고 prefix 가 이름과 일치 — '박영협8309' 의 '박영협'
+    // 5) 끝 4자리 떼고 prefix 가 이름과 일치 — '박영협8309' 의 '박영협'
     if (suffixMatch) {
       const prefix = cp.replace(/\d{4}\s*$/, '').trim();
       if (prefix) {
