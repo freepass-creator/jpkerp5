@@ -30,6 +30,7 @@ import {
   applySnapshotToContract, validateSnapshotRow,
   parseHorizontalContractsRow, isHorizontalMultiContractSheet, diagnoseHorizontalSheet,
   parseReceivablesRow, isHorizontalReceivablesSheet, inferSeqFromDate, mapPaymentMethodToSource,
+  diagnoseContractRow, previewRow,
 } from '@/lib/import-commit';
 import { todayKr } from '@/lib/mock-data';
 import { generateSchedules } from '@/lib/payment-schedule';
@@ -169,7 +170,14 @@ export function CreateDialog({
     setBusy(true);
     try {
       const rows = contractFiles.flatMap((p) => p.rows);
-      const valid = rows.map((r) => parseContractRow(r)).filter((x): x is NonNullable<typeof x> => !!x);
+      // 행별 진단 — 파싱 실패 시 어떤 행이 왜 빠졌는지 토스트로 알림
+      const failed: Array<{ idx: number; reason: string; preview: string }> = [];
+      const valid: Omit<Contract, 'id'>[] = [];
+      rows.forEach((r, idx) => {
+        const parsed = parseContractRow(r);
+        if (parsed) valid.push(parsed);
+        else failed.push({ idx: idx + 1, reason: diagnoseContractRow(r) ?? '필수값 누락', preview: previewRow(r) });
+      });
       // 중복 검증 — 계약번호 또는 차량번호+계약일+고객 기준
       const dedup = dedupAgainst(valid, contracts, contractKeys);
       const skipped = dedup.duplicates.length;
@@ -180,7 +188,7 @@ export function CreateDialog({
         try { await upsertVehicleFromContract(c as Contract, syncCtx); }
         catch (e) { console.error('bulk vehicle sync failed', c.contractNo, e); }
       }
-      const invalid = rows.length - valid.length;
+      const invalid = failed.length;
       const note = [
         invalid > 0 ? `필수값 누락 ${invalid}` : '',
         skipped > 0 ? `중복 ${skipped}` : '',
@@ -188,7 +196,12 @@ export function CreateDialog({
       const msg = `계약 ${n}건 저장 완료 (전체 ${rows.length}행${note ? ` · 제외: ${note}` : ''})`;
       setResult(msg);
       toast.success(`계약 ${n}건 저장`);
-      if (invalid > 0) toast.warning(`${invalid}행 미반영 — 계약일·차량번호·계약자 중 핵심 누락. 시트 헤더 확인 필요 (이후 수기 편집 가능).`);
+      if (invalid > 0) {
+        // 첫 3건 행번호+사유+미리보기를 토스트에 노출 → 어느 행을 고쳐야 하는지 직원이 즉시 인지
+        const sample = failed.slice(0, 3).map((f) => `${f.idx}행: ${f.reason} (${f.preview})`).join('\n');
+        const more = invalid > 3 ? `\n…외 ${invalid - 3}행` : '';
+        toast.warning(`${invalid}행 미반영\n${sample}${more}`, 9000);
+      }
       setParsed((all) => all.filter((p) => p.kind !== '계약'));
     } catch (e) {
       const msg = friendlyError(e);

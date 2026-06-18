@@ -64,6 +64,33 @@ export function parseVehicleRow(row: Row): Omit<Vehicle, 'id'> | null {
 
 /* ──────────────── 계약 ──────────────── */
 
+/**
+ * 계약 행 거부 사유 진단 — null 이면 parseContractRow 가 통과시킬 행, 문자열이면 거부 사유.
+ * commit 흐름에서 "왜 N건이 미반영됐는지" 사용자에게 행별로 알려주기 위함.
+ */
+export function diagnoseContractRow(row: Row): string | null {
+  const customerName = toStr(get(row, '계약자명', '계약자', '고객명', '임차인', '임차인명', 'customerName'));
+  const platePeek = toStr(get(row, '차량번호', 'vehiclePlate', '번호'));
+  const contractDate = toDate(get(row, '계약일', '계약일자', '체결일', '계약체결일', 'contractDate'));
+  const reasons: string[] = [];
+  if (!customerName && !platePeek) reasons.push('계약자명·차량번호 모두 없음');
+  if (!contractDate) reasons.push('계약일 없음');
+  return reasons.length > 0 ? reasons.join(' + ') : null;
+}
+
+/** 행을 가장 알아보기 쉽게 한 줄 요약 — 진단 토스트/모달에서 사용. */
+export function previewRow(row: Row, maxFields = 3, maxLen = 18): string {
+  const items: string[] = [];
+  for (const [k, v] of Object.entries(row)) {
+    if (v == null) continue;
+    const sv = String(v).trim();
+    if (!sv) continue;
+    items.push(`${k}=${sv.length > maxLen ? sv.slice(0, maxLen) + '…' : sv}`);
+    if (items.length >= maxFields) break;
+  }
+  return items.join(' / ') || '(빈 행)';
+}
+
 export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
   const customerName = toStr(get(row, '계약자명', '계약자', '고객명', '임차인', '임차인명', 'customerName'));
   const contractDate = toDate(get(row, '계약일', '계약일자', '체결일', '계약체결일', 'contractDate'));

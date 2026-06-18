@@ -7,6 +7,17 @@
 
 ---
 
+## 5.0.2 — 2026-06-19 · 계약 import 행별 진단
+
+- **계약 import** — 미반영 행마다 `행번호 + 사유 (계약일 없음 / 계약자명·차량번호 모두 없음) + 미리보기` 토스트로 노출. 직원이 어느 행을 고쳐야 하는지 즉시 인지.
+- `lib/import-commit.ts` — `diagnoseContractRow`, `previewRow` 헬퍼 추가.
+
+## 5.0.1 — 2026-06-19 · 내용증명 위약금률 일치
+
+- `components/notice/cert-document.tsx` 의 monthsServed·monthsRemaining 을 `lib/utils.monthsBetween` 으로 통일. 단건/일괄 페이지가 1년 경계에서 위약금률 30% vs 20% 갈리던 사고 해결.
+
+---
+
 ## 5.0.0 — 2026-06-19 · 베이스라인
 
 jpkerp5 60라운드 polish + 운영 안정화 완료 시점에서 **렌터카매니저 v5** 로 브랜드 통합.
