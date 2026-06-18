@@ -5,8 +5,9 @@ import {
   User, Car, FileText, ClipboardText, ArrowsLeftRight, CurrencyKrw,
   Plus, CheckCircle, PauseCircle, PlayCircle, ArrowUUpLeft, CircleNotch, Trash,
   Upload, Warning as WarningIcon, X as XIcon, X, CaretRight,
-  Pencil,
+  Pencil, Printer,
 } from '@phosphor-icons/react';
+import { ReceiptPrintDialog } from '@/components/receipt-print-dialog';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
@@ -2547,6 +2548,7 @@ function generatePaymentHistory(c: Contract): PaymentLog[] {
 function PaymentHistoryTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   const logs = generatePaymentHistory(c);
   const today = todayKr();
+  const [receiptFor, setReceiptFor] = useState<{ amount: number; date: string; period: string } | null>(null);
 
   function handleRemove(seq: number, entryIdx: number) {
     if (!confirm('이 입금 기록을 삭제하시겠습니까?')) return;
@@ -2566,6 +2568,7 @@ function PaymentHistoryTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contr
     );
   }
   return (
+    <>
     <table className="table">
         <thead>
           <tr>
@@ -2575,6 +2578,7 @@ function PaymentHistoryTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contr
             <th className="center" style={{ width: COL.paymentMethod }}>출처</th>
             <th>메모</th>
             <th className="dim" style={{ width: 140 }}>등록자</th>
+            <th className="center" style={{ width: 70 }}>영수증</th>
             <th className="center" style={{ width: 40 }}></th>
           </tr>
         </thead>
@@ -2604,6 +2608,20 @@ function PaymentHistoryTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contr
                 <td className="dim">{l.memo || '-'}</td>
                 <td className="mono dim">{l.by ?? (l.source === '정산' ? '(자동)' : '-')}</td>
                 <td className="center">
+                  <button
+                    className="btn btn-sm btn-ghost btn-icon"
+                    type="button"
+                    title="영수증 발행"
+                    onClick={() => setReceiptFor({
+                      amount: l.amount,
+                      date: l.date,
+                      period: `${l.seq}회차`,
+                    })}
+                  >
+                    <Printer size={11} />
+                  </button>
+                </td>
+                <td className="center">
                   {canRemove && (
                     <button className="btn btn-sm btn-ghost btn-icon" type="button"
                       onClick={() => handleRemove(l.seq, l.entryIdx!)} title="삭제">
@@ -2616,6 +2634,16 @@ function PaymentHistoryTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contr
           })}
         </tbody>
       </table>
+      <ReceiptPrintDialog
+        open={!!receiptFor}
+        onOpenChange={(o) => { if (!o) setReceiptFor(null); }}
+        contract={c}
+        amount={receiptFor?.amount ?? 0}
+        paymentDate={receiptFor?.date ?? today}
+        purpose="대여료"
+        period={receiptFor?.period}
+      />
+    </>
   );
 }
 
