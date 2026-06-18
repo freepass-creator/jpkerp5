@@ -144,6 +144,18 @@ export default function DashboardPage() {
       (c) => c.status === '운행' && c.returnScheduledDate?.startsWith(nextMonth)
     ).length;
     const newThisMonth = contracts.filter((c) => c.contractDate?.startsWith(thisMonth)).length;
+    // 확정대기 — 계약 체결됐으나 인도 전. 보증금 입금 추적 + 출고 일정 관리 대상.
+    const pendingDelivery = contracts.filter((c) => {
+      if (c.deliveredDate) return false;
+      if (c.status === '반납' || c.status === '해지' || c.status === '채권') return false;
+      return c.status === '대기' ||
+        c.vehicleStatus === '인도대기' ||
+        c.vehicleStatus === '출고대기' ||
+        c.vehicleStatus === '상품대기' ||
+        c.vehicleStatus === '재고';
+    });
+    const pendingDeliveryCount = pendingDelivery.length;
+    const pendingDepositSum = pendingDelivery.reduce((s, c) => s + Math.max(0, (c.deposit ?? 0) - (c.depositReceived ?? 0)), 0);
 
     return {
       totalUnpaid, unpaidCount, activeContracts, totalVehicles, utilization,
@@ -151,6 +163,7 @@ export default function DashboardPage() {
       overdueReturns, monthlyTarget, idle, penaltyOpen,
       collectedThisMonth, collectedLastMonth, collectionProgress, momGrowth, collectedTotal,
       expiringNextMonth, newThisMonth,
+      pendingDeliveryCount, pendingDepositSum,
     };
   }, [contracts, vehicles, bankTx, cardTx, penalties, today]);
 
@@ -255,6 +268,15 @@ export default function DashboardPage() {
                     tone="brand"
                     href="/contract"
                     details={[{ k: '다음달 만기', v: `${kpi.expiringNextMonth}건` }]}
+                  />
+                  <CompactKpi
+                    label="확정대기 (인도 전)"
+                    value={`${kpi.pendingDeliveryCount}건`}
+                    tone={kpi.pendingDeliveryCount === 0 ? 'zinc' : kpi.pendingDepositSum > 0 ? 'orange' : 'brand'}
+                    href="/?view=확정대기"
+                    details={[
+                      { k: '보증금 미수령', v: formatCurrency(kpi.pendingDepositSum) },
+                    ]}
                   />
                   <CompactKpi
                     label="과태료 미처리"

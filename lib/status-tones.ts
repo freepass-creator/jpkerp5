@@ -46,6 +46,7 @@ export function vehicleStateTone(name: VehicleState | undefined): BadgeTone {
 
 export function contractStateTone(name: ContractState | undefined): BadgeTone {
   switch (name) {
+    case '확정대기':     return 'blue';
     case '계약중':       return 'green';
     case '만기임박':
     case '연장대기':

@@ -120,8 +120,8 @@ export function getVehicleState(c: Contract): { name: VehicleState; days: number
   return { name: '휴차대기', days: daysSince(c.readiedDate ?? c.contractDate, today) };
 }
 
-/** 계약상태 — 계약 라이프사이클 + 컴플라이언스 + 무계약. 우선순위: 위반 > 미수검 > 연장 > 종료 > 만기경과 > 만기임박 > 계약중 > 무계약 */
-export type ContractState = '무계약' | '계약중' | '만기임박' | '만기경과' | '연장대기' | '종료대기' | '미수검' | '위반';
+/** 계약상태 — 계약 라이프사이클 + 컴플라이언스 + 무계약. 우선순위: 위반 > 미수검 > 연장 > 종료 > 만기경과 > 만기임박 > 확정대기 > 계약중 > 무계약 */
+export type ContractState = '무계약' | '확정대기' | '계약중' | '만기임박' | '만기경과' | '연장대기' | '종료대기' | '미수검' | '위반';
 
 export function getContractState(c: Contract): { name: ContractState; days: number } {
   const today = todayKr();
@@ -137,6 +137,17 @@ export function getContractState(c: Contract): { name: ContractState; days: numb
     const d = daysToExpiry(c, today);
     return { name: '종료대기', days: d !== null ? Math.max(0, -d) : 0 };
   }
+  // 확정대기 — 계약 체결됐으나 차량 인도 전.
+  // 정의: customerName 있음 + deliveredDate 없음 + status='대기' (또는 vehicleStatus 인도대기/출고대기/상품대기/재고)
+  // 출고 일정 관리 + 보증금 입금 추적 단계 (업무흐름도 Ⅳ ② 계약확정 절차)
+  const isPreDelivery = !c.deliveredDate && (
+    c.status === '대기' ||
+    c.vehicleStatus === '인도대기' ||
+    c.vehicleStatus === '출고대기' ||
+    c.vehicleStatus === '상품대기' ||
+    c.vehicleStatus === '재고'
+  );
+  if (isPreDelivery) return { name: '확정대기', days: daysSince(c.contractDate, today) };
   const isRunning = c.vehicleStatus === '운행' || (c.deliveredDate && c.status === '운행');
   if (isRunning) {
     const d = daysToExpiry(c, today);

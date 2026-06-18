@@ -37,11 +37,11 @@ import {
   type VehicleState, type ContractState, type PaymentState,
 } from '@/lib/contract-stage';
 
-type View = '전체' | '계약중' | '만기경과' | '만기임박' | '연장대기' | '종료대기' | '휴차' | '미수';
+type View = '전체' | '확정대기' | '계약중' | '만기경과' | '만기임박' | '연장대기' | '종료대기' | '휴차' | '미수';
 /** 항상 표시되는 기본 필터 */
 const BASE_VIEWS: View[] = ['전체', '계약중', '휴차', '미수'];
 /** 데이터 있을 때만 표시되는 조건부 필터 */
-const CONDITIONAL_VIEWS: View[] = ['만기경과', '만기임박', '연장대기', '종료대기'];
+const CONDITIONAL_VIEWS: View[] = ['확정대기', '만기경과', '만기임박', '연장대기', '종료대기'];
 
 /**
  * (구) 계약중 — 반납·해지 안 됨. 사용 안 함 (matchesView 가 isRunning 사용).
@@ -94,6 +94,7 @@ function matchesView(c: Contract, v: View): boolean {
   // '계약중' = 실제 운행 중인 계약만 (휴차/매각/상품화 제외 — 사용자 명시).
   // 휴차 chip 과 mutually exclusive. 합집합 = 전체.
   if (v === '계약중') return isRunning(c);
+  if (v === '확정대기') return getContractState(c).name === '확정대기';
   if (v === '만기경과') return getContractState(c).name === '만기경과';
   if (v === '만기임박') return getContractState(c).name === '만기임박';
   if (v === '연장대기') return c.vehicleStatus === '연장대기';
@@ -116,7 +117,7 @@ const VS_ORDER: VehicleState[] = [
   '운행중',
   '휴차대기', '휴차', '매각검토', '매각대기', '매각완료', '반납',
 ];
-const CS_ORDER: ContractState[] = ['위반', '미수검', '연장대기', '종료대기', '만기경과', '만기임박', '계약중'];
+const CS_ORDER: ContractState[] = ['위반', '미수검', '연장대기', '종료대기', '만기경과', '만기임박', '확정대기', '계약중'];
 const PS_ORDER: PaymentState[] = ['미납', '정상', '휴차', '종결'];
 
 /**
@@ -308,6 +309,16 @@ export default function Page() {
   const today = useLiveTodayKr();
   const [search, setSearch] = useState('');
   const [view, setView] = usePersistentState<View>('filter:operation:view', '전체');
+  // URL ?view= 진입 시 필터 prefill (dashboard drill-down)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const v = sp.get('view');
+    if (v && ['전체', '확정대기', '계약중', '만기경과', '만기임박', '연장대기', '종료대기', '휴차', '미수'].includes(v)) {
+      setView(v as View);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:operation:company', '전체');
   const [manualSort, setManualSort] = useState<{ col: SortCol; dir: SortDir } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -494,6 +505,7 @@ export default function Page() {
     return {
       전체: scoped.length,
       계약중: scoped.filter((c) => matchesView(c, '계약중')).length,
+      확정대기: scoped.filter((c) => matchesView(c, '확정대기')).length,
       만기경과: scoped.filter((c) => matchesView(c, '만기경과')).length,
       만기임박: scoped.filter((c) => matchesView(c, '만기임박')).length,
       연장대기: scoped.filter((c) => matchesView(c, '연장대기')).length,
