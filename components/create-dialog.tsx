@@ -222,6 +222,18 @@ export function CreateDialog({
       const cardParseFail = cardParseAll.filter((x) => x === null).length;
       const cardParsed = cardParseAll.filter((x): x is NonNullable<typeof x> => !!x);
 
+      // 전부 parse 실패 + 시트 있음 → 헤더 진단 (사용자가 어느 헤더가 잘못됐는지 알 수 있게)
+      const totalParsedOk = bankParsed.length + cardParsed.length;
+      const totalAttempted = bankRows.length + cardRows.length;
+      if (totalParsedOk === 0 && totalAttempted > 0) {
+        const sampleHeaders: string[] = [];
+        for (const p of paymentFiles) {
+          const h = p.headers?.slice(0, 8).join(' / ') ?? '';
+          if (h) sampleHeaders.push(`「${p.fileName} > ${p.sheetName}」: ${h}`);
+        }
+        toast.error(`${totalAttempted}행 전부 미반영 — 필수 컬럼 (거래일/금액/입금자 또는 승인일/금액/승인번호) 누락. 시트 헤더 확인:\n${sampleHeaders.slice(0, 2).join('\n')}`);
+      }
+
       // 중복 검증 — DB 기존 거래 + 시트 내 중복 동시 처리
       const bankDedup = dedupAgainst(bankParsed, existingBankTx, bankTxKeys);
       const cardDedup = dedupAgainst(cardParsed, existingCardTx, cardTxKeys);
