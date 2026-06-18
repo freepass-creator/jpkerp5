@@ -7,8 +7,7 @@
  * jpkerp-v4 권한 정책 동일 — Rules 는 인증만, 권한 분리는 앱 코드에서.
  */
 export const SUPER_ADMIN_EMAILS: ReadonlyArray<string> = [
-  'jpkpyh@gmail.com',
-  'dudguq@gmail.com',
+  'pyh@teamjpk.com',
 ];
 
 export const ADMIN_EMAILS: ReadonlyArray<string> = [

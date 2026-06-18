@@ -161,7 +161,7 @@ export default function ProposalPage() {
         {/* 푸터 */}
         <footer className="proposal-footer">
           <div>렌터카매니저 — jpkerp5 · 2026</div>
-          <div>문의: dudguq@gmail.com / jpkpyh@gmail.com</div>
+          <div>문의: pyh@teamjpk.com</div>
         </footer>
       </main>
 

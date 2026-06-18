@@ -531,7 +531,7 @@ export default function HelpPage() {
                 사용 중 막히면 <strong>화면 캡쳐 + 어떤 작업 중이었는지</strong>를 같이 보내주세요. 빠르게 조치합니다.
                 <br />
                 <br />
-                관리자: <span className="mono">dudguq@gmail.com</span> · <span className="mono">jpkpyh@gmail.com</span>
+                관리자: <span className="mono">pyh@teamjpk.com</span>
               </div>
             </Section>
 
