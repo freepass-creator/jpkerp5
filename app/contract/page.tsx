@@ -25,6 +25,7 @@ import { CompanyFilter } from '@/components/ui/filter-bar';
 import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
@@ -347,7 +348,7 @@ export default function ContractPage() {
                         <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleRow(c.id)} aria-label="행 선택" />
                         </td>
-                        <td>{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
+                        <td><CompanyCell raw={c.company} master={companyMaster} /></td>
                         <td className="mono">{c.contractNo}</td>
                         <td className="mono">{c.vehiclePlate}</td>
                         <td>{c.customerName}</td>

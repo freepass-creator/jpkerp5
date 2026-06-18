@@ -34,6 +34,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import type { Vehicle, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -382,7 +383,7 @@ export default function AssetPage() {
                     return (
                     <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => { setOpenTab('asset'); setOpenId(v.id); }} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
-                      <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                      <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
                       <td className="center">
@@ -513,7 +514,7 @@ export default function AssetPage() {
                   ) : filtered.map((v) => (
                     <tr key={v.id} onClick={() => setSelectedId(v.id)} onDoubleClick={() => { setOpenTab('asset'); setOpenId(v.id); }} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
-                      <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                      <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleMaker || '-'}</td>
                       <td>{v.vehicleModelLine || v.model || '-'}</td>

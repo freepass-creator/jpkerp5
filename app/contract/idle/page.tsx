@@ -16,6 +16,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { useRole } from '@/lib/use-role';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { IdleLocationDialog } from '@/components/idle-location-dialog';
@@ -151,7 +152,7 @@ export default function ContractIdlePage() {
             const noLocation = !c.idleLocation?.trim();
             return (
               <tr key={c.id} onClick={() => setEditing(c)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
-                <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
+                <td className="dim"><CompanyCell raw={c.company} master={companyMaster} /></td>
                 <td className="mono">{c.vehiclePlate}</td>
                 <td className="dim">{c.vehicleModel || '-'}</td>
                 <td><StatusBadge tone={vehicleStatusTone(c.vehicleStatus)}>{c.vehicleStatus}</StatusBadge></td>

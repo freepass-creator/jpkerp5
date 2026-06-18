@@ -18,6 +18,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
@@ -106,7 +107,7 @@ export default function AssetLoanPage() {
                   ) : filtered.map((v, idx) => (
                     <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onClick={(e) => rowSel.onRowClick(e, v.id, idx)} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                       <TableRowCheckbox id={v.id} selection={sel} />
-                      <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                      <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
                       <td>{v.loanCompany || <span className="muted">-</span>}</td>

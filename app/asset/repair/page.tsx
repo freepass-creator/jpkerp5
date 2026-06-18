@@ -19,6 +19,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
@@ -139,7 +140,7 @@ export default function RepairPage() {
                         className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}
                       >
                         <TableRowCheckbox id={v.id} selection={sel} />
-                        <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                        <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                         <td className="mono">{v.plate || '-'}</td>
                         <td>{v.vehicleModelLine || v.model || '-'}</td>
                         <td className="mono dim">{r?.lastDate || <span className="muted">-</span>}</td>

@@ -22,6 +22,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { Plus, FileXls, Trash, MagnifyingGlass, Copy } from '@phosphor-icons/react';
@@ -237,7 +238,7 @@ export default function AssetInsurancePage() {
                         <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} aria-label="행 선택" />
                         </td>
-                        <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                        <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                         <td className="mono">{v.plate || '-'}</td>
                         <td>{v.vehicleModelLine || v.model || '-'}</td>
                         <td>{insurer || <span className="muted">-</span>}</td>

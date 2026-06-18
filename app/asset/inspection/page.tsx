@@ -21,6 +21,7 @@ import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 
@@ -160,7 +161,7 @@ export default function AssetInspectionPage() {
               return (
                 <tr key={c.id} onClick={(e) => rowSel.onRowClick(e, c.id, upcoming.findIndex((u) => u.c.id === c.id))} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, c.id, upcoming.findIndex((u) => u.c.id === c.id), () => setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }))} style={{ cursor: 'pointer' }} className={sel.selectedIds.has(c.id) ? 'selected-row' : undefined}>
                   <TableRowCheckbox id={c.id} selection={sel} />
-                  <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
+                  <td className="dim"><CompanyCell raw={c.company} master={companyMaster} /></td>
                   <td className="mono">{c.vehiclePlate}</td>
                   <td className="dim">{c.vehicleModel || vehicles.find((v) => v.plate === c.vehiclePlate)?.model || '-'}</td>
                   <td>{c.customerName}</td>

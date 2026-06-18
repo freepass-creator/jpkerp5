@@ -21,6 +21,7 @@ import { vehicleStatusTone } from '@/lib/status-tones';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
@@ -109,7 +110,7 @@ export default function AssetGpsPage() {
                     return (
                       <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onClick={(e) => rowSel.onRowClick(e, v.id, idx)} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                         <TableRowCheckbox id={v.id} selection={sel} />
-                        <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                        <td><CompanyCell raw={v.company} master={companyMaster} /></td>
                         <td className="mono">{v.plate || '-'}</td>
                         <td>{v.vehicleModelLine || v.model || '-'}</td>
                         <td>{v.gpsProvider || <span className="muted">-</span>}</td>

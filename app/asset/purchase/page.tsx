@@ -16,6 +16,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
 import { toast } from '@/lib/toast';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
 import { EmptyRow } from '@/components/ui/empty-row';
@@ -166,7 +167,7 @@ export default function PurchasePage() {
               <EmptyRow colSpan={6}>{vehiclesLoading ? '데이터 불러오는 중…' : '구매대기 차량 없음'}</EmptyRow>
             ) : pending.map((v) => (
               <tr key={v.id} onDoubleClick={() => v.plate && v.plate !== '미정' && openVehicle(v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer' }}>
-                <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                <td className="dim"><CompanyCell raw={v.company} master={companyMaster} /></td>
                 <td className="mono">{v.plate || '미정'}</td>
                 <td>{v.model || '-'}</td>
                 <td className="dim">{v.vehicleMaker ?? '-'}</td>
@@ -200,7 +201,7 @@ export default function PurchasePage() {
               <EmptyRow colSpan={7}>{vehiclesLoading ? '데이터 불러오는 중…' : '매입 완료 차량 없음'}</EmptyRow>
             ) : purchased.map((v) => (
               <tr key={v.id} onDoubleClick={() => v.plate && v.plate !== '미정' && openVehicle(v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} style={{ cursor: 'pointer' }}>
-                <td className="dim">{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
+                <td className="dim"><CompanyCell raw={v.company} master={companyMaster} /></td>
                 <td className="mono">{v.plate}</td>
                 <td>{v.model}</td>
                 <td className="mono">{v.purchasedDate}</td>

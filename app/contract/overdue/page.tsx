@@ -16,6 +16,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { contractStatusTone } from '@/lib/status-tones';
 import { downloadContractsExcel } from '@/lib/contract-export';
@@ -130,7 +131,7 @@ export default function ContractOverduePage() {
             <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>{contractsLoading ? '데이터 불러오는 중…' : '미수금 계약 없음'}</td></tr>
           ) : overdue.map((c) => (
             <tr key={c.id} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'risk')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
-              <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
+              <td className="dim"><CompanyCell raw={c.company} master={companyMaster} /></td>
               <td className="mono">{c.vehiclePlate}</td>
               <td>{c.customerName}</td>
               <td className="mono dim">{c.customerPhone1 || '-'}</td>

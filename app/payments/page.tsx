@@ -12,6 +12,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { applicableSubjects } from '@/lib/ledger-subjects';
 import { autoMatchAll, applyMatch, reverseMatch, applyFifoPayment, autoMatchCardAll, applyCardMatch } from '@/lib/receipt-match';
 import { findAllSettlements, buildSettlementPatch } from '@/lib/settlement-match';
@@ -725,7 +726,7 @@ function LedgerTable({
               <td className="center">
                 <StatusBadge tone={status === 'closed' ? 'green' : status === 'posted' ? 'blue' : 'neutral'}>{STATUS_LABEL[status]}</StatusBadge>
               </td>
-              <td className="dim">{t.companyCode || (c ? displayCompanyName(c.company, companyMaster) : '-')}</td>
+              <td className="dim">{t.companyCode ? t.companyCode : (c ? <CompanyCell raw={c.company} master={companyMaster} /> : <CompanyCell raw={undefined} master={companyMaster} />)}</td>
               <td className="mono" style={{ fontSize: 11 }}>{formatAccountLabel(t, companyMaster, c)}</td>
               <td className="mono">{formatDate(t.txDate)}</td>
               <td className="num mono">{t.amount > 0 ? `₩${formatCurrency(t.amount)}` : '-'}</td>

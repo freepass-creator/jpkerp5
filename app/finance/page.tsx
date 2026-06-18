@@ -20,6 +20,7 @@ import { buildAllJournals, summarizeByAccount, ACCOUNTS, CLASS_LABEL, type Ledge
 import { useRole } from '@/lib/use-role';
 import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { CreateDialog } from '@/components/create-dialog';
 import { DailyLedgerView } from '@/components/finance/daily-ledger-view';
 import { toast } from '@/lib/toast';
@@ -1279,7 +1280,7 @@ function CustomerSubLedgerView({
                     <tr key={c.id}>
                       <td className="mono dim">{c.contractNo || '-'}</td>
                       <td className="mono">{c.vehiclePlate || '-'}</td>
-                      <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
+                      <td className="dim"><CompanyCell raw={c.company} master={companyMaster} /></td>
                       <td className="dim">{c.status || '-'}</td>
                       <td className="mono dim">{c.contractDate || '-'}</td>
                       <td className="mono dim">{c.returnedDate || (c.returnScheduledDate ? `(예정 ${c.returnScheduledDate})` : '-')}</td>

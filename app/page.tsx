@@ -16,6 +16,7 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { PageShell } from '@/components/ui/page-shell';
@@ -736,8 +737,8 @@ export default function Page() {
                             aria-label={`${c.customerName} 선택`}
                           />
                         </td>
-                        {/* 회사 */}
-                        <td className="center dim">{displayCompanyName(c.company, companyMaster)}</td>
+                        {/* 회사 — 미입력이면 빨강 경고 뱃지 */}
+                        <td className="center dim"><CompanyCell raw={c.company} master={companyMaster} /></td>
                         {/* 차량상태 — display 만. 변경은 더블클릭 → dialog → 처리 flow 거쳐서 (휴차 사유/반납 검수 등) */}
                         <td className="center">
                           <StatusBadge tone={vehicleStateTone(vs.name)} title="더블클릭 → 상세 dialog → 상태 탭에서 처리 (휴차 사유·반납 검수 등 flow 거침)">

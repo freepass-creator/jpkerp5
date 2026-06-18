@@ -20,6 +20,7 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { CompanyCell } from '@/components/ui/company-cell';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { downloadOverdueExcel } from '@/lib/contract-export';
 import { useAuth } from '@/lib/use-auth';
@@ -408,7 +409,7 @@ export default function ReceivablesPage() {
                               aria-label="행 선택"
                             />
                           </td>
-                          <td className="center dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
+                          <td className="center dim"><CompanyCell raw={c.company} master={companyMaster} /></td>
                           <td className="center">{c.vehicleStatus ? <StatusBadge tone={vehicleStatusTone(c.vehicleStatus)}>{c.vehicleStatus}</StatusBadge> : <span className="muted">-</span>}</td>
                           <td className="mono">{c.vehiclePlate}</td>
                           <td>{c.customerName}</td>
