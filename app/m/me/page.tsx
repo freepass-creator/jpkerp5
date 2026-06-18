@@ -97,7 +97,7 @@ export default function MobileMe() {
       </button>
 
       <div style={{ fontSize: 10, color: 'var(--text-weak)', textAlign: 'center', marginTop: 8 }}>
-        렌터카매니저 모바일 · v1.0 (beta)
+        렌터카매니저 모바일 · v5.0.0
       </div>
       </div>
     </div>
