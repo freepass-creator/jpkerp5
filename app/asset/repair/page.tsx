@@ -21,6 +21,7 @@ import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useTableSelection } from '@/lib/use-table-selection';
+import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { exportToExcel } from '@/lib/excel-export';
@@ -83,6 +84,10 @@ export default function RepairPage() {
     });
   }, [vehicles, search, companyFilter, repairByPlate]);
 
+  // Ctrl/Shift+click 행선택 + Ctrl+A 전체선택
+  const rowSel = useRowSelection({ ids: filtered.map((v) => v.id), selection: sel });
+  useCtrlASelectAll(rowSel, sel);
+
   if (roleLoading || !master) {
     return <div className="layout"><Sidebar /><div className="app"><div style={{ padding: 40, fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div></div></div>;
   }
@@ -122,14 +127,15 @@ export default function RepairPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</td></tr>
-                  ) : filtered.map((v) => {
+                  ) : filtered.map((v, idx) => {
                     const r = v.plate ? repairByPlate.get(v.plate.replace(/\s/g, '')) : undefined;
                     return (
                       <tr
                         key={v.id}
                         style={{ verticalAlign: 'middle', cursor: 'pointer' }}
+                        onClick={(e) => rowSel.onRowClick(e, v.id, idx)}
                         onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')}
-                        onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }}
+                        onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))}
                         className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}
                       >
                         <TableRowCheckbox id={v.id} selection={sel} />
@@ -230,13 +236,36 @@ export default function RepairPage() {
           x={ctxMenu.x}
           y={ctxMenu.y}
           onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
-          items={ctxMenu.row ? ([
-            { label: '차량 상세', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) openVehicle(ctxMenu.row.plate, 'asset'); }, disabled: !ctxMenu.row?.plate },
-            { type: 'separator' },
-            { label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); } },
-            { type: 'separator' },
-            { label: '계약 이력', icon: <ArrowSquareOut size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) router.push(`/contract?q=${encodeURIComponent(ctxMenu.row.plate)}`); } },
-          ] satisfies ContextMenuItem[]) : []}
+          items={ctxMenu.row ? ((): ContextMenuItem[] => {
+            const n = sel.size;
+            const isMulti = n > 1;
+            const items: ContextMenuItem[] = [];
+            if (isMulti) {
+              items.push({ label: `${n}건 선택`, icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => {}, disabled: true });
+            } else {
+              items.push({ label: '차량 상세', icon: <MagnifyingGlass size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) openVehicle(ctxMenu.row.plate, 'asset'); }, disabled: !ctxMenu.row?.plate });
+              items.push({ type: 'separator' });
+              items.push({ label: '차량번호 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) navigator.clipboard.writeText(ctxMenu.row.plate); } });
+              items.push({ type: 'separator' });
+              items.push({ label: '계약 이력', icon: <ArrowSquareOut size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.plate) router.push(`/contract?q=${encodeURIComponent(ctxMenu.row.plate)}`); } });
+            }
+            items.push({ type: 'separator' });
+            items.push({
+              label: isMulti ? `${n}건 일괄 삭제` : '차량 삭제',
+              icon: <Trash size={12} weight="bold" />,
+              danger: true,
+              onClick: async () => {
+                const ids = Array.from(sel.selectedIds);
+                if (ids.length === 0 && ctxMenu.row) ids.push(ctxMenu.row.id);
+                if (ids.length === 0) return;
+                if (!confirm(`${ids.length}대의 차량을 삭제하시겠습니까? (감사로그 남음)`)) return;
+                for (const id of ids) { try { await removeVehicle(id); } catch (e) { console.error(e); } }
+                sel.clear();
+                toast.success(`${ids.length}대 삭제됨`);
+              },
+            });
+            return items;
+          })() : []}
         />
       </div>
     </div>
