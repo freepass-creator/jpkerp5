@@ -15,16 +15,24 @@ export const ADMIN_EMAILS: ReadonlyArray<string> = [
 ];
 
 /**
- * ⚠️ 현재 모드 — 모든 인증 사용자에게 마스터 권한 부여 (개발/초기 운영).
- * 정식 권한 분리 시 화이트리스트 검사로 복원:
- *   return !!email && SUPER_ADMIN_EMAILS.some((x) => x.toLowerCase() === email.toLowerCase());
+ * ★ 활성화 (2026-06-19) — strict 화이트리스트.
+ *
+ *  · isSuperAdmin: SUPER_ADMIN_EMAILS 만 통과 — 위험 작업·관리 페이지 gate
+ *  · isAdmin:      SUPER_ADMIN_EMAILS + ADMIN_EMAILS 통과 — 일반 관리 페이지
+ *
+ * 페이지 접근 (운영 페이지) 은 use-role.ts 의 isMaster (permissive — !!user) 로 분리.
+ * 위 두 함수는 위험 작업 (일괄 삭제·migration·dev-tools·role 부여 API) 전용.
  */
 export function isSuperAdmin(email?: string | null): boolean {
-  return !!email;
+  if (!email) return false;
+  const e = email.toLowerCase();
+  return SUPER_ADMIN_EMAILS.some((x) => x.toLowerCase() === e);
 }
 
 export function isAdmin(email?: string | null): boolean {
-  return !!email;
+  if (!email) return false;
+  const e = email.toLowerCase();
+  return ADMIN_EMAILS.some((x) => x.toLowerCase() === e);
 }
 
 /**
