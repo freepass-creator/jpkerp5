@@ -30,6 +30,8 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { toast } from '@/lib/toast';
 import type { Vehicle } from '@/lib/types';
 import { useVehicleDialog } from '@/lib/global-dialogs';
+import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
+import type { TableSelection } from '@/lib/use-table-selection';
 
 type QF = 'all' | 'missing' | 'expire' | 'expired';
 
@@ -89,6 +91,14 @@ export default function AssetInsurancePage() {
   function toggleRow(id: string) {
     setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }
+
+  const selAdapter = useMemo<TableSelection>(() => ({
+    selectedIds, setSelectedIds,
+    toggleRow,
+    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
+    clear: () => setSelectedIds(new Set()),
+    size: selectedIds.size,
+  }), [selectedIds]);
 
   const today = useLiveTodayKr();
 
@@ -155,6 +165,9 @@ export default function AssetInsurancePage() {
       return (a.v.plate ?? '').localeCompare(b.v.plate ?? '');
     });
   }, [allRows, search, companyFilter, qf]);
+
+  const rowSel = useRowSelection({ ids: filtered.map((r) => r.v.id), selection: selAdapter });
+  useCtrlASelectAll(rowSel, selAdapter);
 
   if (roleLoading || !master) {
     return <div className="layout"><Sidebar /><div className="app"><div style={{ padding: 40, fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div></div></div>;
@@ -234,7 +247,7 @@ export default function AssetInsurancePage() {
                   ) : filtered.map(({ v, insurer, policy, startDate, endDate, totalPremium, installmentCount, days, status }) => {
                     const tone = status === 'expired' ? 'red' : status === 'expire' ? 'orange' : status === 'missing' ? 'red' : '';
                     return (
-                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={selectedIds.has(v.id) ? 'selected-row' : undefined}>
+                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, v.id, filtered.findIndex((x) => x.v.id === v.id))} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, filtered.findIndex((x) => x.v.id === v.id), () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={selectedIds.has(v.id) ? 'selected-row' : undefined}>
                         <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} aria-label="행 선택" />
                         </td>
