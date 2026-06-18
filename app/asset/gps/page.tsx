@@ -23,6 +23,7 @@ import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { useTableSelection } from '@/lib/use-table-selection';
+import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
 import { exportToExcel } from '@/lib/excel-export';
 import { useVehicleDialog } from '@/lib/global-dialogs';
@@ -60,6 +61,9 @@ export default function AssetGpsPage() {
       return (a.plate ?? '').localeCompare(b.plate ?? '');
     });
   }, [vehicles, search, companyFilter]);
+
+  const rowSel = useRowSelection({ ids: filtered.map((v) => v.id), selection: sel });
+  useCtrlASelectAll(rowSel, sel);
 
   if (roleLoading || !master) {
     return <div className="layout"><Sidebar /><div className="app"><div style={{ padding: 40, fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div></div></div>;
@@ -100,10 +104,10 @@ export default function AssetGpsPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</td></tr>
-                  ) : filtered.map((v) => {
+                  ) : filtered.map((v, idx) => {
                     const installed = !!(v.gpsProvider || v.gpsDeviceId);
                     return (
-                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }); }} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
+                      <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onClick={(e) => rowSel.onRowClick(e, v.id, idx)} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                         <TableRowCheckbox id={v.id} selection={sel} />
                         <td>{v.company ? displayCompanyName(v.company, companyMaster) : '-'}</td>
                         <td className="mono">{v.plate || '-'}</td>

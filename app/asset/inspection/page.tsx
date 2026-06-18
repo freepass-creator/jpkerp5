@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { ClipboardText, FileXls, MagnifyingGlass, Copy } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { useTableSelection } from '@/lib/use-table-selection';
+import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { TableHeaderCheckbox, TableRowCheckbox } from '@/components/ui/table-checkbox';
 import { exportToExcel } from '@/lib/excel-export';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
@@ -49,6 +50,9 @@ export default function AssetInspectionPage() {
 
   const overdue = upcoming.filter((u) => u.daysLeft < 0);
   const within30 = upcoming.filter((u) => u.daysLeft >= 0 && u.daysLeft <= 30);
+
+  const rowSel = useRowSelection({ ids: upcoming.map((u) => u.c.id), selection: sel });
+  useCtrlASelectAll(rowSel, sel);
 
   return (
     <MasterPageShell
@@ -154,7 +158,7 @@ export default function AssetInspectionPage() {
               const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
               const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;
               return (
-                <tr key={c.id} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }); }} style={{ cursor: 'pointer' }} className={sel.selectedIds.has(c.id) ? 'selected-row' : undefined}>
+                <tr key={c.id} onClick={(e) => rowSel.onRowClick(e, c.id, upcoming.findIndex((u) => u.c.id === c.id))} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, c.id, upcoming.findIndex((u) => u.c.id === c.id), () => setCtxMenu({ x: e.clientX, y: e.clientY, plate: c.vehiclePlate, phone: c.customerPhone1, due: c.inspectionDueDate, customerName: c.customerName }))} style={{ cursor: 'pointer' }} className={sel.selectedIds.has(c.id) ? 'selected-row' : undefined}>
                   <TableRowCheckbox id={c.id} selection={sel} />
                   <td className="dim">{c.company ? displayCompanyName(c.company, companyMaster) : '-'}</td>
                   <td className="mono">{c.vehiclePlate}</td>
