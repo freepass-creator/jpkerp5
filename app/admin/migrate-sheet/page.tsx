@@ -8,6 +8,7 @@ import { getRtdb, dbPath, RTDB_ROOT, ensureAuth, pruneUndefined } from '@/lib/fi
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { generateSchedules } from '@/lib/payment-schedule';
+import { monthsBetween } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { friendlyError } from '@/lib/friendly-error';
 import type { Contract, CompanyCode, PaymentEntry, PaymentScheduleInline } from '@/lib/types';
@@ -562,7 +563,7 @@ export default function MigrateSheetPage() {
         const k = groupKey(s);
         const correctCompany = mapCompany(s.company);
         const termMonths = s.returnScheduledDate && s.contractDate
-          ? Math.max(1, Math.round((new Date(s.returnScheduledDate).getTime() - new Date(s.contractDate).getTime()) / (1000 * 60 * 60 * 24 * 30)))
+          ? (monthsBetween(s.contractDate, s.returnScheduledDate) || 12)
           : 12;
 
         const dbGroup = groupMap.get(k) ?? [];

@@ -15,6 +15,7 @@ import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { toast } from '@/lib/toast';
 import { friendlyError } from '@/lib/friendly-error';
 import { todayKr } from '@/lib/mock-data';
+import { monthsBetween } from '@/lib/utils';
 import { stripCorpSuffix } from '@/lib/company-display';
 
 /* ─── 자동 연동 헬퍼 (preview와 동일) ─── */
@@ -28,11 +29,7 @@ function addMonths(yyyymmdd: string, months: number): string {
   return d.toISOString().slice(0, 10);
 }
 function diffMonths(start: string, end: string): number {
-  if (!start || !end) return 0;
-  const s = new Date(start);
-  const e = new Date(end);
-  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
-  return Math.max(0, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30.4375)));
+  return monthsBetween(start, end);
 }
 function fmtPhone(s: string): string {
   const d = s.replace(/\D/g, '');

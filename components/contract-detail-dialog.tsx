@@ -23,7 +23,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone, contractStatusTone, scheduleStatusTone } from '@/lib/status-tones';
 import { DateInput } from '@/components/ui/date-input';
 import type { Contract, VehicleStatus, PaymentScheduleInline, PaymentEntry, ScheduleStatus, AdditionalDriver, DepositDeduction } from '@/lib/types';
-import { formatCurrency, formatDateFull, daysSince } from '@/lib/utils';
+import { formatCurrency, formatDateFull, daysSince, monthsBetween } from '@/lib/utils';
 import { contractIdentMasked, birthFromIdent, inferKind } from '@/lib/ident';
 import { displayCompanyName } from '@/lib/company-display';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -871,10 +871,8 @@ function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract
     if (!renewNewReturn) { toast.error('새 반납예정일을 입력하세요'); return; }
     if (renewNewReturn <= c.contractDate) { toast.error('반납예정일은 계약일 이후여야 합니다'); return; }
     const newRent = renewNewRent ? parseInt(renewNewRent.replace(/[^0-9]/g, ''), 10) || c.monthlyRent : c.monthlyRent;
-    // 새 종료일까지 약정개월 재계산
-    const start = new Date(c.contractDate);
-    const end = new Date(renewNewReturn);
-    const newTerm = Math.max(c.termMonths, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+    // 새 종료일까지 약정개월 재계산 — calendar months (나누기 X)
+    const newTerm = Math.max(c.termMonths, monthsBetween(c.contractDate, renewNewReturn));
     onUpdate({
       ...c,
       vehicleStatus: '운행',

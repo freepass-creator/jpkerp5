@@ -7,6 +7,7 @@ import { normalizeIdent, inferKind, formatIdent, type CustomerKind } from './ide
 import { generateSchedules, distributeUnpaid, computeCurrentSeq as computeCurrentSeqFromSchedules } from './payment-schedule';
 import { todayKr } from './mock-data';
 import { toStr, toNum, toDate, get, type Row } from './parse-helpers';
+import { monthsBetween } from './utils';
 
 /* ──────────────── 도메인별 picker ──────────────── */
 
@@ -82,12 +83,10 @@ export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
   const deposit = toNum(get(row, '보증금', '예치금', 'deposit'));
   const paymentMethod = toStr(get(row, '결제방법', '결제수단', 'paymentMethod')) || '이체';
 
-  // termMonths 자동 계산
+  // termMonths 자동 계산 — 진짜 calendar months (나누기 X)
   let termMonths = toNum(get(row, '약정개월', '약정', 'termMonths'));
   if (!termMonths && returnScheduled) {
-    const d1 = new Date(contractDate);
-    const d2 = new Date(returnScheduled);
-    termMonths = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+    termMonths = monthsBetween(contractDate, returnScheduled) || 12;
   }
   if (!termMonths) termMonths = 12;
 
@@ -204,9 +203,7 @@ function parseContractPeriod(row: Row): { start: string; end: string; months: nu
 
   let months = 12;
   if (start && end) {
-    const d1 = new Date(start);
-    const d2 = new Date(end);
-    months = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+    months = monthsBetween(start, end) || 12;
   }
   return { start, end, months };
 }
@@ -573,12 +570,10 @@ export function parseHorizontalContractsRow(
       || (returnScheduled ? returnScheduled : '');
     if (!contractDate) continue;  // 일자 정보 없으면 skip
 
-    // 약정개월 — 계약일~종료일로 추정
+    // 약정개월 — 계약일~종료일 calendar months (나누기 X)
     let termMonths = 12;
     if (returnScheduled && contractDate) {
-      const d1 = new Date(contractDate);
-      const d2 = new Date(returnScheduled);
-      termMonths = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+      termMonths = monthsBetween(contractDate, returnScheduled) || 12;
     }
 
     // 결제일

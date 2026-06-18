@@ -56,6 +56,33 @@ export function daysSince(date: string, today: string): number {
   return daysBetween(date, today);
 }
 
+/**
+ * 계약 기간 (개월 수) — 진짜 calendar months 로 계산. 나누기 X.
+ *
+ * 정책:
+ *  - 만기일 inclusive (한국 계약 관행) — 시작일 ~ 만기일 = (만기일+1) 까지의 month diff.
+ *  - 예: 2022-01-01 ~ 2026-01-01 = 48 (4년)
+ *  - 예: 2022-01-01 ~ 2025-12-31 = 48 (마지막 날 포함, 다음 시작 1/1)
+ *  - 예: 2022-01-01 ~ 2025-01-01 = 36 (3년)
+ *
+ *  · 시작·만기 둘 다 필수. 빈 값/잘못된 형식 → 0.
+ *  · 만기 < 시작 → 0.
+ */
+export function monthsBetween(startISO: string | undefined, endISO: string | undefined): number {
+  if (!startISO || !endISO) return 0;
+  const s = new Date(startISO);
+  const e = new Date(endISO);
+  if (!Number.isFinite(s.getTime()) || !Number.isFinite(e.getTime())) return 0;
+  if (e < s) return 0;
+  // 만기일 inclusive: end + 1 day 로 정렬 후 calendar 달 diff.
+  const eAdj = new Date(e);
+  eAdj.setDate(eAdj.getDate() + 1);
+  let months = (eAdj.getFullYear() - s.getFullYear()) * 12 + (eAdj.getMonth() - s.getMonth());
+  // eAdj 의 일자가 시작 일자보다 작으면 한 달 깎음 (예: 1/15 → 4/14 = 2개월, 4/15 = 3개월).
+  if (eAdj.getDate() < s.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+
 export function isOverdue(scheduledDate: string, today: string): boolean {
   return scheduledDate < today;
 }

@@ -15,6 +15,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useAuth } from '@/lib/use-auth';
 import { todayKr } from '@/lib/mock-data';
+import { monthsBetween } from '@/lib/utils';
 import { CertDocument, CERT_PRINT_CSS } from '@/components/notice/cert-document';
 import type { Contract } from '@/lib/types';
 
@@ -26,7 +27,7 @@ function addDays(ymd: string, days: number): string {
 
 function calcPenaltyRate(contractDate: string, terminationDate: string): number {
   if (!contractDate || !terminationDate) return 0.3;
-  const months = Math.round((new Date(terminationDate).getTime() - new Date(contractDate).getTime()) / (1000 * 60 * 60 * 24 * 30));
+  const months = monthsBetween(contractDate, terminationDate);
   return months < 12 ? 0.3 : 0.2;
 }
 

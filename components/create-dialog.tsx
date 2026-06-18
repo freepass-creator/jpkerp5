@@ -11,7 +11,7 @@ import {
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DateInput } from '@/components/ui/date-input';
 import { parseExcelFile, type ParsedSheet, type UploadKind } from '@/lib/excel-detect';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, monthsBetween } from '@/lib/utils';
 import { MAKERS, MODELS_BY_MAKER, buildVehicleFullName } from '@/lib/vehicle-master';
 import type { Contract, HistoryCategory, HistoryScope, AdditionalDriver, BankTransaction, CardTransaction } from '@/lib/types';
 import {
@@ -2273,12 +2273,10 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
         }
       }
 
-      // termMonths 자동 계산 (반납예정 - 계약일, 월 단위)
+      // termMonths 자동 계산 — 진짜 calendar months (나누기 X)
       let termMonths = 12;
       if (returnDate && contractDate) {
-        const start = new Date(contractDate);
-        const end = new Date(returnDate);
-        termMonths = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+        termMonths = monthsBetween(contractDate, returnDate) || 12;
       }
 
       const identDigits = (regNo || '').replace(/\D/g, '');
