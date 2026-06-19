@@ -5,21 +5,9 @@
 - **MINOR (x.1.x)** : 좀 큰 수정 (신규 기능, 페이지 추가)
 - **PATCH (x.x.1)** : 자잘한 수정 (UI 다듬기, 버그 픽스)
 
----
-
-## 5.0.3 — 2026-06-19 · 퀵필터 드랍다운 규격 통일
-
-- `app/globals.css` — `.filter-bar / .quick-filters / .topbar` 안의 `input-compact` 만 font 12px + border-radius 4px 로 chip 과 일치 (다이얼로그·폼은 영향 없음, scoped).
-- `app/finance/page.tsx` — 입출금 방향 dropdown `data-w="sm"` → `"md"` (타 페이지와 폭 일치).
-
-## 5.0.2 — 2026-06-19 · 계약 import 행별 진단
-
-- **계약 import** — 미반영 행마다 `행번호 + 사유 (계약일 없음 / 계약자명·차량번호 모두 없음) + 미리보기` 토스트로 노출. 직원이 어느 행을 고쳐야 하는지 즉시 인지.
-- `lib/import-commit.ts` — `diagnoseContractRow`, `previewRow` 헬퍼 추가.
-
-## 5.0.1 — 2026-06-19 · 내용증명 위약금률 일치
-
-- `components/notice/cert-document.tsx` 의 monthsServed·monthsRemaining 을 `lib/utils.monthsBetween` 으로 통일. 단건/일괄 페이지가 1년 경계에서 위약금률 30% vs 20% 갈리던 사고 해결.
+워크플로우:
+- 사용자 테스트 전 author 준비 작업은 모두 현 버전에 머무름.
+- 사용자가 테스트 → 피드백 → 그에 따라 수정한 결과부터 다음 버전.
 
 ---
 
@@ -37,6 +25,9 @@ jpkerp5 60라운드 polish + 운영 안정화 완료 시점에서 **렌터카매
 - **Ctrl+A 토글** — 다시 누르면 전체 해제.
 - **재무 업로드** — 카드/계좌/자동이체 alias 확장, 휴리스틱 자동매칭 (`autoMatchAll`, plate suffix).
 - **마스터 계정 변경** — `pyh@teamjpk.com`.
+- **내용증명 위약금률 일치** — `cert-document.tsx` 의 monthsServed·monthsRemaining `monthsBetween` 통일 (1년 경계 30%/20% 분기 해결).
+- **계약 import 행별 진단** — 미반영 행마다 `행번호 + 사유 + 미리보기` 토스트 (`diagnoseContractRow`, `previewRow`).
+- **퀵필터 드랍다운 규격 통일** — `.filter-bar/.quick-filters/.topbar .input-compact` font 12px + radius 4px 로 chip 과 일치 (scoped, 다이얼로그 영향 X). finance 입출금 방향 `sm`→`md`.
 
 ### 알려진 미결
 - `/m/upload` Phase B (OCR 자동매칭 신뢰도 분류).
