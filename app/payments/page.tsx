@@ -448,7 +448,7 @@ export default function PaymentsPage() {
               />
             )}
             <span className="filter-divider" />
-            {/* 뷰 — chip 명은 신규등록 dialog tab 과 동일하게 통일 */}
+            {/* 뷰 chip 그룹 — chip 명은 신규등록 dialog tab 과 동일하게 통일 */}
             <button type="button" className={`chip ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>
               <ListChecks /> 입출금
               {bankTx.length > 0 && <span className="chip-count">{bankTx.length}</span>}
@@ -471,10 +471,19 @@ export default function PaymentsPage() {
                 <span className="chip-count">{cardTx.filter((t) => t.kind === '법인카드').length}</span>
               )}
             </button>
+            <button
+              type="button"
+              className={`chip chip-tone-amber ${tab === 'summary' ? 'active' : ''}`}
+              onClick={() => setTab('summary')}
+              title="회사·일자별 입출금 집계 — 세무사 전달용"
+            >
+              <ChartBar /> 자금일보
+              {daily.length > 0 && <span className="chip-count">{daily.length}</span>}
+            </button>
+            {/* 보조 dropdown 그룹 — 맨 뒤. tab === 'all' 일 때만 노출 */}
             {tab === 'all' && (
               <>
                 <span className="filter-divider" />
-                {/* 입출금 방향 dropdown */}
                 <FilterSelect
                   value={direction}
                   onChange={(v) => setDirection(v as 'all' | 'deposit' | 'withdraw')}
@@ -486,7 +495,6 @@ export default function PaymentsPage() {
                     { value: 'withdraw', label: '출금만' },
                   ]}
                 />
-                {/* 분개 상태 dropdown */}
                 <FilterSelect
                   value={filter}
                   onChange={(v) => setFilter(v as 'all' | 'unposted' | 'posted' | 'closed')}
@@ -499,7 +507,6 @@ export default function PaymentsPage() {
                     { value: 'closed', label: '마감', hint: counts.closed > 0 ? `(${counts.closed})` : undefined },
                   ]}
                 />
-                {/* 계정과목 dropdown */}
                 {subjectOptions.length > 0 && (
                   <FilterSelect
                     value={subjectFilter}
@@ -514,17 +521,6 @@ export default function PaymentsPage() {
                 )}
               </>
             )}
-            {/* 자금일보 — 맨 오른쪽으로 push */}
-            <button
-              type="button"
-              className={`chip chip-tone-amber ${tab === 'summary' ? 'active' : ''}`}
-              onClick={() => setTab('summary')}
-              style={{ marginLeft: 'auto' }}
-              title="회사·일자별 입출금 집계 — 세무사 전달용"
-            >
-              <ChartBar /> 자금일보
-              {daily.length > 0 && <span className="chip-count">{daily.length}</span>}
-            </button>
           </div>
         </header>
 

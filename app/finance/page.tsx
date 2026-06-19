@@ -247,8 +247,21 @@ export default function FinancePage() {
       icon={<Bank size={16} weight="fill" style={{ color: 'var(--brand)' }} />}
       topbarSearch={{ placeholder: '거래상대 / 적요 / 계좌 / 계정과목 / 계약자', value: search, onChange: setSearch }}
       topbarFilter={
+        <CompanyFilter value={companyFilter} onChange={setCompanyFilter} options={companyOptions} master={companyMaster} />
+      }
+      topbarChips={
         <>
-          <CompanyFilter value={companyFilter} onChange={setCompanyFilter} options={companyOptions} master={companyMaster} />
+          {/* 기간 chip 그룹 */}
+          <button type="button" className={`chip ${periodMode === 'month' ? 'active' : ''}`} onClick={() => setPeriodMode('month')}>월</button>
+          <button type="button" className={`chip ${periodMode === 'quarter' ? 'active' : ''}`} onClick={() => setPeriodMode('quarter')}>분기</button>
+          <button type="button" className={`chip ${periodMode === 'year' ? 'active' : ''}`} onClick={() => setPeriodMode('year')}>연</button>
+          <span className="filter-divider" />
+          <button type="button" className="chip" onClick={() => shiftPeriod(-1)} title="이전 기간">◀</button>
+          <strong className="mono" style={{ minWidth: 80, textAlign: 'center', fontSize: 12 }}>{periodLabel}</strong>
+          <button type="button" className="chip" onClick={() => shiftPeriod(1)} title="다음 기간">▶</button>
+          <button type="button" className="chip" onClick={gotoCurrent} title="현재 기간으로">당월</button>
+          {/* 보조 dropdown — 맨 뒤 */}
+          <span className="filter-divider" />
           <FilterSelect
             value={directionFilter}
             onChange={(v) => setDirectionFilter(v as 'all' | 'deposit' | 'withdraw')}
@@ -260,19 +273,6 @@ export default function FinancePage() {
               { value: 'withdraw', label: '출금만' },
             ]}
           />
-        </>
-      }
-      topbarChips={
-        <>
-          {/* 기간 필터 — 검색 우측 (필터 영역) */}
-          <button type="button" className={`chip ${periodMode === 'month' ? 'active' : ''}`} onClick={() => setPeriodMode('month')}>월</button>
-          <button type="button" className={`chip ${periodMode === 'quarter' ? 'active' : ''}`} onClick={() => setPeriodMode('quarter')}>분기</button>
-          <button type="button" className={`chip ${periodMode === 'year' ? 'active' : ''}`} onClick={() => setPeriodMode('year')}>연</button>
-          <span className="filter-divider" />
-          <button type="button" className="chip" onClick={() => shiftPeriod(-1)} title="이전 기간">◀</button>
-          <strong className="mono" style={{ minWidth: 80, textAlign: 'center', fontSize: 12 }}>{periodLabel}</strong>
-          <button type="button" className="chip" onClick={() => shiftPeriod(1)} title="다음 기간">▶</button>
-          <button type="button" className="chip" onClick={gotoCurrent} title="현재 기간으로">당월</button>
         </>
       }
       topbarRight={
