@@ -2797,6 +2797,17 @@ kbd {
   border-radius: var(--radius);
 }
 
+/* 드랍다운이 열렸을 때 option 패널도 같은 규격 (Chrome/Edge 한정 — Firefox/Safari 는 OS 기본).
+   font 통일 + 적당한 padding. select 내부의 option 만 (다른 select 영향 없게). */
+.filter-bar .input-compact option,
+.quick-filters .input-compact option,
+.topbar .input-compact option {
+  font-size: 12px;
+  padding: 4px 6px;
+  background: var(--bg-card);
+  color: var(--text-main);
+}
+
 /* ════════════════════════════════════════════════════════════════════
  *  Notice box — 페이지 내 인포·에러·경고·성공 알림 패널
  *  대체 대상: <div style={{ padding: 14, background: var(--red-bg), borderRadius: 6, fontSize: 13 }}>
