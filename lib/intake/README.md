@@ -50,9 +50,16 @@
 ### Phase 2 — `intake/` RTDB 노드 신설
 모든 입력을 일단 intake 에 저장 → classify → match → status 갱신.
 
-- [ ] `lib/firebase/intake-store.ts` 신설 (CRUD + onValue 구독)
+- [x] `lib/firebase/intake-store.ts` 신설 — CRUD + 라이브 구독:
+      `addIntakeItem` / `setIntakeClassify` / `setIntakeMatch` /
+      `setIntakeOverrideKind` / `setIntakeOverrideMatch` /
+      `markIntakeCommitted` / `markIntakeRejected` / `removeIntakeItem` /
+      `useIntakeItems` / `useIntakeItem`
+- [ ] **Firebase Rules 검증** — 콘솔에서 `/intake/{itemId}` 가 `auth != null`
+      체크만 확인. 메모리 [[v4-permission-policy]] 정책 그대로.
+      base64 데이터 큰 항목은 추후 Storage 분리 검토.
 - [ ] `app/api/intake/process/route.ts` (서버 worker) — pending intake 재처리
-- [ ] 기존 입구 7곳이 모두 intake/ 로 우회
+- [ ] 기존 입구 7곳이 모두 intake/ 로 우회 (Phase 2.1+)
 
 ### Phase 3 — `/inbox` 단일 페이지
 - [ ] `app/inbox/page.tsx` — 단일 입력 + 분류 결과 + 미매칭 pending 보드.
