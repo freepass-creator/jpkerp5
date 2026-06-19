@@ -14,19 +14,22 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/use-auth';
+import { useRole } from '@/lib/use-role';
 import { useSettings, type Theme, type Radius } from '@/lib/use-settings';
 import { getAuth, signOut } from 'firebase/auth';
 import { getFirebaseApp } from '@/lib/firebase/client';
 import {
   User, SignOut, Bell, BellSlash, ShareNetwork, Copy, Check,
-  Calendar, Sun, Moon, CircleHalf,
+  Calendar, Sun, Moon, CircleHalf, Tray,
 } from '@phosphor-icons/react';
 import { toast } from '@/lib/toast';
+import { APP_VERSION } from '@/lib/version';
 
 const NOTI_KEY = 'jpkerp5:mobile:notifications';
 
 export default function MobileMe() {
   const { user } = useAuth();
+  const { isRealMaster } = useRole();
 
   async function handleLogout() {
     if (!window.confirm('로그아웃하시겠습니까?')) return;
@@ -78,6 +81,14 @@ export default function MobileMe() {
           desc="휴가·반차·조퇴 신청"
           href="/m/me/attendance"
         />
+        {isRealMaster && (
+          <MenuItem
+            icon={<Tray size={18} weight="duotone" />}
+            label="입력함 (intake)"
+            desc="모든 입력 audit · 분류·매칭 결과 · 수동 보정"
+            href="/inbox"
+          />
+        )}
         <NotificationToggle />
       </section>
 
@@ -97,7 +108,7 @@ export default function MobileMe() {
       </button>
 
       <div style={{ fontSize: 10, color: 'var(--text-weak)', textAlign: 'center', marginTop: 8 }}>
-        렌터카매니저 모바일 · v5.0.0
+        렌터카매니저 모바일 · v{APP_VERSION}
       </div>
       </div>
     </div>
