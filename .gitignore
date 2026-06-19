@@ -26,6 +26,11 @@ Thumbs.db
 .env*.local
 .env
 
+# secrets — Service Account JSON 키 등 절대 푸시 X
+.secrets/
+*.key.json
+*-service-account*.json
+
 # editor
 .vscode/
 .idea/
