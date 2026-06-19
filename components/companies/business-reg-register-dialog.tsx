@@ -17,21 +17,16 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { reassignVehiclesToCompany } from '@/lib/entity-sync';
-import { runWithConcurrency } from '@/lib/parallel';
 import { fileToDataUrl } from '@/lib/image-compress';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
-import { getFirebaseAuth } from '@/lib/firebase/client';
 import { audit } from '@/lib/firebase/audit-store';
 import { toast } from '@/lib/toast';
 import type { Company, CompanyDocument } from '@/lib/types';
+// 공용 OCR 배치 훅 + 드롭존 (penalty/vehicle-reg/insurance 와 동일 패턴)
+import { useOcrBatch, type OcrBatchItem } from '@/lib/use-ocr-batch';
+import { OcrUploadStage } from '@/components/ui/ocr-upload-stage';
 
-const OCR_CONCURRENCY = 10;
-
-type Status = 'pending' | 'done' | 'failed';
-type WorkItem = Partial<Company> & {
-  id: string;
-  _status: Status;
-  _error?: string;
+type WorkItem = Partial<Company> & OcrBatchItem & {
   _existingId?: string;
   _fileName?: string;
   _fileDataUrl?: string;
@@ -50,12 +45,50 @@ export function BusinessRegRegisterDialog({
 }) {
   const { companies, add: addCompany, update: updateCompany } = useCompanies();
   const { vehicles, update: updateVehicle } = useVehicles();
-  const [items, setItems] = useState<WorkItem[]>([]);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [dragging, setDragging] = useState(false);
   const [mode, setMode] = useState<'ocr' | 'manual'>('ocr');
   const [manualDraft, setManualDraft] = useState<Partial<Company>>({});
+
+  // ─── OCR 배치 (공용 훅) ───
+  const ocr = useOcrBatch<WorkItem>({
+    docType: 'business_reg',
+    concurrency: 10,
+    preconvertPdfToImage: pdfFirstPageToJpegFile,
+    createPlaceholder: async (file, id) => {
+      const dataUrl = await fileToDataUrl(file).catch(() => '');
+      return {
+        id,
+        fileName: file.name,
+        _status: 'pending',
+        _fileName: file.name,
+        _fileDataUrl: dataUrl || undefined,
+      };
+    },
+    applyResult: (prev, raw) => {
+      const name = (String(raw.partner_name ?? '')).trim();
+      const bizRegNo = (String(raw.biz_no ?? '')).replace(/[^\d-]/g, '');
+      const corpRegNo = (String(raw.corp_no ?? '')).replace(/[^\d-]/g, '');
+      const existing = companies.find((c) => {
+        if (bizRegNo && normReg(c.bizRegNo) === normReg(bizRegNo)) return true;
+        if (corpRegNo && normReg(c.corpRegNo) === normReg(corpRegNo)) return true;
+        return false;
+      });
+      return {
+        ...prev,
+        name: name || existing?.name || '',
+        bizRegNo: bizRegNo || existing?.bizRegNo,
+        corpRegNo: corpRegNo || existing?.corpRegNo,
+        ceo: (raw.ceo as string | null) ?? existing?.ceo,
+        address: (raw.address as string | null) ?? existing?.address,
+        bizType: (raw.industry as string | null) ?? existing?.bizType,
+        bizItem: (raw.category as string | null) ?? existing?.bizItem,
+        partnerKind: existing?.partnerKind ?? '기타',
+        _existingId: existing?.id,
+      };
+    },
+  });
+  const items = ocr.items;
+  const setItems = ocr.setItems;
 
   // 수정 모드 — open + editId 변경 시 prefill + 수기 탭 강제
   const editTarget = editId ? companies.find((c) => c.id === editId) ?? null : null;
@@ -75,10 +108,8 @@ export function BusinessRegRegisterDialog({
   }, [open, editTarget?.id]);
 
   function reset() {
-    setItems([]);
+    ocr.reset();
     setBusy(false);
-    setProgress(null);
-    setDragging(false);
     setManualDraft({});
     setMode('ocr');
   }
@@ -99,78 +130,6 @@ export function BusinessRegRegisterDialog({
     }
     return s;
   }, [companies]);
-
-  async function handleFiles(files: File[] | FileList | null) {
-    if (!files) return;
-    const arr = Array.from(files);
-    if (arr.length === 0) return;
-
-    const dataUrls = await Promise.all(arr.map(fileToDataUrl).map((p) => p.catch(() => '')));
-    const placeholders: WorkItem[] = arr.map((f, i) => ({
-      id: `br-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
-      _status: 'pending' as Status,
-      _fileName: f.name,
-      _fileDataUrl: dataUrls[i] || undefined,
-    }));
-    setItems((prev) => [...prev, ...placeholders]);
-    setProgress({ done: 0, total: arr.length });
-
-    try {
-      await runWithConcurrency(arr, OCR_CONCURRENCY, async (f, i) => {
-        const id = placeholders[i].id;
-        try {
-          let toSend = f;
-          try { toSend = await pdfFirstPageToJpegFile(f); } catch { /* fallback */ }
-
-          const fd = new FormData();
-          fd.append('file', toSend);
-          fd.append('type', 'business_reg');
-          const user = getFirebaseAuth()?.currentUser;
-          const idToken = user ? await user.getIdToken() : '';
-          const res = await fetch('/api/ocr/extract', {
-            method: 'POST',
-            headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-            body: fd,
-          });
-          const json = await res.json();
-          if (!json.ok) throw new Error(json.error || 'OCR 실패');
-          const raw = json.extracted as Record<string, string | null>;
-
-          const name = (raw.partner_name ?? '').trim();
-          // OCR 결과: 숫자/하이픈만 추출 — 공백·zero-width·invisible 문자 모두 제거
-          const bizRegNo = (raw.biz_no ?? '').replace(/[^\d-]/g, '');
-          const corpRegNo = (raw.corp_no ?? '').replace(/[^\d-]/g, '');
-          // 같은 회사 매칭 — 사업자번호/법인번호로
-          const existing = companies.find((c) => {
-            if (bizRegNo && normReg(c.bizRegNo) === normReg(bizRegNo)) return true;
-            if (corpRegNo && normReg(c.corpRegNo) === normReg(corpRegNo)) return true;
-            return false;
-          });
-
-          setItems((prev) => prev.map((p) => p.id === id ? {
-            ...p,
-            name: name || existing?.name || '',
-            bizRegNo: bizRegNo || existing?.bizRegNo,
-            corpRegNo: corpRegNo || existing?.corpRegNo,
-            ceo: raw.ceo ?? existing?.ceo,
-            address: raw.address ?? existing?.address,
-            bizType: raw.industry ?? existing?.bizType,
-            bizItem: raw.category ?? existing?.bizItem,
-            partnerKind: existing?.partnerKind ?? '기타',  // OCR 시 기본 '기타'
-            _status: 'done' as Status,
-            _existingId: existing?.id,
-          } : p));
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          setItems((prev) => prev.map((p) => p.id === id ? { ...p, _status: 'failed' as Status, _error: msg } : p));
-        } finally {
-          setProgress((p) => p ? { done: p.done + 1, total: p.total } : null);
-        }
-      });
-    } finally {
-      setProgress(null);
-    }
-  }
 
   function updateRow(id: string, patch: Partial<WorkItem>) {
     setItems((prev) => prev.map((p) => p.id === id ? { ...p, ...patch } : p));
@@ -348,36 +307,15 @@ export function BusinessRegRegisterDialog({
 
             {/* OCR 탭 */}
             <Tabs.Content value="ocr">
-              <label
-                className={`dropzone ${dragging ? 'dragging' : ''} ${busy ? 'busy' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragging(false);
-                  void handleFiles(e.dataTransfer.files);
-                }}
-              >
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  multiple
-                  style={{ display: 'none' }}
-                  onChange={(e) => { void handleFiles(e.target.files); e.target.value = ''; }}
-                />
-                <div style={{ textAlign: 'center', padding: 24 }}>
-                  <Upload size={28} weight="duotone" style={{ color: 'var(--brand)', marginBottom: 8 }} />
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>사업자등록증 파일 드래그 / 클릭 선택</div>
-                  <div className="dim" style={{ fontSize: 11, marginTop: 4 }}>이미지·PDF · 여러 장 한번에</div>
-                </div>
-              </label>
+              <OcrUploadStage
+                progress={ocr.progress}
+                busy={ocr.busy || busy}
+                onFiles={ocr.handleFiles}
+                idleTitle="사업자등록증 파일 드래그 / 클릭 선택"
+                idleSubtitle="이미지·PDF · 여러 장 한번에 — 사업자번호/법인번호 기준 기존 회사 자동 매칭"
+                progressSubtitle="Gemini 가 사업자등록증을 읽고 있습니다"
+              />
 
-              {progress && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12, color: 'var(--text-sub)' }}>
-                  <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
-                  <span>OCR 진행 {progress.done}/{progress.total}</span>
-                </div>
-              )}
 
               {items.length > 0 && (
                 <div style={{ marginTop: 14, maxHeight: 360, overflow: 'auto' }}>

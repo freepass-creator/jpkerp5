@@ -22,7 +22,6 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
-import { runWithConcurrency } from '@/lib/parallel';
 import { fileToDataUrl } from '@/lib/image-compress';
 import { getFirebaseAuth } from '@/lib/firebase/client';
 import { toast } from '@/lib/toast';
@@ -30,15 +29,13 @@ import type { Vehicle, CompanyCode } from '@/lib/types';
 import { normPlate, findCompanyByRegNo } from '@/lib/entity-sync';
 import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
 import { displayCompanyName } from '@/lib/company-display';
+// 공용 OCR 배치 훅 + 드롭존 (penalty 와 동일 패턴 — 중복 제거)
+import { useOcrBatch, type OcrBatchItem } from '@/lib/use-ocr-batch';
+import { OcrUploadStage } from '@/components/ui/ocr-upload-stage';
 
-const OCR_CONCURRENCY = 30;
 const PLATE_RE = /^\d{2,3}[가-힣]\d{4}$/;
 
-type Status = 'pending' | 'done' | 'failed';
-type WorkItem = Partial<Vehicle> & {
-  id: string;
-  _status: Status;
-  _error?: string;
+type WorkItem = Partial<Vehicle> & OcrBatchItem & {
   _existingId?: string;        // 기존 차량 매칭 시 update 대상
   _fileName?: string;
   _fileDataUrl?: string;       // OCR 원본 파일 data URL — 등록증 첨부 보존
@@ -62,13 +59,68 @@ export function VehicleRegRegisterDialog({
     const hit = findCompanyByRegNo(rawRegNo, companies);
     return hit?.code || hit?.name;
   }
-  const [items, setItems] = useState<WorkItem[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);   // commit 단계의 busy (OCR busy 는 ocr.busy)
   const [mode, setMode] = useState<'ocr' | 'manual' | 'excel'>('ocr');
   // 개별 입력 폼 state
   const [manualDraft, setManualDraft] = useState<Partial<Vehicle>>({});
+
+  // ─── OCR 배치 (공용 훅) ───
+  const ocr = useOcrBatch<WorkItem>({
+    docType: 'vehicle_reg',
+    preconvertPdfToImage: pdfFirstPageToJpegFile,
+    createPlaceholder: async (file, id) => {
+      const dataUrl = await fileToDataUrl(file).catch(() => '');
+      return {
+        id,
+        fileName: file.name,
+        _status: 'pending',
+        _fileName: file.name,
+        _fileDataUrl: dataUrl,
+      };
+    },
+    applyResult: (prev, raw) => {
+      const s = (k: string): string | undefined => (raw[k] != null ? String(raw[k]) : undefined);
+      const n = (k: string): number | undefined => {
+        const v = raw[k];
+        if (v == null) return undefined;
+        const num = typeof v === 'number' ? v : Number(String(v).replace(/[,\s]/g, ''));
+        return Number.isFinite(num) ? num : undefined;
+      };
+      const plate = normPlate(s('car_number'));
+      const existing = plate ? vehicles.find((v) => normPlate(v.plate) === plate) : undefined;
+      const ownerReg = s('owner_biz_no');
+      const matchedCompany = matchCompanyByRegNo(ownerReg);
+      return {
+        ...(existing ?? {}),
+        ...prev,                  // fileName/_fileName/_fileDataUrl 보존
+        company: (matchedCompany ?? existing?.company) as Partial<Vehicle>['company'],
+        plate: plate || existing?.plate || s('car_number') || '',
+        model: s('car_name') ?? existing?.model ?? '',
+        vehicleType: s('category_hint') ?? existing?.vehicleType,
+        vehicleUsage: s('usage_type') ?? existing?.vehicleUsage,
+        vehicleFormat: s('type_number') ?? existing?.vehicleFormat,
+        manufacturedDate: s('car_year_month') ?? existing?.manufacturedDate,
+        firstRegisteredDate: s('first_registration_date') ?? existing?.firstRegisteredDate,
+        vin: s('vin') ?? existing?.vin,
+        engineFormat: s('engine_type') ?? existing?.engineFormat,
+        garage: s('address') ?? existing?.garage,
+        ownerName: s('owner_name') ?? existing?.ownerName,
+        ownerRegNo: s('owner_biz_no') ?? existing?.ownerRegNo,
+        specMgmtNo: s('approval_number') ?? existing?.specMgmtNo,
+        vehicleLength: n('length_mm') ?? existing?.vehicleLength,
+        vehicleWidth: n('width_mm') ?? existing?.vehicleWidth,
+        vehicleHeight: n('height_mm') ?? existing?.vehicleHeight,
+        totalWeight: n('gross_weight_kg') ?? existing?.totalWeight,
+        seatingCapacity: n('seats') ?? existing?.seatingCapacity,
+        displacementCc: n('displacement') ?? existing?.displacementCc,
+        fuelType: s('fuel_type') ?? existing?.fuelType,
+        purchasePrice: n('acquisition_price') ?? existing?.purchasePrice,
+        _existingId: existing?.id,
+      };
+    },
+  });
+  const items = ocr.items;
+  const setItems = ocr.setItems;
 
   // prefillVehicle 변경 시 수기 탭으로 강제 + manualDraft 채움
   useEffect(() => {
@@ -80,9 +132,8 @@ export function VehicleRegRegisterDialog({
   }, [open, prefillVehicle?.id]);
 
   function reset() {
-    setItems([]);
+    ocr.reset();
     setBusy(false);
-    setProgress(null);
   }
 
   function handleClose(o: boolean) {
@@ -93,101 +144,6 @@ export function VehicleRegRegisterDialog({
     }
     onOpenChange(o);
     if (!o) reset();
-  }
-
-  async function handleFiles(files: FileList | File[]): Promise<void> {
-    const arr = Array.from(files);
-    if (arr.length === 0) return;
-    setBusy(true);
-
-    // 등록증은 1 파일 = 1 등록증. PDF 첫 페이지만 OCR (다중페이지 분리 X)
-    const expanded: File[] = arr;
-    const dataUrls = await Promise.all(expanded.map(fileToDataUrl));
-    const placeholders: WorkItem[] = expanded.map((f, i) => ({
-      id: `vr-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
-      _status: 'pending' as Status,
-      _fileName: f.name,
-      _fileDataUrl: dataUrls[i],
-    }));
-    setItems((prev) => [...prev, ...placeholders]);
-    setProgress({ done: 0, total: expanded.length });
-
-    try {
-      await runWithConcurrency(expanded, OCR_CONCURRENCY, async (f, i) => {
-        const id = placeholders[i].id;
-        try {
-          let toSend = f;
-          try { toSend = await pdfFirstPageToJpegFile(f); } catch { /* fallback */ }
-
-          const fd = new FormData();
-          fd.append('file', toSend);
-          fd.append('type', 'vehicle_reg');
-          const user = getFirebaseAuth()?.currentUser;
-          const idToken = user ? await user.getIdToken() : '';
-          const res = await fetch('/api/ocr/extract', {
-            method: 'POST',
-            headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-            body: fd,
-          });
-          const json = await res.json();
-          if (!json.ok) throw new Error(json.error || 'OCR 실패');
-          const raw = json.extracted as Record<string, unknown>;
-
-          const s = (k: string): string | undefined => (raw[k] != null ? String(raw[k]) : undefined);
-          const n = (k: string): number | undefined => {
-            const v = raw[k];
-            if (v == null) return undefined;
-            const num = typeof v === 'number' ? v : Number(String(v).replace(/[,\s]/g, ''));
-            return Number.isFinite(num) ? num : undefined;
-          };
-
-          const plate = normPlate(s('car_number'));
-          const existing = plate ? vehicles.find((v) => normPlate(v.plate) === plate) : undefined;
-          // 법인등록번호 (자등증 소유자) → 회사 자동 매칭
-          const ownerReg = s('owner_biz_no');
-          const matchedCompany = matchCompanyByRegNo(ownerReg);
-
-          setItems((prev) => prev.map((p) => p.id === id ? {
-            ...(existing ?? {}),
-            id,
-            company: (matchedCompany ?? existing?.company) as Partial<Vehicle>['company'],
-            plate: plate || existing?.plate || s('car_number') || '',
-            model: s('car_name') ?? existing?.model ?? '',
-            vehicleType: s('category_hint') ?? existing?.vehicleType,
-            vehicleUsage: s('usage_type') ?? existing?.vehicleUsage,
-            vehicleFormat: s('type_number') ?? existing?.vehicleFormat,
-            manufacturedDate: s('car_year_month') ?? existing?.manufacturedDate,
-            firstRegisteredDate: s('first_registration_date') ?? existing?.firstRegisteredDate,
-            vin: s('vin') ?? existing?.vin,
-            engineFormat: s('engine_type') ?? existing?.engineFormat,
-            garage: s('address') ?? existing?.garage,
-            ownerName: s('owner_name') ?? existing?.ownerName,
-            ownerRegNo: s('owner_biz_no') ?? existing?.ownerRegNo,
-            specMgmtNo: s('approval_number') ?? existing?.specMgmtNo,
-            vehicleLength: n('length_mm') ?? existing?.vehicleLength,
-            vehicleWidth: n('width_mm') ?? existing?.vehicleWidth,
-            vehicleHeight: n('height_mm') ?? existing?.vehicleHeight,
-            totalWeight: n('gross_weight_kg') ?? existing?.totalWeight,
-            seatingCapacity: n('seats') ?? existing?.seatingCapacity,
-            displacementCc: n('displacement') ?? existing?.displacementCc,
-            fuelType: s('fuel_type') ?? existing?.fuelType,
-            purchasePrice: n('acquisition_price') ?? existing?.purchasePrice,
-            _status: 'done' as Status,
-            _existingId: existing?.id,
-            _fileName: placeholders[i]._fileName,
-            _fileDataUrl: placeholders[i]._fileDataUrl,
-          } : p));
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          setItems((prev) => prev.map((p) => p.id === id ? { ...p, _status: 'failed' as Status, _error: msg } : p));
-        } finally {
-          setProgress((p) => p ? { done: p.done + 1, total: p.total } : null);
-        }
-      });
-    } finally {
-      setBusy(false);
-      setTimeout(() => setProgress(null), 1500);
-    }
   }
 
   function removeItem(id: string) {
@@ -333,60 +289,16 @@ export function VehicleRegRegisterDialog({
             </Tabs.List>
 
             <Tabs.Content value="ocr">
-          <label
-            className={`dropzone ${dragging ? 'dragging' : ''} ${busy ? 'busy' : ''}`}
-            style={{ display: 'block', cursor: busy ? 'wait' : 'pointer', padding: 20, marginBottom: 12 }}
-            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy) setDragging(true); }}
-            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy) setDragging(true); }}
-            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(false); }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setDragging(false);
-              if (!busy && e.dataTransfer.files.length > 0) void handleFiles(e.dataTransfer.files);
-            }}
-          >
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              multiple
-              style={{ display: 'none' }}
-              disabled={busy}
-              onChange={(e) => { if (e.target.files && e.target.files.length > 0) void handleFiles(e.target.files); }}
+          <div style={{ marginBottom: 12 }}>
+            <OcrUploadStage
+              progress={ocr.progress}
+              busy={ocr.busy || busy}
+              onFiles={ocr.handleFiles}
+              idleTitle="자동차등록증 파일 여러 장 한 번에"
+              idleSubtitle="PDF / JPG / PNG 다중 선택 · 드래그&드롭 OK — 같은 차량번호 기존 자산 있으면 업데이트"
+              progressSubtitle="Gemini 가 자동차등록증을 읽고 있습니다"
             />
-            <div style={{ textAlign: 'center' }}>
-              {progress && progress.done < progress.total ? (
-                <>
-                  <CircleNotch size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--brand)' }} />
-                  <div style={{ fontSize: 13, marginTop: 8, fontWeight: 500, color: 'var(--brand)' }}>
-                    OCR 진행 중… <strong>{progress.done}</strong> / {progress.total}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>
-                    Gemini 가 자동차등록증을 읽고 있습니다 (동시 {OCR_CONCURRENCY}건)
-                  </div>
-                </>
-              ) : progress && progress.done >= progress.total && progress.total > 0 ? (
-                <>
-                  <CheckCircle size={24} weight="duotone" style={{ color: 'var(--green-text)' }} />
-                  <div style={{ fontSize: 13, marginTop: 8, fontWeight: 500, color: 'var(--green-text)' }}>
-                    OCR 완료 <strong>{progress.done}</strong> / {progress.total}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>
-                    아래 표에서 확인 후 [모두 등록] 클릭
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Upload size={24} weight="duotone" style={{ color: 'var(--text-weak)' }} />
-                  <div style={{ fontSize: 13, marginTop: 8, fontWeight: 500 }}>자동차등록증 파일 여러 장 한 번에</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>
-                    PDF / JPG / PNG 다중 선택 · 드래그&드롭 OK — Gemini OCR 병렬 처리 (동시 {OCR_CONCURRENCY}건)
-                    <br />같은 차량번호 기존 자산 있으면 <strong>업데이트</strong>, 없으면 <strong>신규 등록</strong>
-                  </div>
-                </>
-              )}
-            </div>
-          </label>
+          </div>
 
           {items.length > 0 && (
             <>

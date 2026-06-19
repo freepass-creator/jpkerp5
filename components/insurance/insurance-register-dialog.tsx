@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, X, CircleNotch, CheckCircle, Warning, Upload } from '@phosphor-icons/react';
+import { Plus, X, CircleNotch, CheckCircle, Warning } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useInsurances } from '@/lib/firebase/insurance-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
@@ -21,18 +21,14 @@ import { upsertVehicleFromPolicy, findCompanyByRegNo } from '@/lib/entity-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { buildInsurancePolicyFromOcr } from '@/lib/insurance-calc';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
-import { runWithConcurrency } from '@/lib/parallel';
 import { fileToDataUrl } from '@/lib/image-compress';
-import { getFirebaseAuth } from '@/lib/firebase/client';
 import { toast } from '@/lib/toast';
 import type { InsurancePolicy } from '@/lib/types';
+// 공용 OCR 배치 훅 + 드롭존 (penalty / vehicle-reg 와 동일 패턴)
+import { useOcrBatch, type OcrBatchItem } from '@/lib/use-ocr-batch';
+import { OcrUploadStage } from '@/components/ui/ocr-upload-stage';
 
-const OCR_CONCURRENCY = 30;
-
-type Status = 'pending' | 'done' | 'failed';
-type WorkItem = InsurancePolicy & {
-  _status: Status;
-  _error?: string;
+type WorkItem = Partial<InsurancePolicy> & OcrBatchItem & {
   _matchedVehicleId?: string;
   _fileDataUrl?: string;
   _fileName?: string;
@@ -54,11 +50,48 @@ export function InsuranceRegisterDialog({
   const { policies, add: addPolicy, update: updatePolicy } = useInsurances();
   const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
   const { companies } = useCompanies();
-  const [items, setItems] = useState<WorkItem[]>([]);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [dragging, setDragging] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // ─── OCR 배치 (공용 훅) ───
+  const ocr = useOcrBatch<WorkItem>({
+    docType: 'insurance_policy',
+    preconvertPdfToImage: pdfFirstPageToJpegFile,
+    createPlaceholder: async (file, id) => {
+      const dataUrl = await fileToDataUrl(file).catch(() => '');
+      return {
+        id,
+        fileName: file.name,
+        _status: 'pending',
+        _fileName: file.name,
+        _fileDataUrl: dataUrl,
+      };
+    },
+    applyResult: (prev, raw) => {
+      const carNumber = String(raw.car_number ?? '').replace(/\s/g, '');
+      const matchedVehicle = carNumber
+        ? vehicles.find((v) => (v.plate ?? '').replace(/\s/g, '') === carNumber)
+        : undefined;
+      let companyMatch = matchedVehicle?.company;
+      if (!companyMatch) {
+        const hit = findCompanyByRegNo(String(raw.biz_no ?? raw.bizNo ?? ''), companies);
+        companyMatch = hit?.code || hit?.name;
+      }
+      const policy = buildInsurancePolicyFromOcr(raw, {
+        id: prev.id,
+        vehicleId: vehicleId ?? matchedVehicle?.id,
+        companyCode: companyMatch,
+      });
+      return {
+        ...policy,
+        ...prev,                 // id/fileName/_fileName/_fileDataUrl 보존
+        ...policy,               // policy 가 우선 (id 는 prev.id 와 동일)
+        _matchedVehicleId: matchedVehicle?.id,
+      };
+    },
+  });
+  const items = ocr.items;
+  const setItems = ocr.setItems;
 
   // 수정 모드 — open + prefillPolicy 변경 시 표에 1행 prefill (수정 후 저장 시 update)
   useEffect(() => {
@@ -66,6 +99,7 @@ export function InsuranceRegisterDialog({
       const matchedVehicle = vehicles.find((v) => v.id === prefillPolicy.vehicleId);
       setItems([{
         ...prefillPolicy,
+        fileName: prefillPolicy.fileName ?? prefillPolicy.id,
         _status: 'done',
         _matchedVehicleId: matchedVehicle?.id,
         _fileName: prefillPolicy.fileName,
@@ -87,9 +121,8 @@ export function InsuranceRegisterDialog({
   const existingPolicyNos = useMemo(() => new Set(policies.filter((p) => p.policyNo).map((p) => p.policyNo!)), [policies]);
 
   function reset() {
-    setItems([]);
+    ocr.reset();
     setBusy(false);
-    setProgress(null);
   }
 
   function handleClose(o: boolean) {
@@ -98,86 +131,6 @@ export function InsuranceRegisterDialog({
     }
     onOpenChange(o);
     if (!o) reset();
-  }
-
-  async function handleFiles(files: FileList | File[]): Promise<void> {
-    const arr = Array.from(files);
-    if (arr.length === 0) return;
-    setBusy(true);
-
-    // 보험증권은 1 파일 = 1 증권 — PDF 다중페이지 분리 안 함 (첫 페이지만 OCR)
-    const expanded: File[] = arr;
-
-    // 1) placeholder 한 번에 추가
-    const dataUrls = await Promise.all(expanded.map(fileToDataUrl));
-    const placeholders: WorkItem[] = expanded.map((f, i) => ({
-      id: `ip-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
-      _status: 'pending' as Status,
-      _fileDataUrl: dataUrls[i],
-      _fileName: f.name,
-    }));
-    setItems((prev) => [...prev, ...placeholders]);
-    setProgress({ done: 0, total: expanded.length });
-
-    try {
-      // 2) 동시성 제한 병렬 OCR
-      await runWithConcurrency(expanded, OCR_CONCURRENCY, async (f, i) => {
-        const id = placeholders[i].id;
-        try {
-          // PDF → JPEG 첫 페이지 (Gemini 안정성)
-          let toSend = f;
-          try { toSend = await pdfFirstPageToJpegFile(f); } catch { /* fallback */ }
-
-          const fd = new FormData();
-          fd.append('file', toSend);
-          fd.append('type', 'insurance_policy');
-          const user = getFirebaseAuth()?.currentUser;
-          const idToken = user ? await user.getIdToken() : '';
-          const res = await fetch('/api/ocr/extract', {
-            method: 'POST',
-            headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-            body: fd,
-          });
-          const json = await res.json();
-          if (!json.ok) throw new Error(json.error || 'OCR 실패');
-          const raw = json.extracted as Record<string, unknown>;
-
-          // 차량 매칭 (carNumber → Vehicle.plate)
-          const carNumber = String(raw.car_number ?? '').replace(/\s/g, '');
-          const matchedVehicle = carNumber
-            ? vehicles.find((v) => (v.plate ?? '').replace(/\s/g, '') === carNumber)
-            : undefined;
-          // 회사 매칭: 1) 매칭 차량의 company 우선 / 2) 차량 미매칭 시 보험증권 bizNo 로 직접 매칭 (공용 헬퍼)
-          let companyMatch = matchedVehicle?.company;
-          if (!companyMatch) {
-            const hit = findCompanyByRegNo(String(raw.biz_no ?? raw.bizNo ?? ''), companies);
-            companyMatch = hit?.code || hit?.name;
-          }
-
-          const policy = buildInsurancePolicyFromOcr(raw, {
-            id,
-            vehicleId: vehicleId ?? matchedVehicle?.id,
-            companyCode: companyMatch,
-          });
-
-          setItems((prev) => prev.map((p) => p.id === id ? {
-            ...policy,
-            _status: 'done' as Status,
-            _matchedVehicleId: matchedVehicle?.id,
-            _fileDataUrl: placeholders[i]._fileDataUrl,
-            _fileName: placeholders[i]._fileName,
-          } : p));
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          setItems((prev) => prev.map((p) => p.id === id ? { ...p, _status: 'failed' as Status, _error: msg } : p));
-        } finally {
-          setProgress((p) => p ? { done: p.done + 1, total: p.total } : null);
-        }
-      });
-    } finally {
-      setBusy(false);
-      setTimeout(() => setProgress(null), 1500);
-    }
   }
 
   function removeItem(id: string) {
@@ -266,43 +219,17 @@ export function InsuranceRegisterDialog({
     <DialogRoot open={open} onOpenChange={handleClose}>
       <DialogContent title={prefillPolicy ? `보험증권 수정` : `보험증권 일괄 OCR 등록`} mode={prefillPolicy ? 'edit' : 'new'}>
         <DialogBody>
-          {/* 드롭존 */}
-          <label
-            className={`dropzone ${dragging ? 'dragging' : ''} ${busy ? 'busy' : ''}`}
-            style={{ display: 'block', cursor: busy ? 'wait' : 'pointer', padding: 20, marginBottom: 12 }}
-            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy) setDragging(true); }}
-            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy) setDragging(true); }}
-            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(false); }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setDragging(false);
-              if (!busy && e.dataTransfer.files.length > 0) void handleFiles(e.dataTransfer.files);
-            }}
-          >
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              multiple
-              style={{ display: 'none' }}
-              disabled={busy}
-              onChange={(e) => { if (e.target.files && e.target.files.length > 0) void handleFiles(e.target.files); }}
+          {/* 드롭존 — 공용 OcrUploadStage (penalty / vehicle-reg 와 동일) */}
+          <div style={{ marginBottom: 12 }}>
+            <OcrUploadStage
+              progress={ocr.progress}
+              busy={ocr.busy || busy}
+              onFiles={ocr.handleFiles}
+              idleTitle="보험증권 파일 여러 장 한 번에"
+              idleSubtitle="PDF / JPG / PNG 다중 선택 — 1회차 보험료 = 총보험료 − 2~N회차 자동 산출"
+              progressSubtitle="Gemini 가 보험증권을 읽고 있습니다"
             />
-            <div style={{ textAlign: 'center' }}>
-              <Upload size={24} weight="duotone" style={{ color: 'var(--text-weak)' }} />
-              <div style={{ fontSize: 13, marginTop: 8, fontWeight: 500 }}>보험증권 파일 여러 장 한 번에</div>
-              <div style={{ fontSize: 11, color: 'var(--text-sub)', marginTop: 4 }}>
-                PDF / JPG / PNG 다중 선택 · 드래그&드롭 OK — PDF 다중페이지는 자동 분리
-                <br />Gemini OCR 병렬 처리 (동시 {OCR_CONCURRENCY}건). <strong>1회차 보험료 = 총보험료 − 2~N회차 합</strong> 자동 산출
-              </div>
-            </div>
-          </label>
-
-          {progress && (
-            <div style={{ padding: '8px 12px', background: 'var(--brand-bg)', color: 'var(--brand)', fontSize: 12, borderRadius: 'var(--radius)', marginBottom: 8 }}>
-              OCR 진행: {progress.done} / {progress.total}
-            </div>
-          )}
+          </div>
 
           {items.length > 0 && (
             <>
