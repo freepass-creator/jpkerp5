@@ -14,7 +14,8 @@
  *  · none — 매칭 실패 → pending에 그대로
  */
 
-import type { Contract } from '../types';
+import type { Contract, Vehicle } from '../types';
+import { match as intakeMatch } from '@/lib/intake/match';
 
 export type AutoMatchResult = {
   contractId: string;
@@ -25,14 +26,16 @@ export type AutoMatchResult = {
 };
 
 /** 전화번호 → 디지트만 (010-1234-5678 → 01012345678) */
-function normalizePhone(s?: string): string {
+export function normalizePhone(s?: string): string {
   return (s ?? '').replace(/\D/g, '');
 }
 
 /**
- * 자동 매칭 시도.
- *  · audio + 전화번호 추출 → 정확 일치하는 customer.phone1/phone2 찾음
- *  · 매칭되면 contractId 반환
+ * 자동 매칭 시도 — lib/intake/match 위임 (Phase 1).
+ *
+ * 외부 API 시그니처·기본 동작 보존:
+ *  · 'high' 일 때만 결과 반환 (medium/low 는 null — 기존 호출자가 pending 으로 보냄)
+ *  · contractId required
  */
 export function tryAutoMatch(opts: {
   kind: 'image' | 'audio' | 'document' | 'other';
@@ -42,53 +45,21 @@ export function tryAutoMatch(opts: {
   vehicles: Array<{ id: string; plate?: string; plateHistory?: string[] }>;
 }): AutoMatchResult | null {
   const { kind, detectedPhone, detectedPlate, contracts, vehicles } = opts;
+  void kind; // 향후 분류별 추가 단서용
 
-  // 1. 전화번호 매칭 (audio + 파일명에서 추출됨)
-  if (detectedPhone) {
-    const target = normalizePhone(detectedPhone);
-    if (target.length >= 7) {
-      // 완전 일치 (high confidence)
-      const exact = contracts.find((c) =>
-        normalizePhone(c.customerPhone1) === target
-        || normalizePhone(c.customerPhone2) === target,
-      );
-      if (exact) {
-        const v = vehicles.find((vh) =>
-          (vh.plate ?? '').trim() === (exact.vehiclePlate ?? '').trim()
-          || (vh.plateHistory ?? []).some((p) => (p ?? '').trim() === (exact.vehiclePlate ?? '').trim()),
-        );
-        return {
-          contractId: exact.id,
-          vehicleId: v?.id,
-          customerKey: (exact.customerIdentNo ?? '').replace(/\D/g, '') || undefined,
-          confidence: 'high',
-          reason: `전화번호 ${detectedPhone} 완전 일치`,
-        };
-      }
-    }
-  }
-
-  // 2. 차량번호 매칭 (image OCR로 추출 시 — Phase B-2)
-  if (detectedPlate) {
-    const target = detectedPlate.trim();
-    const matchedC = contracts.find((c) => (c.vehiclePlate ?? '').trim() === target);
-    if (matchedC) {
-      const v = vehicles.find((vh) =>
-        (vh.plate ?? '').trim() === target
-        || (vh.plateHistory ?? []).some((p) => (p ?? '').trim() === target),
-      );
-      return {
-        contractId: matchedC.id,
-        vehicleId: v?.id,
-        customerKey: (matchedC.customerIdentNo ?? '').replace(/\D/g, '') || undefined,
-        confidence: 'high',
-        reason: `차량번호 ${target} 일치`,
-      };
-    }
-  }
-
-  void kind; // 추후 image/document 분류별 추가 매칭 단서
-  return null;
+  const result = intakeMatch(
+    { phone: detectedPhone, plate: detectedPlate },
+    contracts,
+    vehicles as Vehicle[],
+  );
+  if (result.confidence !== 'high' || !result.contractId) return null;
+  return {
+    contractId: result.contractId,
+    vehicleId: result.vehicleId,
+    customerKey: result.customerKey,
+    confidence: 'high',
+    reason: result.reason,
+  };
 }
 
 /**

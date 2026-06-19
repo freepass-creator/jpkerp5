@@ -73,12 +73,48 @@ export const SUB_CATEGORIES_BY_KIND: Record<UploadKind, string[]> = {
   other:    ['general', 'other'],
 };
 
-/** 파일 MIME 타입에서 종류 자동 감지 */
+/**
+ * 파일 MIME 타입에서 종류 자동 감지.
+ *
+ * 내부적으로 lib/intake/classify 위임 — 분류 SSOT 단일화 (Phase 1).
+ * 외부 API 시그니처는 그대로 (UploadKind 반환). intake 의 더 상세한 IntakeKind
+ * 를 4가지 generic 카테고리로 매핑.
+ */
+import { classify as intakeClassify } from '@/lib/intake/classify';
+import type { IntakeKind } from '@/lib/intake/types';
+
+function intakeKindToUploadKind(k: IntakeKind): UploadKind {
+  // photo/penalty/vehicle/insurance/company/document-misc 등은 origin MIME 으로 카테고리 결정
+  switch (k) {
+    case 'photo':
+      return 'image';
+    case 'audio-call':
+      return 'audio';
+    case 'document-misc':
+    case 'penalty':       // 고지서는 보통 PDF
+    case 'insurance':     // 증권 PDF
+    case 'company':       // 사업자등록증 PDF
+      return 'document';
+    case 'vehicle':       // 등록증은 이미지가 더 흔함
+      return 'image';
+    default:
+      return 'other';
+  }
+}
+
 export function detectKind(mimeType: string): UploadKind {
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  if (mimeType === 'application/pdf' || mimeType.startsWith('text/')) return 'document';
-  return 'other';
+  const c = intakeClassify({
+    mode: 'file',
+    file: { name: '', type: mimeType, size: 0 },
+  });
+  // intake 가 'unknown' 반환 시 (드물게) 안전한 fallback
+  if (c.kind === 'unknown') {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType === 'application/pdf' || mimeType.startsWith('text/')) return 'document';
+    return 'other';
+  }
+  return intakeKindToUploadKind(c.kind);
 }
 
 /** 파일명에서 전화번호 추출 (통화녹음) */
