@@ -44,6 +44,10 @@ import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { upsertVehicleFromContract, normPlate } from '@/lib/entity-sync';
+import { useAuth } from '@/lib/use-auth';
+// Phase 2.2 — intake 평행 기록 (배치 단위)
+import { addIntakeItem, markIntakeCommitted, setIntakeMatch } from '@/lib/firebase/intake-store';
+import type { IntakeKind } from '@/lib/intake/types';
 
 type Mode = '현황' | '차량' | '계약' | '입출금' | '자동이체' | '카드매출' | '법인카드' | '이력';
 
@@ -101,6 +105,46 @@ export function CreateDialog({
   const { rows: existingBankTx, addMany: addBankTx, update: updateBankTx } = useBankTx();
   const { rows: existingCardTx, addMany: addCardTx, update: updateCardTx } = useCardTx();
   const { companies } = useCompanies();
+  const { user } = useAuth();
+
+  /**
+   * Phase 2.2 — 엑셀 배치 commit 을 intake 에 평행 기록.
+   *
+   * 행 단위가 아닌 BATCH 단위 1건만 기록 (write 폭증 방지).
+   * raw 는 manual payload 로 fileName / sheetName / rowCount / kind 보존.
+   * 한 commit 시작 시 intake item 1개 push → 끝나면 결과로 status 갱신.
+   */
+  async function intakeBatchStart(kind: IntakeKind, payload: Record<string, unknown>): Promise<string | null> {
+    try {
+      return await addIntakeItem({
+        source: 'desktop-excel',
+        raw: { mode: 'manual', kind, payload },
+        createdBy: user?.email ?? undefined,
+      });
+    } catch (e) {
+      console.warn('[intake] addIntakeItem 실패 (계속 진행)', e);
+      return null;
+    }
+  }
+  async function intakeBatchEnd(intakeId: string | null, ok: boolean, committedNodes: string[], reason?: string): Promise<void> {
+    if (!intakeId) return;
+    try {
+      if (ok && committedNodes.length > 0) {
+        await markIntakeCommitted(
+          intakeId,
+          committedNodes.map((n) => ({ node: n, id: '(batch)' })),
+          user?.email ?? undefined,
+        );
+      } else {
+        await setIntakeMatch(
+          intakeId,
+          { confidence: 'none', reason: reason ?? '배치 commit 결과 empty' },
+          'pending',
+          user?.email ?? undefined,
+        );
+      }
+    } catch (e) { console.warn('[intake] batch 결과 갱신 실패', e); }
+  }
 
   const reset = useCallback(() => {
     setParsed([]);
@@ -168,6 +212,11 @@ export function CreateDialog({
   // ─── 커밋 핸들러 ─── //
   async function commitContractFiles() {
     setBusy(true);
+    const intakeId = await intakeBatchStart('contract', {
+      fileNames: contractFiles.map((p) => p.fileName),
+      sheetNames: contractFiles.map((p) => p.sheetName),
+      rowCount: contractFiles.reduce((s, p) => s + p.rows.length, 0),
+    });
     try {
       const rows = contractFiles.flatMap((p) => p.rows);
       // 행별 진단 — 파싱 실패 시 어떤 행이 왜 빠졌는지 토스트로 알림
@@ -203,10 +252,12 @@ export function CreateDialog({
         toast.warning(`${invalid}행 미반영\n${sample}${more}`, 9000);
       }
       setParsed((all) => all.filter((p) => p.kind !== '계약'));
+      await intakeBatchEnd(intakeId, n > 0, n > 0 ? ['contracts'] : [], n === 0 ? '저장된 계약 0건' : undefined);
     } catch (e) {
       const msg = friendlyError(e);
       setResult(`오류 — ${msg}`);
       toast.error(msg);
+      await intakeBatchEnd(intakeId, false, [], msg);
     } finally {
       setBusy(false);
     }
@@ -214,6 +265,16 @@ export function CreateDialog({
 
   async function commitPaymentFiles() {
     setBusy(true);
+    const paymentKind: IntakeKind =
+      mode === '자동이체' ? 'auto-debit'
+      : mode === '카드매출' ? 'card-tx'
+      : mode === '법인카드' ? 'card-tx'
+      : 'bank-tx';
+    const intakeId = await intakeBatchStart(paymentKind, {
+      mode,
+      fileNames: paymentFiles.map((p) => p.fileName),
+      rowCount: paymentFiles.reduce((s, p) => s + p.rows.length, 0),
+    });
     try {
       // 모드별 채널 라우팅 — 4 variant 가 같은 commit 함수를 공유하므로 mode 로 분기.
       const isAutopay = mode === '자동이체';
@@ -367,10 +428,17 @@ export function CreateDialog({
         toast.warning(`잉여 ${leftoverCount}건 ${leftoverTotal.toLocaleString('ko-KR')}원 — /payments 매칭 dialog 에서 잔여분 계약 매칭 필요`);
       }
       setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '자동이체' && p.kind !== '카드'));
+      await intakeBatchEnd(
+        intakeId,
+        total > 0,
+        total > 0 ? (paymentKind === 'card-tx' ? ['cardTransactions'] : ['bankTransactions']) : [],
+        total === 0 ? '저장된 거래 0건' : undefined,
+      );
     } catch (e) {
       const msg = friendlyError(e);
       setResult(`오류 — ${msg}`);
       toast.error(msg);
+      await intakeBatchEnd(intakeId, false, [], msg);
     } finally {
       setBusy(false);
     }
@@ -513,6 +581,7 @@ export function CreateDialog({
 
   async function commitSnapshotRows(rows: Record<string, unknown>[]) {
     setBusy(true);
+    const intakeId = await intakeBatchStart('snapshot-mixed', { rowCount: rows.length });
     try {
       // 행별 분류 — contract / vehicle-only / invalid
       const validations = rows.map((r) => validateSnapshotRow(r, companies));
@@ -568,10 +637,18 @@ export function CreateDialog({
       );
       if (invalid > 0) toast.warning(`${invalid}행 미반영 — 필수 컬럼 (차량번호·계약자명·계약일) 누락 또는 형식 오류. 시트 헤더 확인 필요.`);
       else toast.success(`스냅샷 ${updates.length + created + vehiclesAdded}건 처리 완료`);
+      const totalSnapshotChanged = updates.length + created + vehiclesAdded;
+      await intakeBatchEnd(
+        intakeId,
+        totalSnapshotChanged > 0,
+        totalSnapshotChanged > 0 ? ['contracts', 'vehicles'] : [],
+        totalSnapshotChanged === 0 ? '변경된 항목 0건' : undefined,
+      );
     } catch (e) {
       const msg = friendlyError(e);
       setResult(`오류 — ${msg}`);
       toast.error(msg);
+      await intakeBatchEnd(intakeId, false, [], msg);
     } finally {
       setBusy(false);
     }
@@ -579,6 +656,7 @@ export function CreateDialog({
 
   async function commitVehicleRows(rows: Record<string, unknown>[]) {
     setBusy(true);
+    const intakeId = await intakeBatchStart('vehicle', { rowCount: rows.length });
     try {
       const valid = rows.map((r) => parseVehicleRow(r)).filter((x): x is NonNullable<typeof x> => !!x);
       // 차량번호 중복 검증 (계약 테이블의 차량번호도 포함)
@@ -604,10 +682,12 @@ export function CreateDialog({
       if (n > 0) toast.success(`차량 ${n}건 등록`);
       else if (skipped > 0) toast.warning(`전부 중복 — ${skipped}건 제외됨`);
       if (invalid > 0) toast.warning(`${invalid}행 미반영 — 차량번호·차종 모두 비어있음. 시트 헤더 확인 필요.`);
+      await intakeBatchEnd(intakeId, n > 0, n > 0 ? ['vehicles'] : [], n === 0 ? '저장된 차량 0건' : undefined);
     } catch (e) {
       const msg = friendlyError(e);
       setResult(`오류 — ${msg}`);
       toast.error(msg);
+      await intakeBatchEnd(intakeId, false, [], msg);
     } finally {
       setBusy(false);
     }

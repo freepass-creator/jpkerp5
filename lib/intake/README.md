@@ -62,7 +62,10 @@
 - [ ] 기존 입구 7곳이 모두 intake/ 로 우회 (Phase 2.1+)
   - [x] 2.1 `/m/upload` — 평행 기록 (기존 pending_uploads / vehicle_photos /
         field_logs 흐름 유지 + intake/ 에 audit 로그). 미매칭은 intake status='pending'.
-  - [ ] 2.2 CreateDialog (엑셀 import) — 행마다 intake 기록
+  - [x] 2.2 CreateDialog (엑셀 import) — 배치 단위 평행 기록 (write 폭증 방지).
+        commitContractFiles / commitPaymentFiles / commitSnapshotRows /
+        commitVehicleRows 모두 intakeBatchStart + intakeBatchEnd 추가.
+        (horizontal / receivables 는 less-common, 추후)
   - [ ] 2.3 OCR dialog 4종 — 평행 기록
   - [ ] 2.4 페이지 폼 입력 다이얼로그들
 
