@@ -203,6 +203,15 @@ export function InsuranceRegisterDialog({
       return;
     }
     setBusy(true);
+    // Phase 2.3 — intake 평행 기록
+    let intakeId: string | null = null;
+    try {
+      const { addIntakeItem } = await import('@/lib/firebase/intake-store');
+      intakeId = await addIntakeItem({
+        source: 'desktop-ocr-insurance',
+        raw: { mode: 'manual', kind: 'insurance', payload: { itemCount: registerableItems.length } },
+      });
+    } catch (e) { console.warn('[intake] insurance addIntakeItem 실패', e); }
     let success = 0, fail = 0, vehicleCreated = 0;
     for (const item of registerableItems) {
       try {
@@ -239,6 +248,17 @@ export function InsuranceRegisterDialog({
       toast.success(`보험증권 ${success}건 등록${veh}${fail > 0 ? ` (실패 ${fail}건)` : ''}`);
     }
     if (fail > 0 && success === 0) toast.error(`등록 모두 실패 (${fail}건)`);
+    // intake 결과 갱신
+    if (intakeId) {
+      try {
+        const { markIntakeCommitted, setIntakeMatch } = await import('@/lib/firebase/intake-store');
+        if (success > 0) {
+          await markIntakeCommitted(intakeId, [{ node: 'insurance', id: '(batch)' }]);
+        } else {
+          await setIntakeMatch(intakeId, { confidence: 'none', reason: `등록 실패 ${fail}건` }, 'pending');
+        }
+      } catch (e) { console.warn('[intake] insurance batch end 실패', e); }
+    }
     handleClose(false);
   }
 

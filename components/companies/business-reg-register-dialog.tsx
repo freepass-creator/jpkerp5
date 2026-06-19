@@ -188,6 +188,15 @@ export function BusinessRegRegisterDialog({
       return;
     }
     setBusy(true);
+    // Phase 2.3 — intake 평행 기록
+    let intakeId: string | null = null;
+    try {
+      const { addIntakeItem } = await import('@/lib/firebase/intake-store');
+      intakeId = await addIntakeItem({
+        source: 'desktop-ocr-business',
+        raw: { mode: 'manual', kind: 'company', payload: { itemCount: registerable.length } },
+      });
+    } catch (e) { console.warn('[intake] business-reg addIntakeItem 실패', e); }
     let updated = 0, added = 0, fail = 0;
     for (const item of registerable) {
       try {
@@ -249,6 +258,17 @@ export function BusinessRegRegisterDialog({
       .filter(Boolean).join(' · ');
     if (added + updated > 0) toast.success(`법인 ${msg}`);
     else if (fail > 0) toast.error(`등록 모두 실패 (${fail}건)`);
+    // intake 결과 갱신
+    if (intakeId) {
+      try {
+        const { markIntakeCommitted, setIntakeMatch } = await import('@/lib/firebase/intake-store');
+        if (added + updated > 0) {
+          await markIntakeCommitted(intakeId, [{ node: 'companies', id: '(batch)' }]);
+        } else {
+          await setIntakeMatch(intakeId, { confidence: 'none', reason: `등록 실패 ${fail}건` }, 'pending');
+        }
+      } catch (e) { console.warn('[intake] business-reg batch end 실패', e); }
+    }
     handleClose(false);
   }
 

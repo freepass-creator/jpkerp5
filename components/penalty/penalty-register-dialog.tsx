@@ -131,10 +131,35 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
   // 팩스 보내기 모달
   const [faxOpen, setFaxOpen] = useState(false);
 
-  function commitAll() {
+  async function commitAll() {
     const ok = ocr.items.filter((i) => i._status === 'done');
     if (ok.length === 0) return;
-    onCreate(ok.map(({ _status: _s, _error: _e, ...rest }) => rest as PenaltyWorkItem));
+    // Phase 2.3 — intake 평행 기록 (배치 단위)
+    let intakeId: string | null = null;
+    try {
+      const { addIntakeItem, markIntakeCommitted } = await import('@/lib/firebase/intake-store');
+      const fbAuth = getFirebaseAuth();
+      const by = fbAuth?.currentUser?.email ?? undefined;
+      intakeId = await addIntakeItem({
+        source: 'desktop-ocr-penalty',
+        raw: {
+          mode: 'manual',
+          kind: 'penalty',
+          payload: {
+            itemCount: ok.length,
+            withMatch: ok.filter((i) => i._contract?.contractor_name).length,
+          },
+        },
+        createdBy: by,
+      });
+      onCreate(ok.map(({ _status: _s, _error: _e, ...rest }) => rest as PenaltyWorkItem));
+      if (intakeId) {
+        await markIntakeCommitted(intakeId, [{ node: 'penalties', id: '(batch)' }], by);
+      }
+    } catch (e) {
+      console.warn('[intake] penalty commit 실패 (기존 흐름 유지)', e);
+      onCreate(ok.map(({ _status: _s, _error: _e, ...rest }) => rest as PenaltyWorkItem));
+    }
     setOpen(false);
     setTimeout(() => { ocr.reset(); setSelected(new Set()); }, 100);
   }

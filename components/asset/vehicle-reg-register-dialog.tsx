@@ -211,6 +211,18 @@ export function VehicleRegRegisterDialog({
       return;
     }
     setBusy(true);
+    // Phase 2.3 — intake 평행 기록 (배치)
+    let intakeId: string | null = null;
+    try {
+      const { addIntakeItem } = await import('@/lib/firebase/intake-store');
+      const fbAuth = getFirebaseAuth();
+      const by = fbAuth?.currentUser?.email ?? undefined;
+      intakeId = await addIntakeItem({
+        source: 'desktop-ocr-vehicle',
+        raw: { mode: 'manual', kind: 'vehicle', payload: { itemCount: registerableItems.length } },
+        createdBy: by,
+      });
+    } catch (e) { console.warn('[intake] vehicle-reg addIntakeItem 실패', e); }
     let updated = 0, added = 0, fail = 0;
     for (const item of registerableItems) {
       try {
@@ -255,6 +267,19 @@ export function VehicleRegRegisterDialog({
     ].filter(Boolean).join(' · ');
     if (added + updated > 0) toast.success(`자산 ${msg}`);
     else if (fail > 0) toast.error(`등록 모두 실패 (${fail}건)`);
+    // intake 결과 갱신
+    if (intakeId) {
+      try {
+        const { markIntakeCommitted, setIntakeMatch } = await import('@/lib/firebase/intake-store');
+        const fbAuth = getFirebaseAuth();
+        const by = fbAuth?.currentUser?.email ?? undefined;
+        if (added + updated > 0) {
+          await markIntakeCommitted(intakeId, [{ node: 'vehicles', id: '(batch)' }], by);
+        } else {
+          await setIntakeMatch(intakeId, { confidence: 'none', reason: '등록 0건' }, 'pending', by);
+        }
+      } catch (e) { console.warn('[intake] vehicle-reg batch end 실패', e); }
+    }
     handleClose(false);
   }
 

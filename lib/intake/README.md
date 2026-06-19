@@ -66,8 +66,12 @@
         commitContractFiles / commitPaymentFiles / commitSnapshotRows /
         commitVehicleRows 모두 intakeBatchStart + intakeBatchEnd 추가.
         (horizontal / receivables 는 less-common, 추후)
-  - [ ] 2.3 OCR dialog 4종 — 평행 기록
-  - [ ] 2.4 페이지 폼 입력 다이얼로그들
+  - [x] 2.3 OCR dialog 4종 — 평행 기록 (배치 단위)
+    - penalty-register-dialog.tsx commitAll → desktop-ocr-penalty
+    - vehicle-reg-register-dialog.tsx handleCommitAll → desktop-ocr-vehicle
+    - insurance-register-dialog.tsx handleCommitAll → desktop-ocr-insurance
+    - business-reg-register-dialog.tsx handleCommitAll → desktop-ocr-business
+  - [ ] 2.4 페이지 폼 입력 다이얼로그들 (contract-detail / vehicle-detail / 등 다수)
 
 ### Phase 3 — `/inbox` 단일 페이지
 - [ ] `app/inbox/page.tsx` — 단일 입력 + 분류 결과 + 미매칭 pending 보드.
