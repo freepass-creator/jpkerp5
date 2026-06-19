@@ -296,10 +296,6 @@ export default function CompaniesPage() {
           }
           right={
             <>
-              <span>법인 <strong>{sortedCompanies.length}</strong>곳</span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              <span>계약 <strong>{contracts.length}</strong>건</span>
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
               <button
                 className="btn"
                 type="button"

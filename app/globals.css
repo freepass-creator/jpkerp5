@@ -889,6 +889,17 @@ a { color: var(--text-link); text-decoration: none; }
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.topbar-version {
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-weak);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+}
 
 /* ────────────── Page body — 모든 페이지 공통 컨테이너 ────────────── */
 .page-body {

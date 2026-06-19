@@ -657,9 +657,6 @@ export default function Page() {
       }
       topbarRight={
         <>
-          <span style={{ fontSize: 11, color: 'var(--text-weak)' }} title={`자산 ${vehicles.length}대 / 계약 ${rawContracts.length}건 / 휴차 노출 ${contracts.filter((c) => c.id.startsWith('vehicle-orphan-')).length}대`}>
-            자산 <strong>{vehicles.length}</strong> · 계약 <strong>{rawContracts.length}</strong>
-          </span>
           <span className="topbar-sort" title={manualSort ? '컬럼 헤더 다시 클릭으로 변경/해제' : '필터별 자동 정렬'}>
             <span className="arrow">{manualSort?.dir === 'asc' ? '▲' : '▼'}</span>
             {manualSort
