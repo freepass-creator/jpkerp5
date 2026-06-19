@@ -21,6 +21,8 @@ import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-r
 import { ActivityView } from '@/components/activity/activity-view';
 import { DispatchView } from '@/components/dispatch/dispatch-view';
 import { AttendanceView } from '@/components/attendance/attendance-view';
+import { DocumentIssueButton } from '@/components/document-issue-dialog';
+import { useIssuedDocuments } from '@/lib/firebase/issued-docs-store';
 import { CompanyDetailDialog } from '@/components/companies/company-detail-dialog';
 import { audit } from '@/lib/firebase/audit-store';
 import { useStaffList } from '@/lib/use-staff-list';
@@ -121,7 +123,8 @@ export default function GeneralPage() {
             {view === 'activity' && <ActivityView />}
             {view === 'dispatch' && <DispatchView />}
             {view === 'attendance' && <AttendanceView />}
-            {view !== 'company' && view !== 'staff' && view !== 'fleet_apply' && view !== 'activity' && view !== 'dispatch' && view !== 'attendance' && <ViewPlaceholder view={view} />}
+            {view === 'docs' && <DocsIssuanceView />}
+            {view !== 'company' && view !== 'staff' && view !== 'fleet_apply' && view !== 'activity' && view !== 'dispatch' && view !== 'attendance' && view !== 'docs' && <ViewPlaceholder view={view} />}
           </main>
         </div>
 
@@ -351,6 +354,65 @@ function CompanyListView({
 
 
 /* ─────────────── 다른 view placeholder ─────────────── */
+
+/** /general '공문·인감' = 표준 문서 발급 화면 */
+function DocsIssuanceView() {
+  const { items, loading } = useIssuedDocuments({ limit: 100 });
+  return (
+    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, height: '100%' }}>
+      <header className="page-header" style={{ marginBottom: 0 }}>
+        <div className="page-header-title-group">
+          <h1 className="page-header-title">표준 문서 발급</h1>
+          <div className="page-header-title-sub">
+            재직증명서·거래사실확인서·입금확인서·위임장 등. 발급 시 자동 문서번호 부여 + 영구 로그.
+          </div>
+        </div>
+        <div className="page-header-actions">
+          <DocumentIssueButton label="+ 신규 발급" />
+        </div>
+      </header>
+
+      <div className="panel" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th style={{ width: 130 }}>문서번호</th>
+              <th style={{ width: 60 }}>분류</th>
+              <th>양식</th>
+              <th>대상</th>
+              <th>발급자(회사)</th>
+              <th style={{ width: 130 }}>발급일</th>
+              <th style={{ width: 110 }}>발급담당자</th>
+              <th style={{ width: 70 }}>Drive</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={8} className="center muted" style={{ padding: 24 }}>불러오는 중…</td></tr>
+            ) : items.length === 0 ? (
+              <tr><td colSpan={8} className="center muted" style={{ padding: 24 }}>아직 발급 이력 없음 — 우상단 [+ 신규 발급]</td></tr>
+            ) : items.map((d) => (
+              <tr key={d.id}>
+                <td className="mono">{d.docNo}</td>
+                <td><span className="chip" style={{ height: 16, fontSize: 10 }}>{d.category}</span></td>
+                <td>{d.templateTitle}</td>
+                <td>{d.targetName ?? <span className="dim">-</span>}</td>
+                <td className="dim">{d.issuerCompanyName}</td>
+                <td className="mono">{d.issuedAt.slice(0, 16).replace('T', ' ')}</td>
+                <td className="dim">{d.issuedBy}</td>
+                <td className="center">
+                  {d.driveWebViewLink ? (
+                    <a href={d.driveWebViewLink} target="_blank" rel="noopener noreferrer" className="dim" style={{ fontSize: 10 }}>↗ 열기</a>
+                  ) : <span className="dim">-</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function ViewPlaceholder({ view }: { view: GeneralView }) {
   const map: Record<GeneralView, { title: string; desc: string; sub: string; perCompany?: boolean }> = {

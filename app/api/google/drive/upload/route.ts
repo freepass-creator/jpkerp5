@@ -28,25 +28,32 @@ export const maxDuration = 60;
 
 const ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
 
+/**
+ * 공유 드라이브 (Shared Drive) 지원 — files.list / files.create 모두
+ * supportsAllDrives + includeItemsFromAllDrives 필요. 일반 My Drive 만 쓰면
+ * 이 플래그 없어도 되지만, JPK문서는 공유드라이브 안에 있으므로 필수.
+ */
+const SHARED_DRIVE_ID = process.env.GOOGLE_DRIVE_SHARED_DRIVE_ID ?? '0ALp5cUm1kqTvUk9PVA';
+
 /** path 의 각 segment 폴더를 Drive 에 생성/조회. 경로 마지막 folder ID 반환. */
 async function ensureFolderPath(drive: ReturnType<typeof getDriveClient>, segments: string[]): Promise<string> {
   if (!ROOT_FOLDER_ID) throw new Error('GOOGLE_DRIVE_ROOT_FOLDER_ID 미설정');
   let parentId = ROOT_FOLDER_ID;
   for (const name of segments) {
     if (!name.trim()) continue;
-    // 같은 parent 안에 같은 이름 폴더 존재?
     const escName = name.replace(/'/g, "\\'");
     const q = `name='${escName}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
-    const list = await drive.files.list({ q, fields: 'files(id,name)', pageSize: 1 });
+    const list = await drive.files.list({
+      q, fields: 'files(id,name)', pageSize: 1,
+      supportsAllDrives: true, includeItemsFromAllDrives: true,
+      corpora: 'drive', driveId: SHARED_DRIVE_ID,
+    });
     const existing = list.data.files?.[0];
-    if (existing?.id) {
-      parentId = existing.id;
-      continue;
-    }
-    // 신규 생성
+    if (existing?.id) { parentId = existing.id; continue; }
     const created = await drive.files.create({
       requestBody: { name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },
       fields: 'id',
+      supportsAllDrives: true,
     });
     if (!created.data.id) throw new Error(`폴더 생성 실패: ${name}`);
     parentId = created.data.id;
