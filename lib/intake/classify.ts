@@ -19,77 +19,85 @@ import type { ClassifyResult, IntakeKind, IntakeRaw } from './types';
 
 /* ────────────────────────── 헤더 휴리스틱 ────────────────────────── */
 
-type HeaderRule = {
-  kind: IntakeKind;
-  /** 필수 헤더 (모두 등장해야 매칭). normKey 적용 후 비교. */
-  must: string[];
-  /** 추가 가점 헤더 — 등장하면 confidence 상승 */
-  bonus?: string[];
-  baseConfidence: number;
+/**
+ * 도메인별 헤더 키워드 — production 검증된 lib/excel-detect.ts 의 KIND_KEYWORDS 와
+ * 동일. 둘 다 같은 SSOT 를 봐야 회귀 0.
+ *
+ * 점수 계산: 헤더 셀에 키워드가 substring match 된 갯수 / 4 = confidence (cap 1.0).
+ * 2 hit 이상이어야 후보로 인정.
+ */
+export const HEADER_KEYWORDS: Record<Exclude<IntakeKind, 'unknown' | 'photo' | 'audio-call' | 'document-misc'>, string[]> = {
+  contract: ['계약자명', '계약자', '계약일', '등록번호', '주민번호', '월대여료', '계약번호', '약정', '인도일', '반납예정'],
+  'bank-tx': [
+    '거래일', '거래일자', '거래일시', '거래시각', '입금일', '출금일',
+    '입금', '입금액', '받은금액', '출금', '출금액', '인출액', '지급액',
+    '적요', '메모', '내용', '거래내용', '거래메모', '용도',
+    '상대계좌', '상대', '예금주', '입금자', '입금자명', '송금인', '보낸이', '받는분', '수취인',
+    '계좌번호', '잔액', '이체',
+  ],
+  'card-tx': ['승인번호', '승인일', '카드번호', '카드', '매입금액', '카드사', '가맹점'],
+  // CMS 자동이체 명세 — 회원명+수납금액+청구완납일자/청구월 조합
+  'auto-debit': [
+    '회원명', '회원번호', '납부자', '납부자명', '납부자 휴대전화',
+    '수납금액', '청구금액', '청구월', '최초청구월', '청구완납일자', '결제일(납부기간)',
+    '결제수단', '결제방식', '결제상태', '수납상태', '미수처리상태',
+    'CMS', '자동이체', '이체출금', '집금',
+  ],
+  vehicle:  ['차량번호', '차대번호', 'VIN', '제조사', '연식', '매입가', '매입일'],
+  company:  ['상호', '대표자', '사업자등록번호', '법인등록번호', '소재지'],
+  penalty:  ['고지서번호', '위반일시', '단속일', '위반장소', '과태료'],
+  insurance: ['증권번호', '보험사', '보험기간', '담보종목', '피보험자'],
+  loan:     ['할부사', '잔여원금', '월납입', '대출잔액', '할부원리금'],
+  'snapshot-mixed': ['차량번호', '계약자', '월대여료', '현재미수'],
 };
 
-const HEADER_RULES: HeaderRule[] = [
-  {
-    kind: 'contract',
-    must: ['계약자', '계약일'],
-    bonus: ['월대여료', '월렌트료', '차량번호', '반납예정'],
-    baseConfidence: 0.85,
-  },
-  {
-    kind: 'bank-tx',
-    must: ['거래일'],
-    bonus: ['입금액', '출금액', '잔액', '거래내역', '적요'],
-    baseConfidence: 0.85,
-  },
-  {
-    kind: 'card-tx',
-    must: ['승인'],
-    bonus: ['가맹점', '카드번호', '승인번호', '매출금액', '카드사'],
-    baseConfidence: 0.80,
-  },
-  {
-    kind: 'auto-debit',
-    must: ['자동이체'],
-    bonus: ['고객명', '이체일', '금액'],
-    baseConfidence: 0.85,
-  },
-  {
-    kind: 'vehicle',
-    must: ['차량번호'],
-    bonus: ['차대번호', 'VIN', '제조사', '연식', '매입가', '매입일'],
-    baseConfidence: 0.65,
-  },
-  {
-    kind: 'snapshot-mixed',
-    must: ['차량번호', '계약자', '월대여료', '현재미수'],
-    bonus: ['반납예정', '결제일'],
-    baseConfidence: 0.90,
-  },
-];
+/**
+ * 헤더 배열 → ClassifyResult.
+ *
+ * - **CMS 강제 룰**: 회원명 + (수납금액|청구완납일자|청구월|청구금액) → auto-debit confidence 1.0
+ * - 그 외: KIND_KEYWORDS substring 매칭 갯수가 최고인 종류 선택.
+ *   2 hit 미만이면 unknown.
+ */
+export function classifyByHeaders(headers: string[]): ClassifyResult | null {
+  const cells = headers.map((h) => String(h ?? '').trim());
 
-function classifyByHeaders(headers: string[]): ClassifyResult | null {
-  const normSet = new Set(headers.map(normKey));
-  const scored: Array<ClassifyResult> = [];
-  for (const rule of HEADER_RULES) {
-    const allMust = rule.must.every((m) => Array.from(normSet).some((h) => h.includes(normKey(m))));
-    if (!allMust) continue;
-    const bonus = (rule.bonus ?? []).reduce(
-      (n, b) => n + (Array.from(normSet).some((h) => h.includes(normKey(b))) ? 1 : 0),
-      0,
-    );
-    const confidence = Math.min(0.99, rule.baseConfidence + bonus * 0.03);
-    scored.push({
-      kind: rule.kind,
-      confidence,
-      reason: `헤더 매칭: ${rule.must.join('+')}${bonus > 0 ? ` (+ 보조 ${bonus})` : ''}`,
-    });
+  // CMS 자동이체 강제 인식
+  const hasMember = cells.some((c) => c === '회원명');
+  const hasAutopaySignal = cells.some((c) =>
+    c === '수납금액' || c === '청구완납일자' || c === '청구월' || c === '청구금액',
+  );
+  if (hasMember && hasAutopaySignal) {
+    return { kind: 'auto-debit', confidence: 1.0, reason: 'CMS 강제 룰 (회원명 + 수납금액 등)' };
   }
-  if (scored.length === 0) return null;
-  scored.sort((a, b) => b.confidence - a.confidence);
-  const best = scored[0];
-  const alts = scored.slice(1).map((s) => ({ kind: s.kind, confidence: s.confidence }));
-  return { ...best, alternatives: alts.length > 0 ? alts : undefined };
+
+  let bestKind: IntakeKind = 'unknown';
+  let bestScore = 0;
+  const scoredAll: Array<{ kind: IntakeKind; score: number }> = [];
+
+  for (const [kindRaw, kws] of Object.entries(HEADER_KEYWORDS)) {
+    const kind = kindRaw as IntakeKind;
+    const hit = kws.filter((kw) => cells.some((c) => c.includes(kw))).length;
+    if (hit > 0) scoredAll.push({ kind, score: hit });
+    if (hit > bestScore) {
+      bestScore = hit;
+      bestKind = kind;
+    }
+  }
+  if (bestScore < 2) return null;
+
+  const confidence = Math.min(bestScore / 4, 1);
+  // 차순위 후보
+  scoredAll.sort((a, b) => b.score - a.score);
+  const alts = scoredAll.slice(1, 4).map((s) => ({ kind: s.kind, confidence: Math.min(s.score / 4, 1) }));
+  return {
+    kind: bestKind,
+    confidence,
+    reason: `헤더 키워드 hit=${bestScore} / 4`,
+    alternatives: alts.length > 0 ? alts : undefined,
+  };
 }
+
+void normKey; // 향후 normalized 비교용 (현재는 raw substring)
 
 /* ────────────────────────── MIME / 파일명 휴리스틱 ────────────────────────── */
 

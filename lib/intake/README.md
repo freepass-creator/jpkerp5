@@ -26,22 +26,26 @@
 - [x] types / classify / match 스켈레톤 (기존 로직 wrap).
 - [x] typecheck 통과.
 
-### Phase 1 — 호출자 리팩터 (UI 영향 0)
-기존 산발 분류·매칭을 이 모듈로 위임. 한 번에 하나씩.
+### Phase 1 — 호출자 리팩터 (UI 영향 0) ★ 완료
 
-- [x] `lib/firebase/pending-uploads-store.ts` `detectKind(mime)` → `classify({mode:'file'})` 위임 ★
-- [x] `lib/firebase/upload-auto-match.ts` `tryAutoMatch` → `match()` thin wrapper ★
-- [ ] `components/create-dialog.tsx` `parseAndDetectKind` → `classify({ mode: 'row', row, headerHint })`
-      → 3994줄 파일. 헤더 휴리스틱 통합 필요.
-- [ ] `lib/receipt-match.ts` `autoMatchAll` → `match(...)` 기반으로 재구현
-      → 468줄. plate-suffix·dueDate proximity 통합 필요.
-- [ ] `components/penalty/penalty-register-dialog.tsx` matching →
-      `lib/use-contract-store.ts` 의 adapted Contract shape 이라 `match()` 직접 호출 불가.
-      Phase 2 에서 adapter 정리 시 함께.
+기존 산발 분류·매칭을 이 모듈로 위임.
+
+- [x] `lib/firebase/pending-uploads-store.ts` `detectKind(mime)` → `classify({mode:'file'})` 위임
+- [x] `lib/firebase/upload-auto-match.ts` `tryAutoMatch` → `match()` thin wrapper
+- [x] `lib/excel-detect.ts` `detectHeaderRow` → `classifyByHeaders` 위임 + production keywords SSOT
+      → create-dialog 의 엑셀 import (`parseExcelFile` 호출) 도 자동으로 SSOT 사용
+
+#### Phase 1 에 안 들어가는 항목 (다른 abstraction)
+
+- `lib/receipt-match.ts` `autoMatchAll` — schedule-level 매칭 (`contract.schedule[seq]`
+  단위). intake/match 는 contract-level 만. dueDate proximity / FIFO / 동명이인
+  격하 등 특화 로직 다수. Phase 2 에서 schedule matcher 를 별도 모듈로 분리 검토.
+
+- `components/penalty/penalty-register-dialog.tsx` `findContractByPlate` —
+  `lib/use-contract-store.ts` 의 adapted Contract shape (plate/startDate/endDate)
+  이라 intake/match 직접 호출 불가. Phase 2 adapter 정리 시 동반.
 
 각 단계마다 기존 동작 동일 유지 (regression 0). 단지 구현 위치만 이동.
-
-★ = 완료 (regression 0, typecheck 통과).
 
 ### Phase 2 — `intake/` RTDB 노드 신설
 모든 입력을 일단 intake 에 저장 → classify → match → status 갱신.

@@ -1,6 +1,11 @@
 // 엑셀 파일 1개 → 자동 분류 + 미리보기 (한국 은행 export 호환)
+//
+// 분류 SSOT: lib/intake/classify.ts. 여기는 행 스캔 + 헤더 추출 + 은행명만 담당.
+// kind 판정은 intake 의 classifyByHeaders() 위임 (Phase 1.3).
 
 import * as XLSX from 'xlsx';
+import { classifyByHeaders } from '@/lib/intake/classify';
+import type { IntakeKind } from '@/lib/intake/types';
 
 export type UploadKind = '계약' | '계좌' | '카드' | '자동이체' | '미분류';
 
@@ -17,25 +22,16 @@ export type ParsedSheet = {
   bankHint?: string;
 };
 
-/** 키워드 사전 — 헤더에 포함되면 해당 종류로 판정 */
-const KIND_KEYWORDS: Record<Exclude<UploadKind, '미분류'>, string[]> = {
-  계약: ['계약자명', '계약자', '계약일', '등록번호', '주민번호', '월대여료', '계약번호', '약정', '인도일', '반납예정'],
-  계좌: [
-    '거래일', '거래일자', '거래일시', '거래시각', '입금일', '출금일',
-    '입금', '입금액', '받은금액', '출금', '출금액', '인출액', '지급액',
-    '적요', '메모', '내용', '거래내용', '거래메모', '용도',
-    '상대계좌', '상대', '예금주', '입금자', '입금자명', '송금인', '보낸이', '받는분', '수취인',
-    '계좌번호', '잔액', '이체'
-  ],
-  카드: ['승인번호', '승인일', '카드번호', '카드', '매입금액', '카드사', '가맹점'],
-  // CMS 자동이체 명세 — 회원명+수납금액+청구완납일자/청구월 조합
-  자동이체: [
-    '회원명', '회원번호', '납부자', '납부자명', '납부자 휴대전화',
-    '수납금액', '청구금액', '청구월', '최초청구월', '청구완납일자', '결제일(납부기간)',
-    '결제수단', '결제방식', '결제상태', '수납상태', '미수처리상태',
-    'CMS', '자동이체', '이체출금', '집금',
-  ],
-};
+/** intake IntakeKind → 이 파일의 UploadKind 매핑 (호출자 API 보존) */
+function intakeToUploadKind(k: IntakeKind): UploadKind {
+  switch (k) {
+    case 'contract': return '계약';
+    case 'bank-tx': return '계좌';
+    case 'card-tx': return '카드';
+    case 'auto-debit': return '자동이체';
+    default: return '미분류';   // vehicle/company/penalty 등은 excel 입구에서 '미분류' 로 노출
+  }
+}
 
 /** 체크박스 / 일련번호 / 빈 UI 컬럼 — 헤더에서 제거 (신한 인터넷뱅킹 등) */
 const CHECKBOX_HEADER_RE = /^(전체\s*선택|선택|체크|✓|☑|순번|no\.?|번호)$/i;
@@ -78,10 +74,10 @@ function detectBankFromFileName(fileName: string): string | undefined {
 const HEADER_MIN_NON_EMPTY = 3;  // 4 → 3 (간단 신한 export 대응)
 const LOOK_ROWS_MAX = 30;        // 12 → 30 (안내문 다수 은행 대응)
 
-/** 헤더 행 자동 탐지 — 빈 셀이 적고 키워드 매치 많은 행 (상위 30행 스캔)
+/**
+ * 헤더 행 자동 탐지 — 빈 셀이 적은 행 (상위 30행 스캔).
  *
- *  CMS 자동이체 명세는 '계약번호' 컬럼이 있어서 '계약' 으로 잘못 분류될 수 있음.
- *  → '회원명' + '수납금액' (또는 '청구완납일자') 둘 다 있으면 무조건 '자동이체' 우선.
+ * kind 판정은 intake classify SSOT 위임. 여기는 row 좌표만 결정.
  */
 function detectHeaderRow(aoa: unknown[][]): { headerRow: number; kind: UploadKind; confidence: number } {
   let best = { headerRow: 0, kind: '미분류' as UploadKind, confidence: 0 };
@@ -92,25 +88,20 @@ function detectHeaderRow(aoa: unknown[][]): { headerRow: number; kind: UploadKin
     const nonEmpty = cells.filter((c) => c.length > 0).length;
     if (nonEmpty < HEADER_MIN_NON_EMPTY) continue;
 
-    // CMS 자동이체 강제 인식 — 회원명 + (수납금액 OR 청구완납일자 OR 청구월)
-    const hasMember = cells.some((c) => c === '회원명');
-    const hasAutopaySignal = cells.some((c) => c === '수납금액' || c === '청구완납일자' || c === '청구월' || c === '청구금액');
-    if (hasMember && hasAutopaySignal) {
+    const result = classifyByHeaders(cells);
+    if (!result) continue;
+
+    // CMS 강제 룰은 즉시 반환 (intake classify 가 confidence 1.0 으로 표시)
+    if (result.confidence >= 1.0 && result.kind === 'auto-debit') {
       return { headerRow: r, kind: '자동이체' as UploadKind, confidence: 1 };
     }
 
-    let bestKind: UploadKind = '미분류';
-    let bestScore = 0;
-    for (const [kind, kws] of Object.entries(KIND_KEYWORDS) as [Exclude<UploadKind, '미분류'>, string[]][]) {
-      const hit = kws.filter((kw) => cells.some((c) => c.includes(kw))).length;
-      if (hit > bestScore) {
-        bestScore = hit;
-        bestKind = kind;
-      }
-    }
-    const confidence = bestScore / 4;
-    if (bestScore >= 2 && confidence > best.confidence) {
-      best = { headerRow: r, kind: bestKind, confidence: Math.min(confidence, 1) };
+    if (result.confidence > best.confidence) {
+      best = {
+        headerRow: r,
+        kind: intakeToUploadKind(result.kind),
+        confidence: result.confidence,
+      };
     }
   }
   return best;
