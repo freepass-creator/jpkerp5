@@ -1,20 +1,26 @@
 'use client';
 
 /**
- * /inbox — intake 단일 inbox 페이지 (Phase 3).
+ * /inbox — intake 단일 inbox 페이지 (Phase 3 + 3.1).
  *
  * 모든 데이터 입력 (모바일 업로드 · 엑셀 import · OCR dialog) 의 audit 로그.
  * 단계 표시: classifying → matching → matched/pending → committed/rejected.
  *
- * 현재는 **READ-ONLY 가시화**. 클릭 시 raw + classify + match 상세 패널.
- * 사용자 수동 수정·재처리는 Phase 3.1+ 에서 추가.
+ * 우측 디테일 패널에서:
+ *  · kind 수동 변경 (overrideKind)
+ *  · 거부 (status='rejected' + reason)
+ *  · 삭제 (intake/ 노드에서 제거 — 도메인 노드 영향 X)
  */
 
 import { useMemo, useState } from 'react';
-import { Tray, ArrowsClockwise } from '@phosphor-icons/react';
+import { Tray, ArrowsClockwise, X, PencilSimple } from '@phosphor-icons/react';
 import { PageShell } from '@/components/ui/page-shell';
 import { FilterSelect } from '@/components/ui/filter-select';
-import { useIntakeItems, removeIntakeItem } from '@/lib/firebase/intake-store';
+import {
+  useIntakeItems, removeIntakeItem,
+  setIntakeOverrideKind, markIntakeRejected,
+} from '@/lib/firebase/intake-store';
+import { useAuth } from '@/lib/use-auth';
 import { toast } from '@/lib/toast';
 import type { IntakeItem, IntakeStatus, IntakeSource, IntakeKind } from '@/lib/intake/types';
 
@@ -88,6 +94,7 @@ export default function InboxPage() {
   const [sourceFilter, setSourceFilter] = useState<'all' | IntakeSource>('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { user } = useAuth();
 
   // 'all' → 모든 status (loadAll), 'active' → 처리 진행중 (default)
   const { items, loading } = useIntakeItems({
@@ -117,6 +124,26 @@ export default function InboxPage() {
       if (selectedId === id) setSelectedId(null);
     } catch (e) {
       toast.error(`삭제 실패: ${(e as Error).message}`);
+    }
+  }
+
+  async function handleOverrideKind(id: string, newKind: IntakeKind) {
+    try {
+      await setIntakeOverrideKind(id, newKind, user?.email ?? undefined);
+      toast.success(`종류를 ${KIND_LABEL[newKind]} 로 보정`);
+    } catch (e) {
+      toast.error(`보정 실패: ${(e as Error).message}`);
+    }
+  }
+
+  async function handleReject(id: string) {
+    const reason = prompt('거부 사유를 입력하세요 (audit log 에 영구 보존):');
+    if (!reason) return;
+    try {
+      await markIntakeRejected(id, reason, user?.email ?? undefined);
+      toast.success('거부 처리');
+    } catch (e) {
+      toast.error(`거부 실패: ${(e as Error).message}`);
     }
   }
 
@@ -288,6 +315,42 @@ export default function InboxPage() {
             {selected.rejectReason && (
               <DetailRow label="거부사유">{selected.rejectReason}</DetailRow>
             )}
+
+            {/* Phase 3.1 — 수동 보정 액션 (active 항목만) */}
+            {selected.status !== 'committed' && selected.status !== 'rejected' && (
+              <div style={{
+                marginTop: 4, padding: 8,
+                background: 'var(--bg-sunken)',
+                borderRadius: 'var(--radius-sm)',
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                <div style={{ fontSize: 10, color: 'var(--text-weak)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <PencilSimple size={10} weight="bold" /> 수동 보정
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                  <span style={{ width: 56, color: 'var(--text-sub)' }}>종류</span>
+                  <select
+                    className="input-compact"
+                    style={{ flex: 1, fontSize: 11 }}
+                    value={effectiveKind(selected)}
+                    onChange={(e) => void handleOverrideKind(selected.id, e.target.value as IntakeKind)}
+                  >
+                    {(Object.keys(KIND_LABEL) as IntakeKind[]).map((k) => (
+                      <option key={k} value={k}>{KIND_LABEL[k]}</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ color: 'var(--red-text)', justifyContent: 'flex-start' }}
+                  onClick={() => void handleReject(selected.id)}
+                >
+                  <X size={10} weight="bold" /> 이 입력 거부
+                </button>
+              </div>
+            )}
+
             <div style={{ marginTop: 8 }}>
               <div className="dim" style={{ fontSize: 10, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <ArrowsClockwise size={10} weight="bold" /> raw payload

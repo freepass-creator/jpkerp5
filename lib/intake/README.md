@@ -76,8 +76,15 @@
 ### Phase 3 — `/inbox` 단일 페이지
 - [x] `app/inbox/page.tsx` — intake/ 라이브 구독, 행 클릭 → raw + classify + match 상세 패널.
       필터: status (active/all/각 단계), source (mobile/excel/OCR 4종/manual), 검색.
-      현재 **READ-ONLY 가시화**. 수동 보정·재처리는 추후.
 - [x] Sidebar 메뉴 `inbox` 추가 (master 한정, /inbox).
+
+### Phase 3.1 — /inbox 수동 보정 액션
+- [x] kind 수동 override (overrideKind) — 드롭다운 선택 즉시 setIntakeOverrideKind
+- [x] 거부 처리 (markIntakeRejected + 사용자 입력 reason)
+- [x] 삭제 (이미 있음 — intake/ 노드에서 제거, 도메인 노드 영향 X)
+- [ ] 계약 매칭 수동 변경 (overrideMatch) — 계약 검색 다이얼로그 필요. 추후.
+- [ ] 재처리 (status reset + classify/match 재실행) — Phase 3.2.
+
 - [ ] 기존 7개 다이얼로그·`/m/upload` 와 양립 (점진 폐기) — Phase 4 이후.
 
 ### Phase 4 — 각 페이지 read-only 화
