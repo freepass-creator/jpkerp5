@@ -74,8 +74,11 @@
   - [ ] 2.4 페이지 폼 입력 다이얼로그들 (contract-detail / vehicle-detail / 등 다수)
 
 ### Phase 3 — `/inbox` 단일 페이지
-- [ ] `app/inbox/page.tsx` — 단일 입력 + 분류 결과 + 미매칭 pending 보드.
-- [ ] 기존 7개 다이얼로그·`/m/upload` 와 양립 (점진 폐기).
+- [x] `app/inbox/page.tsx` — intake/ 라이브 구독, 행 클릭 → raw + classify + match 상세 패널.
+      필터: status (active/all/각 단계), source (mobile/excel/OCR 4종/manual), 검색.
+      현재 **READ-ONLY 가시화**. 수동 보정·재처리는 추후.
+- [x] Sidebar 메뉴 `inbox` 추가 (master 한정, /inbox).
+- [ ] 기존 7개 다이얼로그·`/m/upload` 와 양립 (점진 폐기) — Phase 4 이후.
 
 ### Phase 4 — 각 페이지 read-only 화
 - [ ] 페이지에서 CRUD 다이얼로그 떼고 "편집" 버튼 → /inbox 모달 호출.

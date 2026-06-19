@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Megaphone,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Megaphone, Tray,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -19,7 +19,7 @@ export type MenuKey =
   | 'dashboard' | 'receivables'
   | 'asset' | 'contract' | 'finance'
   | 'penalty' | 'general'
-  | 'notice'
+  | 'notice' | 'inbox'
   | 'devtools';
 
 export const MENU_LABELS: Record<MenuKey, string> = {
@@ -31,6 +31,7 @@ export const MENU_LABELS: Record<MenuKey, string> = {
   penalty: '과태료 업무',
   general: '일반 관리',
   notice: '공지사항',
+  inbox: '입력함 (intake)',
   devtools: '개발도구',
 };
 
@@ -45,6 +46,7 @@ export const DEFAULT_VISIBILITY: Record<MenuKey, boolean> = {
   penalty: true,
   general: true,
   notice: true,
+  inbox: true,
   devtools: true,
 };
 
@@ -194,6 +196,12 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
 
       {/* 관리 영역 — 도구·설정 (과태료 업무는 위 디테일 묶음으로 이동) */}
       <div className="sb-foot">
+        {master && show('inbox') && (
+          <Link href="/inbox" className={`sb-item ${isActive('/inbox') ? 'active' : ''}`} title="입력함 — 모든 데이터 입력 audit (intake)">
+            <Tray size={14} weight={isActive('/inbox') ? 'fill' : 'regular'} />
+            <span>입력함</span>
+          </Link>
+        )}
         {master && show('devtools') && (
           <Link href="/admin/dev-tools" className={`sb-item ${isActive('/admin/dev-tools') ? 'active' : ''}`} title="개발도구 — 마스터 전용">
             <Wrench size={14} weight={isActive('/admin/dev-tools') ? 'fill' : 'regular'} />
