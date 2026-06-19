@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { Car, MagnifyingGlass } from '@phosphor-icons/react';
 import { displayCompanyName } from '@/lib/company-display';
 import type { Company } from '@/lib/types';
+import { FilterSelect } from '@/components/ui/filter-select';
 
 export type AssetTopbarPage = 'status' | 'registered' | 'insurance' | 'loan' | 'repair' | 'gps' | 'disposal' | 'ledger';
 
@@ -70,17 +71,16 @@ export function AssetTopbar({
 
       {onCompanyFilterChange && (
         <div className="filter-bar">
-          <select
-            className="input-compact" data-w="md"
-            value={companyFilter}
-            onChange={(e) => onCompanyFilterChange(e.target.value)}
+          <FilterSelect
+            value={companyFilter ?? 'all'}
+            onChange={onCompanyFilterChange}
+            dataW="md"
             title="회사별 필터"
-          >
-            <option value="all">회사: 전체</option>
-            {companyOptions.map((co) => (
-              <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
-            ))}
-          </select>
+            options={[
+              { value: 'all', label: '회사: 전체' },
+              ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) })),
+            ]}
+          />
         </div>
       )}
 

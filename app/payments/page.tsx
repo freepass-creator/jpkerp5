@@ -24,6 +24,7 @@ import { todayKr } from '@/lib/mock-data';
 import { toast } from '@/lib/toast';
 import type { BankTransaction, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { FilterSelect } from '@/components/ui/filter-select';
 import { usePersistentState } from '@/lib/use-persistent-state';
 
 type Tab = 'all' | 'autodebit' | 'summary' | 'card' | 'corpcard';
@@ -435,18 +436,16 @@ export default function PaymentsPage() {
           <div className="filter-bar">
             {/* 회사 — 검색창 우측 맨 앞 */}
             {companyOptions.length > 0 && (
-              <select
-                className="input-compact"
-                data-w="md"
+              <FilterSelect
                 value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
+                onChange={setCompanyFilter}
+                dataW="md"
                 title="회사별 필터"
-              >
-                <option value="all">회사: 전체</option>
-                {companyOptions.map((co) => (
-                  <option key={co} value={co}>{displayCompanyName(co, companyMaster)}</option>
-                ))}
-              </select>
+                options={[
+                  { value: 'all', label: '회사: 전체' },
+                  ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) })),
+                ]}
+              />
             )}
             <span className="filter-divider" />
             {/* 뷰 — chip 명은 신규등록 dialog tab 과 동일하게 통일 */}
@@ -476,44 +475,42 @@ export default function PaymentsPage() {
               <>
                 <span className="filter-divider" />
                 {/* 입출금 방향 dropdown */}
-                <select
-                  className="input-compact"
-                  data-w="md"
+                <FilterSelect
                   value={direction}
-                  onChange={(e) => setDirection(e.target.value as 'all' | 'deposit' | 'withdraw')}
+                  onChange={(v) => setDirection(v as 'all' | 'deposit' | 'withdraw')}
+                  dataW="md"
                   title="입출금 방향"
-                >
-                  <option value="all">입출금 전체</option>
-                  <option value="deposit">입금만</option>
-                  <option value="withdraw">출금만</option>
-                </select>
+                  options={[
+                    { value: 'all', label: '입출금 전체' },
+                    { value: 'deposit', label: '입금만' },
+                    { value: 'withdraw', label: '출금만' },
+                  ]}
+                />
                 {/* 분개 상태 dropdown */}
-                <select
-                  className="input-compact"
-                  data-w="md"
+                <FilterSelect
                   value={filter}
-                  onChange={(e) => setFilter(e.target.value as 'all' | 'unposted' | 'posted' | 'closed')}
+                  onChange={(v) => setFilter(v as 'all' | 'unposted' | 'posted' | 'closed')}
+                  dataW="md"
                   title="분개 상태"
-                >
-                  <option value="all">상태: 전체</option>
-                  <option value="unposted">미분개{counts.unposted > 0 ? ` (${counts.unposted})` : ''}</option>
-                  <option value="posted">분개{counts.posted > 0 ? ` (${counts.posted})` : ''}</option>
-                  <option value="closed">마감{counts.closed > 0 ? ` (${counts.closed})` : ''}</option>
-                </select>
+                  options={[
+                    { value: 'all', label: '상태: 전체' },
+                    { value: 'unposted', label: '미분개', hint: counts.unposted > 0 ? `(${counts.unposted})` : undefined },
+                    { value: 'posted', label: '분개', hint: counts.posted > 0 ? `(${counts.posted})` : undefined },
+                    { value: 'closed', label: '마감', hint: counts.closed > 0 ? `(${counts.closed})` : undefined },
+                  ]}
+                />
                 {/* 계정과목 dropdown */}
                 {subjectOptions.length > 0 && (
-                  <select
-                    className="input-compact"
-                    data-w="md"
+                  <FilterSelect
                     value={subjectFilter}
-                    onChange={(e) => setSubjectFilter(e.target.value)}
+                    onChange={setSubjectFilter}
+                    dataW="md"
                     title="계정과목별 필터"
-                  >
-                    <option value="all">계정: 전체</option>
-                    {subjectOptions.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: 'all', label: '계정: 전체' },
+                      ...subjectOptions.map((s) => ({ value: s, label: s })),
+                    ]}
+                  />
                 )}
               </>
             )}

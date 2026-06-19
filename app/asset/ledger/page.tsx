@@ -23,6 +23,7 @@ import { matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers'
 import { computeAssetLedgerEntry, summarizeLedger } from '@/lib/asset-ledger';
 import { formatCurrency } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { FilterSelect } from '@/components/ui/filter-select';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import type { VehicleStatus } from '@/lib/types';
@@ -93,17 +94,16 @@ export default function AssetLedgerPage() {
             />
           </div>
           <div className="filter-bar">
-            <select
-              className="input-compact" data-w="md"
+            <FilterSelect
               value={companyFilter}
-              onChange={(e) => setCompanyFilter(e.target.value)}
+              onChange={setCompanyFilter}
+              dataW="md"
               title="회사별 필터"
-            >
-              <option value="all">회사: 전체</option>
-              {companyOptions.map((co) => (
-                <option key={co} value={co}>{co}</option>
-              ))}
-            </select>
+              options={[
+                { value: 'all', label: '회사: 전체' },
+                ...companyOptions.map((co) => ({ value: co, label: co })),
+              ]}
+            />
             <span className="filter-divider" />
             <button type="button" className={`chip ${scope === 'active' ? 'active' : ''}`} onClick={() => setScope('active')}>운영자산</button>
             <button type="button" className={`chip ${scope === 'disposed' ? 'active' : ''}`} onClick={() => setScope('disposed')}>처분자산</button>

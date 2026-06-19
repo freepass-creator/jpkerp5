@@ -23,6 +23,7 @@ import type { TableSelection } from '@/lib/use-table-selection';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { PageShell } from '@/components/ui/page-shell';
+import { FilterSelect } from '@/components/ui/filter-select';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
@@ -634,23 +635,17 @@ export default function Page() {
           {companies.length > 1 && (
             <>
               <span className="filter-divider" />
-              <select
-                className="input-compact"
-                data-w="md"
+              <FilterSelect
                 value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
+                onChange={setCompanyFilter}
+                dataW="md"
                 title="회사별 필터"
-              >
-                {companies.map((co) => {
+                options={companies.map((co) => {
                   const cnt = companyCounts[co] ?? 0;
                   const label = co === '전체' ? '회사: 전체' : displayCompanyName(co, companyMaster) || co;
-                  return (
-                    <option key={co} value={co}>
-                      {label}{cnt > 0 ? ` (${cnt})` : ''}
-                    </option>
-                  );
+                  return { value: co, label, hint: cnt > 0 ? `(${cnt})` : undefined };
                 })}
-              </select>
+              />
             </>
           )}
         </>

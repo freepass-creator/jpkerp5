@@ -6,6 +6,7 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { Sidebar } from '@/components/layout/sidebar';
 import { AppTopbar } from '@/components/layout/app-topbar';
+import { FilterSelect } from '@/components/ui/filter-select';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { SmsDialog } from '@/components/sms-dialog';
@@ -299,18 +300,16 @@ export default function ReceivablesPage() {
           search={{ placeholder: '고객 / 차량 / 차종 / 담당', value: search, onChange: setSearch }}
           filter={
             <>
-              <select
-                className="input-compact"
-                data-w="md"
+              <FilterSelect
                 value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
+                onChange={setCompanyFilter}
+                dataW="md"
                 title="회사별 필터"
-              >
-                <option value="all">회사: 전체</option>
-                {companyOptions.map((co) => (
-                  <option key={co} value={co}>{co}</option>
-                ))}
-              </select>
+                options={[
+                  { value: 'all', label: '회사: 전체' },
+                  ...companyOptions.map((co) => ({ value: co, label: co })),
+                ]}
+              />
               <span className="filter-divider" />
               {QUICK_FILTERS.map((f) => {
                 if (f !== '전체' && (counts[f] ?? 0) === 0) return null;
@@ -325,25 +324,23 @@ export default function ReceivablesPage() {
                   </button>
                 );
               })}
-              <select
-                className="input-compact"
-                data-w="md"
+              <FilterSelect
                 value={MORE_FILTERS.includes(filter) ? filter : ''}
-                onChange={(e) => { if (e.target.value) setFilter(e.target.value as Filter); }}
+                onChange={(v) => { if (v) setFilter(v as Filter); }}
+                dataW="md"
                 title="기타 상태"
-              >
-                <option value="">기타 상태…</option>
-                <optgroup label="진행중">
-                  {MORE_ACTIVE.map((f) => (
-                    <option key={f} value={f}>{f}{counts[f] > 0 ? ` (${counts[f]})` : ''}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="종결">
-                  {CLOSED_FILTERS.map((f) => (
-                    <option key={f} value={f}>{f}{counts[f] > 0 ? ` (${counts[f]})` : ''}</option>
-                  ))}
-                </optgroup>
-              </select>
+                emptyLabel="기타 상태…"
+                options={[
+                  ...MORE_ACTIVE.map((f) => ({
+                    value: f, label: f, group: '진행중',
+                    hint: counts[f] > 0 ? `(${counts[f]})` : undefined,
+                  })),
+                  ...CLOSED_FILTERS.map((f) => ({
+                    value: f, label: f, group: '종결',
+                    hint: counts[f] > 0 ? `(${counts[f]})` : undefined,
+                  })),
+                ]}
+              />
             </>
           }
           right={<span className="topbar-date">{today}</span>}

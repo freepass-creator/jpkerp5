@@ -12,6 +12,7 @@
 
 import type { Company } from '@/lib/types';
 import { displayCompanyName } from '@/lib/company-display';
+import { FilterSelect } from './filter-select';
 
 /** 회사 dropdown — 'all' + option list */
 export function CompanyFilter({
@@ -24,17 +25,16 @@ export function CompanyFilter({
   label?: string;
 }) {
   return (
-    <select
-      className="input-compact" data-w="md"
+    <FilterSelect
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={onChange}
+      dataW="md"
       title={`${label} 필터`}
-    >
-      <option value="all">{label}: 전체</option>
-      {options.map((co) => (
-        <option key={co} value={co}>{displayCompanyName(co, master)}</option>
-      ))}
-    </select>
+      options={[
+        { value: 'all', label: `${label}: 전체` },
+        ...options.map((co) => ({ value: co, label: displayCompanyName(co, master) })),
+      ]}
+    />
   );
 }
 

@@ -28,6 +28,7 @@ import { downloadTaxInvoiceExcel } from '@/lib/tax-invoice-export';
 import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
 import { PageShell } from '@/components/ui/page-shell';
 import { CompanyFilter } from '@/components/ui/filter-bar';
+import { FilterSelect } from '@/components/ui/filter-select';
 import { usePersistentState } from '@/lib/use-persistent-state';
 
 const fmtNum = (v: number) => v ? v.toLocaleString('ko-KR') : '';
@@ -248,16 +249,17 @@ export default function FinancePage() {
       topbarFilter={
         <>
           <CompanyFilter value={companyFilter} onChange={setCompanyFilter} options={companyOptions} master={companyMaster} />
-          <select
-            className="input-compact" data-w="md"
+          <FilterSelect
             value={directionFilter}
-            onChange={(e) => setDirectionFilter(e.target.value as 'all' | 'deposit' | 'withdraw')}
+            onChange={(v) => setDirectionFilter(v as 'all' | 'deposit' | 'withdraw')}
+            dataW="md"
             title="입출금 방향"
-          >
-            <option value="all">입출금</option>
-            <option value="deposit">입금만</option>
-            <option value="withdraw">출금만</option>
-          </select>
+            options={[
+              { value: 'all', label: '입출금' },
+              { value: 'deposit', label: '입금만' },
+              { value: 'withdraw', label: '출금만' },
+            ]}
+          />
         </>
       }
       topbarChips={
