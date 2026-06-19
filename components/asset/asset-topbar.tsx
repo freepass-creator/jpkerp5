@@ -67,20 +67,24 @@ export function AssetTopbar({
           />
         </div>
       )}
-      {extraFilters && <div className="filter-bar">{extraFilters}</div>}
-
-      {onCompanyFilterChange && (
+      {/* 회사 dropdown + extraFilters (quick chips) 를 한 filter-bar 안에서 [회사 → divider → chips] 순서로.
+          다른 페이지와 동일 규격. */}
+      {(onCompanyFilterChange || extraFilters) && (
         <div className="filter-bar">
-          <FilterSelect
-            value={companyFilter ?? 'all'}
-            onChange={onCompanyFilterChange}
-            dataW="md"
-            title="회사별 필터"
-            options={[
-              { value: 'all', label: '회사: 전체' },
-              ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) })),
-            ]}
-          />
+          {onCompanyFilterChange && (
+            <FilterSelect
+              value={companyFilter ?? 'all'}
+              onChange={onCompanyFilterChange}
+              dataW="md"
+              title="회사별 필터"
+              options={[
+                { value: 'all', label: '회사: 전체' },
+                ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) })),
+              ]}
+            />
+          )}
+          {onCompanyFilterChange && extraFilters && <span className="filter-divider" />}
+          {extraFilters}
         </div>
       )}
 
