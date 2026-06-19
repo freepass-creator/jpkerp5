@@ -60,6 +60,11 @@
       base64 데이터 큰 항목은 추후 Storage 분리 검토.
 - [ ] `app/api/intake/process/route.ts` (서버 worker) — pending intake 재처리
 - [ ] 기존 입구 7곳이 모두 intake/ 로 우회 (Phase 2.1+)
+  - [x] 2.1 `/m/upload` — 평행 기록 (기존 pending_uploads / vehicle_photos /
+        field_logs 흐름 유지 + intake/ 에 audit 로그). 미매칭은 intake status='pending'.
+  - [ ] 2.2 CreateDialog (엑셀 import) — 행마다 intake 기록
+  - [ ] 2.3 OCR dialog 4종 — 평행 기록
+  - [ ] 2.4 페이지 폼 입력 다이얼로그들
 
 ### Phase 3 — `/inbox` 단일 페이지
 - [ ] `app/inbox/page.tsx` — 단일 입력 + 분류 결과 + 미매칭 pending 보드.

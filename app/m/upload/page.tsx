@@ -32,6 +32,12 @@ import { addFieldLog } from '@/lib/firebase/field-logs-store';
 import { addVehiclePhoto, type VehiclePhotoKind } from '@/lib/firebase/vehicle-attachments-store';
 import { tryAutoMatch, extractOcrHints, findCustomerByLicenseNo } from '@/lib/firebase/upload-auto-match';
 import { toast } from '@/lib/toast';
+// Phase 2.1 — intake 평행 기록 (기존 흐름 유지)
+import {
+  addIntakeItem, setIntakeClassify, setIntakeMatch, markIntakeCommitted,
+} from '@/lib/firebase/intake-store';
+import { classify as intakeClassify } from '@/lib/intake/classify';
+import type { ClassifyResult, MatchResult } from '@/lib/intake/types';
 
 type DraftFile = {
   id: string;
@@ -85,6 +91,27 @@ export default function MobileUpload() {
    */
   async function uploadOne(draft: DraftFile): Promise<{ matched: boolean }> {
     const dataUrl = await fileToDataUrl(draft.file);
+    const by = user?.email ?? undefined;
+
+    // ─── Phase 2.1 intake 평행 기록 (시작) ───
+    // 모든 모바일 업로드를 intake/ 에 audit 로그 → 차후 /inbox 페이지·worker 가
+    // 이걸 source-of-truth 로 사용. 기존 pending_uploads / vehicle_photos /
+    // field_logs 흐름은 그대로 유지 (regression 0).
+    let intakeId: string | null = null;
+    try {
+      intakeId = await addIntakeItem({
+        source: 'mobile-upload',
+        raw: {
+          mode: 'file',
+          file: { name: draft.file.name, type: draft.file.type, size: draft.file.size },
+          dataUrl,
+        },
+        createdBy: by,
+      });
+    } catch (e) {
+      console.warn('[intake] addIntakeItem 실패 (기존 흐름 계속 진행)', e);
+    }
+    // ─── intake 평행 기록 (끝) ───
 
     // OCR 자동 추출 (image + 분류가 OCR 지원 종류일 때만)
     let ocrPlate: string | undefined;
@@ -95,6 +122,21 @@ export default function MobileUpload() {
         ocrPlate = ocr.plate;
         ocrLicenseNo = ocr.licenseNo;
       }
+    }
+
+    // intake classify — 파일 메타 + OCR fields 로 정밀 분류
+    if (intakeId) {
+      const ocrFields = (ocrPlate || ocrLicenseNo) ? {
+        ...(ocrPlate ? { plate: ocrPlate } : {}),
+        ...(ocrLicenseNo ? { license_no: ocrLicenseNo } : {}),
+      } : undefined;
+      const classifyResult: ClassifyResult = intakeClassify({
+        mode: 'file',
+        file: { name: draft.file.name, type: draft.file.type, size: draft.file.size },
+        ocrFields,
+      });
+      try { await setIntakeClassify(intakeId, classifyResult, by); }
+      catch (e) { console.warn('[intake] setIntakeClassify 실패', e); }
     }
 
     // 1차: 전화번호 / 차량번호 매칭
@@ -111,17 +153,33 @@ export default function MobileUpload() {
       autoMatch = findCustomerByLicenseNo(ocrLicenseNo, contracts, vehicles);
     }
 
+    // intake 에 매칭 결과 부착
+    if (intakeId) {
+      const matchResult: MatchResult = autoMatch
+        ? {
+            contractId: autoMatch.contractId,
+            vehicleId: autoMatch.vehicleId,
+            customerKey: autoMatch.customerKey,
+            confidence: 'high',
+            reason: autoMatch.reason,
+          }
+        : { confidence: 'none', reason: '자동 매칭 실패' };
+      try { await setIntakeMatch(intakeId, matchResult, autoMatch ? 'matched' : 'pending', by); }
+      catch (e) { console.warn('[intake] setIntakeMatch 실패', e); }
+    }
+
     if (autoMatch && autoMatch.confidence === 'high') {
       // 자동 매칭 성공 → 분류별 destination 으로 직접 저장 (pending 안 거침)
-      const by = user?.email ?? undefined;
+      const committedRefs: NonNullable<import('@/lib/intake/types').IntakeItem['committed']> = [];
       if (draft.kind === 'image' && autoMatch.vehicleId) {
         const photoKind: VehiclePhotoKind =
           draft.subCategory === 'product' ? 'product'
           : draft.subCategory === 'delivery' ? 'delivery'
           : draft.subCategory === 'return' ? 'return'
           : 'product';
+        const vpId = `vp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         await addVehiclePhoto(autoMatch.vehicleId, {
-          id: `vp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          id: vpId,
           kind: photoKind,
           url: dataUrl,
           fileName: draft.file.name,
@@ -130,6 +188,7 @@ export default function MobileUpload() {
           contractId: autoMatch.contractId,
           eventDate: new Date().toISOString().slice(0, 10),
         });
+        committedRefs.push({ node: `vehicle_attachments/${autoMatch.vehicleId}`, id: vpId });
       } else if (autoMatch.contractId) {
         await addFieldLog(autoMatch.contractId, {
           type: draft.kind === 'audio' ? 'call' : 'memo',
@@ -139,11 +198,16 @@ export default function MobileUpload() {
           customerKey: autoMatch.customerKey,
           by,
         });
+        committedRefs.push({ node: `field_logs/${autoMatch.contractId}`, id: '(addFieldLog 반환 미사용)' });
+      }
+      if (intakeId && committedRefs.length > 0) {
+        try { await markIntakeCommitted(intakeId, committedRefs, by); }
+        catch (e) { console.warn('[intake] markIntakeCommitted 실패', e); }
       }
       return { matched: true };
     }
 
-    // 매칭 실패 → pending 으로
+    // 매칭 실패 → pending 으로 (기존 흐름 유지)
     await addPendingUpload({
       fileName: draft.file.name,
       mimeType: draft.file.type,
