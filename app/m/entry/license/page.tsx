@@ -22,6 +22,8 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useAuth } from '@/lib/use-auth';
 import { addFieldLog } from '@/lib/firebase/field-logs-store';
 import { toast } from '@/lib/toast';
+// Phase 2.4 — 모바일 입력 4종 intake 평행 기록 (audit 일관성)
+import { addIntakeItem, markIntakeCommitted } from '@/lib/firebase/intake-store';
 
 type OcrResult = {
   license_no?: string;
@@ -107,6 +109,25 @@ export default function MobileLicenseVerify() {
   async function handleSave() {
     if (!contract || !ocr) return;
     setBusy('saving');
+    const by = user?.email ?? undefined;
+    // intake 평행 기록 (배치 1건)
+    let intakeId: string | null = null;
+    try {
+      intakeId = await addIntakeItem({
+        source: 'mobile-upload',
+        raw: {
+          mode: 'manual',
+          kind: 'document-misc',
+          payload: {
+            scope: 'license-verify',
+            contractId: contract.id,
+            licenseNo: ocr.license_no,
+            verifyStatus: verify?.status,
+          },
+        },
+        createdBy: by,
+      });
+    } catch (e) { console.warn('[intake] license addIntakeItem 실패', e); }
     try {
       await addFieldLog(contract.id, {
         type: 'memo',
@@ -117,8 +138,12 @@ export default function MobileLicenseVerify() {
           verifyStatus: verify?.status,
           verifyRtnCode: verify?.rtnCode,
         },
-        by: user?.email ?? undefined,
+        by,
       });
+      if (intakeId) {
+        try { await markIntakeCommitted(intakeId, [{ node: `field_logs/${contract.id}`, id: '(memo)' }], by); }
+        catch (e) { console.warn('[intake] license markIntakeCommitted 실패', e); }
+      }
       toast.success('면허 검증 결과 저장됨');
       router.push(`/m/contract/${contract.id}`);
     } catch (e) {

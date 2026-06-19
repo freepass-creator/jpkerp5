@@ -22,6 +22,7 @@ import {
 } from '@/lib/firebase/field-logs-store';
 import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/haptic';
+import { addIntakeItem, markIntakeCommitted } from '@/lib/firebase/intake-store';
 
 export default function MobileMemoEntry() {
   const router = useRouter();
@@ -88,9 +89,22 @@ export default function MobileMemoEntry() {
   async function handleSave() {
     if (!contractId || !memo.trim()) return;
     setSaving(true);
+    const body = memo.trim();
+    const by = user?.email ?? undefined;
+    let intakeId: string | null = null;
     try {
-      const body = memo.trim();
-      const by = user?.email ?? undefined;
+      intakeId = await addIntakeItem({
+        source: 'mobile-upload',
+        raw: {
+          mode: 'manual',
+          kind: 'document-misc',
+          payload: { scope: `memo-${scope}`, contractId, vehicleStorageKey, customerStorageKey, length: body.length },
+        },
+        createdBy: by,
+      });
+    } catch (e) { console.warn('[intake] memo addIntakeItem 실패', e); }
+    try {
+      let committedNode = '';
       if (scope === 'contract') {
         // 계약 메모 — 차량/손님 노드에도 자동 전파 (addFieldLog 가 처리)
         await addFieldLog(contractId, {
@@ -98,14 +112,21 @@ export default function MobileMemoEntry() {
           vehicleId: vehicleStorageKey ?? undefined,
           customerKey: customerStorageKey ?? undefined,
         });
+        committedNode = `field_logs/${contractId}`;
       } else if (scope === 'vehicle' && vehicleStorageKey) {
         await addVehicleFieldLog(vehicleStorageKey, { type: 'memo', body, by });
+        committedNode = `vehicle_field_logs/${vehicleStorageKey}`;
       } else if (scope === 'customer' && customerStorageKey) {
         await addCustomerFieldLog(customerStorageKey, { type: 'memo', body, by });
+        committedNode = `customer_field_logs/${customerStorageKey}`;
       } else {
         toast.warning('대상 식별자가 없어 저장 불가 (차량번호·휴대폰·등록번호 전부 결손)');
         setSaving(false);
         return;
+      }
+      if (intakeId) {
+        try { await markIntakeCommitted(intakeId, [{ node: committedNode, id: '(memo)' }], by); }
+        catch (e) { console.warn('[intake] memo markIntakeCommitted 실패', e); }
       }
       toast.success('메모 저장됨');
       router.push(`/m/contract/${contractId}`);

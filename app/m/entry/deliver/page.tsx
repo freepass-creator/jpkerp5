@@ -21,6 +21,8 @@ import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-syn
 import { toast } from '@/lib/toast';
 import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { todayKr } from '@/lib/mock-data';
+// Phase 2.4 — 모바일 입력 intake 평행 기록
+import { addIntakeItem, markIntakeCommitted } from '@/lib/firebase/intake-store';
 
 export default function MobileDeliver() {
   const router = useRouter();
@@ -70,6 +72,19 @@ export default function MobileDeliver() {
   async function handleSave() {
     if (!contract || !deliveredDate) return;
     setSaving(true);
+    const by = user?.email ?? undefined;
+    let intakeId: string | null = null;
+    try {
+      intakeId = await addIntakeItem({
+        source: 'mobile-upload',
+        raw: {
+          mode: 'manual',
+          kind: 'contract',
+          payload: { scope: 'deliver', contractId: contract.id, deliveredDate, vehicleId, customerKey },
+        },
+        createdBy: by,
+      });
+    } catch (e) { console.warn('[intake] deliver addIntakeItem 실패', e); }
     try {
       // 1. 계약 인도완료 처리 (+ Vehicle 마스터 status 자동 동기화)
       await syncContractAndVehicleStatus(
@@ -86,8 +101,15 @@ export default function MobileDeliver() {
         payload: { deliveredDate },
         vehicleId,
         customerKey,
-        by: user?.email ?? undefined,
+        by,
       });
+      if (intakeId) {
+        try { await markIntakeCommitted(intakeId, [
+          { node: `contracts/${contract.id}`, id: contract.id },
+          { node: `field_logs/${contract.id}`, id: '(delivery)' },
+        ], by); }
+        catch (e) { console.warn('[intake] deliver markIntakeCommitted 실패', e); }
+      }
       toast.success('인도 처리 완료');
       router.push(`/m/contract/${contract.id}`);
     } catch (e) {

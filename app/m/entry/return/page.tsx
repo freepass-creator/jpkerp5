@@ -21,6 +21,7 @@ import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-syn
 import { toast } from '@/lib/toast';
 import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { todayKr } from '@/lib/mock-data';
+import { addIntakeItem, markIntakeCommitted } from '@/lib/firebase/intake-store';
 
 export default function MobileReturn() {
   const router = useRouter();
@@ -76,6 +77,19 @@ export default function MobileReturn() {
   async function handleSave() {
     if (!contract || !returnedDate) return;
     setSaving(true);
+    const by = user?.email ?? undefined;
+    let intakeId: string | null = null;
+    try {
+      intakeId = await addIntakeItem({
+        source: 'mobile-upload',
+        raw: {
+          mode: 'manual',
+          kind: 'contract',
+          payload: { scope: 'return', contractId: contract.id, returnedDate, vehicleId, customerKey },
+        },
+        createdBy: by,
+      });
+    } catch (e) { console.warn('[intake] return addIntakeItem 실패', e); }
     try {
       // 1. 계약 반납 처리 (+ Vehicle 마스터 status 자동 동기화)
       await syncContractAndVehicleStatus(
@@ -92,8 +106,15 @@ export default function MobileReturn() {
         payload: { returnedDate },
         vehicleId,
         customerKey,
-        by: user?.email ?? undefined,
+        by,
       });
+      if (intakeId) {
+        try { await markIntakeCommitted(intakeId, [
+          { node: `contracts/${contract.id}`, id: contract.id },
+          { node: `field_logs/${contract.id}`, id: '(return)' },
+        ], by); }
+        catch (e) { console.warn('[intake] return markIntakeCommitted 실패', e); }
+      }
       toast.success('반납 처리 완료');
       router.push(`/m/contract/${contract.id}`);
     } catch (e) {

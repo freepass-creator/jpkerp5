@@ -71,7 +71,12 @@
     - vehicle-reg-register-dialog.tsx handleCommitAll → desktop-ocr-vehicle
     - insurance-register-dialog.tsx handleCommitAll → desktop-ocr-insurance
     - business-reg-register-dialog.tsx handleCommitAll → desktop-ocr-business
-  - [ ] 2.4 페이지 폼 입력 다이얼로그들 (contract-detail / vehicle-detail / 등 다수)
+  - [x] 2.4 모바일 entry 4종 평행 기록 (2026-06-20)
+    - /m/entry/license: source='mobile-upload', kind='document-misc' (license-verify scope)
+    - /m/entry/deliver: source='mobile-upload', kind='contract' (deliver scope)
+    - /m/entry/return: source='mobile-upload', kind='contract' (return scope)
+    - /m/entry/memo: source='mobile-upload', kind='document-misc' (memo-{contract/vehicle/customer} scope)
+  - [ ] 2.5 데스크탑 페이지 폼 다이얼로그 (contract-detail / vehicle-detail / 등 다수)
 
 ### Phase 3 — `/inbox` 단일 페이지
 - [x] `app/inbox/page.tsx` — intake/ 라이브 구독, 행 클릭 → raw + classify + match 상세 패널.
