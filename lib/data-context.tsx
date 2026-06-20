@@ -13,11 +13,12 @@
  * Provider 외부에서 호출 시 빈 데이터 반환 (throw X) — 안전 fallback.
  */
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { getRtdb, ensureAuth, dbPath, isFirebaseConfigured } from './firebase/client';
 import { recalcContract } from './payment-schedule';
 import { todayKr } from './mock-data';
+import { useRole } from './use-role';
 import type { Vehicle, Contract, Company, InsurancePolicy, HistoryEntry } from './types';
 
 type DataState = {
@@ -122,14 +123,36 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // ─── 회사 격리 (ERP #19) ─────
+  // staff/admin 사용자가 회사 소속(companyCodes) 가지면 → 그 회사 데이터만 통과.
+  // master 또는 미설정 = 전체 통과 (legacy).
+  // 클라이언트 layer 필터링. Firebase Rules 의 회사별 강제는 별도 (TODO).
+  const { companyCodes } = useRole();
+
+  const filtered = useMemo(() => {
+    if (!companyCodes || companyCodes.length === 0) {
+      // 전체 접근 (master 등)
+      return { vehicles, contracts, companies, policies, history };
+    }
+    const set = new Set(companyCodes);
+    return {
+      vehicles: vehicles.filter((v) => !v.company || set.has(v.company)),
+      contracts: contracts.filter((c) => !c.company || set.has(c.company)),
+      // companies 마스터 자체도 본인 회사만 노출
+      companies: companies.filter((c) => set.has(c.code)),
+      // policies / history 는 차량별 → vehicle 필터링과 연동 (plate 매칭)
+      policies, history,
+    };
+  }, [companyCodes, vehicles, contracts, companies, policies, history]);
+
   return (
     <DataContext.Provider
       value={{
-        vehicles, vehiclesLoading,
-        contracts, contractsLoading,
-        companies, companiesLoading,
-        policies, policiesLoading,
-        history, historyLoading,
+        vehicles: filtered.vehicles, vehiclesLoading,
+        contracts: filtered.contracts, contractsLoading,
+        companies: filtered.companies, companiesLoading,
+        policies: filtered.policies, policiesLoading,
+        history: filtered.history, historyLoading,
       }}
     >
       {children}
