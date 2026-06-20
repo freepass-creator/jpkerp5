@@ -12,7 +12,10 @@ import { useMemo, useState } from 'react';
 import { Car, CaretLeft, ClipboardText, MagnifyingGlass, Wrench } from '@phosphor-icons/react';
 import { DateInput } from '@/components/ui/date-input';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useHistoryEntries } from '@/lib/firebase/history-store';
+import { useBusyAction } from '@/lib/use-busy-action';
 import { toast } from '@/lib/toast';
+import { friendlyError } from '@/lib/friendly-error';
 import type { Contract, HistoryCategory, HistoryScope } from '@/lib/types';
 
 const VEHICLE_CATEGORIES: HistoryCategory[] = ['정비', '사고', '검사', '세차', '위반', '보험', '부품교체', '기타'];
@@ -21,11 +24,32 @@ const CONTRACT_CATEGORIES: HistoryCategory[] = ['연락기록', '분쟁', '클�
 export function HistoryAddPane({ onClose }: { onClose: () => void }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Contract | null>(null);
+  const { add: addHistory } = useHistoryEntries();
+  const [busy, runMutation] = useBusyAction();
 
   if (selected) {
-    return <HistoryForm contract={selected} onBack={() => setSelected(null)} onSubmit={(scope) => {
-      toast.info(`mock: ${selected.vehiclePlate} ${selected.customerName} ${scope === 'vehicle' ? '차량' : '계약'} 이력 등록 완료`);
-      onClose();
+    return <HistoryForm contract={selected} onBack={() => setSelected(null)} busy={busy} onSubmit={(form) => {
+      void runMutation(async () => {
+        try {
+          await addHistory({
+            scope: form.scope,
+            contractId: form.scope === 'contract' ? selected.id : undefined,
+            vehiclePlate: form.scope === 'vehicle' ? selected.vehiclePlate : undefined,
+            date: form.date,
+            category: form.category,
+            title: form.title,
+            description: form.description || undefined,
+            cost: form.cost || undefined,
+            status: form.status,
+            vendor: form.vendor || undefined,
+            mileage: form.mileage || undefined,
+          });
+          toast.success(`${selected.vehiclePlate} ${form.scope === 'vehicle' ? '차량' : '계약'} 이력 저장됨`);
+          onClose();
+        } catch (e) {
+          toast.error(`이력 저장 실패 — ${friendlyError(e)}`);
+        }
+      });
     }} />;
   }
 
@@ -95,9 +119,21 @@ function HistorySearchResults({ q, onPick }: { q: string; onPick: (c: Contract) 
   );
 }
 
+type HistoryFormData = {
+  scope: HistoryScope;
+  category: HistoryCategory;
+  date: string;
+  title: string;
+  cost: number | undefined;
+  vendor: string;
+  mileage: number | undefined;
+  status: '완료' | '진행' | '예정';
+  description: string;
+};
+
 function HistoryForm({
-  contract, onBack, onSubmit,
-}: { contract: Contract; onBack: () => void; onSubmit: (scope: HistoryScope) => void }) {
+  contract, onBack, busy, onSubmit,
+}: { contract: Contract; onBack: () => void; busy: boolean; onSubmit: (form: HistoryFormData) => void }) {
   const [scope, setScope] = useState<HistoryScope>('vehicle');
   const [category, setCategory] = useState<HistoryCategory>('정비');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -116,7 +152,14 @@ function HistoryForm({
 
   return (
     <form
-      onSubmit={(e) => { e.preventDefault(); onSubmit(scope); }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({
+          scope, category, date, title, vendor, status, description,
+          cost: cost ? parseInt(cost, 10) || undefined : undefined,
+          mileage: mileage ? parseInt(mileage, 10) || undefined : undefined,
+        });
+      }}
       style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}
     >
       <div className="detail-hero">
@@ -201,9 +244,9 @@ function HistoryForm({
       </div>
 
       <div style={{ marginTop: 'auto', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button type="button" className="btn" onClick={onBack}>취소</button>
-        <button type="submit" className="btn btn-primary" disabled={!title}>
-          <ClipboardText size={14} /> 이력 저장
+        <button type="button" className="btn" onClick={onBack} disabled={busy}>취소</button>
+        <button type="submit" className="btn btn-primary" disabled={!title || busy}>
+          <ClipboardText size={14} /> {busy ? '저장 중…' : '이력 저장'}
         </button>
       </div>
     </form>

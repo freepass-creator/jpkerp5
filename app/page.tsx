@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, X, Plus, PaperPlaneTilt, DownloadSimple, Car, Upload, FileXls } from '@phosphor-icons/react';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import {
@@ -313,6 +314,7 @@ function resolveUsage(c: Contract): string {
 // PaymentState / getPaymentState → lib/contract-stage.ts
 
 export default function Page() {
+  const router = useRouter();
   const today = useLiveTodayKr();
   const [search, setSearch] = useState('');
   const [view, setView] = usePersistentState<View>('filter:operation:view', '전체');
@@ -1082,8 +1084,9 @@ export default function Page() {
           setDetailOpen(true);
         }}
         onVehicleCreated={(newId) => {
-          // 차량 등록 후 자산 페이지로 이동 + URL ?id= 로 detail 자동 오픈
-          window.location.href = `/asset?id=${newId}`;
+          // 차량 등록 후 자산 페이지로 SPA 네비게이션 + URL ?id= 로 detail 자동 오픈.
+          // asset 페이지의 useEffect 가 rawVehicles 로드 완료 후 id 매칭하여 오픈 (자동 재시도)
+          router.push(`/asset?id=${newId}`);
         }}
       />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filteredContracts} selectedIds={selectedIds} />
