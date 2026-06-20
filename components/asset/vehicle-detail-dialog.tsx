@@ -433,6 +433,16 @@ function SummaryTab({
           uploadedAt={vehicle.registrationCertUploadedAt}
         />
       )}
+
+      {/* 비고 — 인라인 즉시 편집 (직원이 차량별 메모·발주처·특이사항 입력) */}
+      <Section title="비고">
+        <InlineTextEdit
+          value={vehicle.notes}
+          onSave={(v) => onUpdate({ ...vehicle, notes: v || undefined })}
+          placeholder="차량 메모 없음 — 클릭하여 입력"
+          multiline rows={3}
+        />
+      </Section>
     </Stack>
   );
 }
