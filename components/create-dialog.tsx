@@ -1346,9 +1346,11 @@ function VehicleManualForm({ onSubmit }: { onSubmit: (newVehicleId?: string) => 
         </div>
       </div>
 
-      {/* 제조사 스펙 */}
-      <div className="detail-section">
-        <div className="detail-section-header">제조사 스펙</div>
+      {/* 제조사 스펙 — advanced, 필요 시 펼침 */}
+      <details open={!!vehicleSubModel || !!vehicleVariant || !!vehicleTrim || !!exteriorColor} className="detail-section">
+        <summary className="detail-section-header" style={{ cursor: 'pointer' }}>
+          제조사 스펙 <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-weak)', marginLeft: 6 }}>(선택 — 등록 후에도 입력 가능)</span>
+        </summary>
         <div className="detail-section-body">
           <div className="form-grid-2">
             <label className="form-label">③ 세부모델</label>
@@ -1370,11 +1372,13 @@ function VehicleManualForm({ onSubmit }: { onSubmit: (newVehicleId?: string) => 
             <input className="input" placeholder="예: 선루프, 풀옵션, 18인치휠, 내비" value={vehicleOptions} onChange={(e) => setVehicleOptions(e.target.value)} />
           </div>
         </div>
-      </div>
+      </details>
 
-      {/* 등록증 정보 */}
-      <div className="detail-section">
-        <div className="detail-section-header">자동차등록증 정보</div>
+      {/* 자동차등록증 정보 — advanced (OCR 등록 시 채워짐) */}
+      <details open={!!vin || !!manufacturedDate || !!firstRegisteredDate} className="detail-section">
+        <summary className="detail-section-header" style={{ cursor: 'pointer' }}>
+          자동차등록증 정보 <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-weak)', marginLeft: 6 }}>(선택 — OCR 또는 상세에서 입력 가능)</span>
+        </summary>
         <div className="detail-section-body">
           <div className="form-grid-2">
             <label className="form-label">차대번호</label>
@@ -1402,11 +1406,13 @@ function VehicleManualForm({ onSubmit }: { onSubmit: (newVehicleId?: string) => 
             <input className="input" placeholder="등록증상 소유자명 (회사 명의)" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
           </div>
         </div>
-      </div>
+      </details>
 
-      {/* 매입 정보 */}
-      <div className="detail-section">
-        <div className="detail-section-header">매입 정보</div>
+      {/* 매입 정보 — advanced */}
+      <details open={!!purchasedDate || !!purchasePrice || !!notes} className="detail-section">
+        <summary className="detail-section-header" style={{ cursor: 'pointer' }}>
+          매입 정보 <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-weak)', marginLeft: 6 }}>(선택)</span>
+        </summary>
         <div className="detail-section-body">
           <div className="form-grid-2">
             <label className="form-label">매입일</label>
@@ -1432,7 +1438,7 @@ function VehicleManualForm({ onSubmit }: { onSubmit: (newVehicleId?: string) => 
             ↑ 필수: 회사 · 차량상태 · 제조사 · 모델. 나머지는 상세 페이지에서 추가/수정 가능.
           </div>
         </div>
-      </div>
+      </details>
 
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8, position: 'sticky', bottom: 0, background: 'var(--bg-card)', paddingTop: 8 }}>
         <button type="submit" className="btn btn-primary" disabled={!fullName || saving}>

@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { Section, Grid2, Stack } from '@/components/ui/detail-primitives';
 import { EditableField } from '@/components/ui/editable-field';
+import { InlineTextEdit } from '@/components/ui/inline-text-edit';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -148,6 +149,24 @@ export function CompanyDetailDialog({
             <EditableField editing={editing} label="실무자 연락처" value={cleanReg(cur.contactPhone)} onChange={(v) => setDraft((d) => d && { ...d, contactPhone: v })} mono />
             <EditableField editing={editing} label="실무자 이메일" value={cur.contactEmail} onChange={(v) => setDraft((d) => d && { ...d, contactEmail: v })} />
           </Grid2>
+        </Section>
+
+        {/* 메모 — 인라인 즉시 편집 (직원이 회사별 메모 자주 추가) */}
+        <Section title="메모">
+          <InlineTextEdit
+            value={editing ? (draft?.notes ?? '') : (company.notes ?? '')}
+            onSave={(v) => {
+              if (editing) {
+                setDraft((d) => d && { ...d, notes: v || undefined });
+              } else {
+                // editing 모드 아닐 때는 즉시 RTDB 반영
+                void update({ ...company, notes: v || undefined });
+                void audit.update('company', company.id, `메모 수정 — ${company.name}`);
+              }
+            }}
+            placeholder="회사 메모 없음 — 클릭하여 입력"
+            multiline rows={3}
+          />
         </Section>
 
         {/* 계좌 — 입출금 (BankTx 업로드 시 매칭) */}
