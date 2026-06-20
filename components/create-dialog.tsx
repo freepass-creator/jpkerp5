@@ -76,7 +76,7 @@ function useDialogFooterActions(actions: ReactNode | null, deps: React.Dependenc
 }
 
 export function CreateDialog({
-  open, onOpenChange, initialMode, visibleModes = ALL_MODES, onContractCreated,
+  open, onOpenChange, initialMode, visibleModes = ALL_MODES, onContractCreated, onVehicleCreated,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -85,6 +85,8 @@ export function CreateDialog({
   visibleModes?: Mode[];
   /** 신규 계약 등록 완료 시 호출 — 호출자가 ContractDetailDialog 자동 오픈 가능 (트렌드 UX) */
   onContractCreated?: (newContractId: string) => void;
+  /** 신규 차량 등록 완료 시 호출 — 호출자가 VehicleDetailDialog 자동 오픈 가능 */
+  onVehicleCreated?: (newVehicleId: string) => void;
 }) {
   const defaultMode = initialMode && visibleModes.includes(initialMode) ? initialMode : visibleModes[0] ?? '현황';
   const [mode, setMode] = useState<Mode>(defaultMode);
@@ -769,6 +771,7 @@ export function CreateDialog({
               <Tabs.Content value="차량">
                 <VehicleRegisterPane
                   onClose={() => onOpenChange(false)}
+                  onVehicleCreated={onVehicleCreated}
                   onCommit={commitVehicleRows}
                   busy={busy}
                   result={result}
@@ -1175,9 +1178,11 @@ function SheetPreview({ sheet, onChangeKind }: { sheet: ParsedSheet; onChangeKin
 type VehicleMode = 'manual' | 'ocr' | 'excel' | 'paste';
 
 function VehicleRegisterPane({
-  onClose, onCommit, busy, result,
+  onClose, onVehicleCreated, onCommit, busy, result,
 }: {
   onClose: () => void;
+  /** 등록 후 detail 자동 오픈 콜백 (트렌드 UX) */
+  onVehicleCreated?: (id: string) => void;
   onCommit: (rows: Record<string, unknown>[]) => Promise<void>;
   busy: boolean;
   result: string | null;
@@ -1198,7 +1203,10 @@ function VehicleRegisterPane({
         </button>
       </div>
 
-      {mode === 'manual' && <VehicleManualForm onSubmit={onClose} />}
+      {mode === 'manual' && <VehicleManualForm onSubmit={(newId) => {
+        onClose();
+        if (newId) onVehicleCreated?.(newId);
+      }} />}
       {mode === 'ocr' && <VehicleOcrPane onSubmit={onClose} />}
       {mode === 'excel' && <VehicleExcelPane onCommit={onCommit} busy={busy} result={result} />}
     </div>
@@ -1213,7 +1221,7 @@ function useCompanyNames(): string[] {
   return companies.map((c) => c.name).filter(Boolean);
 }
 
-function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
+function VehicleManualForm({ onSubmit }: { onSubmit: (newVehicleId?: string) => void }) {
   const companyNames = useCompanyNames();
   const { add: addVehicle } = useVehicles();
   const [company, setCompany] = useState(companyNames[0] ?? '');
@@ -1254,7 +1262,7 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
     if (!fullName || saving) return;
     setSaving(true);
     try {
-      await addVehicle({
+      const newVehicleId = await addVehicle({
         plate: normPlate(plate.trim()) || '미정',
         model: fullName,
         company: (company || '기타') as import('@/lib/types').CompanyCode,
@@ -1284,7 +1292,7 @@ function VehicleManualForm({ onSubmit }: { onSubmit: () => void }) {
         notes: notes.trim() || undefined,
         createdAt: new Date().toISOString(),
       });
-      onSubmit();
+      onSubmit(newVehicleId);
     } catch (e) {
       toast.error('차량 등록 실패: ' + ((e as Error).message ?? String(e)));
     } finally {

@@ -1081,6 +1081,10 @@ export default function Page() {
           setSelectedId(newId);
           setDetailOpen(true);
         }}
+        onVehicleCreated={(newId) => {
+          // 차량 등록 후 자산 페이지로 이동 + URL ?id= 로 detail 자동 오픈
+          window.location.href = `/asset?id=${newId}`;
+        }}
       />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filteredContracts} selectedIds={selectedIds} />
 
