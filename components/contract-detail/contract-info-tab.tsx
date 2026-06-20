@@ -15,6 +15,7 @@ import { Section } from '@/components/ui/detail-primitives';
 import { Field as SharedField, EditableField as SharedEditableField } from '@/components/ui/editable-field';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
+import { InlineTextEdit } from '@/components/ui/inline-text-edit';
 import { formatCurrency, formatDateFull } from '@/lib/utils';
 import { contractIdentMasked } from '@/lib/ident';
 import type { Contract, AdditionalDriver } from '@/lib/types';
@@ -211,7 +212,20 @@ export const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUp
               <Field label="결제시기" value={c.paymentTiming ?? '선불'} />
             )}
             <EditableField label="결제일(1-31)" value={editing ? String(draft.paymentDay ?? '') : `매월 ${c.paymentDay}일`} editing={editing} mono onChange={(v) => set('paymentDay', Number(v) || 0)} />
-            <EditableField label="담당자" value={editing ? (draft.manager ?? '') : (c.manager ?? '-')} editing={editing} onChange={(v) => set('manager', v || undefined)} />
+            {/* 담당자 — 인라인 즉시 편집 (editing 모드 무관) */}
+            <div className="detail-field">
+              <div className="label">담당자</div>
+              <div className="value">
+                <InlineTextEdit
+                  value={editing ? (draft.manager ?? '') : (c.manager ?? '')}
+                  onSave={(v) => {
+                    if (editing) set('manager', v || undefined);
+                    else onUpdate({ ...c, manager: v || undefined });
+                  }}
+                  placeholder="-"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </Section>
@@ -253,19 +267,20 @@ export const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUp
       </Section>
 
       <Section icon={<FileText size={12} weight="duotone" />} title="비고">
-        {editing ? (
-          <textarea
-            value={draft.notes ?? ''}
-            onChange={(e) => set('notes', e.target.value || undefined)}
-            rows={4}
-            style={{ width: '100%', fontSize: 12, padding: 8, border: '1px solid var(--border)', borderRadius: 'var(--radius)', resize: 'vertical' }}
-            placeholder="메모"
-          />
-        ) : (
-          <div style={{ fontSize: 12, color: c.notes ? 'var(--text-main)' : 'var(--text-weak)', whiteSpace: 'pre-wrap' }}>
-            {c.notes || '메모 없음'}
-          </div>
-        )}
+        {/* 인라인 즉시 편집 (ERP UX 트렌드 — 직원 [수정] 클릭 단계 생략) */}
+        <InlineTextEdit
+          value={editing ? (draft.notes ?? '') : (c.notes ?? '')}
+          onSave={(v) => {
+            if (editing) {
+              set('notes', v || undefined);
+            } else {
+              // editing 모드 아닐 때는 즉시 onUpdate 발사
+              onUpdate({ ...c, notes: v || undefined });
+            }
+          }}
+          placeholder="메모 없음 — 클릭하여 입력"
+          multiline rows={4}
+        />
       </Section>
     </div>
   );

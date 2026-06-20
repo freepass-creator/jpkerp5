@@ -10,6 +10,8 @@ import {
 } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DateInput } from '@/components/ui/date-input';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { IdentInput } from '@/components/ui/ident-input';
 import { parseExcelFile, type ParsedSheet, type UploadKind } from '@/lib/excel-detect';
 import { formatCurrency, cn, monthsBetween } from '@/lib/utils';
 import { MAKERS, MODELS_BY_MAKER, buildVehicleFullName } from '@/lib/vehicle-master';
@@ -2529,7 +2531,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
             <input className="input" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
 
             <label className="form-label">연락처 *</label>
-            <input className="input" required placeholder="010-1234-5678" value={customerPhone1} onChange={(e) => setCustomerPhone1(e.target.value)} />
+            <PhoneInput value={customerPhone1} onChange={setCustomerPhone1} className="input" />
 
             <label className="form-label">계약일 *</label>
             <DateInput required value={contractDate} onChange={setContractDate} style={{ width: 200 }} />
@@ -2618,11 +2620,11 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
             </select>
 
             <label className="form-label">등록번호</label>
-            <input
-              className="input"
-              placeholder={customerKind === '사업자' ? '123-45-67890' : customerKind === '법인' ? '110111-1234567' : '900101-1234567'}
+            <IdentInput
+              kind={customerKind === '사업자' ? '사업자' : 'auto'}
               value={regNo}
-              onChange={(e) => setRegNo(e.target.value)}
+              onChange={setRegNo}
+              className="input"
             />
 
             {customerKind === '법인' && (
@@ -2662,10 +2664,11 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
                       value={d.name ?? ''}
                       onChange={(e) => setAdditionalDrivers((arr) => arr.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))}
                     />
-                    <input
-                      className="input mono" placeholder="주민번호"
+                    <IdentInput
+                      kind="개인"
                       value={d.identNo ?? ''}
-                      onChange={(e) => setAdditionalDrivers((arr) => arr.map((x, idx) => idx === i ? { ...x, identNo: e.target.value } : x))}
+                      onChange={(v) => setAdditionalDrivers((arr) => arr.map((x, idx) => idx === i ? { ...x, identNo: v } : x))}
+                      className="input mono"
                     />
                     <input
                       className="input" placeholder="관계 (배우자/자녀 등)"
