@@ -527,6 +527,12 @@ export type Company = {
   documents?: CompanyDocument[]; // 사업자등록증/등기부/인감 등 서류
   notes?: string;
   createdAt: string;
+  // 표준 timestamp (ERP #33)
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 };
 
 /** 차량 마스터 — 등록증 기준 (plate + model + company만). 디테일은 나중. */
@@ -667,8 +673,13 @@ export type Vendor = {
   /** 어느 회사가 거래하는 거래처인지 — 회사 분리 시 사용. 미지정이면 전체 공유 */
   companyCode?: CompanyCode;
   notes?: string;
+  // 표준 timestamp (ERP #33)
   createdAt: string;
   createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 };
 
 /** 감사 로그 — 모든 변경 추적 (누가 / 언제 / 무엇을) */

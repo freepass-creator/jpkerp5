@@ -10,6 +10,7 @@ import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } f
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { Vendor } from '@/lib/types';
+import { lockedUpdate } from './locked-update';
 
 const PATH = dbPath('vendors');
 
@@ -62,7 +63,10 @@ export function useVendors() {
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbUpdate(ref(db, `${PATH}/${v.id}`), pruneUndefined(v as unknown as Record<string, unknown>));
+      // Optimistic Lock (ERP #22)
+      await lockedUpdate<Vendor>(`${PATH}/${v.id}`, v.updatedAt, () => ({
+        ...v, updatedAt: new Date().toISOString(),
+      }));
       void audit.update('system', v.id, `거래처 수정 ${v.name}`);
     },
     remove: async (id: string) => {

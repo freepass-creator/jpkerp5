@@ -5,6 +5,7 @@ import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } f
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { Penalty } from '@/lib/types-penalty';
+import { lockedUpdate } from './locked-update';
 
 const PATH = dbPath('penalties');
 
@@ -69,7 +70,10 @@ export function usePenalties(): {
       await ensureAuth();
       const db = getRtdb();
       if (!db) return;
-      await rtdbUpdate(ref(db, `${PATH}/${p.id}`), pruneUndefined(p as unknown as Record<string, unknown>));
+      // Optimistic Lock (ERP #22)
+      await lockedUpdate<Penalty>(`${PATH}/${p.id}`, p.updatedAt, () => ({
+        ...p, updatedAt: new Date().toISOString(),
+      }));
       void audit.update('penalty', p.id, `과태료 수정 ${p.noticeNo ?? ''} ${p.carNumber}`);
     },
     remove: async (id) => {

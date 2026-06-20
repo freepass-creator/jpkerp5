@@ -42,8 +42,12 @@ export type Penalty = {
   // 첨부
   fileName?: string;
   fileDataUrl?: string;         // 원본 PDF/이미지 (base64)
-  // 감사
+  // 감사 + 표준 timestamp (ERP #33)
   createdAt: string;
   createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  deletedAt?: string;
+  deletedBy?: string;
   notes?: string;
 };

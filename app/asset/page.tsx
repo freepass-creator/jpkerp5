@@ -48,6 +48,7 @@ import { showConfirm } from '@/lib/confirm';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
 import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
+import { safeUpdate } from '@/lib/safe-update';
 import { setVehicleAttachments } from '@/lib/firebase/vehicle-attachments-store';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 import { VehicleDetailDialog } from '@/components/asset/vehicle-detail-dialog';
@@ -720,9 +721,11 @@ export default function AssetPage() {
             contracts={contracts.filter((c) => c.vehiclePlate === vehicles.find((v) => v.id === openId)?.plate)}
             view={assetView}
             initialTab={openTab}
-            onUpdate={async (v) => {
-              await updateVehicle(v);
-              await syncContractStatusFromVehicle(v, contracts, updateContract);
+            onUpdate={(v) => {
+              void safeUpdate(async () => {
+                await updateVehicle(v);
+                await syncContractStatusFromVehicle(v, contracts, updateContract);
+              }, { onConflict: () => setOpenId(null) });
             }}
             onClose={() => setOpenId(null)}
             onEdit={(v) => setEditVehicle(v)}

@@ -11,6 +11,7 @@ import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } fro
 import { audit } from './audit-store';
 import { useDataContext } from '@/lib/data-context';
 import type { InsurancePolicy } from '@/lib/types';
+import { lockedUpdate } from './locked-update';
 
 const PATH = dbPath('insurances');
 
@@ -37,7 +38,10 @@ export function useInsurances() {
       if (!configured) return;
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbUpdate(ref(db, `${PATH}/${p.id}`), pruneUndefined({ ...p, updatedAt: new Date().toISOString() } as unknown as Record<string, unknown>));
+      // Optimistic Lock (ERP #22)
+      await lockedUpdate<InsurancePolicy>(`${PATH}/${p.id}`, p.updatedAt, () => ({
+        ...p, updatedAt: new Date().toISOString(),
+      }));
       void audit.update('system', p.id, `보험증권 수정 ${p.carNumber ?? ''} ${p.policyNo ?? ''}`);
     },
     remove: async (id: string): Promise<void> => {

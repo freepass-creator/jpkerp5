@@ -28,6 +28,7 @@ import { CompanyCell } from '@/components/ui/company-cell';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
+import { safeUpdate } from '@/lib/safe-update';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { isContractEnded, isAbnormalEnded, isNormalEnded } from '@/lib/contract-lifecycle';
@@ -377,7 +378,10 @@ export default function ContractPage() {
         onOpenChange={(v) => !v && setOpenId(null)}
         onUpdate={(updated) => {
           // Vehicle.status 동기 + 반납 일할 자동 적용 (반납 시 마지막 회차 prorate).
-          void syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster);
+          void safeUpdate(
+            () => syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster),
+            { onConflict: () => setOpenId(null) },
+          );
         }}
       />
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['계약']} initialMode="계약" />
@@ -422,7 +426,7 @@ export default function ContractPage() {
               if (!r) return;
               if (!await showConfirm({ title: `${r.contractNo} 반납 처리하시겠습니까? (반납일=오늘)` })) return;
               const updated = { ...r, returnedDate: new Date().toISOString().slice(0, 10), status: '반납' as const, vehicleStatus: '반납' as const };
-              void syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster);
+              void safeUpdate(() => syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster));
             },
             disabled: !!ctxMenu.row.returnedDate,
           },

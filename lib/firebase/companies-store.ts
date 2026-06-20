@@ -5,6 +5,7 @@ import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'fire
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { useDataContext } from '@/lib/data-context';
 import type { Company } from '@/lib/types';
+import { lockedUpdate } from './locked-update';
 
 import { genCode } from '@/lib/code';
 
@@ -48,7 +49,10 @@ export function useCompanies(): {
       if (!configured) return;
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbUpdate(ref(db, `${COMPANIES_PATH}/${c.id}`), pruneUndefined(c as unknown as Record<string, unknown>));
+      // Optimistic Lock (ERP #22)
+      await lockedUpdate<Company>(`${COMPANIES_PATH}/${c.id}`, c.updatedAt, () => ({
+        ...c, updatedAt: new Date().toISOString(),
+      }));
     },
     remove: async (id) => {
       if (!configured) return;

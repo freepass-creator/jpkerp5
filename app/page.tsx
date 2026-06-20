@@ -38,6 +38,7 @@ import { isSuperAdmin } from '@/lib/admin-emails';
 import { ageFromIdent } from '@/lib/ident';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone } from '@/lib/status-tones';
+import { safeUpdate } from '@/lib/safe-update';
 import {
   getExpiryDate,
   getVehicleState, getContractState, getPaymentState,
@@ -394,8 +395,8 @@ export default function Page() {
 
   // 계약+차량 마스터 상태 동기화 — lib/firebase/contract-status-sync 의 공용 헬퍼 사용
   // 모바일(deliver/return) 과 같은 함수 호출 → 양립 보장
-  const updateContract = useCallback((updated: Contract) => {
-    void syncContractAndVehicleStatus(updated, vehicles, rtdbUpdate, updateVehicleMaster);
+  const updateContract = useCallback(async (updated: Contract): Promise<void> => {
+    await syncContractAndVehicleStatus(updated, vehicles, rtdbUpdate, updateVehicleMaster);
   }, [rtdbUpdate, vehicles, updateVehicleMaster]);
 
   // 우클릭 컨텍스트 메뉴 액션 — 빠른 인도/반납/연락/SMS/삭제
@@ -1067,7 +1068,7 @@ export default function Page() {
         contract={selected}
         open={detailOpen}
         onOpenChange={setDetailOpen}
-        onUpdate={updateContract}
+        onUpdate={(c) => { void safeUpdate(() => updateContract(c), { onConflict: () => setDetailOpen(false) }); }}
         onNavigate={(contractId) => setSelectedId(contractId)}
       />
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['현황', '차량', '계약', '입출금']} initialMode={createMode} />
