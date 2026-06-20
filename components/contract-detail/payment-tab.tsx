@@ -18,6 +18,7 @@ import { scheduleStatusTone } from '@/lib/status-tones';
 import { COL } from '@/lib/table-cols';
 import { formatCurrency, formatDateFull } from '@/lib/utils';
 import { useBusyAction } from '@/lib/use-busy-action';
+import { useClosedPeriods, isDateInClosedPeriod } from '@/lib/firebase/closed-periods-store';
 import { todayKr } from '@/lib/mock-data';
 import { recalcSchedule } from '@/lib/payment-schedule';
 import { toast } from '@/lib/toast';
@@ -392,6 +393,8 @@ type DiscountReason = '자가조치' | '보상' | '사은품' | '캠페인' | '�
 function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
   // 멱등성 SSOT — 결제 처리 더블탭 차단 (ERP #16)
   const [busy, runMutation] = useBusyAction();
+  // 회계기간 마감 (ERP #18) — 마감된 월 입금 등록 차단
+  const { closedPeriods } = useClosedPeriods();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [addOpenSeq, setAddOpenSeq] = useState<number | null>(null);
   const [addMode, setAddMode] = useState<AddMode>('payment');
@@ -496,6 +499,13 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
     if (busy) return; // 멱등성 — 진행 중 중복 호출 무시
     const amt = parseInt(addAmount.replace(/[^0-9]/g, ''), 10);
     if (!amt || amt <= 0) { toast.error('금액을 입력하세요'); return; }
+    // 회계기간 마감 (ERP #18) — 입금일이 마감된 월에 속하면 차단
+    const targetDate = addDate || todayKr();
+    if (isDateInClosedPeriod(closedPeriods, targetDate)) {
+      const yyyymm = targetDate.slice(0, 7);
+      toast.error(`회계기간 마감 — ${yyyymm}월 거래 등록 불가. 정정은 신규 회차로 처리하세요.`);
+      return;
+    }
     void runMutation(async () => { commitAddInner(keepOpen, amt); });
   }
 

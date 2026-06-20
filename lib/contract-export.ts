@@ -8,6 +8,7 @@ import type { Contract } from './types';
 import { contractIdentMasked } from './ident';
 import { displayCompanyName } from './company-display';
 import { todayKr } from './mock-data';
+import { fmtMaskedPhone } from './format/korean';
 
 const FONT = '맑은 고딕';
 
@@ -79,7 +80,7 @@ export function downloadContractsExcel(
       c.customerName,
       c.customerKind ?? '',
       contractIdentMasked(c),
-      c.customerPhone1 ?? '',
+      fmtMaskedPhone(c.customerPhone1),
       c.contractDate,
       c.returnScheduledDate ?? '',
       `${c.currentSeq}/${c.totalSeq}`,
@@ -115,7 +116,7 @@ export function downloadContractsExcel(
     set(4, c.customerName);
     set(5, c.customerKind ?? '');
     set(6, contractIdentMasked(c));
-    set(7, c.customerPhone1 ?? '');
+    set(7, fmtMaskedPhone(c.customerPhone1));
     set(8, c.contractDate, styleDate);
     set(9, c.returnScheduledDate ?? '', styleDate);
     set(10, `${c.currentSeq}/${c.totalSeq}`, styleDate);
@@ -172,7 +173,7 @@ export function downloadOverdueExcel(
       return [
         displayCompanyName(c.company, companyMaster),
         c.vehiclePlate, c.vehicleModel, c.customerName,
-        c.customerPhone1 ?? '',
+        fmtMaskedPhone(c.customerPhone1),
         c.contractDate, `${c.currentSeq}/${c.totalSeq}`,
         c.monthlyRent ?? 0, c.unpaidAmount ?? 0, c.unpaidSeqCount ?? 0,
         days, c.manager ?? '',
@@ -205,7 +206,7 @@ export function downloadOverdueExcel(
     set(1, c.vehiclePlate);
     set(2, c.vehicleModel);
     set(3, c.customerName);
-    set(4, c.customerPhone1 ?? '');
+    set(4, fmtMaskedPhone(c.customerPhone1));
     set(5, c.contractDate, styleDate);
     set(6, `${c.currentSeq}/${c.totalSeq}`, styleDate);
     set(7, c.monthlyRent ?? 0, styleNum);

@@ -48,6 +48,12 @@
         ".indexOn": ["date", "scope", "vehiclePlate", "contractId"]
       },
 
+      "closed_periods": {
+        "$yyyymm": {
+          ".write": "auth != null && root.child($tenant + '/users/' + auth.uid + '/role').val() === 'master'"
+        }
+      },
+
       "audit_logs": {
         ".indexOn": ["at", "entity", "entityId", "action", "userId"],
         "$logId": {
