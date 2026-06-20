@@ -272,10 +272,13 @@ export default function CompaniesPage() {
                 tab={tab}
                 onTabChange={setTab}
                 onEdit={startEdit}
-                onRemove={() => {
-                  if (confirm(`"${selected.name}" 법인을 삭제하시겠습니까?\n계약 데이터는 유지됩니다.`)) {
-                    void remove(selected.id).then(() => setSelectedId(null));
-                  }
+                onRemove={async () => {
+                  if (!await showConfirm({
+                    title: `"${selected.name}" 법인을 삭제하시겠습니까?`,
+                    description: '계약 데이터는 유지됩니다.',
+                    danger: true,
+                  })) return;
+                  void remove(selected.id).then(() => setSelectedId(null));
                 }}
               />
             ) : (

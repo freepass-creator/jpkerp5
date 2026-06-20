@@ -59,7 +59,10 @@ export default function FinancePage() {
     if (candidates.length === 0) { toast.info('CMS 매칭 후보 없음'); return; }
     const high = candidates.filter((c) => c.confidence === 'high');
     const others = candidates.length - high.length;
-    if (!window.confirm(`CMS 자동 매칭 — high confidence ${high.length}건 자동 적용${others > 0 ? ` (${others}건은 수동 검토)` : ''}\n\n계속하시겠습니까?`)) return;
+    if (!await showConfirm({
+      title: `CMS 자동 매칭 ${high.length}건 적용`,
+      description: others > 0 ? `나머지 ${others}건은 수동 검토 필요` : undefined,
+    })) return;
     for (const cand of high) {
       for (const { id, patch } of buildSettlementPatches(cand)) {
         try { await updateBank(id, patch); } catch (e) { console.error('[cms]', e); }

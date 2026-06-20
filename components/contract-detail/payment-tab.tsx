@@ -20,6 +20,7 @@ import { formatCurrency, formatDateFull } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
 import { recalcSchedule } from '@/lib/payment-schedule';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import type {
   Contract, PaymentScheduleInline, PaymentEntry, ScheduleStatus, DepositDeduction,
 } from '@/lib/types';
@@ -131,8 +132,8 @@ function DepositSection({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) 
     };
     onUpdate({ ...c, depositDeductions: [...deductions, next] });
   }
-  function removeDeduction(id: string) {
-    if (!confirm('차감 내역을 삭제하시겠습니까?')) return;
+  async function removeDeduction(id: string) {
+    if (!await showConfirm({ title: '차감 내역을 삭제하시겠습니까?', danger: true })) return;
     onUpdate({ ...c, depositDeductions: deductions.filter((d) => d.id !== id) });
   }
 
@@ -287,8 +288,8 @@ function PaymentHistoryTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contr
   const today = todayKr();
   const [receiptFor, setReceiptFor] = useState<{ amount: number; date: string; period: string } | null>(null);
 
-  function handleRemove(seq: number, entryIdx: number) {
-    if (!confirm('이 입금 기록을 삭제하시겠습니까?')) return;
+  async function handleRemove(seq: number, entryIdx: number) {
+    if (!await showConfirm({ title: '이 입금 기록을 삭제하시겠습니까?', danger: true })) return;
     const nextSchedules = (c.schedules ?? []).map((s) => {
       if (s.seq !== seq) return s;
       const payments = [...(s.payments ?? [])];
@@ -564,8 +565,8 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
     setLastSnapshot(null);
   }
 
-  function removePayment(seq: number, idx: number) {
-    if (!confirm(`이 입금 기록을 삭제하시겠습니까?`)) return;
+  async function removePayment(seq: number, idx: number) {
+    if (!await showConfirm({ title: `이 입금 기록을 삭제하시겠습니까?`, danger: true })) return;
     const today = todayKr();
     const next = schedulesNorm.map((s) => {
       if (s.seq !== seq) return { ...s };
@@ -576,8 +577,8 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
     persist(next);
   }
 
-  function removeDiscount(seq: number, idx: number) {
-    if (!confirm(`이 할인 기록을 삭제하시겠습니까?`)) return;
+  async function removeDiscount(seq: number, idx: number) {
+    if (!await showConfirm({ title: `이 할인 기록을 삭제하시겠습니까?`, danger: true })) return;
     const today = todayKr();
     const next = schedulesNorm.map((s) => {
       if (s.seq !== seq) return { ...s };
@@ -588,14 +589,14 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
     persist(next);
   }
 
-  function handleExempt(seq: number) {
-    if (!confirm(`${seq}회차를 '면제'로 처리하시겠습니까?\n(미수에서 제외됨)`)) return;
+  async function handleExempt(seq: number) {
+    if (!await showConfirm({ title: `${seq}회차를 '면제'로 처리하시겠습니까?\n(미수에서 제외됨)`, danger: true })) return;
     const next = schedulesNorm.map((s) => s.seq === seq ? { ...s, status: '면제' as ScheduleStatus, paidAmount: s.amount } : { ...s });
     persist(next);
   }
 
-  function handleRevert(seq: number) {
-    if (!confirm(`${seq}회차의 모든 입금·할인·면제 처리를 취소하시겠습니까?`)) return;
+  async function handleRevert(seq: number) {
+    if (!await showConfirm({ title: `${seq}회차의 모든 입금·할인·면제 처리를 취소하시겠습니까?`, danger: true })) return;
     const today = todayKr();
     const next = schedulesNorm.map((s) => {
       if (s.seq !== seq) return { ...s };

@@ -1,5 +1,6 @@
 'use client';
 
+import { showConfirm } from '@/lib/confirm';
 import { useMemo, useState } from 'react';
 import { MapPin, FloppyDisk, CircleNotch, ArrowRight } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -47,9 +48,9 @@ export function IdleLocationDialog({
     idleContact.trim() !== (contract.idleContact ?? '') ||
     idleReason.trim() !== (contract.idleReason ?? '');
 
-  function tryClose() {
+  async function tryClose() {
     if (isDirty) {
-      if (!window.confirm('편집 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
+      if (!await showConfirm({ title: '편집 중인 내용이 있습니다. 저장하지 않고 닫을까요?' })) return;
     }
     onClose();
   }

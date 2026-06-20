@@ -1,5 +1,6 @@
 'use client';
 
+import { showConfirm } from '@/lib/confirm';
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from '@/lib/toast';
 import JSZip from 'jszip';
@@ -164,9 +165,9 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
     setTimeout(() => { ocr.reset(); setSelected(new Set()); }, 100);
   }
 
-  function handleClose(o: boolean) {
+  async function handleClose(o: boolean) {
     if (!o && ocr.items.length > 0) {
-      if (!window.confirm('OCR 결과 또는 입력 중인 고지서 정보가 있습니다. 저장하지 않고 닫을까요?')) return;
+      if (!await showConfirm({ title: 'OCR 결과 또는 입력 중인 고지서 정보가 있습니다. 저장하지 않고 닫을까요?' })) return;
     }
     setOpen(o);
     if (!o) { ocr.reset(); setSelected(new Set()); }
@@ -268,9 +269,9 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
                 <button
                   className="btn btn-sm"
                   disabled={selectedCount === 0}
-                  onClick={() => {
+                  onClick={async () => {
                     if (selectedCount === 0) return;
-                    if (!window.confirm(`선택한 ${selectedCount}건을 삭제하시겠습니까?`)) return;
+                    if (!await showConfirm({ title: `선택한 ${selectedCount}건을 삭제하시겠습니까?`, danger: true })) return;
                     selected.forEach((id) => ocr.removeItem(id));
                     setSelected(new Set());
                   }}
@@ -348,8 +349,8 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
                           <td className="center">
                             <button
                               className="btn-ghost btn btn-sm"
-                              onClick={() => {
-                                if (!window.confirm('이 항목을 삭제하시겠습니까?')) return;
+                              onClick={async () => {
+                                if (!await showConfirm({ title: '이 항목을 삭제하시겠습니까?', danger: true })) return;
                                 ocr.removeItem(p.id);
                                 setSelected((prev) => { const n = new Set(prev); n.delete(p.id); return n; });
                               }}

@@ -14,10 +14,12 @@ import {
   PauseCircle, PlayCircle, Warning as WarningIcon,
 } from '@phosphor-icons/react';
 import { Section } from '@/components/ui/detail-primitives';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { Field as SharedField } from '@/components/ui/editable-field';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { DateInput } from '@/components/ui/date-input';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { formatCurrency, formatDateFull, daysSince, monthsBetween } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
 import {
@@ -325,14 +327,14 @@ export function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: C
   }
 
   /** 연장대기 / 종료대기 → 운행 복귀 (결정 취소) */
-  function revertToRunning() {
-    if (!window.confirm('결정을 취소하고 계약중(운행)로 되돌립니다. 계속하시겠습니까?')) return;
+  async function revertToRunning() {
+    if (!await showConfirm({ title: '결정을 취소하고 계약중(운행)로 되돌립니다. 계속하시겠습니까?' })) return;
     onUpdate({ ...c, vehicleStatus: '운행' });
   }
 
   /** 되돌리기 — 한 단계 이전으로 (실수 정정용) */
-  function revertStage() {
-    if (!window.confirm(`현재 단계(${stage})를 이전 단계로 되돌립니다. 계속하시겠습니까?`)) return;
+  async function revertStage() {
+    if (!await showConfirm({ title: `현재 단계(${stage})를 이전 단계로 되돌립니다. 계속하시겠습니까?` })) return;
     switch (stage) {
       case '매각':
         onUpdate({ ...c, vehicleStatus: '매각대기' });
@@ -430,10 +432,10 @@ export function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: C
           <select
             className="input"
             value=""
-            onChange={(e) => {
+            onChange={async (e) => {
               const next = e.target.value as VehicleStatus;
               if (!next) return;
-              if (!confirm(`차량 상태를 '${next}' 로 변경합니다.\n진행할까요?`)) return;
+              if (!await showConfirm({ title: `차량 상태를 '${next}' 로 변경합니다.\n진행할까요?` })) return;
               onUpdate({ ...c, vehicleStatus: next });
               toast.success(`상태 변경: ${c.vehicleStatus} → ${next}`);
             }}
@@ -747,8 +749,8 @@ export function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: C
               <button
                 className="btn btn-primary"
                 disabled={!allChecked}
-                onClick={() => {
-                  if (!window.confirm('매각 진행을 결정합니다. 매각대기 상태로 전환됩니다.')) return;
+                onClick={async () => {
+                  if (!await showConfirm({ title: '매각 진행을 결정합니다. 매각대기 상태로 전환됩니다.' })) return;
                   onUpdate({ ...c, vehicleStatus: '매각대기' });
                 }}
               >
@@ -942,8 +944,8 @@ export function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: C
         </div>
       </Section>
 
-      {/* 종료 정보 — status 가 반납/해지/채권 또는 endReason 있을 때만 */}
-      {(c.status === '반납' || c.status === '해지' || c.status === '채권' || c.endReason) && (
+      {/* 종료 정보 — 종료된 계약 또는 endReason 있을 때만 */}
+      {(isContractEnded(c) || c.endReason) && (
         <EndInfoSection c={c} onUpdate={onUpdate} />
       )}
 

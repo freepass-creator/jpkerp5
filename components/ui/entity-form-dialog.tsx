@@ -22,6 +22,7 @@ import type { Icon } from '@phosphor-icons/react';
 import { Dialog, DialogContent, DialogClose, DialogFooter } from './dialog';
 import { cn } from '@/lib/cn';
 import { useDialogShortcuts, countChanges } from '@/lib/use-dialog-shortcuts';
+import { showConfirm } from '@/lib/confirm';
 
 export type FieldDef = {
   key: string;
@@ -102,9 +103,9 @@ export function EntityFormDialog({
   // 변경 감지 — initial vs current data
   const dirtyCount = useMemo(() => countChanges(initial, data), [initial, data]);
 
-  function handleClose() {
+  async function handleClose() {
     if (currentMode === 'edit' && dirtyCount > 0) {
-      if (!window.confirm('미저장 변경이 있습니다. 닫을까요?')) return;
+      if (!await showConfirm({ title: '미저장 변경이 있습니다. 닫을까요?' })) return;
     }
     onOpenChange(false);
   }

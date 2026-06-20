@@ -16,6 +16,7 @@
 
 import type { Contract } from './types';
 import { todayKr } from './mock-data';
+import { isContractEnded } from './contract-lifecycle';
 
 export type AlertSeverity = 'overdue' | 'urgent' | 'soon';
 
@@ -39,8 +40,7 @@ export type AlertItem = {
  * 운행 중이 아닌(해지/반납) 계약은 제외.
  */
 export function buildAlertsForContract(c: Contract, today: string): AlertItem[] {
-  if (c.status === '해지' || c.status === '반납') return [];
-  if (c.returnedDate) return [];
+  if (isContractEnded(c)) return [];
   const out: AlertItem[] = [];
 
   function add(kind: AlertKind, dueDate: string) {

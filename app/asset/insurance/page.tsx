@@ -93,7 +93,6 @@ export default function AssetInsurancePage() {
   // 행 선택 — lib/use-table-selection SSOT
   const sel = useTableSelection();
   const { selectedIds, setSelectedIds, toggleRow } = sel;
-  const selAdapter = sel;
 
   const today = useLiveTodayKr();
 
@@ -161,8 +160,8 @@ export default function AssetInsurancePage() {
     });
   }, [allRows, search, companyFilter, qf]);
 
-  const rowSel = useRowSelection({ ids: filtered.map((r) => r.v.id), selection: selAdapter });
-  useCtrlASelectAll(rowSel, selAdapter);
+  const rowSel = useRowSelection({ ids: filtered.map((r) => r.v.id), selection: sel });
+  useCtrlASelectAll(rowSel, sel);
 
   if (roleLoading || !master) {
     return <PageLoading />;

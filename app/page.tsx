@@ -467,7 +467,6 @@ export default function Page() {
   }
 
   const clearSelection = useCallback(() => sel.clear(), [sel]);
-  const selAdapter = sel;
 
   // 퀵필터 변경 시 수동 정렬·선택 초기화 (필터 의도된 자동 정렬 우선)
   useEffect(() => { setManualSort(null); sel.clear(); }, [view, sel]);
@@ -587,8 +586,8 @@ export default function Page() {
   }
 
   // Ctrl/Shift+click 행선택 + Ctrl+A
-  const rowSel = useRowSelection({ ids: filteredContracts.map((c) => c.id), selection: selAdapter });
-  useCtrlASelectAll(rowSel, selAdapter);
+  const rowSel = useRowSelection({ ids: filteredContracts.map((c) => c.id), selection: sel });
+  useCtrlASelectAll(rowSel, sel);
 
   return (
     <PageShell
@@ -871,7 +870,7 @@ export default function Page() {
                         <td className={`center mono ${isReturnOverdue ? 'danger' : 'dim'}`}>
                           {(() => {
                             const s = c.vehicleStatus;
-                            const skip = s === '휴차' || s === '휴차대기' || s === '매각검토' || s === '매각' || s === '매각대기' || c.status === '반납' || c.status === '해지';
+                            const skip = s === '휴차' || s === '휴차대기' || s === '매각검토' || s === '매각' || s === '매각대기' || isContractEnded(c);
                             if (skip) return <span className="muted">-</span>;
                             if (!expiryDate) return <span className="muted">-</span>;
                             if (c.contractDate && expiryDate < c.contractDate) {

@@ -1,5 +1,6 @@
 'use client';
 
+import { showConfirm } from '@/lib/confirm';
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
 import { CheckCircle, CircleNotch } from '@phosphor-icons/react';
@@ -70,9 +71,9 @@ export function HistoryAddDialog({
     !!title.trim() || !!description.trim() || !!cost ||
     !!vendor.trim() || !!mileage || Object.keys(meta).length > 0;
 
-  function guardedClose(next: boolean) {
+  async function guardedClose(next: boolean) {
     if (!next && isDirty) {
-      if (!window.confirm('입력 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
+      if (!await showConfirm({ title: '입력 중인 내용이 있습니다. 저장하지 않고 닫을까요?' })) return;
     }
     onOpenChange(next);
   }

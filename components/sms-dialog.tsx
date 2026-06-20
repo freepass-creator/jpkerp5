@@ -5,6 +5,7 @@ import { ChatCircleDots, PaperPlaneTilt } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import type { Contract } from '@/lib/types';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 
 type Recipient = {
   contractId: string;
@@ -119,9 +120,10 @@ export function SmsDialog({
   }
 
   async function sendMessages() {
-    const ok = window.confirm(
-      `${recipients.length}명에게 문자를 발송합니다.\n\n[미리보기]\n${preview(body, recipients[0])}\n\n계속 진행하시겠습니까?`
-    );
+    const ok = await showConfirm({
+      title: `${recipients.length}명에게 문자를 발송합니다`,
+      description: `[미리보기]\n${preview(body, recipients[0])}`,
+    });
     if (!ok) return;
 
     // Firebase ID token

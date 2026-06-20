@@ -21,6 +21,7 @@ import { fileToDataUrl } from '@/lib/image-compress';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
 import { audit } from '@/lib/firebase/audit-store';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import type { Company, CompanyDocument } from '@/lib/types';
 // 공용 OCR 배치 훅 + 드롭존 (penalty/vehicle-reg/insurance 와 동일 패턴)
 import { useOcrBatch, type OcrBatchItem } from '@/lib/use-ocr-batch';
@@ -113,9 +114,9 @@ export function BusinessRegRegisterDialog({
     setManualDraft({});
     setMode('ocr');
   }
-  function handleClose(o: boolean) {
+  async function handleClose(o: boolean) {
     if (!o && items.length > 0) {
-      if (!window.confirm('OCR 결과 또는 입력 중인 법인 정보가 있습니다. 저장하지 않고 닫을까요?')) return;
+      if (!await showConfirm({ title: 'OCR 결과 또는 입력 중인 법인 정보가 있습니다. 저장하지 않고 닫을까요?' })) return;
     }
     if (!o) reset();
     onOpenChange(o);

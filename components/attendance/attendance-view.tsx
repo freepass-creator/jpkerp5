@@ -19,6 +19,7 @@ import {
 } from '@/lib/firebase/attendance-store';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { Calendar, CheckCircle, XCircle, ClockCounterClockwise, FunnelSimple } from '@phosphor-icons/react';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'all';
@@ -216,7 +217,7 @@ function KpiCard({ label, value, tone, icon }: { label: string; value: number; t
 
 function ApproveBtn({ r, approverEmail }: { r: AttendanceRequest; approverEmail?: string }) {
   async function handle() {
-    if (!window.confirm(`${r.applicantName ?? r.applicantEmail}의 ${ATTENDANCE_LABEL[r.type]} 승인하시겠습니까?`)) return;
+    if (!await showConfirm({ title: `${r.applicantName ?? r.applicantEmail}의 ${ATTENDANCE_LABEL[r.type]} 승인하시겠습니까?` })) return;
     try {
       await updateAttendanceStatus(r.id, { status: 'approved', approvedBy: approverEmail });
       toast.success('승인 완료');

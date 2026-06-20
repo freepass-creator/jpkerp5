@@ -39,7 +39,6 @@ const STAFF_DEFAULTS = {
   fax: '',
 };
 
-const CHECK_COL_WIDTH = 28;
 const COMPANY_COL_WIDTH = 56;
 const PLATE_COL_WIDTH = 96;
 
@@ -150,21 +149,6 @@ export default function PenaltyPage() {
     ));
   }
 
-  /** 체크박스 토글 — sel.toggleRow alias (legacy 호출자) */
-  const toggleSelect = sel.toggleRow;
-
-  /** 현재 visible 행 전체 선택/해제 (penalty 만의 특수 로직 — 일부만 체크되어도 모두 선택) */
-  function toggleSelectAll(visibleIds: string[]) {
-    setSelectedIds((prev) => {
-      const allChecked = visibleIds.every((id) => prev.has(id));
-      const next = new Set(prev);
-      if (allChecked) visibleIds.forEach((id) => next.delete(id));
-      else visibleIds.forEach((id) => next.add(id));
-      return next;
-    });
-  }
-
-  const selAdapter = sel;
 
   /** 선택된 매칭 완료건 일괄 처리완료 */
   async function markSelectedCompleted() {
@@ -184,7 +168,7 @@ export default function PenaltyPage() {
       ? { ...it, _phase: 'completed' as Phase, _processedAt: now }
       : it,
     ));
-    setSelectedIds(new Set());
+    sel.clear();
   }
 
   /** 선택된 항목 PDF 다운로드 (중복 자동 제외) */
@@ -207,7 +191,7 @@ export default function PenaltyPage() {
         ? { ...it, _phase: 'completed' as Phase, _processedAt: now }
         : it,
       ));
-      setSelectedIds(new Set());
+      sel.clear();
     } finally {
       setBusy(false);
       setPdfProgress(null);
@@ -373,8 +357,8 @@ export default function PenaltyPage() {
 
   // 행 선택 - 현재 visible (in-progress 또는 completed) 기준
   const visibleRows = phase === 'in-progress' ? inProgress : completed;
-  const rowSel = useRowSelection({ ids: visibleRows.map((i) => i.id), selection: selAdapter });
-  useCtrlASelectAll(rowSel, selAdapter);
+  const rowSel = useRowSelection({ ids: visibleRows.map((i) => i.id), selection: sel });
+  useCtrlASelectAll(rowSel, sel);
 
   return (
     <>
@@ -540,23 +524,8 @@ export default function PenaltyPage() {
           <table className="table">
             <thead>
               <tr>
-                <th className="checkbox-col sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH }}>
-                  <input
-                    type="checkbox"
-                    checked={visible.length > 0 && visible.every((it) => selectedIds.has(it.id))}
-                    ref={(el) => {
-                      if (!el) return;
-                      const some = visible.some((it) => selectedIds.has(it.id));
-                      const all = visible.every((it) => selectedIds.has(it.id));
-                      el.indeterminate = some && !all;
-                    }}
-                    onChange={() => toggleSelectAll(visible.map((it) => it.id))}
-                    title="현재 보이는 항목 전체 선택"
-                    aria-label="전체 선택"
-                  />
-                </th>
-                <th className="sticky-col" style={{ left: CHECK_COL_WIDTH, minWidth: COMPANY_COL_WIDTH }}>회사코드</th>
-                <th className="sticky-col-2" style={{ left: CHECK_COL_WIDTH + COMPANY_COL_WIDTH, minWidth: PLATE_COL_WIDTH }}>차량번호</th>
+                <th style={{ minWidth: COMPANY_COL_WIDTH }}>회사코드</th>
+                <th style={{ minWidth: PLATE_COL_WIDTH }}>차량번호</th>
                 <th className="center" style={{ width: 36 }}>매칭</th>
                 {phase === 'in-progress' ? (
                   <>
@@ -651,17 +620,10 @@ export default function PenaltyPage() {
                   const violClass = inRange === false ? 'text-red' : 'mono';
                   return (
                     <tr key={it.id} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, it.id, visibleRows.findIndex((x) => x.id === it.id))} onDoubleClick={() => it.car_number && openVehicle(it.car_number, 'risk')} onContextMenu={(e) => rowSel.onRowContextMenu(e, it.id, visibleRows.findIndex((x) => x.id === it.id), () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: it }))} style={{ cursor: 'pointer' }}>
-                      <td className="checkbox-col sticky-col" style={{ left: 0, width: CHECK_COL_WIDTH, background: 'var(--bg-card)' }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(it.id)}
-                          onChange={() => toggleSelect(it.id)}
-                        />
-                      </td>
-                      <td className="plate text-medium sticky-col" style={{ left: CHECK_COL_WIDTH, minWidth: COMPANY_COL_WIDTH }}>
+                      <td className="plate text-medium" style={{ minWidth: COMPANY_COL_WIDTH }}>
                         {it._company?.code || <span className="text-muted">-</span>}
                       </td>
-                      <td className="plate text-medium sticky-col-2" style={{ left: CHECK_COL_WIDTH + COMPANY_COL_WIDTH, minWidth: PLATE_COL_WIDTH }}>
+                      <td className="plate text-medium" style={{ minWidth: PLATE_COL_WIDTH }}>
                         {it.car_number || <span className="text-muted">-</span>}
                       </td>
                       <td className="center">

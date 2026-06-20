@@ -153,7 +153,6 @@ export default function AssetPage() {
   // 행 선택 — lib/use-table-selection SSOT
   const sel = useTableSelection();
   const { selectedIds, setSelectedIds, toggleRow } = sel;
-  const selAdapter = sel;
 
   const selected = useMemo(() => vehicles.find((v) => v.id === selectedId) ?? null, [vehicles, selectedId]);
 
@@ -282,8 +281,8 @@ export default function AssetPage() {
   }, [vehicles, search, companyFilter, statusFilter, assetQF, isMissing]);
 
   // Ctrl/Shift+click 행선택 + Ctrl+A 전체선택
-  const rowSel = useRowSelection({ ids: filtered.map((v) => v.id), selection: selAdapter });
-  useCtrlASelectAll(rowSel, selAdapter);
+  const rowSel = useRowSelection({ ids: filtered.map((v) => v.id), selection: sel });
+  useCtrlASelectAll(rowSel, sel);
 
   return (
     <div className="layout">

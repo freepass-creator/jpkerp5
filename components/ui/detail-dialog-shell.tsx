@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { EditButtons } from '@/components/ui/edit-buttons';
 import { useDialogShortcuts } from '@/lib/use-dialog-shortcuts';
+import { showConfirm } from '@/lib/confirm';
 
 export type ShellTab = {
   value: string;
@@ -85,9 +86,9 @@ export function DetailDialogShell({
     onSave: editing ? onSave : undefined,
   });
   // 닫기 가드 — 편집 중 X/Esc/overlay 클릭 시 확인 (실수 닫기 방지)
-  const guardedOnOpenChange = (next: boolean) => {
+  const guardedOnOpenChange = async (next: boolean) => {
     if (!next && editing) {
-      const ok = window.confirm('편집 중인 내용이 있습니다. 저장하지 않고 닫을까요?');
+      const ok = await showConfirm({ title: '편집 중인 내용이 있습니다. 저장하지 않고 닫을까요?' });
       if (!ok) return;
       // 사용자가 OK 누른 경우 — 자식 탭의 draft 도 cancel 해서 잔류 방지
       onCancel?.();

@@ -9,6 +9,7 @@
  */
 
 import type { Contract, RiskIssue, RiskIssueKind } from './types';
+import { isContractEnded } from './contract-lifecycle';
 
 /** 미납 회차 중 가장 오래된 dueDate (없으면 undefined) */
 function oldestUnpaidDueDate(c: Contract): string | undefined {
@@ -142,7 +143,7 @@ export function pickPrimaryIssue(issues: RiskIssue[]): RiskIssue | null {
  */
 export function needsEngineLockAction(c: Contract, today: string): boolean {
   if (c.engineDisabled === true) return false;        // 이미 했으면 ok
-  if (c.status === '채권' || c.status === '반납' || c.status === '해지') return false;
+  if (isContractEnded(c)) return false;
   const due = oldestUnpaidDueDate(c);
   if (!due) return false;
   return diffDays(due, today) >= 3;

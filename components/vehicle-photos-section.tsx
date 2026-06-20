@@ -23,6 +23,7 @@ import {
 import { fileToDataUrl } from '@/lib/image-compress';
 import { useAuth } from '@/lib/use-auth';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 
 type Props = {
   vehicleId: string | null | undefined;
@@ -87,7 +88,7 @@ export function VehiclePhotosSection({ vehicleId, contractId, defaultKind = 'pro
 
   async function handleDelete(p: VehiclePhoto) {
     if (!vehicleId) return;
-    if (!window.confirm(`이 사진을 삭제할까요?\n\n${p.fileName ?? p.id}`)) return;
+    if (!await showConfirm({ title: `이 사진을 삭제할까요?\n\n${p.fileName ?? p.id}`, danger: true })) return;
     try {
       await removeVehiclePhoto(vehicleId, p.id);
       toast.success('삭제됨');
@@ -316,7 +317,7 @@ export function VehiclePhotosByKind({ vehicleId, kind, contractId, title, readon
 
   async function handleDelete(p: VehiclePhoto) {
     if (!vehicleId) return;
-    if (!window.confirm(`이 사진을 삭제할까요?\n\n${p.fileName ?? p.id}`)) return;
+    if (!await showConfirm({ title: `이 사진을 삭제할까요?\n\n${p.fileName ?? p.id}`, danger: true })) return;
     try {
       await removeVehiclePhoto(vehicleId, p.id);
       toast.success('삭제됨');

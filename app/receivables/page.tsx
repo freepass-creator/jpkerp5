@@ -135,7 +135,6 @@ export default function ReceivablesPage() {
   // 행 선택 — lib/use-table-selection SSOT
   const sel = useTableSelection();
   const { selectedIds, setSelectedIds } = sel;
-  const selAdapter = sel;
 
   const today = useLiveTodayKr();
 
@@ -279,8 +278,8 @@ export default function ReceivablesPage() {
   };
 
   // Ctrl/Shift+click 행선택 + Ctrl+A
-  const rowSel = useRowSelection({ ids: filtered.map((c) => c.id), selection: selAdapter });
-  useCtrlASelectAll(rowSel, selAdapter);
+  const rowSel = useRowSelection({ ids: filtered.map((c) => c.id), selection: sel });
+  useCtrlASelectAll(rowSel, sel);
 
   return (
     <div className="layout">
@@ -854,8 +853,8 @@ function ContactLogDialog({
   const [saving, setSaving] = useState(false);
 
   const isDirty = !!response.trim() || !!nextPromise || !!notes.trim();
-  function tryClose() {
-    if (isDirty && !window.confirm('입력 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
+  async function tryClose() {
+    if (isDirty && !await showConfirm({ title: '입력 중인 내용이 있습니다. 저장하지 않고 닫을까요?' })) return;
     onClose();
   }
 

@@ -68,7 +68,6 @@ export default function ContractPage() {
   // 행 선택 — lib/use-table-selection SSOT
   const sel = useTableSelection();
   const { selectedIds, setSelectedIds, toggleRow } = sel;
-  const selAdapter = sel;
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
 
@@ -146,8 +145,8 @@ export default function ContractPage() {
   }, [contracts, search, quickFilter, companyFilter, today]);
 
   // Ctrl/Shift+click 행선택 + Ctrl+A
-  const rowSel = useRowSelection({ ids: filtered.map((c) => c.id), selection: selAdapter });
-  useCtrlASelectAll(rowSel, selAdapter);
+  const rowSel = useRowSelection({ ids: filtered.map((c) => c.id), selection: sel });
+  useCtrlASelectAll(rowSel, sel);
 
   // 각 퀵필터 카운트 — chip 라벨에 표시
   const counts = useMemo(() => {

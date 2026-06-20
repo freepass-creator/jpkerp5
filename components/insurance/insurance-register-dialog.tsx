@@ -23,6 +23,7 @@ import { buildInsurancePolicyFromOcr } from '@/lib/insurance-calc';
 import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
 import { fileToDataUrl } from '@/lib/image-compress';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import type { InsurancePolicy } from '@/lib/types';
 // 공용 OCR 배치 훅 + 드롭존 (penalty / vehicle-reg 와 동일 패턴)
 import { useOcrBatch, type OcrBatchItem } from '@/lib/use-ocr-batch';
@@ -125,9 +126,9 @@ export function InsuranceRegisterDialog({
     setBusy(false);
   }
 
-  function handleClose(o: boolean) {
+  async function handleClose(o: boolean) {
     if (!o && items.length > 0) {
-      if (!window.confirm('OCR 결과 또는 입력 중인 보험증권 정보가 있습니다. 저장하지 않고 닫을까요?')) return;
+      if (!await showConfirm({ title: 'OCR 결과 또는 입력 중인 보험증권 정보가 있습니다. 저장하지 않고 닫을까요?' })) return;
     }
     onOpenChange(o);
     if (!o) reset();

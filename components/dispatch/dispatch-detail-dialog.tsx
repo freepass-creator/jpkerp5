@@ -17,6 +17,7 @@ import {
   type DispatchOrder, type DispatchStatus, type DispatchComment,
 } from '@/lib/firebase/dispatch-store';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { useAuth, useUsers } from '@/lib/use-auth';
 import { useContracts } from '@/lib/firebase/contracts-store';
 
@@ -287,8 +288,8 @@ export function DispatchDetailDialog({
             </button>
           )}
           {isCreator && (
-            <button type="button" className="btn" style={{ color: 'var(--red-text)' }} onClick={() => {
-              if (!window.confirm('이 업무 요청을 삭제하시겠습니까?')) return;
+            <button type="button" className="btn" style={{ color: 'var(--red-text)' }} onClick={async () => {
+              if (!await showConfirm({ title: '이 업무 요청을 삭제하시겠습니까?', danger: true })) return;
               void (async () => {
                 try {
                   await removeDispatchOrder(order.id);
