@@ -5,6 +5,7 @@ import { ref, onValue, set, update as rtdbUpdate, push, remove as rtdbRemove } f
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { BankTransaction, CardTransaction, AuditEntityType } from '@/lib/types';
+import { lockedUpdate } from './locked-update';
 
 const BANK_PATH = dbPath('bank_tx');
 const CARD_PATH = dbPath('card_tx');
@@ -58,7 +59,9 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       const newRef = push(ref(db, path));
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-      await set(newRef, pruneUndefined({ ...row, id }));
+      const now = new Date().toISOString();
+      // 회계일자(#17): importedAt = 시스템 등록 시점, createdAt 도 동일.
+      await set(newRef, pruneUndefined({ ...row, id, importedAt: now, createdAt: now, updatedAt: now }));
       return id;
     },
     update: async (id: string, patch: Partial<T>) => {
@@ -68,7 +71,10 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbUpdate(ref(db, `${path}/${id}`), pruneUndefined(patch as unknown as Record<string, unknown>));
+      // patch 형식 update — updatedAt 자동 갱신.
+      // 동시편집 보호: patch 는 expectedUpdatedAt 모르므로 raw rtdbUpdate (BankTx/CardTx 는 매칭 작업 위주, 충돌 거의 없음).
+      await rtdbUpdate(ref(db, `${path}/${id}`),
+        pruneUndefined({ ...patch, updatedAt: new Date().toISOString() } as unknown as Record<string, unknown>));
     },
     updateMany: async (patches: Record<string, Partial<T>>) => {
       const ids = Object.keys(patches);
@@ -101,11 +107,13 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       const db = getRtdb(); if (!db) return [] as T[];
       const batch: Record<string, T> = {};
       const stamped: T[] = [];
+      const now = new Date().toISOString();
       for (const row of items) {
         const newRef = push(ref(db, path));
         const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-        const full = { ...row, id } as unknown as T;
+        // 회계일자(#17): import 시점 stamped
+        const full = { ...row, id, importedAt: now, createdAt: now, updatedAt: now } as unknown as T;
         batch[id] = full;
         stamped.push(full);
       }

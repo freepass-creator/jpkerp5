@@ -1,0 +1,34 @@
+name: 일일 RTDB 백업 (ERP #20)
+
+# 매일 KST 03:00 (UTC 18:00 전날) 실행
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch: {}  # 수동 실행 허용
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm i google-auth-library
+
+      - name: Backup RTDB
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          BACKUP_DIR: .backups
+        run: node scripts/backup-rtdb.mjs
+
+      - name: Upload artifact (30일 보관)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtdb-backup-${{ github.run_id }}
+          path: .backups/*.json
+          retention-days: 30

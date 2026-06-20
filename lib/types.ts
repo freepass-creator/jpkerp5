@@ -336,6 +336,20 @@ export type BankTransaction = {
   settlementFeeAmount?: number;     // 수수료 = gross - 실 입금액
   settlementItemCount?: number;     // 묶음 건수
   raw?: Record<string, unknown>;
+
+  // 표준 timestamp (ERP #33) + 회계일자/시스템일자 분리 (#17)
+  /** 시스템 import 시점 — 은행 명세 업로드한 ISO timestamp */
+  importedAt?: string;
+  importedBy?: string;
+  /** 회계 인식일 — txDate(거래일)와 별도. 마감 처리 시 기준 (기본 = txDate) */
+  accountedDate?: string;
+  /** 표준 timestamp */
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 };
 
 /** 카드 입금 트랜잭션 */
@@ -369,6 +383,17 @@ export type CardTransaction = {
   /** 카드사 집금 정산 ID — 1 BankTransaction deposit ↔ N CardTransaction 묶음. role='item' 만 카드 측에 표시 */
   settlementId?: string;
   raw?: Record<string, unknown>;
+
+  // 표준 timestamp (ERP #33) + 회계일자/시스템일자 분리 (#17)
+  importedAt?: string;
+  importedBy?: string;
+  accountedDate?: string;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 };
 
 /** 이력 — 두 가지 귀속 방식
