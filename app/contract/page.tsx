@@ -385,7 +385,16 @@ export default function ContractPage() {
           );
         }}
       />
-      <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['계약']} initialMode="계약" />
+      <CreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        visibleModes={['계약']}
+        initialMode="계약"
+        onContractCreated={(newId) => {
+          // 등록 즉시 detail 자동 오픈 — 직원이 추가 정보 점진 입력 (트렌드 UX)
+          setOpenId(newId);
+        }}
+      />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filtered} selectedIds={selectedIds} />
       <ContextMenu
         open={ctxMenu.open}

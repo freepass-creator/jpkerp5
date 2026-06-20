@@ -1071,7 +1071,17 @@ export default function Page() {
         onUpdate={(c) => { void safeUpdate(() => updateContract(c), { onConflict: () => setDetailOpen(false) }); }}
         onNavigate={(contractId) => setSelectedId(contractId)}
       />
-      <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['현황', '차량', '계약', '입출금']} initialMode={createMode} />
+      <CreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        visibleModes={['현황', '차량', '계약', '입출금']}
+        initialMode={createMode}
+        onContractCreated={(newId) => {
+          // 등록 즉시 detail 자동 오픈 (트렌드 UX)
+          setSelectedId(newId);
+          setDetailOpen(true);
+        }}
+      />
       <SmsDialog open={smsOpen} onOpenChange={setSmsOpen} contracts={filteredContracts} selectedIds={selectedIds} />
 
       <ContextMenu

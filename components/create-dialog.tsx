@@ -76,13 +76,15 @@ function useDialogFooterActions(actions: ReactNode | null, deps: React.Dependenc
 }
 
 export function CreateDialog({
-  open, onOpenChange, initialMode, visibleModes = ALL_MODES,
+  open, onOpenChange, initialMode, visibleModes = ALL_MODES, onContractCreated,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initialMode?: Mode;
   /** 노출할 탭 화이트리스트. 미지정 시 전체 노출 */
   visibleModes?: Mode[];
+  /** 신규 계약 등록 완료 시 호출 — 호출자가 ContractDetailDialog 자동 오픈 가능 (트렌드 UX) */
+  onContractCreated?: (newContractId: string) => void;
 }) {
   const defaultMode = initialMode && visibleModes.includes(initialMode) ? initialMode : visibleModes[0] ?? '현황';
   const [mode, setMode] = useState<Mode>(defaultMode);
@@ -779,6 +781,7 @@ export function CreateDialog({
                   onPick={onPick}
                   onChangeKind={(idx, k) => updateKind(idx, k, 'contract')}
                   onClose={() => onOpenChange(false)}
+                  onContractCreated={onContractCreated}
                   onCommit={commitContractFiles}
                   busy={busy}
                   result={result}
@@ -2232,7 +2235,7 @@ function SnapshotPane({
 /* ─────────────── 계약 등록 Pane (개별 / OCR / 엑셀) ─────────────── */
 
 function ContractRegisterPane({
-  files, drag, onPick, onChangeKind, onClose,
+  files, drag, onPick, onChangeKind, onClose, onContractCreated,
   onCommit, busy, result,
 }: {
   files: ParsedSheet[];
@@ -2240,6 +2243,8 @@ function ContractRegisterPane({
   onPick: () => void;
   onChangeKind: (idx: number, k: UploadKind) => void;
   onClose: () => void;
+  /** 등록 완료 시 detail 자동 오픈 콜백 — 트렌드 UX (등록 후 점진 입력) */
+  onContractCreated?: (id: string) => void;
   onCommit: () => Promise<void>;
   busy: boolean;
   result: string | null;
@@ -2259,7 +2264,10 @@ function ContractRegisterPane({
         </button>
       </div>
 
-      {mode === 'manual' && <ContractManualForm onSubmit={onClose} />}
+      {mode === 'manual' && <ContractManualForm onSubmit={(newId) => {
+        onClose();
+        if (newId) onContractCreated?.(newId);
+      }} />}
       {mode === 'ocr' && <ContractOcrPane onSubmit={() => { toast.info('mock: OCR 계약 등록 완료'); onClose(); }} />}
       {mode === 'excel' && (
         <UploadPane
@@ -2275,7 +2283,7 @@ function ContractRegisterPane({
   );
 }
 
-function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
+function ContractManualForm({ onSubmit }: { onSubmit: (newContractId?: string) => void }) {
   const companyNames = useCompanyNames();
   const { add: addContract } = useContracts();
   const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
@@ -2467,7 +2475,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
       } catch (syncErr) {
         console.error('vehicle sync from contract failed', syncErr);
       }
-      onSubmit();
+      onSubmit(newContractId);
     } catch (e) {
       toast.error('계약 등록 실패: ' + ((e as Error).message ?? String(e)));
     } finally {
@@ -2574,31 +2582,37 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
             </div>
           )}
 
-          <div className="form-grid-2" style={{ marginTop: 10, opacity: matchedVehicle ? 0.6 : 1 }}>
-            <label className="form-label">① 제조사</label>
-            <input className="input" disabled={!!matchedVehicle} list="dl-makers" placeholder="예: 현대" value={vehicleMaker} onChange={(e) => { setVehicleMaker(e.target.value); setVehicleModelLine(''); }} />
+          {/* 차량 상세 (5단 + 옵션·색상) — 등록 후 detail 에서도 입력 가능. 매칭된 차량은 자동 펼침. */}
+          <details open={!matchedVehicle && (!!vehicleMaker || !!vehicleModelLine)} style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--text-sub)', padding: '6px 0' }}>
+              + 차량 5단 분류·색상·옵션 (선택 — 등록 후 차량 상세에서 입력 가능)
+            </summary>
+            <div className="form-grid-2" style={{ marginTop: 6, opacity: matchedVehicle ? 0.6 : 1 }}>
+              <label className="form-label">① 제조사</label>
+              <input className="input" disabled={!!matchedVehicle} list="dl-makers" placeholder="예: 현대" value={vehicleMaker} onChange={(e) => { setVehicleMaker(e.target.value); setVehicleModelLine(''); }} />
 
-            <label className="form-label">② 모델</label>
-            <input className="input" disabled={!!matchedVehicle} list="dl-models" placeholder="예: 그랜저" value={vehicleModelLine} onChange={(e) => setVehicleModelLine(e.target.value)} />
+              <label className="form-label">② 모델</label>
+              <input className="input" disabled={!!matchedVehicle} list="dl-models" placeholder="예: 그랜저" value={vehicleModelLine} onChange={(e) => setVehicleModelLine(e.target.value)} />
 
-            <label className="form-label">③ 세부모델</label>
-            <input className="input" disabled={!!matchedVehicle} placeholder="예: 더 뉴 그랜저 GN7" value={vehicleSubModel} onChange={(e) => setVehicleSubModel(e.target.value)} />
+              <label className="form-label">③ 세부모델</label>
+              <input className="input" disabled={!!matchedVehicle} placeholder="예: 더 뉴 그랜저 GN7" value={vehicleSubModel} onChange={(e) => setVehicleSubModel(e.target.value)} />
 
-            <label className="form-label">④ 모델구분</label>
-            <input className="input" disabled={!!matchedVehicle} placeholder="예: 가솔린 3.5 AWD (연료·엔진·구동·인승)" value={vehicleVariant} onChange={(e) => setVehicleVariant(e.target.value)} />
+              <label className="form-label">④ 모델구분</label>
+              <input className="input" disabled={!!matchedVehicle} placeholder="예: 가솔린 3.5 AWD (연료·엔진·구동·인승)" value={vehicleVariant} onChange={(e) => setVehicleVariant(e.target.value)} />
 
-            <label className="form-label">⑤ 트림</label>
-            <input className="input" disabled={!!matchedVehicle} placeholder="예: 캘리그래피" value={vehicleTrim} onChange={(e) => setVehicleTrim(e.target.value)} />
+              <label className="form-label">⑤ 트림</label>
+              <input className="input" disabled={!!matchedVehicle} placeholder="예: 캘리그래피" value={vehicleTrim} onChange={(e) => setVehicleTrim(e.target.value)} />
 
-            <label className="form-label">선택옵션</label>
-            <input className="input" disabled={!!matchedVehicle} placeholder="예: 선루프, 풀옵션, 18인치휠, 내비" value={vehicleOptions} onChange={(e) => setVehicleOptions(e.target.value)} />
+              <label className="form-label">선택옵션</label>
+              <input className="input" disabled={!!matchedVehicle} placeholder="예: 선루프, 풀옵션, 18인치휠, 내비" value={vehicleOptions} onChange={(e) => setVehicleOptions(e.target.value)} />
 
-            <label className="form-label">외부 색상</label>
-            <input className="input" disabled={!!matchedVehicle} placeholder="예: 화이트 펄" value={exteriorColor} onChange={(e) => setExteriorColor(e.target.value)} />
+              <label className="form-label">외부 색상</label>
+              <input className="input" disabled={!!matchedVehicle} placeholder="예: 화이트 펄" value={exteriorColor} onChange={(e) => setExteriorColor(e.target.value)} />
 
-            <label className="form-label">내부 색상</label>
-            <input className="input" disabled={!!matchedVehicle} placeholder="예: 베이지" value={interiorColor} onChange={(e) => setInteriorColor(e.target.value)} />
-          </div>
+              <label className="form-label">내부 색상</label>
+              <input className="input" disabled={!!matchedVehicle} placeholder="예: 베이지" value={interiorColor} onChange={(e) => setInteriorColor(e.target.value)} />
+            </div>
+          </details>
           <datalist id="dl-makers">
             {MAKERS.map((m) => <option key={m} value={m} />)}
           </datalist>
@@ -2608,8 +2622,10 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
         </div>
       </div>
 
-      <div className="detail-section">
-        <div className="detail-section-header">계약자 구분 / 운전자 면허</div>
+      <details open={customerKind === '법인' || !!regNo || !!driverName || !!licenseNo} className="detail-section">
+        <summary className="detail-section-header" style={{ cursor: 'pointer' }}>
+          계약자 구분 / 운전자 면허 <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-weak)', marginLeft: 6 }}>(선택 — 등록 후에도 입력 가능)</span>
+        </summary>
         <div className="detail-section-body">
           <div className="form-grid-2">
             <label className="form-label">구분</label>
@@ -2739,7 +2755,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: () => void }) {
             </select>
           </div>
         </div>
-      </div>
+      </details>
 
       <div className="detail-section">
         <div className="detail-section-header">계약 조건 (선택)</div>
