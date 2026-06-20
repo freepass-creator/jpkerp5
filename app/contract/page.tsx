@@ -32,6 +32,7 @@ import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { isContractEnded, isAbnormalEnded, isNormalEnded } from '@/lib/contract-lifecycle';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { usePersistentState } from '@/lib/use-persistent-state';
@@ -277,7 +278,7 @@ export default function ContractPage() {
             style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
             onClick={async () => {
               if (selectedIds.size === 0) return;
-              if (!confirm(`선택한 ${selectedIds.size}건의 계약을 삭제하시겠습니까? (감사로그 남음)`)) return;
+              if (!await showConfirm({ title: `선택한 ${selectedIds.size}건의 계약을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
               for (const id of selectedIds) {
                 try { await removeContract(id); } catch (e) { console.error('contract delete failed', id, e); }
               }
@@ -417,10 +418,10 @@ export default function ContractPage() {
           {
             label: '반납 처리 (오늘)',
             icon: <ArrowUDownLeft size={12} weight="bold" />,
-            onClick: () => {
+            onClick: async () => {
               const r = ctxMenu.row;
               if (!r) return;
-              if (!confirm(`${r.contractNo} 반납 처리하시겠습니까? (반납일=오늘)`)) return;
+              if (!await showConfirm({ title: `${r.contractNo} 반납 처리하시겠습니까? (반납일=오늘)` })) return;
               const updated = { ...r, returnedDate: new Date().toISOString().slice(0, 10), status: '반납' as const, vehicleStatus: '반납' as const };
               void syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster);
             },
@@ -430,10 +431,10 @@ export default function ContractPage() {
           {
             label: '계약 삭제',
             icon: <X size={12} weight="bold" />,
-            onClick: () => {
+            onClick: async () => {
               const r = ctxMenu.row;
               if (!r) return;
-              if (!confirm(`${r.contractNo} 계약을 삭제하시겠습니까? (감사로그 남음)`)) return;
+              if (!await showConfirm({ title: `${r.contractNo} 계약을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
               void removeContract(r.id);
             },
             danger: true,

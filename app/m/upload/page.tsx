@@ -32,6 +32,7 @@ import { addFieldLog } from '@/lib/firebase/field-logs-store';
 import { addVehiclePhoto, type VehiclePhotoKind } from '@/lib/firebase/vehicle-attachments-store';
 import { tryAutoMatch, extractOcrHints, findCustomerByLicenseNo } from '@/lib/firebase/upload-auto-match';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 // Phase 2.1 — intake 평행 기록 (기존 흐름 유지)
 import {
   addIntakeItem, setIntakeClassify, setIntakeMatch, markIntakeCommitted,
@@ -389,7 +390,7 @@ function PendingCard({ item, userEmail }: { item: PendingUpload; userEmail?: str
     : item.kind === 'document' ? FilePdf : FileIcon;
 
   async function handleDelete() {
-    if (!window.confirm('이 업로드를 삭제할까요?')) return;
+    if (!await showConfirm({ title: '이 업로드를 삭제할까요?', danger: true })) return;
     try {
       await removePendingUpload(item.id);
       toast.success('삭제됨');

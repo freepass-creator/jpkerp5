@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import { getFirebaseAuth } from '@/lib/firebase/client';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 
 type UserRow = {
   uid: string;
@@ -81,7 +82,7 @@ export default function AdminUsersPage() {
     if (!user) return;
     if (u.uid === user.uid) { toast.error('자기 자신은 비활성화 불가'); return; }
     const next = !u.disabled;
-    if (!confirm(`${u.email} 계정을 ${next ? '비활성화' : '활성화'} 할까요?`)) return;
+    if (!await showConfirm({ title: `${u.email} 계정을 ${next ? '비활성화' : '활성화'} 할까요?` })) return;
     setBusyUid(u.uid);
     try {
       const token = await user.getIdToken();
@@ -102,7 +103,7 @@ export default function AdminUsersPage() {
 
   const sendReset = useCallback(async (u: UserRow) => {
     if (!u.email) { toast.error('이메일 없음'); return; }
-    if (!confirm(`${u.email} 으로 비밀번호 재설정 메일을 보낼까요?`)) return;
+    if (!await showConfirm({ title: `${u.email} 으로 비밀번호 재설정 메일을 보낼까요?` })) return;
     setBusyUid(u.uid);
     try {
       const auth = getFirebaseAuth();
@@ -120,7 +121,7 @@ export default function AdminUsersPage() {
     if (!user || !isMaster) return;
     if (u.role === 'master') { toast.error('마스터 권한은 코드(SUPER_ADMIN_EMAILS) 변경 후 가능'); return; }
     const next: 'admin' | 'staff' = u.role === 'admin' ? 'staff' : 'admin';
-    if (!confirm(`${u.email} 의 권한을 ${next === 'admin' ? '관리자' : '일반 직원'} 으로 변경할까요?`)) return;
+    if (!await showConfirm({ title: `${u.email} 의 권한을 ${next === 'admin' ? '관리자' : '일반 직원'} 으로 변경할까요?` })) return;
     setBusyUid(u.uid);
     try {
       const token = await user.getIdToken();
@@ -142,7 +143,7 @@ export default function AdminUsersPage() {
   const deleteUser = useCallback(async (u: UserRow) => {
     if (!user) return;
     if (u.uid === user.uid) { toast.error('자기 자신은 삭제 불가'); return; }
-    if (!confirm(`${u.email} 계정을 영구 삭제할까요?\n복구 불가능합니다.`)) return;
+    if (!await showConfirm({ title: `${u.email} 계정을 영구 삭제할까요?\n복구 불가능합니다.`, danger: true })) return;
     setBusyUid(u.uid);
     try {
       const token = await user.getIdToken();

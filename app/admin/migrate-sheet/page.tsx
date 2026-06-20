@@ -10,6 +10,7 @@ import { isSuperAdmin } from '@/lib/admin-emails';
 import { generateSchedules } from '@/lib/payment-schedule';
 import { monthsBetween } from '@/lib/utils';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { isContractEnded } from '@/lib/contract-lifecycle';
 import { friendlyError } from '@/lib/friendly-error';
 import type { Contract, CompanyCode, PaymentEntry, PaymentScheduleInline } from '@/lib/types';
@@ -227,7 +228,7 @@ export default function MigrateSheetPage() {
   /** 사진 plate-키 → vehicleId 일괄 이관. plate(또는 plateHistory) 매칭되는 차량에 자동 흡수 */
   async function migratePlatePhotos() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
-    if (!window.confirm('plate-키로 임시 저장된 사진을 자체코드(vehicleId) 로 일괄 이관합니다.\n(매칭되는 차량이 있는 plate만 처리, 미등록 차량은 그대로 plate 유지)')) return;
+    if (!await showConfirm({ title: 'plate 사진 일괄 이관', description: 'plate-키로 임시 저장된 사진을 자체코드(vehicleId)로 일괄 이관합니다.\n매칭되는 차량이 있는 plate만 처리, 미등록 차량은 plate 유지.' })) return;
     setRunning(true);
     setLog([]);
     try {
@@ -284,7 +285,7 @@ export default function MigrateSheetPage() {
    */
   async function backfillDeliveredDate() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
-    if (!window.confirm('계약자가 있는데 인도일이 비어있는 계약을 일괄 인도완료(deliveredDate=contractDate, status/vehicleStatus=운행) 처리합니다.\n\n진행할까요?')) return;
+    if (!await showConfirm({ title: '인도일 일괄 백필', description: '계약자가 있는데 인도일이 비어있는 계약을 일괄 인도완료 처리합니다.\ndeliveredDate=contractDate, status/vehicleStatus=운행 으로 설정.' })) return;
     setRunning(true);
     setLog([]);
     try {
@@ -336,7 +337,11 @@ export default function MigrateSheetPage() {
   /** 강제 wipe — root 통째로 삭제 (companies/audit_logs 포함 모든 것) */
   async function nukeEverything() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
-    if (!window.confirm(`핵 wipe — ${RTDB_ROOT} root 노드 전체 삭제\n\ncompanies/audit_logs 포함 모든 데이터 사라집니다.\n진행할까요?`)) return;
+    if (!await showConfirm({
+      title: `핵 wipe — ${RTDB_ROOT} root 노드 전체 삭제`,
+      description: 'companies/audit_logs 포함 모든 데이터 사라집니다.\n복구 불가능합니다.',
+      confirmLabel: 'wipe 진행', danger: true,
+    })) return;
     // Type-to-confirm — 머슬 메모리 'Enter Enter' 사고 방지
     const typed = window.prompt(`마지막 확인 — 아래 문자열을 그대로 입력하세요:\n\n  ${RTDB_ROOT}\n\n(빈 입력·다른 문자 = 취소)`, '');
     if (typed !== RTDB_ROOT) {
@@ -401,7 +406,11 @@ export default function MigrateSheetPage() {
         return;
       }
 
-      if (!window.confirm(`⚠️ contracts ${cAll.length}건 + vehicles ${vAll.length}대 영구 삭제. 진행?`)) return;
+      if (!await showConfirm({
+        title: `contracts ${cAll.length}건 + vehicles ${vAll.length}대 영구 삭제`,
+        description: '복구 불가능합니다. 진행할까요?',
+        confirmLabel: '영구 삭제', danger: true,
+      })) return;
       // Type-to-confirm — 머슬 메모리 'Enter Enter' 사고 방지
       const phrase = 'WIPE';
       const typed = window.prompt(`마지막 확인 — 아래 단어를 그대로 입력하세요:\n\n  ${phrase}\n\n(빈 입력·다른 문자 = 취소)`, '');
@@ -456,13 +465,14 @@ export default function MigrateSheetPage() {
 
   async function runFullMigration() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
-    if (!window.confirm(
-      `구글 시트 import + 중복 자동 정리\n\n` +
-      `· 같은 (차량번호+고객명) 중복 발견 시 실 입금 데이터 많은 쪽 keeper, 나머지 삭제\n` +
-      `· 회사명 잘못된 경우 시드값으로 자동 보정\n` +
-      `· 'spillover/스냅샷 자동 정리' 는 실 입금과 같은 월(회차)에 있으면 제거\n` +
-      `· 결제는 차량+계약일 매칭 → schedules.payments에 추가\n\n진행하시겠습니까?`,
-    )) return;
+    if (!await showConfirm({
+      title: '구글 시트 import + 중복 자동 정리',
+      description:
+        '· 같은 (차량번호+고객명) 중복 발견 시 실 입금 데이터 많은 쪽 keeper, 나머지 삭제\n' +
+        '· 회사명 잘못된 경우 시드값으로 자동 보정\n' +
+        '· spillover/스냅샷 자동 정리는 실 입금과 같은 월(회차)에 있으면 제거\n' +
+        '· 결제는 차량+계약일 매칭 → schedules.payments에 추가',
+    })) return;
 
     setRunning(true);
     setLog([]);

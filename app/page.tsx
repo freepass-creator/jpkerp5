@@ -33,6 +33,7 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { useAuth } from '@/lib/use-auth';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { ageFromIdent } from '@/lib/ident';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
@@ -410,12 +411,12 @@ export default function Page() {
     const today = new Date().toISOString().slice(0, 10);
     updateContract({ ...c, deliveredDate: today, status: '운행', vehicleStatus: '운행' });
   }
-  function ctxAction_markReturned(c: Contract) {
+  async function ctxAction_markReturned(c: Contract) {
     if (c.returnedDate) {
       toast.info(`${c.vehiclePlate} 는 이미 반납 완료 (${c.returnedDate})`);
       return;
     }
-    if (!confirm(`${c.vehiclePlate} ${c.customerName} 을 오늘 반납 처리하시겠습니까?`)) return;
+    if (!await showConfirm({ title: `${c.vehiclePlate} ${c.customerName} 을 오늘 반납 처리하시겠습니까?` })) return;
     const today = new Date().toISOString().slice(0, 10);
     updateContract({ ...c, returnedDate: today, status: '반납', vehicleStatus: '반납' });
   }
@@ -423,8 +424,8 @@ export default function Page() {
     setSelectedIds(new Set([c.id]));
     setSmsOpen(true);
   }
-  function ctxAction_delete(c: Contract) {
-    if (!confirm(`정말 ${c.contractNo} ${c.vehiclePlate} ${c.customerName} 계약을 삭제하시겠습니까?\n(돌이킬 수 없음)`)) return;
+  async function ctxAction_delete(c: Contract) {
+    if (!await showConfirm({ title: `정말 ${c.contractNo} ${c.vehiclePlate} ${c.customerName} 계약을 삭제하시겠습니까?\n(돌이킬 수 없음)`, danger: true })) return;
     void rtdbRemove(c.id);
   }
 
@@ -435,8 +436,8 @@ export default function Page() {
     if (list.length === 0) return;
     const preview = list.slice(0, 5).map((c) => `· ${c.vehiclePlate} ${c.customerName}`).join('\n');
     const more = list.length > 5 ? `\n... 외 ${list.length - 5}건` : '';
-    if (!confirm(`정말 ${list.length}건 계약을 삭제하시겠습니까?\n\n${preview}${more}\n\n(돌이킬 수 없음)`)) return;
-    if (!confirm(`한 번 더 확인 — 진짜 삭제할까요? (${list.length}건)`)) return;
+    if (!await showConfirm({ title: `정말 ${list.length}건 계약을 삭제하시겠습니까?\n\n${preview}${more}\n\n(돌이킬 수 없음)`, danger: true })) return;
+    if (!await showConfirm({ title: `한 번 더 확인 — 진짜 삭제할까요? (${list.length}건)`, danger: true })) return;
     for (const c of list) {
       await rtdbRemove(c.id);
     }
@@ -453,7 +454,7 @@ export default function Page() {
       toast.info('선택 항목 모두 이미 인도 완료됨');
       return;
     }
-    if (!confirm(`${targets.length}건을 일괄 인도완료 처리하시겠습니까?\n(deliveredDate = 계약시작일, status = '운행')`)) return;
+    if (!await showConfirm({ title: `${targets.length}건을 일괄 인도완료 처리하시겠습니까?\n(deliveredDate = 계약시작일, status = '운행')` })) return;
     const updated = targets.map((c) => ({
       ...c,
       deliveredDate: c.contractDate,

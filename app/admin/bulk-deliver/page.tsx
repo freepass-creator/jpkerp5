@@ -27,6 +27,7 @@ import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-syn
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { isContractEnded } from '@/lib/contract-lifecycle';
 import { todayKr } from '@/lib/mock-data';
 
@@ -69,7 +70,7 @@ export default function BulkDeliverPage() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     const targets = candidates.filter((c) => selected.has(c.id));
     if (targets.length === 0) { toast.warning('선택된 계약 없음'); return; }
-    if (!window.confirm(`${targets.length}건 일괄 인도완료 처리합니다.\n  · deliveredDate = 계약시작일\n  · status, vehicleStatus = '운행'\n  · 차량 마스터(자산) status 동시 동기화\n\n진행할까요?`)) return;
+    if (!await showConfirm({ title: `${targets.length}건 일괄 인도완료 처리합니다.\n  · deliveredDate = 계약시작일\n  · status, vehicleStatus = '운행'\n  · 차량 마스터(자산) status 동시 동기화\n\n진행할까요?` })) return;
 
     setRunning(true);
     setDoneCount(0);

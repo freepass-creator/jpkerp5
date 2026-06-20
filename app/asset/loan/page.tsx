@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileXls, MagnifyingGlass, Copy, Trash } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -145,7 +146,7 @@ export default function AssetLoanPage() {
                     return;
                   }
                   const note = sel.size - realIds.length > 0 ? `\n(자동 인식 ${sel.size - realIds.length}건은 제외됨)` : '';
-                  if (!confirm(`선택한 ${realIds.length}건의 자산을 삭제하시겠습니까?${note}`)) return;
+                  if (!await showConfirm({ title: `선택한 ${realIds.length}건의 자산을 삭제하시겠습니까?${note}`, danger: true })) return;
                   for (const id of realIds) {
                     try { await removeVehicle(id); } catch (err) { console.error('vehicle delete failed', id, err); }
                   }

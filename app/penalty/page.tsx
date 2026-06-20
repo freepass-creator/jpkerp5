@@ -19,6 +19,7 @@ import { exportToExcel } from '@/lib/excel-export';
 import { PERIODS, type Period, periodRange, isInRange } from '@/lib/period-filter';
 import { useAuth } from '@/lib/use-auth';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
@@ -128,10 +129,10 @@ export default function PenaltyPage() {
     setItems((p) => p.filter((i) => i.id !== id));
   }
 
-  function clearInProgress() {
+  async function clearInProgress() {
     const n = items.filter((i) => (i._phase ?? 'in-progress') === 'in-progress').length;
     if (n === 0) return;
-    if (!confirm(`처리중 ${n}건을 전체 초기화할까요? 처리완료 이력은 유지됩니다.`)) return;
+    if (!await showConfirm({ title: `처리중 ${n}건을 전체 초기화할까요? 처리완료 이력은 유지됩니다.` })) return;
     setItems((prev) => prev.filter((i) => i._phase === 'completed'));
   }
 
@@ -166,7 +167,7 @@ export default function PenaltyPage() {
   const selAdapter = sel;
 
   /** 선택된 매칭 완료건 일괄 처리완료 */
-  function markSelectedCompleted() {
+  async function markSelectedCompleted() {
     const targets = items.filter((i) =>
       selectedIds.has(i.id) &&
       (i._phase ?? 'in-progress') === 'in-progress' &&
@@ -176,7 +177,7 @@ export default function PenaltyPage() {
       toast.info('처리완료 가능한 매칭 항목이 선택되지 않았습니다');
       return;
     }
-    if (!confirm(`매칭 완료된 ${targets.length}건을 처리완료로 이동할까요?`)) return;
+    if (!await showConfirm({ title: `매칭 완료된 ${targets.length}건을 처리완료로 이동할까요?` })) return;
     const now = new Date().toISOString();
     const ids = new Set(targets.map((t) => t.id));
     setItems((prev) => prev.map((it) => ids.has(it.id)

@@ -63,6 +63,7 @@ const NEXT_STATES: Record<VehicleStatus, VehicleStatus[]> = {
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { showConfirm } from '@/lib/confirm';
 import { Field } from '@/components/ui/editable-field';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { Section, Stack, Grid2 } from '@/components/ui/detail-primitives';
@@ -130,8 +131,8 @@ function OperationOverviewTab({
   // 가능한 다음 상태
   const nextStates = NEXT_STATES[vehicle.status as VehicleStatus] ?? [];
 
-  function changeStatus(next: VehicleStatus) {
-    if (!window.confirm(`차량 상태를 [${vehicle.status}] → [${next}] 로 변경하시겠습니까?`)) return;
+  async function changeStatus(next: VehicleStatus) {
+    if (!await showConfirm({ title: `차량 상태를 [${vehicle.status}] → [${next}] 로 변경하시겠습니까?` })) return;
     onUpdate({ ...vehicle, status: next });
   }
 

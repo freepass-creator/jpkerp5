@@ -29,6 +29,7 @@ import { useLiveTodayKr } from '@/lib/use-live-today';
 import { Plus, FileXls, Trash, MagnifyingGlass, Copy } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { isContractEnded } from '@/lib/contract-lifecycle';
 import type { Vehicle } from '@/lib/types';
 import { useVehicleDialog } from '@/lib/global-dialogs';
@@ -323,7 +324,7 @@ export default function AssetInsurancePage() {
                     toast.info('선택한 차량 중 매칭된 보험증권 없음');
                     return;
                   }
-                  if (!confirm(`선택한 ${targets.length}건의 보험증권을 삭제하시겠습니까? (감사로그 남음)`)) return;
+                  if (!await showConfirm({ title: `선택한 ${targets.length}건의 보험증권을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
                   for (const { policy } of targets) {
                     if (!policy) continue;
                     try { await removePolicy(policy.id); }

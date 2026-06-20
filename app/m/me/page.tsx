@@ -23,6 +23,7 @@ import {
   Calendar, Sun, Moon, CircleHalf, Tray,
 } from '@phosphor-icons/react';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { APP_VERSION } from '@/lib/version';
 
 const NOTI_KEY = 'jpkerp5:mobile:notifications';
@@ -32,7 +33,7 @@ export default function MobileMe() {
   const { isRealMaster } = useRole();
 
   async function handleLogout() {
-    if (!window.confirm('로그아웃하시겠습니까?')) return;
+    if (!await showConfirm({ title: '로그아웃하시겠습니까?' })) return;
     const app = getFirebaseApp();
     if (!app) return;
     await signOut(getAuth(app));

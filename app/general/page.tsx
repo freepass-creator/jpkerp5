@@ -14,6 +14,7 @@ import {
   Megaphone, Calendar, Pulse,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
+import { showConfirm } from '@/lib/confirm';
 import { EmptyRow } from "@/components/ui/empty-row";
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-apply';
@@ -64,7 +65,7 @@ export default function GeneralPage() {
   async function deleteSelectedCompanies() {
     const target = companies.filter((c) => companySelectedIds.has(c.id));
     if (target.length === 0) return;
-    if (!window.confirm(`선택한 ${target.length}건 삭제하시겠습니까?`)) return;
+    if (!await showConfirm({ title: `선택한 ${target.length}건 삭제하시겠습니까?`, danger: true })) return;
     for (const c of target) {
       await removeCompany(c.id);
       void audit.delete('company', c.id, `법인 삭제 — ${c.name}`);

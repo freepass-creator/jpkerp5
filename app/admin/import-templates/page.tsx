@@ -8,6 +8,7 @@ import { getRtdb, dbPath, ensureAuth, pruneUndefined } from '@/lib/firebase/clie
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { friendlyError } from '@/lib/friendly-error';
 import { downloadHorizontalTemplate } from '@/lib/excel-template';
 import { CONTRACT_HISTORY_TEMPLATE, RECEIPT_HISTORY_TEMPLATE } from '@/lib/import-schema';
@@ -61,7 +62,7 @@ export default function ImportTemplatesPage() {
   async function applyContractHistory() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!contractParsed || contractParsed.length === 0) { toast.warning('계약이력 파일을 먼저 업로드하세요'); return; }
-    if (!window.confirm(`계약이력 ${contractParsed.length}대(차량) 적용 — 같은 차량+계약자는 갱신, 신규는 추가`)) return;
+    if (!await showConfirm({ title: `계약이력 ${contractParsed.length}대(차량) 적용 — 같은 차량+계약자는 갱신, 신규는 추가` })) return;
     setRunning(true);
     try {
       await ensureAuth();
@@ -142,7 +143,7 @@ export default function ImportTemplatesPage() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!receiptParsed || receiptParsed.length === 0) { toast.warning('수납이력 파일을 먼저 업로드하세요'); return; }
     const totalP = receiptParsed.reduce((s, r) => s + r.payments.length, 0);
-    if (!window.confirm(`수납이력 ${totalP}건 결제 매칭 적용 — 차량+등록번호로 계약 찾아 schedule에 입금 누적`)) return;
+    if (!await showConfirm({ title: `수납이력 ${totalP}건 결제 매칭 적용 — 차량+등록번호로 계약 찾아 schedule에 입금 누적` })) return;
     setRunning(true);
     try {
       await ensureAuth();

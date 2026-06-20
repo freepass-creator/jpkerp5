@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Wrench, Warning, CheckCircle, ArrowRight, ArrowLeft, MagnifyingGlass } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
+import { showConfirm } from '@/lib/confirm';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
@@ -134,7 +135,7 @@ export default function StatusDriftPage() {
 
   async function applyAllVehicleSide() {
     if (drift.length === 0 || busy) return;
-    if (!confirm(`드리프트 ${drift.length}건을 모두 '자산 마스터' 값으로 정렬합니다. 진행할까요?\n\n각 계약의 vehicleStatus 가 vehicle.status 로 덮입니다.`)) return;
+    if (!await showConfirm({ title: `드리프트 ${drift.length}건을 모두 '자산 마스터' 값으로 정렬합니다. 진행할까요?\n\n각 계약의 vehicleStatus 가 vehicle.status 로 덮입니다.` })) return;
     setBusy(true);
     try {
       for (const row of drift) {

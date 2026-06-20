@@ -15,6 +15,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
@@ -41,7 +42,7 @@ export default function PurchasePage() {
       toast.info('차량번호가 등록된 구매대기 자산 없음 (먼저 차량번호 입력 필요)');
       return;
     }
-    if (!confirm(`구매대기 ${promotable.length}건을 상품대기로 일괄 전환합니다.\n같은 plate 활성 계약 vehicleStatus 도 sync 됩니다.\n계속?`)) return;
+    if (!await showConfirm({ title: `구매대기 ${promotable.length}건을 상품대기로 일괄 전환합니다.\n같은 plate 활성 계약 vehicleStatus 도 sync 됩니다.\n계속?` })) return;
     setBusy(true);
     let changed = 0, synced = 0;
     try {

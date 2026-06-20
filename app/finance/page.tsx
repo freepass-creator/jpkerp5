@@ -25,6 +25,7 @@ import { CompanyCell } from '@/components/ui/company-cell';
 import { CreateDialog } from '@/components/create-dialog';
 import { DailyLedgerView } from '@/components/finance/daily-ledger-view';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { downloadTaxInvoiceExcel } from '@/lib/tax-invoice-export';
 import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
 import { PageShell } from '@/components/ui/page-shell';
@@ -77,7 +78,7 @@ export default function FinancePage() {
   }
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`선택한 ${selectedIds.size}건의 거래내역을 삭제하시겠습니까?`)) return;
+    if (!await showConfirm({ title: `선택한 ${selectedIds.size}건의 거래내역을 삭제하시겠습니까?`, danger: true })) return;
     try {
       await removeManyBank(Array.from(selectedIds));
       setSelectedIds(new Set());

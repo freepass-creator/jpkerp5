@@ -44,6 +44,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
 import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
@@ -570,7 +571,7 @@ export default function AssetPage() {
                     return;
                   }
                   const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
-                  if (!confirm(`선택한 ${realIds.length}건의 자산을 삭제하시겠습니까? (감사로그 남음)${note}`)) return;
+                  if (!await showConfirm({ title: `선택한 ${realIds.length}건의 자산을 삭제하시겠습니까? (감사로그 남음)${note}`, danger: true })) return;
                   for (const id of realIds) {
                     try { await removeVehicle(id); } catch (e) { console.error('vehicle delete failed', id, e); }
                   }
@@ -598,7 +599,7 @@ export default function AssetPage() {
                     return;
                   }
                   const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
-                  if (!confirm(`선택한 ${targets.length}건의 자산 상태를 '${next}' 로 변경합니다.\n같은 plate 의 활성 계약 vehicleStatus 도 함께 sync 됩니다.${note}\n계속?`)) return;
+                  if (!await showConfirm({ title: `선택한 ${targets.length}건의 자산 상태를 '${next}' 로 변경합니다.\n같은 plate 의 활성 계약 vehicleStatus 도 함께 sync 됩니다.${note}\n계속?` })) return;
                   let changed = 0, syncedContracts = 0;
                   for (const v of targets) {
                     if (v.status === next) continue;
@@ -689,7 +690,7 @@ export default function AssetPage() {
                   toast.info('자동 결정 대상 없음 — 모든 차량이 사용자 명시 상태');
                   return;
                 }
-                if (!confirm(`자동 결정 대상 ${targets.length}대 — 차량번호로 휴차/등록대기/구매대기 재계산.\n사용자 명시 상태(운행/정비/사고/매각 등)는 보존.\n계속?`)) return;
+                if (!await showConfirm({ title: `자동 결정 대상 ${targets.length}대 — 차량번호로 휴차/등록대기/구매대기 재계산.\n사용자 명시 상태(운행/정비/사고/매각 등)는 보존.\n계속?` })) return;
                 let changed = 0;
                 let syncedContracts = 0;
                 for (const v of targets) {
@@ -752,10 +753,10 @@ export default function AssetPage() {
             {
               label: '차량 삭제',
               icon: <X size={12} weight="bold" />,
-              onClick: () => {
+              onClick: async () => {
                 const r = ctxMenu.row;
                 if (!r) return;
-                if (!confirm(`${r.plate ?? r.id} 차량을 삭제하시겠습니까? (감사로그 남음)`)) return;
+                if (!await showConfirm({ title: `${r.plate ?? r.id} 차량을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
                 void removeVehicle(r.id);
               },
               danger: true,

@@ -22,6 +22,7 @@ import {
 } from '@/lib/firebase/intake-store';
 import { useAuth } from '@/lib/use-auth';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import type { IntakeItem, IntakeStatus, IntakeSource, IntakeKind } from '@/lib/intake/types';
 
 const STATUS_LABEL: Record<IntakeStatus, string> = {
@@ -117,7 +118,7 @@ export default function InboxPage() {
   const selected = useMemo(() => filtered.find((i) => i.id === selectedId) ?? null, [filtered, selectedId]);
 
   async function handleRemove(id: string) {
-    if (!confirm('이 intake 기록을 삭제합니다 (도메인 노드는 영향 X). 진행?')) return;
+    if (!await showConfirm({ title: '이 intake 기록을 삭제합니다 (도메인 노드는 영향 X). 진행?', danger: true })) return;
     try {
       await removeIntakeItem(id);
       toast.success('삭제됨');

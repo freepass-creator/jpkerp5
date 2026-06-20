@@ -13,6 +13,7 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import type { Vehicle } from '@/lib/types';
 import { Sidebar } from '@/components/layout/sidebar';
 import { EmptyRow } from "@/components/ui/empty-row";
@@ -152,7 +153,7 @@ export default function AssetDisposalPage() {
                     return;
                   }
                   const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
-                  if (!confirm(`선택한 ${targets.length}건의 자산 상태를 '${next}' 로 변경합니다.\n같은 plate 활성 계약 vehicleStatus 도 sync 됩니다.${note}\n계속?`)) return;
+                  if (!await showConfirm({ title: `선택한 ${targets.length}건의 자산 상태를 '${next}' 로 변경합니다.\n같은 plate 활성 계약 vehicleStatus 도 sync 됩니다.${note}\n계속?` })) return;
                   let changed = 0, syncedContracts = 0;
                   const todayIso = new Date().toISOString().slice(0, 10);
                   for (const v of targets) {
@@ -191,7 +192,7 @@ export default function AssetDisposalPage() {
                     return;
                   }
                   const note = sel.size - realIds.length > 0 ? `\n(자동 인식 ${sel.size - realIds.length}건은 제외됨)` : '';
-                  if (!confirm(`선택한 ${realIds.length}건의 자산을 삭제하시겠습니까?${note}`)) return;
+                  if (!await showConfirm({ title: `선택한 ${realIds.length}건의 자산을 삭제하시겠습니까?${note}`, danger: true })) return;
                   for (const id of realIds) {
                     try { await removeVehicle(id); } catch (err) { console.error('vehicle delete failed', id, err); }
                   }

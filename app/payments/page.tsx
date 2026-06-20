@@ -22,6 +22,7 @@ import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { audit } from '@/lib/firebase/audit-store';
 import { todayKr } from '@/lib/mock-data';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import type { BankTransaction, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { FilterSelect } from '@/components/ui/filter-select';
@@ -199,7 +200,7 @@ export default function PaymentsPage() {
       toast.info('자동 매칭 가능한 카드 매출이 없습니다 (고객명·금액 일치 미매칭 없음)');
       return;
     }
-    if (!confirm(`카드 매출 자동 매칭 ${results.length}건 일괄 적용하시겠습니까?`)) return;
+    if (!await showConfirm({ title: `카드 매출 자동 매칭 ${results.length}건 일괄 적용하시겠습니까?` })) return;
 
     const txPatches: Record<string, Partial<import('@/lib/types').CardTransaction>> = {};
     const ctxByContract = new Map<string, Contract>();
@@ -254,7 +255,7 @@ export default function PaymentsPage() {
       `· ${r.tx.txDate.slice(0, 10)} ${r.tx.amount.toLocaleString('ko-KR')}원 → ${r.candidate.contract.contractNo} ${r.candidate.scheduleSeq}회차`,
     ).join('\n');
     const more = results.length > 10 ? `\n... 외 ${results.length - 10}건` : '';
-    if (!confirm(`자동 매칭 ${results.length}건 일괄 적용:\n\n${preview}${more}\n\n진행할까요?`)) return;
+    if (!await showConfirm({ title: `자동 매칭 ${results.length}건 일괄 적용:\n\n${preview}${more}\n\n진행할까요?` })) return;
 
     // tx + contract 일괄 patch 준비
     const txPatches: Record<string, Partial<BankTransaction>> = {};
@@ -291,7 +292,7 @@ export default function PaymentsPage() {
       return `· ${m.depositTx.txDate.slice(0, 10)} ${kindLabel} ₩${m.netAmount.toLocaleString('ko-KR')}\n   ↳ 묶음 ${count}건 (총액 ₩${m.grossAmount.toLocaleString('ko-KR')}, 수수료 ₩${m.feeAmount.toLocaleString('ko-KR')} / ${feePct}%)`;
     }).join('\n');
     const more = matches.length > 8 ? `\n... 외 ${matches.length - 8}건` : '';
-    if (!confirm(`정산 매칭 ${matches.length}건 일괄 적용:\n\n${preview}${more}\n\n진행할까요?`)) return;
+    if (!await showConfirm({ title: `정산 매칭 ${matches.length}건 일괄 적용:\n\n${preview}${more}\n\n진행할까요?` })) return;
 
     // 일괄 patch
     const bankPatches: Record<string, Partial<BankTransaction>> = {};

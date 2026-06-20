@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileXls, MagnifyingGlass, Copy, ArrowSquareOut, Trash } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
@@ -178,7 +179,7 @@ export default function RepairPage() {
                     return;
                   }
                   const note = sel.size - realIds.length > 0 ? `\n(자동 인식 ${sel.size - realIds.length}건은 제외됨)` : '';
-                  if (!confirm(`선택한 ${realIds.length}건의 자산을 삭제하시겠습니까?${note}`)) return;
+                  if (!await showConfirm({ title: `선택한 ${realIds.length}건의 자산을 삭제하시겠습니까?${note}`, danger: true })) return;
                   for (const id of realIds) {
                     try { await removeVehicle(id); } catch (err) { console.error('vehicle delete failed', id, err); }
                   }
@@ -261,7 +262,7 @@ export default function RepairPage() {
                 const ids = Array.from(sel.selectedIds);
                 if (ids.length === 0 && ctxMenu.row) ids.push(ctxMenu.row.id);
                 if (ids.length === 0) return;
-                if (!confirm(`${ids.length}대의 차량을 삭제하시겠습니까? (감사로그 남음)`)) return;
+                if (!await showConfirm({ title: `${ids.length}대의 차량을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
                 for (const id of ids) { try { await removeVehicle(id); } catch (e) { console.error(e); } }
                 sel.clear();
                 toast.success(`${ids.length}대 삭제됨`);

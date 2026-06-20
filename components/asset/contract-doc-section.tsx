@@ -18,6 +18,7 @@ import { DateInput } from '@/components/ui/date-input';
 import type { Vehicle } from '@/lib/types';
 import { normalizePlateLoose as normalizePlate } from '@/lib/customer-match';
 import { fileToDataUrl } from '@/lib/image-compress';
+import { showConfirm } from '@/lib/confirm';
 
 type Extracted = {
   car_number?: string;
@@ -111,8 +112,8 @@ export function ContractDocSection({
     setPendingFileDataUrl('');
   }
 
-  function clearDoc() {
-    if (!confirm('계약사실확인서 정보를 삭제하시겠습니까?')) return;
+  async function clearDoc() {
+    if (!await showConfirm({ title: '계약사실확인서 정보를 삭제하시겠습니까?', danger: true })) return;
     onUpdate({
       ...vehicle,
       contractDocFileName: undefined,

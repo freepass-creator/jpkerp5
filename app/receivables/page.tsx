@@ -28,6 +28,7 @@ import { downloadOverdueExcel } from '@/lib/contract-export';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { isContractEnded } from '@/lib/contract-lifecycle';
 import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
@@ -232,9 +233,9 @@ export default function ReceivablesPage() {
     if (!admin) { toast.error('관리자만 채권 변경 가능'); return; }
     const isDebt = c.status === '채권';
     if (!isDebt) {
-      if (!window.confirm(`${c.vehiclePlate} ${c.customerName} — 채권화 처리 (회수불가/법적조치 검토)?`)) return;
+      if (!await showConfirm({ title: `${c.vehiclePlate} ${c.customerName} — 채권화 처리 (회수불가/법적조치 검토)?`, danger: true })) return;
     } else {
-      if (!window.confirm(`${c.vehiclePlate} ${c.customerName} — 채권 해제하시겠습니까?`)) return;
+      if (!await showConfirm({ title: `${c.vehiclePlate} ${c.customerName} — 채권 해제하시겠습니까?` })) return;
     }
     try {
       // 채권화 시 status='채권', 해제 시 returnedDate 있으면 '반납', 없으면 '운행'

@@ -14,6 +14,7 @@ import {
   ATTENDANCE_LABEL, STATUS_LABEL, STATUS_TONE,
 } from '@/lib/firebase/attendance-store';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 
 export default function MobileAttendance() {
   const { user } = useAuth();
@@ -71,7 +72,7 @@ function RequestRow({ req }: { req: ReturnType<typeof useMyAttendanceRequests>[n
   const canCancel = req.status === 'pending';
 
   async function handleCancel() {
-    if (!window.confirm(`${ATTENDANCE_LABEL[req.type]} 신청을 취소하시겠습니까?`)) return;
+    if (!await showConfirm({ title: `${ATTENDANCE_LABEL[req.type]} 신청을 취소하시겠습니까?` })) return;
     try {
       await updateAttendanceStatus(req.id, { status: 'cancelled' });
       toast.success('신청 취소됨');

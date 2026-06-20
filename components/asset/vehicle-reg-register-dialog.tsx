@@ -25,6 +25,7 @@ import { pdfFirstPageToJpegFile } from '@/lib/pdf-to-image';
 import { fileToDataUrl } from '@/lib/image-compress';
 import { getFirebaseAuth } from '@/lib/firebase/client';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import type { Vehicle, CompanyCode } from '@/lib/types';
 import { normPlate, findCompanyByRegNo } from '@/lib/entity-sync';
 import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';

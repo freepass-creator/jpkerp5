@@ -28,6 +28,7 @@ import { formatCurrency } from '@/lib/utils';
 import { DailyLedgerView } from '@/components/finance/daily-ledger-view';
 import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 import { downloadTaxInvoiceExcel } from '@/lib/tax-invoice-export';
 import { usePersistentState } from '@/lib/use-persistent-state';
 
@@ -154,8 +155,10 @@ export default function FinanceDailyPage() {
     const highConfidence = candidates.filter((c) => c.confidence === 'high');
     const others = candidates.length - highConfidence.length;
 
-    const msg = `CMS 자동 매칭 — high confidence ${highConfidence.length}건 자동 적용${others > 0 ? ` (${others}건은 수동 검토)` : ''}\n\n계속하시겠습니까?`;
-    if (!window.confirm(msg)) return;
+    if (!await showConfirm({
+      title: `CMS 자동 매칭 ${highConfidence.length}건 적용`,
+      description: others > 0 ? `나머지 ${others}건은 수동 검토 필요` : undefined,
+    })) return;
 
     let applied = 0;
     for (const cand of highConfidence) {

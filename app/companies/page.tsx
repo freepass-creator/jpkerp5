@@ -16,6 +16,7 @@ import type {
 } from '@/lib/types';
 import { exportToExcel } from '@/lib/excel-export';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 
 type Tab = 'info' | 'finance' | 'locations' | 'documents';
 
@@ -1016,7 +1017,7 @@ function StampUploader({ draft, onChange }: { draft: Company; onChange: (c: Comp
 
   async function handleRemove() {
     if (!draft.stampUrl) return;
-    if (!confirm('도장을 삭제하시겠습니까?')) return;
+    if (!await showConfirm({ title: '도장을 삭제하시겠습니까?', danger: true })) return;
     const { deleteDocumentByUrl } = await import('@/lib/firebase/storage');
     void deleteDocumentByUrl(draft.stampUrl);
     onChange({ ...draft, stampUrl: undefined, stampFileName: undefined, stampUploadedAt: undefined });

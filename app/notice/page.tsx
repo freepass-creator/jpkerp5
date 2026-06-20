@@ -19,6 +19,7 @@ import {
   type Notice, type NoticeComment,
 } from '@/lib/firebase/notice-store';
 import { toast } from '@/lib/toast';
+import { showConfirm } from '@/lib/confirm';
 
 function timeAgo(iso: string): string {
   if (!iso) return '';
@@ -78,7 +79,7 @@ export default function NoticePage() {
 
   async function handleRemoveNotice(n: Notice) {
     if (n.createdBy !== user?.email) { toast.warning('본인 작성건만 삭제 가능'); return; }
-    if (!window.confirm(`"${n.title}" 공지를 삭제하시겠습니까?`)) return;
+    if (!await showConfirm({ title: `"${n.title}" 공지를 삭제하시겠습니까?`, danger: true })) return;
     try {
       await removeNotice(n.id);
       toast.success('공지 삭제');

@@ -5,6 +5,7 @@ import { SettingsInit } from '@/components/settings-init';
 import { GlobalSearch } from '@/components/global-search';
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour';
 import { ToastContainer } from '@/components/toast-container';
+import { ConfirmDialogHost } from '@/components/ui/confirm-dialog';
 import { DataProvider } from '@/lib/data-context';
 import { GlobalDialogsProvider } from '@/lib/global-dialogs';
 
@@ -96,6 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </DataProvider>
         </AuthGate>
         <ToastContainer />
+        <ConfirmDialogHost />
       </body>
     </html>
   );
