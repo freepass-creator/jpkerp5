@@ -468,7 +468,9 @@ export default function Page() {
   const clearSelection = useCallback(() => sel.clear(), [sel]);
 
   // 퀵필터 변경 시 수동 정렬·선택 초기화 (필터 의도된 자동 정렬 우선)
-  useEffect(() => { setManualSort(null); sel.clear(); }, [view, sel]);
+  // sel 객체는 selectedIds 변경마다 새 ref → deps 에 넣으면 무한루프. view 만 의존.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setManualSort(null); sel.clear(); }, [view]);
 
   function toggleSort(col: SortCol) {
     setManualSort((prev) => {
