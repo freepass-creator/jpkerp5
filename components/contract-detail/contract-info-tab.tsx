@@ -16,6 +16,8 @@ import { Field as SharedField, EditableField as SharedEditableField } from '@/co
 import { StatusBadge } from '@/components/ui/status-badge';
 import { type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { InlineTextEdit } from '@/components/ui/inline-text-edit';
+import { InlinePhoneEdit } from '@/components/ui/inline-phone-edit';
+import { InlineDateEdit } from '@/components/ui/inline-date-edit';
 import { formatCurrency, formatDateFull } from '@/lib/utils';
 import { contractIdentMasked } from '@/lib/ident';
 import type { Contract, AdditionalDriver } from '@/lib/types';
@@ -153,8 +155,27 @@ export const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUp
             />
             <Field label="구분" value={c.customerKind || '-'} />
             <Field label="등록번호" value={identMasked || '-'} mono />
-            <EditableField label="연락처" value={editing ? draft.customerPhone1 : c.customerPhone1} editing={editing} mono onChange={(v) => set('customerPhone1', v)} />
-            <EditableField label="연락처2" value={editing ? (draft.customerPhone2 ?? '') : (c.customerPhone2 ?? '')} editing={editing} mono onChange={(v) => set('customerPhone2', v || undefined)} placeholder="-" />
+            {/* 연락처 — editing 모드면 EditableField, 아니면 클릭 즉시 PhoneInput (트렌드 UX) */}
+            {editing ? (
+              <EditableField label="연락처" value={draft.customerPhone1} editing mono onChange={(v) => set('customerPhone1', v)} />
+            ) : (
+              <div className="detail-field">
+                <div className="label">연락처</div>
+                <div className="value">
+                  <InlinePhoneEdit value={c.customerPhone1} onSave={(v) => onUpdate({ ...c, customerPhone1: v })} />
+                </div>
+              </div>
+            )}
+            {editing ? (
+              <EditableField label="연락처2" value={draft.customerPhone2 ?? ''} editing mono onChange={(v) => set('customerPhone2', v || undefined)} placeholder="-" />
+            ) : (
+              <div className="detail-field">
+                <div className="label">연락처2</div>
+                <div className="value">
+                  <InlinePhoneEdit value={c.customerPhone2} onSave={(v) => onUpdate({ ...c, customerPhone2: v || undefined })} />
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <EditableField label="지역" value={editing ? (draft.customerRegion ?? '') : (c.customerRegion ?? '')} editing={editing} onChange={(v) => set('customerRegion', v || undefined)} placeholder="-" />
@@ -188,7 +209,16 @@ export const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUp
             <Field label="계약번호" value={c.contractNo} mono />
             <EditableField label="계약일" value={editing ? (draft.contractDate ?? '') : (formatDateFull(c.contractDate) || '-')} editing={editing} mono onChange={(v) => set('contractDate', v || '')} placeholder="YYYY-MM-DD" />
             <EditableField label="인도일" value={editing ? (draft.deliveredDate ?? '') : (formatDateFull(c.deliveredDate) || '-')} editing={editing} mono onChange={(v) => set('deliveredDate', v || undefined)} placeholder="YYYY-MM-DD" />
-            <EditableField label="반납예정(종료일)" value={editing ? (draft.returnScheduledDate ?? '') : (formatDateFull(c.returnScheduledDate) || '-')} editing={editing} mono onChange={(v) => set('returnScheduledDate', v || undefined)} placeholder="YYYY-MM-DD" />
+            {editing ? (
+              <EditableField label="반납예정(종료일)" value={draft.returnScheduledDate ?? ''} editing mono onChange={(v) => set('returnScheduledDate', v || undefined)} placeholder="YYYY-MM-DD" />
+            ) : (
+              <div className="detail-field">
+                <div className="label">반납예정(종료일)</div>
+                <div className="value">
+                  <InlineDateEdit value={c.returnScheduledDate} onSave={(v) => onUpdate({ ...c, returnScheduledDate: v })} />
+                </div>
+              </div>
+            )}
             <EditableField label="약정기간(개월)" value={editing ? String(draft.termMonths) : `${c.termMonths}개월 ${c.longTerm ? '(장기)' : '(단기)'}`} editing={editing} mono onChange={(v) => set('termMonths', Number(v) || 0)} />
           </div>
           <div>
