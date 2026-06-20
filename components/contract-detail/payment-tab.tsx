@@ -17,6 +17,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { scheduleStatusTone } from '@/lib/status-tones';
 import { COL } from '@/lib/table-cols';
 import { formatCurrency, formatDateFull } from '@/lib/utils';
+import { useBusyAction } from '@/lib/use-busy-action';
 import { todayKr } from '@/lib/mock-data';
 import { recalcSchedule } from '@/lib/payment-schedule';
 import { toast } from '@/lib/toast';
@@ -389,6 +390,8 @@ type AddMode = 'payment' | 'discount';
 type DiscountReason = '자가조치' | '보상' | '사은품' | '캠페인' | '반납 일할' | '기타';
 
 function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) => void }) {
+  // 멱등성 SSOT — 결제 처리 더블탭 차단 (ERP #16)
+  const [busy, runMutation] = useBusyAction();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [addOpenSeq, setAddOpenSeq] = useState<number | null>(null);
   const [addMode, setAddMode] = useState<AddMode>('payment');
@@ -490,8 +493,13 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
 
   function commitAdd(keepOpen = false) {
     if (addOpenSeq == null) return;
+    if (busy) return; // 멱등성 — 진행 중 중복 호출 무시
     const amt = parseInt(addAmount.replace(/[^0-9]/g, ''), 10);
     if (!amt || amt <= 0) { toast.error('금액을 입력하세요'); return; }
+    void runMutation(async () => { commitAddInner(keepOpen, amt); });
+  }
+
+  function commitAddInner(keepOpen: boolean, amt: number) {
     const today = todayKr();
     const currentSeq = addOpenSeq;
     // 직전 스냅샷 저장 — keepOpen 시 "직전 저장 취소" 액션으로 복원 가능
@@ -783,10 +791,10 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
                         value={addMemo} onChange={(e) => setAddMemo(e.target.value)}
                         style={{ width: 180 }}
                       />
-                      <button className="btn btn-sm btn-primary" type="button" onClick={() => commitAdd(false)}>
-                        <CheckCircle size={11} /> 저장
+                      <button className="btn btn-sm btn-primary" type="button" disabled={busy} onClick={() => commitAdd(false)}>
+                        <CheckCircle size={11} /> {busy ? '저장 중…' : '저장'}
                       </button>
-                      <button className="btn btn-sm" type="button" onClick={() => commitAdd(true)}
+                      <button className="btn btn-sm" type="button" disabled={busy} onClick={() => commitAdd(true)}
                         title={addMode === 'payment' ? '저장하고 같은 회차에 한 줄 더 추가' : '저장하고 할인 사유 한 줄 더 추가'}>
                         <Plus size={11} weight="bold" /> 저장하고 한 줄 더
                       </button>

@@ -7,6 +7,7 @@ import { audit } from './audit-store';
 import { mergePlateAttachmentsToVehicle } from './vehicle-attachments-store';
 import { useDataContext } from '@/lib/data-context';
 import type { Vehicle } from '@/lib/types';
+import { lockedUpdate } from './locked-update';
 
 const VEHICLES_PATH = dbPath('vehicles');
 
@@ -36,7 +37,8 @@ export function useVehicles(): {
       const newRef = push(ref(db, VEHICLES_PATH));
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-      await set(newRef, pruneUndefined({ ...v, id }));
+      const now = new Date().toISOString();
+      await set(newRef, pruneUndefined({ ...v, id, createdAt: now, updatedAt: now }));
       // plate-키로 임시 저장돼있던 사진/첨부가 있으면 신규 vehicleId 로 흡수
       if (v.plate) {
         void mergePlateAttachmentsToVehicle(v.plate, id);
@@ -83,7 +85,10 @@ export function useVehicles(): {
         void mergePlateAttachmentsToVehicle(newPlate, v.id);
         void audit.update('vehicle', v.id, `차량번호 변경 ${prevPlate} → ${newPlate}`);
       }
-      await rtdbUpdate(ref(db, `${VEHICLES_PATH}/${v.id}`), pruneUndefined(next as unknown as Record<string, unknown>));
+      // Optimistic Lock (ERP #22) — v.updatedAt 가 서버값과 다르면 LockConflictError.
+      await lockedUpdate<Vehicle>(`${VEHICLES_PATH}/${v.id}`, v.updatedAt, () => ({
+        ...next, updatedAt: new Date().toISOString(),
+      }));
       void audit.update('vehicle', v.id, `차량 수정 ${v.plate} ${v.model}`);
     },
     remove: async (id) => {

@@ -8,6 +8,7 @@ import { useDataContext } from '@/lib/data-context';
 import { recalcContract } from '@/lib/payment-schedule';
 import { todayKr } from '@/lib/mock-data';
 import type { Contract } from '@/lib/types';
+import { lockedUpdate } from './locked-update';
 
 const CONTRACTS_PATH = dbPath('contracts');
 
@@ -40,7 +41,10 @@ export function useContracts(): {
       if (!db) return;
       // write 시점 recalc — 캐시(unpaidAmount/currentSeq) 즉시 정확. UX 깜빡임 차단.
       const recalced = recalcContract(c, todayKr());
-      await rtdbUpdate(ref(db, `${CONTRACTS_PATH}/${c.id}`), pruneUndefined(recalced) as unknown as Record<string, unknown>);
+      // Optimistic Lock (ERP #22) — c.updatedAt 가 서버값과 다르면 LockConflictError throw.
+      await lockedUpdate<Contract>(`${CONTRACTS_PATH}/${c.id}`, c.updatedAt, () => ({
+        ...recalced, updatedAt: new Date().toISOString(),
+      }));
       void audit.update('contract', c.id, `계약 수정 ${c.contractNo ?? ''} ${c.vehiclePlate} ${c.customerName}`);
     },
     remove: async (id: string) => {
@@ -60,7 +64,8 @@ export function useContracts(): {
       const newRef = push(ref(db, CONTRACTS_PATH));
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-      const full = recalcContract({ ...c, id } as Contract, todayKr());
+      const now = new Date().toISOString();
+      const full = recalcContract({ ...c, id, createdAt: now, updatedAt: now } as Contract, todayKr());
       await set(newRef, pruneUndefined(full));
       void audit.create('contract', id, `계약 등록 ${full.contractNo ?? ''} ${full.vehiclePlate} ${full.customerName}`);
       return id;

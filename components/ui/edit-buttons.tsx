@@ -33,9 +33,11 @@ export type EditButtonsProps = {
   onCancel?: () => void;
   /** inline: 탭 내부 (btn-sm) / footer: Shell 푸터 (기본 size) */
   variant?: 'inline' | 'footer';
+  /** 멱등성 — 저장 중 더블탭 방지 (ERP #16). 저장 버튼 disabled + 라벨 변경. */
+  busy?: boolean;
 };
 
-export function EditButtons({ editing, onEdit, onSave, onCancel, variant = 'footer' }: EditButtonsProps) {
+export function EditButtons({ editing, onEdit, onSave, onCancel, variant = 'footer', busy = false }: EditButtonsProps) {
   const btnCls = variant === 'inline' ? 'btn btn-sm' : 'btn';
   const primaryCls = variant === 'inline' ? 'btn btn-sm btn-primary' : 'btn btn-primary';
   const iconSize = 12;
@@ -43,13 +45,13 @@ export function EditButtons({ editing, onEdit, onSave, onCancel, variant = 'foot
     return (
       <>
         {onCancel && (
-          <button className={btnCls} type="button" onClick={onCancel} aria-label="편집 취소">
+          <button className={btnCls} type="button" onClick={onCancel} disabled={busy} aria-label="편집 취소">
             <XIcon size={iconSize} weight="bold" /> 취소
           </button>
         )}
         {onSave && (
-          <button className={primaryCls} type="button" onClick={onSave} aria-label="변경사항 저장" title="저장 (Ctrl+S)">
-            <FloppyDisk size={iconSize} weight="bold" /> 저장
+          <button className={primaryCls} type="button" onClick={onSave} disabled={busy} aria-label="변경사항 저장" title="저장 (Ctrl+S)">
+            <FloppyDisk size={iconSize} weight="bold" /> {busy ? '저장 중…' : '저장'}
           </button>
         )}
       </>

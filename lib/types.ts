@@ -186,6 +186,14 @@ export type Contract = {
   schedules?: PaymentScheduleInline[];
   // 활성 리스크 이슈 (lib/risk-issues.ts 가 동적 계산 — 저장 X)
   // 운영현황 → 떨어진 계약은 receivables 페이지에서 자동 감지
+
+  // 표준 timestamp (ERP #33) — Optimistic Lock 용
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 };
 
 /** 리스크 이슈 — 각 이슈는 "발생일" 기준 D+N으로 추적 */
@@ -635,6 +643,13 @@ export type Vehicle = {
   contractDocDate?: string;         // 계약 체결일 (YYYY-MM-DD)
   contractDocPrice?: number;        // 매매가 / 임대료 (원)
   contractDocNotes?: string;        // 비고 (특약 등)
+
+  // 표준 timestamp (ERP #33) — Optimistic Lock 용
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 };
 
 /** 거래처 마스터 — 계약자 외 공급사·협력사·외주업체 등 */
