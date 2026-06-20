@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   Gear, User, Sun, Moon, Desktop, ArrowCounterClockwise, SignOut, BookOpen, Snowflake, Leaf, Coffee,
@@ -12,16 +12,18 @@ import { useAuth, logout } from '@/lib/use-auth';
 import { toast } from '@/lib/toast';
 import { useRole } from '@/lib/use-role';
 import { useSettings, type Theme, type FontFamily, type FontSize, type Density, type Radius, type Accent } from '@/lib/use-settings';
+import { POLICY_DEF, usePolicies, type PolicyKey } from '@/lib/policy';
+import { MODULES, useModules, type ModuleKey } from '@/lib/modules';
 import { MENU_LABELS, DEFAULT_VISIBILITY, loadVisibility, saveVisibility, type MenuKey } from '@/components/layout/sidebar';
 import { useEffect as useEffectMenu } from 'react';
 import { usePersistentState } from '@/lib/use-persistent-state';
 
-type Tab = 'display' | 'menu' | 'account' | 'admin';
+type Tab = 'display' | 'menu' | 'account' | 'admin' | 'company';
 
 export default function SettingsPage() {
   const [tab, setTab] = usePersistentState<Tab>('filter:settings:tab', 'display');
   const { user } = useAuth();
-  const { isAdmin: admin } = useRole();
+  const { isAdmin: admin, isRealMaster } = useRole();
 
   return (
     <div className="layout">
@@ -66,6 +68,15 @@ export default function SettingsPage() {
                 </button>
               </>
             )}
+            {isRealMaster && (
+              <>
+                <div className="page-shell-nav-group-label" style={{ marginTop: 14 }}>회사 정책</div>
+                <button type="button" className={`page-shell-nav-item ${tab === 'company' ? 'active' : ''}`} onClick={() => setTab('company')}>
+                  <Gear size={14} weight={tab === 'company' ? 'fill' : 'regular'} />
+                  <span>정책 · 모듈 · 브랜드</span>
+                </button>
+              </>
+            )}
           </nav>
 
           <main className="page-shell-main">
@@ -73,6 +84,7 @@ export default function SettingsPage() {
             {tab === 'menu' && <MenuVisibilitySettings />}
             {tab === 'account' && <AccountSettings />}
             {tab === 'admin' && <AdminSettings />}
+            {tab === 'company' && <CompanyPolicySettings />}
           </main>
         </div>
 
@@ -532,6 +544,121 @@ function MenuVisibilitySettings() {
       </div>
       <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
         <button className="btn btn-sm" type="button" onClick={reset}>모두 표시 (초기화)</button>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────── 회사 정책 — 정책 / 모듈 / 브랜드 (master 만) ──────────────────── */
+
+function CompanyPolicySettings() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <PolicySection />
+      <ModuleSection />
+      <BrandingSection />
+    </div>
+  );
+}
+
+function PolicySection() {
+  const { policies, setPolicy, loading } = usePolicies();
+  const grouped: Record<string, PolicyKey[]> = {};
+  for (const k of Object.keys(POLICY_DEF) as PolicyKey[]) {
+    const g = POLICY_DEF[k].group;
+    (grouped[g] = grouped[g] ?? []).push(k);
+  }
+  return (
+    <div className="settings-card" style={{ padding: 20 }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>정책</h3>
+      <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 16 }}>
+        임박일·연체일·반환기한 — 회사가 직접 변경. 즉시 검증·알림에 반영.
+      </div>
+      {loading && <div style={{ fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div>}
+      {Object.entries(grouped).map(([group, keys]) => (
+        <div key={group} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-sub)', marginBottom: 8 }}>{group}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 100px 80px', gap: 8, alignItems: 'center' }}>
+            {keys.map((k) => (
+              <React.Fragment key={k}>
+                <span style={{ fontSize: 12 }}>{POLICY_DEF[k].label}</span>
+                <input
+                  type="number"
+                  min={0}
+                  className="input"
+                  value={policies[k] ?? POLICY_DEF[k].default}
+                  onChange={(e) => { void setPolicy(k, Number(e.target.value)); }}
+                  style={{ width: 100, fontFamily: 'var(--font-mono)' }}
+                />
+                <span style={{ fontSize: 11, color: 'var(--text-weak)' }}>{POLICY_DEF[k].unit}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ModuleSection() {
+  const { modules, toggleModule, loading } = useModules();
+  return (
+    <div className="settings-card" style={{ padding: 20 }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>모듈 on/off</h3>
+      <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 16 }}>
+        회사 규모에 맞게 기능 모듈 끄기. 운영·리스크 코어는 항상 ON.
+      </div>
+      {loading && <div style={{ fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {(Object.keys(MODULES) as ModuleKey[]).map((k) => (
+          <label key={k} style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+            cursor: 'pointer', background: modules[k] ? 'var(--bg-card)' : 'var(--bg-sunken)',
+          }}>
+            <input
+              type="checkbox"
+              checked={modules[k] ?? MODULES[k].default}
+              onChange={() => { void toggleModule(k); }}
+            />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: modules[k] ? 'var(--text-main)' : 'var(--text-sub)' }}>
+                {MODULES[k].label}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>{MODULES[k].desc}</div>
+            </div>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BrandingSection() {
+  // 화이트라벨 슬롯 — 회사명·CI URL·고객센터 전화. localStorage 기반 (서버 적용은 v7 마이그레이션 시).
+  const [brand, setBrand] = useState(() => {
+    if (typeof window === 'undefined') return { name: '', ciUrl: '', csPhone: '' };
+    try { return JSON.parse(localStorage.getItem('jpkerp5:branding') || '{}'); }
+    catch { return { name: '', ciUrl: '', csPhone: '' }; }
+  });
+  function save(patch: Partial<typeof brand>) {
+    const next = { ...brand, ...patch };
+    setBrand(next);
+    try { localStorage.setItem('jpkerp5:branding', JSON.stringify(next)); } catch { /* noop */ }
+  }
+  return (
+    <div className="settings-card" style={{ padding: 20 }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>브랜드 (화이트라벨)</h3>
+      <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 16 }}>
+        회사명·CI 분리. v6/v7 시스템에서 다른 회사 배포 시 활용 (현재 v5 는 사이드바에 미적용).
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, alignItems: 'center' }}>
+        <label style={{ fontSize: 12 }}>회사명</label>
+        <input className="input" value={brand.name ?? ''} onChange={(e) => save({ name: e.target.value })} placeholder="예: JPK 렌트카" />
+        <label style={{ fontSize: 12 }}>CI URL</label>
+        <input className="input mono" value={brand.ciUrl ?? ''} onChange={(e) => save({ ciUrl: e.target.value })} placeholder="https://.../logo.png" />
+        <label style={{ fontSize: 12 }}>고객센터 전화</label>
+        <input className="input mono" value={brand.csPhone ?? ''} onChange={(e) => save({ csPhone: e.target.value })} placeholder="1588-XXXX" />
       </div>
     </div>
   );
