@@ -27,6 +27,8 @@ import { DailyLedgerView } from '@/components/finance/daily-ledger-view';
 import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
 import { downloadTaxInvoiceExcel } from '@/lib/tax-invoice-export';
+import { recordIssuedInvoices, snapshotFromContract } from '@/lib/firebase/issued-invoices-store';
+import { useAuth } from '@/lib/use-auth';
 import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
 import { PageShell } from '@/components/ui/page-shell';
 import { CompanyFilter } from '@/components/ui/filter-bar';
@@ -37,6 +39,7 @@ const fmtNum = (v: number) => v ? v.toLocaleString('ko-KR') : '';
 
 export default function FinancePage() {
   const router = useRouter();
+  const { user } = useAuth();
   const { isMaster: master, loading: roleLoading } = useRole();
   useEffect(() => {
     if (!roleLoading && !master) router.replace('/');
@@ -45,12 +48,24 @@ export default function FinancePage() {
   const { rows: bankTx, loading: bankTxLoading, removeMany: removeManyBank, update: updateBank } = useBankTx();
   const { rows: cardTx, removeMany: removeManyCard, update: updateCard } = useCardTx();
 
-  function handleTaxInvoiceExport() {
+  async function handleTaxInvoiceExport() {
     const r = downloadTaxInvoiceExcel(contracts);
-    if (r.ok) {
-      toast.success(`세금계산서 ${r.count}건 발행 엑셀 다운로드 — 전자세금계산서 시스템에 일괄 업로드`);
-    } else {
+    if (!r.ok) {
       toast.info('B2B 활성 계약 없음 — 사업자/법인 계약 없거나 모두 반납/해지 상태');
+      return;
+    }
+    // ERP #29 Frozen Artifact
+    try {
+      const billingMonth = new Date().toISOString().slice(0, 7);
+      await recordIssuedInvoices({
+        billingMonth,
+        items: r.snapshots.map(snapshotFromContract),
+        issuedBy: user?.email ?? user?.uid ?? 'unknown',
+      });
+      toast.success(`세금계산서 ${r.count}건 발행 + frozen ledger 기록`);
+    } catch (e) {
+      console.error('[tax-invoice ledger]', e);
+      toast.error(`엑셀 OK — ledger 기록 실패: ${(e as Error).message}`);
     }
   }
 

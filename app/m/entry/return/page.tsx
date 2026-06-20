@@ -22,6 +22,7 @@ import { toast } from '@/lib/toast';
 import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { todayKr } from '@/lib/mock-data';
 import { addIntakeItem, markIntakeCommitted } from '@/lib/firebase/intake-store';
+import { markReturned } from '@/lib/contract-actions';
 
 export default function MobileReturn() {
   const router = useRouter();
@@ -91,9 +92,9 @@ export default function MobileReturn() {
       });
     } catch (e) { console.warn('[intake] return addIntakeItem 실패', e); }
     try {
-      // 1. 계약 반납 처리 (+ Vehicle 마스터 status 자동 동기화)
+      // 1. 계약 반납 처리 (상태값 SSOT ERP #4 — 일할 자동 정산)
       await syncContractAndVehicleStatus(
-        { ...contract, returnedDate, status: '반납', vehicleStatus: '반납' },
+        markReturned(contract, returnedDate),
         vehicles,
         updateContract,
         updateVehicleMaster,

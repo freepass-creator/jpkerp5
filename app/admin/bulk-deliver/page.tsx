@@ -24,6 +24,7 @@ import { Truck, CheckCircle } from '@phosphor-icons/react';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
+import { markDelivered } from '@/lib/contract-actions';
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { toast } from '@/lib/toast';
@@ -77,7 +78,8 @@ export default function BulkDeliverPage() {
     try {
       for (const c of targets) {
         const deliveredDate = overrideDate || c.contractDate || todayKr();
-        const updated = { ...c, deliveredDate, status: '운행' as const, vehicleStatus: '운행' as const };
+        // 상태값 SSOT (ERP #4)
+        const updated = markDelivered(c, deliveredDate);
         await syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster);
         setDoneCount((n) => n + 1);
       }

@@ -24,6 +24,7 @@ import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { todayKr } from '@/lib/mock-data';
 // Phase 2.4 — 모바일 입력 intake 평행 기록
 import { addIntakeItem, markIntakeCommitted } from '@/lib/firebase/intake-store';
+import { markDelivered } from '@/lib/contract-actions';
 
 export default function MobileDeliver() {
   const router = useRouter();
@@ -87,9 +88,9 @@ export default function MobileDeliver() {
       });
     } catch (e) { console.warn('[intake] deliver addIntakeItem 실패', e); }
     try {
-      // 1. 계약 인도완료 처리 (+ Vehicle 마스터 status 자동 동기화)
+      // 1. 계약 인도완료 처리 (상태값 SSOT ERP #4) + Vehicle 마스터 status 자동 동기화
       await syncContractAndVehicleStatus(
-        { ...contract, deliveredDate, status: '운행', vehicleStatus: '운행' },
+        markDelivered(contract, deliveredDate),
         vehicles,
         updateContract,
         updateVehicleMaster,

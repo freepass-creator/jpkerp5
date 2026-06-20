@@ -30,6 +30,8 @@ import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matchi
 import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
 import { downloadTaxInvoiceExcel } from '@/lib/tax-invoice-export';
+import { recordIssuedInvoices, snapshotFromContract } from '@/lib/firebase/issued-invoices-store';
+import { useAuth } from '@/lib/use-auth';
 import { usePersistentState } from '@/lib/use-persistent-state';
 
 type DailyRow = {
@@ -39,6 +41,7 @@ type DailyRow = {
 };
 
 export default function FinanceDailyPage() {
+  const { user } = useAuth();
   const { rows: bankTx, update: updateBank } = useBankTx();
   const { rows: cardTx, update: updateCard } = useCardTx();
   const { contracts } = useContracts();
@@ -170,13 +173,25 @@ export default function FinanceDailyPage() {
     toast.success(`CMS 매칭 ${highConfidence.length}건 적용 (총 ${applied} BankTx update)`);
   }
 
-  function handleTaxInvoiceExport() {
-    // contracts → B2B 활성 계약 → 셀렉션 양식 즉시 다운로드 (별도 entity 없음)
+  async function handleTaxInvoiceExport() {
+    // contracts → B2B 활성 계약 → 셀렉션 양식 즉시 다운로드
     const r = downloadTaxInvoiceExcel(contracts);
-    if (r.ok) {
-      toast.success(`세금계산서 ${r.count}건 발행 엑셀 다운로드 — 전자세금계산서 시스템에 일괄 업로드`);
-    } else {
+    if (!r.ok) {
       toast.info('B2B 활성 계약 없음 — 사업자/법인 계약 없거나 모두 반납/해지 상태');
+      return;
+    }
+    // ERP #29 Frozen Artifact — 발행 시점 snapshot 영구 보존
+    try {
+      const billingMonth = new Date().toISOString().slice(0, 7);
+      const items = r.snapshots.map(snapshotFromContract);
+      await recordIssuedInvoices({
+        billingMonth, items,
+        issuedBy: user?.email ?? user?.uid ?? 'unknown',
+      });
+      toast.success(`세금계산서 ${r.count}건 발행 엑셀 다운로드 + frozen ledger 기록`);
+    } catch (e) {
+      console.error('[tax-invoice ledger]', e);
+      toast.error(`엑셀 다운로드는 완료 — ledger 기록 실패: ${(e as Error).message}`);
     }
   }
 

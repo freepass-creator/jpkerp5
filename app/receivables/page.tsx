@@ -38,6 +38,7 @@ import { computeActiveIssues, pickPrimaryIssue, computeLatePayStage, ISSUE_COLOR
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { markAsDebt, cancelDebt } from '@/lib/contract-actions';
 
 type Filter =
   | '전체'           // 진행중 전체 (종결 제외)
@@ -237,11 +238,15 @@ export default function ReceivablesPage() {
       if (!await showConfirm({ title: `${c.vehiclePlate} ${c.customerName} — 채권 해제하시겠습니까?` })) return;
     }
     try {
-      // 채권화 시 status='채권', 해제 시 returnedDate 있으면 '반납', 없으면 '운행'
-      const nextStatus: Contract['status'] = isDebt
-        ? (c.returnedDate ? '반납' : '운행')
-        : '채권';
-      await updateContract({ ...c, status: nextStatus });
+      // 상태값 SSOT (ERP #4) — markAsDebt/cancelDebt 사용
+      // 해제 시 returnedDate 있으면 '반납' 유지, 없으면 '운행' 복귀
+      let updated: Contract;
+      if (isDebt) {
+        updated = c.returnedDate ? { ...c, status: '반납' as const, endReason: undefined } : cancelDebt(c);
+      } else {
+        updated = markAsDebt(c);
+      }
+      await updateContract(updated);
       toast.success(isDebt ? `${c.vehiclePlate} 채권 해제` : `${c.vehiclePlate} 채권화`);
     } catch (e) {
       toast.error(friendlyError(e));

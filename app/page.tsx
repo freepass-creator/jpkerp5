@@ -39,6 +39,7 @@ import { ageFromIdent } from '@/lib/ident';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { vehicleStateTone, contractStateTone, paymentStateTone } from '@/lib/status-tones';
 import { safeUpdate } from '@/lib/safe-update';
+import { markDelivered, markReturned } from '@/lib/contract-actions';
 import {
   getExpiryDate,
   getVehicleState, getContractState, getPaymentState,
@@ -410,7 +411,7 @@ export default function Page() {
       return;
     }
     const today = new Date().toISOString().slice(0, 10);
-    updateContract({ ...c, deliveredDate: today, status: '운행', vehicleStatus: '운행' });
+    void updateContract(markDelivered(c, today));
   }
   async function ctxAction_markReturned(c: Contract) {
     if (c.returnedDate) {
@@ -419,7 +420,8 @@ export default function Page() {
     }
     if (!await showConfirm({ title: `${c.vehiclePlate} ${c.customerName} 을 오늘 반납 처리하시겠습니까?` })) return;
     const today = new Date().toISOString().slice(0, 10);
-    updateContract({ ...c, returnedDate: today, status: '반납', vehicleStatus: '반납' });
+    // 상태값 SSOT (ERP #4) — markReturned 가 일할 자동 정산 + 부수효과 통합
+    void updateContract(markReturned(c, today));
   }
   function ctxAction_sendSms(c: Contract) {
     setSelectedIds(new Set([c.id]));
@@ -456,12 +458,8 @@ export default function Page() {
       return;
     }
     if (!await showConfirm({ title: `${targets.length}건을 일괄 인도완료 처리하시겠습니까?\n(deliveredDate = 계약시작일, status = '운행')` })) return;
-    const updated = targets.map((c) => ({
-      ...c,
-      deliveredDate: c.contractDate,
-      status: '운행' as const,
-      vehicleStatus: '운행' as const,
-    }));
+    // 상태값 SSOT (ERP #4) — markDelivered 가 부수효과 통합
+    const updated = targets.map((c) => markDelivered(c, c.contractDate));
     // updateContract 헬퍼 한 건씩 — Vehicle 마스터 status 도 함께 동기화 (양립 보장)
     for (const c of updated) updateContract(c);
     toast.success(`${targets.length}건 일괄 인도완료 처리`);

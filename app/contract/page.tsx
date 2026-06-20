@@ -29,6 +29,7 @@ import { useLiveTodayKr } from '@/lib/use-live-today';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { safeUpdate } from '@/lib/safe-update';
+import { markReturned } from '@/lib/contract-actions';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { isContractEnded, isAbnormalEnded, isNormalEnded } from '@/lib/contract-lifecycle';
@@ -425,7 +426,8 @@ export default function ContractPage() {
               const r = ctxMenu.row;
               if (!r) return;
               if (!await showConfirm({ title: `${r.contractNo} 반납 처리하시겠습니까? (반납일=오늘)` })) return;
-              const updated = { ...r, returnedDate: new Date().toISOString().slice(0, 10), status: '반납' as const, vehicleStatus: '반납' as const };
+              // 상태값 SSOT (ERP #4) — markReturned 가 일할 자동 정산 + 부수효과 통합
+              const updated = markReturned(r, new Date().toISOString().slice(0, 10));
               void safeUpdate(() => syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster));
             },
             disabled: !!ctxMenu.row.returnedDate,

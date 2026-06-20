@@ -51,11 +51,11 @@ export function contractToSelectionRow(c: Contract, billingMonth: string): Selec
   };
 }
 
-/** B2B 활성 계약만 필터 + 엑셀 다운로드 */
+/** B2B 활성 계약만 필터 + 엑셀 다운로드. snapshots = 발행 대상 contract list (frozen ledger 기록용). */
 export function downloadTaxInvoiceExcel(
   contracts: Contract[],
   opts?: { billingMonth?: string; fileName?: string },
-): { ok: true; count: number } | { ok: false; reason: 'no-contracts' } {
+): { ok: true; count: number; snapshots: Contract[] } | { ok: false; reason: 'no-contracts' } {
   const billingMonth = opts?.billingMonth ?? new Date().toISOString().slice(0, 7);
 
   // 활성 + B2B 계약만 (개인 계약은 영수증 처리)
@@ -77,5 +77,5 @@ export function downloadTaxInvoiceExcel(
   XLSX.utils.book_append_sheet(wb, ws, '세금계산서');
   const fileName = opts?.fileName ?? `세금계산서_${billingMonth}_${candidates.length}건.xlsx`;
   XLSX.writeFile(wb, fileName);
-  return { ok: true, count: candidates.length };
+  return { ok: true, count: candidates.length, snapshots: candidates };
 }
