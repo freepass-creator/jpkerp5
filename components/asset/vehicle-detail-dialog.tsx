@@ -65,6 +65,7 @@ import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { showConfirm } from '@/lib/confirm';
 import { Field } from '@/components/ui/editable-field';
+import { InlineTextEdit } from '@/components/ui/inline-text-edit';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { Section, Stack, Grid2 } from '@/components/ui/detail-primitives';
 import { VehiclePhotosSection, VehiclePhotosByKind } from '@/components/vehicle-photos-section';
@@ -358,7 +359,6 @@ function SummaryTab({
   onUpdate: (v: Vehicle) => void;
   showAttachment?: boolean;
 }) {
-  void onUpdate;
   const { companies } = useCompanies();
   return (
     <Stack>
@@ -412,7 +412,14 @@ function SummaryTab({
           <KV k="소유자" v={vehicle.ownerName} />
           <KV k="법인등록번호" v={vehicle.ownerRegNo} mono />
           <KV k="제원관리번호" v={vehicle.specMgmtNo} mono />
-          <KV k="사용본거지" v={vehicle.garage} />
+          {/* 사용본거지 — 인라인 클릭 편집 (자주 변경, 트렌드 UX) */}
+          <Field label="사용본거지" value={
+            <InlineTextEdit
+              value={vehicle.garage}
+              onSave={(v) => onUpdate({ ...vehicle, garage: v || undefined })}
+              placeholder="-"
+            />
+          } />
           <KV k="매입일" v={vehicle.purchasedDate} mono />
           <KV k="매입가" v={vehicle.purchasePrice ? `₩${vehicle.purchasePrice.toLocaleString()}` : undefined} mono />
         </Grid2>

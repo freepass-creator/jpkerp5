@@ -224,7 +224,20 @@ export const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUp
           <div>
             <EditableField label="월 대여료" value={editing ? String(draft.monthlyRent ?? 0) : `₩${formatCurrency(c.monthlyRent)}`} editing={editing} mono onChange={(v) => set('monthlyRent', Number(v.replace(/[,\s]/g, '')) || 0)} />
             <EditableField label="보증금" value={editing ? String(draft.deposit ?? 0) : `₩${formatCurrency(c.deposit)}`} editing={editing} mono onChange={(v) => set('deposit', Number(v.replace(/[,\s]/g, '')) || 0)} />
-            <EditableField label="결제방법" value={editing ? (draft.paymentMethod ?? '') : (c.paymentMethod ?? '-')} editing={editing} onChange={(v) => set('paymentMethod', v)} placeholder="이체 / 카드 / CMS 등" />
+            {editing ? (
+              <EditableField label="결제방법" value={draft.paymentMethod ?? ''} editing onChange={(v) => set('paymentMethod', v)} placeholder="이체 / 카드 / CMS 등" />
+            ) : (
+              <div className="detail-field">
+                <div className="label">결제방법</div>
+                <div className="value">
+                  <InlineTextEdit
+                    value={c.paymentMethod}
+                    onSave={(v) => onUpdate({ ...c, paymentMethod: v || '' })}
+                    placeholder="이체 / 카드 / CMS 등"
+                  />
+                </div>
+              </div>
+            )}
             {/* 결제시기 — 선불(1일 인출) vs 후불(말일 결제). 사용자 명시 요구. */}
             {editing ? (
               <div className="detail-field is-editing">
