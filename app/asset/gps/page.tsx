@@ -14,6 +14,8 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { Sidebar } from '@/components/layout/sidebar';
+import { EmptyRow } from "@/components/ui/empty-row";
+import { PageLoading } from "@/components/ui/page-loading";
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -67,7 +69,7 @@ export default function AssetGpsPage() {
   useCtrlASelectAll(rowSel, sel);
 
   if (roleLoading || !master) {
-    return <div className="layout"><Sidebar /><div className="app"><div style={{ padding: 40, fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div></div></div>;
+    return <PageLoading />;
   }
 
   return (
@@ -104,7 +106,7 @@ export default function AssetGpsPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</td></tr>
+                    <EmptyRow colSpan={9}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</EmptyRow>
                   ) : filtered.map((v, idx) => {
                     const installed = !!(v.gpsProvider || v.gpsDeviceId);
                     return (

@@ -14,6 +14,8 @@ import { useInsurances } from '@/lib/firebase/insurance-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { downloadInsuranceExcel } from '@/lib/insurance-export';
 import { Sidebar } from '@/components/layout/sidebar';
+import { EmptyRow } from "@/components/ui/empty-row";
+import { PageLoading } from "@/components/ui/page-loading";
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
@@ -162,7 +164,7 @@ export default function AssetInsurancePage() {
   useCtrlASelectAll(rowSel, selAdapter);
 
   if (roleLoading || !master) {
-    return <div className="layout"><Sidebar /><div className="app"><div style={{ padding: 40, fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div></div></div>;
+    return <PageLoading />;
   }
 
   return (
@@ -235,7 +237,7 @@ export default function AssetInsurancePage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={13} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '해당 차량 없음'}</td></tr>
+                    <EmptyRow colSpan={13}>{vehiclesLoading ? '데이터 불러오는 중…' : '해당 차량 없음'}</EmptyRow>
                   ) : filtered.map(({ v, insurer, policy, startDate, endDate, totalPremium, installmentCount, days, status }) => {
                     const tone = status === 'expired' ? 'red' : status === 'expire' ? 'orange' : status === 'missing' ? 'red' : '';
                     return (

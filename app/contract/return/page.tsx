@@ -11,6 +11,7 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { EmptyRow } from '@/components/ui/empty-row';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { CompanyCell } from '@/components/ui/company-cell';
@@ -67,7 +68,7 @@ export default function ContractReturnPage() {
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr><td colSpan={8} className="muted center" style={{ padding: 32 }}>{contractsLoading ? '데이터 불러오는 중…' : '반납 계약 없음'}</td></tr>
+            <EmptyRow colSpan={8}>{contractsLoading ? '데이터 불러오는 중…' : '반납 계약 없음'}</EmptyRow>
           ) : rows.map((c) => (
             <tr key={c.id} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'contract')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
               <td className="dim"><CompanyCell raw={c.company} master={companyMaster} /></td>

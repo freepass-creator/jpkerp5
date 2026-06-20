@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bank, MagnifyingGlass } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
+import { EmptyRow } from "@/components/ui/empty-row";
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -168,7 +169,7 @@ export default function AssetLedgerPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={12} className="muted center" style={{ padding: 32 }}>{loading ? '데이터 불러오는 중…' : '해당 필터에 맞는 자산 없음'}</td></tr>
+                    <EmptyRow colSpan={12}>{loading ? '데이터 불러오는 중…' : '해당 필터에 맞는 자산 없음'}</EmptyRow>
                   ) : filtered.map((e) => {
                     const tone = vehicleStatusTone(e.status as VehicleStatus);
                     return (

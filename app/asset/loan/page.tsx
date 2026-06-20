@@ -14,6 +14,8 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { Sidebar } from '@/components/layout/sidebar';
+import { EmptyRow } from "@/components/ui/empty-row";
+import { PageLoading } from "@/components/ui/page-loading";
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { useRole } from '@/lib/use-role';
@@ -65,7 +67,7 @@ export default function AssetLoanPage() {
   useCtrlASelectAll(rowSel, sel);
 
   if (roleLoading || !master) {
-    return <div className="layout"><Sidebar /><div className="app"><div style={{ padding: 40, fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div></div></div>;
+    return <PageLoading />;
   }
 
   return (
@@ -103,7 +105,7 @@ export default function AssetLoanPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={10} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</td></tr>
+                    <EmptyRow colSpan={10}>{vehiclesLoading ? '데이터 불러오는 중…' : '등록된 차량 없음'}</EmptyRow>
                   ) : filtered.map((v, idx) => (
                     <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, v.id, idx)} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                       <TableRowCheckbox id={v.id} selection={sel} />

@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bank, Plus, Trash, FileXls } from '@phosphor-icons/react';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { EmptyRow } from '@/components/ui/empty-row';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
@@ -420,7 +421,7 @@ export default function FinancePage() {
                   </thead>
                   <tbody>
                     {filteredCard.length === 0 ? (
-                      <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>카드매출 내역 없음 — 우측 하단 [+ 신규 등록] 으로 추가</td></tr>
+                      <EmptyRow colSpan={9}>카드매출 내역 없음 — 우측 하단 [+ 신규 등록] 으로 추가</EmptyRow>
                     ) : filteredCard.map((t) => {
                       const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
                       const co = t.companyCode || (c?.company);
@@ -458,7 +459,7 @@ export default function FinancePage() {
                   </thead>
                   <tbody>
                     {filteredCard.length === 0 ? (
-                      <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>법인카드 지출 내역 없음 — 우측 하단 [+ 신규 등록] 으로 추가</td></tr>
+                      <EmptyRow colSpan={9}>법인카드 지출 내역 없음 — 우측 하단 [+ 신규 등록] 으로 추가</EmptyRow>
                     ) : filteredCard.map((t) => {
                       const co = t.companyCode;
                       return (

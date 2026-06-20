@@ -11,6 +11,7 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { EmptyRow } from '@/components/ui/empty-row';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { CompanyCell } from '@/components/ui/company-cell';
@@ -107,7 +108,7 @@ export default function ExpirePage() {
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr><td colSpan={8} className="muted center" style={{ padding: 32 }}>{contractsLoading ? '데이터 불러오는 중…' : '만기 임박 계약 없음 (D-90 내)'}</td></tr>
+            <EmptyRow colSpan={8}>{contractsLoading ? '데이터 불러오는 중…' : '만기 임박 계약 없음 (D-90 내)'}</EmptyRow>
           ) : rows.map(({ contract: c, daysLeft }) => {
             const tone = daysLeft < 0 ? 'red' : daysLeft <= 30 ? 'orange' : '';
             const label = daysLeft < 0 ? `만기 ${-daysLeft}일 경과` : daysLeft === 0 ? '오늘 만기' : `D-${daysLeft}`;

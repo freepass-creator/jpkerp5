@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { EmptyRow } from '@/components/ui/empty-row';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
@@ -128,7 +129,7 @@ export default function ContractOverduePage() {
         </thead>
         <tbody>
           {overdue.length === 0 ? (
-            <tr><td colSpan={9} className="muted center" style={{ padding: 32 }}>{contractsLoading ? '데이터 불러오는 중…' : '미수금 계약 없음'}</td></tr>
+            <EmptyRow colSpan={9}>{contractsLoading ? '데이터 불러오는 중…' : '미수금 계약 없음'}</EmptyRow>
           ) : overdue.map((c) => (
             <tr key={c.id} onDoubleClick={() => c.vehiclePlate && openVehicle(c.vehiclePlate, 'risk')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: c }); }} style={{ cursor: 'pointer' }}>
               <td className="dim"><CompanyCell raw={c.company} master={companyMaster} /></td>

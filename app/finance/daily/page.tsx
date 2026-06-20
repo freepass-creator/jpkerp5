@@ -17,6 +17,7 @@ import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { FilterSelect } from '@/components/ui/filter-select';
 import { FINANCE_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { EmptyRow } from '@/components/ui/empty-row';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -330,7 +331,7 @@ export default function FinanceDailyPage() {
         </thead>
         <tbody>
           {daily.length === 0 ? (
-            <tr><td colSpan={8} className="muted center" style={{ padding: 32 }}>거래 내역 없음 — 입출금관리에서 등록</td></tr>
+            <EmptyRow colSpan={8}>거래 내역 없음 — 입출금관리에서 등록</EmptyRow>
           ) : daily.map((r) => (
             <tr key={r.key}>
               <td className="dim">{displayCompanyName(r.companyCode, companyMaster)}</td>

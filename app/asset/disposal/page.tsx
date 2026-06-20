@@ -15,6 +15,8 @@ import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
 import { toast } from '@/lib/toast';
 import type { Vehicle } from '@/lib/types';
 import { Sidebar } from '@/components/layout/sidebar';
+import { EmptyRow } from "@/components/ui/empty-row";
+import { PageLoading } from "@/components/ui/page-loading";
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
@@ -74,7 +76,7 @@ export default function AssetDisposalPage() {
   useCtrlASelectAll(rowSel, sel);
 
   if (roleLoading || !master) {
-    return <div className="layout"><Sidebar /><div className="app"><div style={{ padding: 40, fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div></div></div>;
+    return <PageLoading />;
   }
 
   return (
@@ -109,7 +111,7 @@ export default function AssetDisposalPage() {
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={7} className="muted center" style={{ padding: 32 }}>{vehiclesLoading ? '데이터 불러오는 중…' : '처분 대상 차량 없음'}</td></tr>
+                    <EmptyRow colSpan={7}>{vehiclesLoading ? '데이터 불러오는 중…' : '처분 대상 차량 없음'}</EmptyRow>
                   ) : filtered.map((v, idx) => (
                     <tr key={v.id} style={{ verticalAlign: 'middle', cursor: 'pointer' }} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => rowSel.onRowClick(e, v.id, idx)} onDoubleClick={() => v.plate && openVehicle(v.plate, 'asset')} onContextMenu={(e) => rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v }))} className={sel.selectedIds.has(v.id) ? 'selected-row' : undefined}>
                       <TableRowCheckbox id={v.id} selection={sel} />

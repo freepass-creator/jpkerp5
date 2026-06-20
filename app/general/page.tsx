@@ -14,6 +14,7 @@ import {
   Megaphone, Calendar, Pulse,
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
+import { EmptyRow } from "@/components/ui/empty-row";
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-apply';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -240,11 +241,11 @@ function StaffListView() {
       </thead>
       <tbody>
         {loading ? (
-          <tr><td colSpan={4} className="muted center" style={{ padding: 32 }}>가입회원 불러오는 중…</td></tr>
+          <EmptyRow colSpan={4}>가입회원 불러오는 중…</EmptyRow>
         ) : error ? (
           <tr><td colSpan={4} className="muted center" style={{ padding: 32, color: 'var(--red-text)' }}>오류: {error}</td></tr>
         ) : staff.length === 0 ? (
-          <tr><td colSpan={4} className="muted center" style={{ padding: 32 }}>가입한 직원이 없습니다. 로그인 1회 후 자동 등록됩니다.</td></tr>
+          <EmptyRow colSpan={4}>가입한 직원이 없습니다. 로그인 1회 후 자동 등록됩니다.</EmptyRow>
         ) : staff.map((s, i) => (
           <tr key={s.uid}>
             <td className="dim center">{i + 1}</td>
@@ -311,7 +312,7 @@ function CompanyListView({
       </thead>
       <tbody>
         {companies.length === 0 ? (
-          <tr><td colSpan={12} className="muted center" style={{ padding: 32 }}>등록된 법인 없음 — 우측 하단 [+ 법인 등록] 으로 시작하세요.</td></tr>
+          <EmptyRow colSpan={12}>등록된 법인 없음 — 우측 하단 [+ 법인 등록] 으로 시작하세요.</EmptyRow>
         ) : companies.map((c) => {
           const checked = selectedIds.has(c.id);
           return (
