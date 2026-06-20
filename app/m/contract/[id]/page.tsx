@@ -23,13 +23,14 @@ import {
 } from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/lib/toast';
+import { InlineTextEdit } from '@/components/ui/inline-text-edit';
 
 export default function MobileContractDetail() {
   const params = useParams();
   const searchParams = useSearchParams();
   const riskKind = searchParams?.get('risk') ?? null;
   const id = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : '';
-  const { contracts } = useContracts();
+  const { contracts, update: updateContract } = useContracts();
   const { vehicles } = useVehicles();
   const c = contracts.find((x) => x.id === id);
 
@@ -212,13 +213,27 @@ export default function MobileContractDetail() {
           <Row label="보험연령" value={c.insuranceAge ? `${c.insuranceAge}세` : '-'} />
         </InfoSection>
 
-        {c.notes && (
-          <InfoSection title="비고">
-            <div style={{ fontSize: 13, color: 'var(--text-main)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-              {c.notes}
-            </div>
-          </InfoSection>
-        )}
+        {/* 비고 — 인라인 즉시 편집 (메모 없어도 표시, 클릭 → 입력) */}
+        <InfoSection title="비고">
+          <InlineTextEdit
+            value={c.notes}
+            onSave={(v) => {
+              void (async () => {
+                try {
+                  await updateContract({ ...c, notes: v || undefined });
+                } catch (e) {
+                  if ((e as Error)?.name === 'LockConflictError') {
+                    toast.error('다른 사용자가 먼저 수정했습니다. 새로고침 후 다시 시도하세요.');
+                  } else {
+                    toast.error(`메모 저장 실패 — ${(e as Error)?.message ?? e}`);
+                  }
+                }
+              })();
+            }}
+            placeholder="메모 없음 — 탭하여 입력"
+            multiline rows={3}
+          />
+        </InfoSection>
 
         {mergedLogs.length > 0 && (
           <InfoSection title={`현장 입력 (${mergedLogs.length})`}>
