@@ -10,6 +10,7 @@ import { isSuperAdmin } from '@/lib/admin-emails';
 import { generateSchedules } from '@/lib/payment-schedule';
 import { monthsBetween } from '@/lib/utils';
 import { toast } from '@/lib/toast';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { friendlyError } from '@/lib/friendly-error';
 import type { Contract, CompanyCode, PaymentEntry, PaymentScheduleInline } from '@/lib/types';
 import seedData from '@/lib/migrate/sheet-seed.json';
@@ -161,7 +162,7 @@ export default function MigrateSheetPage() {
           || s === '매각' || s === '매각대기'
           || s === '상품화대기' || s === '상품화중' || s === '상품대기'
           || s === '구매대기' || s === '등록대기'
-          || c.status === '반납' || c.status === '해지';
+          || isContractEnded(c);
         return !inactive;
       });
       append(`전체 계약 ${all.length}건 · 활성 ${active.length}건`);
@@ -298,7 +299,7 @@ export default function MigrateSheetPage() {
         if (!c.customerName?.trim()) return false;
         if (c.deliveredDate) return false;
         // 반납/해지/매각 등은 제외 — 이미 종료 상태
-        if (c.status === '반납' || c.status === '해지') return false;
+        if (isContractEnded(c)) return false;
         if (c.vehicleStatus === '매각' || c.vehicleStatus === '매각대기' || c.vehicleStatus === '매각검토') return false;
         return true;
       });

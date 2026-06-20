@@ -20,6 +20,7 @@ import { CompanyCell } from '@/components/ui/company-cell';
 import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
+import { isContractEnded, isContractActive, isOperating } from '@/lib/contract-lifecycle';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { PageShell } from '@/components/ui/page-shell';
@@ -53,8 +54,7 @@ const CONDITIONAL_VIEWS: View[] = ['확정대기', '만기경과', '만기임박
  * 다른 페이지/모듈에서 사용 시 참조 가능 — 미삭제.
  */
 function isActiveContract(c: Contract): boolean {
-  if (c.returnedDate) return false;
-  return c.status !== '반납' && c.status !== '해지';
+  return isContractActive(c);
 }
 void isActiveContract; // 미사용 경고 회피 (export 안 함)
 
@@ -63,8 +63,7 @@ void isActiveContract; // 미사용 경고 회피 (export 안 함)
  * 스냅샷 업로드 후 인도일이 비어있어도 손님이 있으면 계약중으로 인식.
  */
 function isRunning(c: Contract): boolean {
-  if (c.returnedDate) return false;
-  if (c.status === '해지' || c.status === '반납') return false;
+  if (isContractEnded(c)) return false;
   // 손님이 있고 휴차/매각 상태가 아니면 계약중
   const isIdleStatus = c.vehicleStatus === '휴차'
     || c.vehicleStatus === '휴차대기'
@@ -87,9 +86,9 @@ function isRunning(c: Contract): boolean {
     || c.vehicleStatus === '종료대기';
 }
 
-/** 종료된 계약 — 반납/해지/채권 상태이거나 returnedDate 있는 경우 (리스크관리로 이관) */
+/** 종료된 계약 — lib/contract-lifecycle SSOT alias */
 function isClosed(c: Contract): boolean {
-  return c.status === '반납' || c.status === '해지' || c.status === '채권' || !!c.returnedDate;
+  return isContractEnded(c);
 }
 
 function matchesView(c: Contract, v: View): boolean {
@@ -766,12 +765,7 @@ export default function Page() {
                             운전연령 < 보험연령 = 보험 미커버 (운전 불가) 빨강 경고. */}
                         <td className="center mono">
                           {(() => {
-                            const s = c.vehicleStatus;
-                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
-                              || s === '매각' || s === '매각대기'
-                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
-                              || s === '구매대기' || s === '등록대기'
-                              || c.status === '반납' || c.status === '해지';
+                            const inactive = !isOperating(c);
                             if (inactive) return <span className="muted">-</span>;
                             const a = driverAge(c);
                             const ia = c.insuranceAge ?? 0;
@@ -799,12 +793,7 @@ export default function Page() {
                             운영 중인데 미입력 = 빨강. 추가운전자 중 보험연령보다 어린 사람 있으면 셀 아래 ⚠ 뱃지 */}
                         <td className="center mono dim">
                           {(() => {
-                            const s = c.vehicleStatus;
-                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
-                              || s === '매각' || s === '매각대기'
-                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
-                              || s === '구매대기' || s === '등록대기'
-                              || c.status === '반납' || c.status === '해지';
+                            const inactive = !isOperating(c);
                             if (inactive) return <span className="muted">-</span>;
                             const ia = c.insuranceAge ?? 0;
                             if (!ia) {
@@ -842,12 +831,7 @@ export default function Page() {
                         {/* 기간 — 12/24/36/48/60 별 색상 / 기간정함없음(장기) = brand. 휴차·매각·상품화·종료는 의미 없으니 미표시 */}
                         <td className="center">
                           {(() => {
-                            const s = c.vehicleStatus;
-                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
-                              || s === '매각' || s === '매각대기'
-                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
-                              || s === '구매대기' || s === '등록대기'
-                              || c.status === '반납' || c.status === '해지';
+                            const inactive = !isOperating(c);
                             if (inactive) return <span className="muted">-</span>;
                             const m = c.termMonths;
                             if (!m || m <= 0) {
@@ -863,12 +847,7 @@ export default function Page() {
                         {/* 결제일 — 운행 중인 계약만 의미 있음. 휴차/상품화/매각/반납/해지는 비표시 */}
                         <td className="center mono dim">
                           {(() => {
-                            const s = c.vehicleStatus;
-                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
-                              || s === '매각' || s === '매각대기'
-                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
-                              || s === '구매대기' || s === '등록대기'
-                              || c.status === '반납' || c.status === '해지';
+                            const inactive = !isOperating(c);
                             if (inactive) return <span className="muted">-</span>;
                             const timing = c.paymentTiming ?? '선불';
                             return (
@@ -882,12 +861,7 @@ export default function Page() {
                         {/* 회차 — 운행 계약만 의미 있음 */}
                         <td className="center mono dim">
                           {(() => {
-                            const s = c.vehicleStatus;
-                            const inactive = s === '휴차' || s === '휴차대기' || s === '매각검토'
-                              || s === '매각' || s === '매각대기'
-                              || s === '상품화대기' || s === '상품화중' || s === '상품대기'
-                              || s === '구매대기' || s === '등록대기'
-                              || c.status === '반납' || c.status === '해지';
+                            const inactive = !isOperating(c);
                             if (inactive) return <span className="muted">-</span>;
                             return c.currentSeq && c.totalSeq ? `${c.currentSeq}/${c.totalSeq}` : <span className="muted">-</span>;
                           })()}

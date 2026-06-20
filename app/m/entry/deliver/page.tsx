@@ -19,6 +19,7 @@ import { useAuth } from '@/lib/use-auth';
 import { addFieldLog } from '@/lib/firebase/field-logs-store';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { toast } from '@/lib/toast';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { todayKr } from '@/lib/mock-data';
 // Phase 2.4 — 모바일 입력 intake 평행 기록
@@ -46,7 +47,7 @@ export default function MobileDeliver() {
       if (c.deliveredDate) return false;
       const s = c.vehicleStatus;
       if (s === '휴차' || s === '휴차대기' || s === '매각' || s === '매각대기' || s === '매각검토') return false;
-      if (c.status === '반납' || c.status === '해지') return false;
+      if (isContractEnded(c)) return false;
       return true;
     }).slice(0, 30);
   }, [contracts]);

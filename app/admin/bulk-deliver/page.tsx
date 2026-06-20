@@ -27,6 +27,7 @@ import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-syn
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { toast } from '@/lib/toast';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { todayKr } from '@/lib/mock-data';
 
 export default function BulkDeliverPage() {
@@ -43,7 +44,7 @@ export default function BulkDeliverPage() {
     return contracts.filter((c) => {
       if (!c.customerName?.trim()) return false;
       if (c.deliveredDate) return false;
-      if (c.status === '반납' || c.status === '해지') return false;
+      if (isContractEnded(c)) return false;
       const s = c.vehicleStatus;
       if (s === '매각' || s === '매각대기' || s === '매각검토') return false;
       return true;

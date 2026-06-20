@@ -25,6 +25,7 @@ const DispatchListDialog = dynamic(
 );
 import type { DispatchListKind } from '@/components/dispatch/dispatch-list-dialog';
 import { toast } from '@/lib/toast';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { Sidebar } from '@/components/layout/sidebar';
 import { AppTopbar } from '@/components/layout/app-topbar';
 import { useVehicleDialog } from '@/lib/global-dialogs';
@@ -140,7 +141,7 @@ export default function DashboardPage() {
     // 확정대기 — 계약 체결됐으나 인도 전. 보증금 입금 추적 + 출고 일정 관리 대상.
     const pendingDelivery = contracts.filter((c) => {
       if (c.deliveredDate) return false;
-      if (c.status === '반납' || c.status === '해지' || c.status === '채권') return false;
+      if (isContractEnded(c)) return false;
       return c.status === '대기' ||
         c.vehicleStatus === '인도대기' ||
         c.vehicleStatus === '출고대기' ||

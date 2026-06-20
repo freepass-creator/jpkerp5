@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { useAuth } from '@/lib/use-auth';
 import { useTodayOnLeaveCount } from '@/lib/firebase/attendance-store';
 import { useMyPendingDispatchCount, useSentDispatchOrders } from '@/lib/firebase/dispatch-store';
@@ -87,7 +88,7 @@ export default function MobileHome() {
         || s === '매각' || s === '매각대기'
         || s === '상품화대기' || s === '상품화중' || s === '상품대기'
         || s === '구매대기' || s === '등록대기'
-        || c.status === '반납' || c.status === '해지';
+        || isContractEnded(c);
 
       if (!c.deliveredDate) {
         const sched = toDate(c.deliveryScheduledDate ?? c.contractDate);

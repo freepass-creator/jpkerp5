@@ -27,6 +27,7 @@ import { useLiveTodayKr } from '@/lib/use-live-today';
 import { Plus, FileXls, Trash, MagnifyingGlass, Copy } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { toast } from '@/lib/toast';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import type { Vehicle } from '@/lib/types';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
@@ -50,7 +51,7 @@ export default function AssetInsurancePage() {
   const activeContractByPlate = useMemo(() => {
     const m = new Map<string, typeof contracts[number]>();
     for (const c of contracts) {
-      if (c.status === '해지' || c.status === '반납') continue;
+      if (isContractEnded(c)) continue;
       if (!c.vehiclePlate) continue;
       const key = c.vehiclePlate.replace(/\s/g, '');
       const cur = m.get(key);

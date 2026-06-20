@@ -8,6 +8,7 @@
 
 import { useMemo, useState } from 'react';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
@@ -41,7 +42,7 @@ export default function MobileRisk() {
     for (const c of contracts) {
       const s = c.vehicleStatus;
       const inactive = s === '휴차' || s === '휴차대기' || s === '매각' || s === '매각대기'
-        || s === '매각검토' || c.status === '반납' || c.status === '해지';
+        || s === '매각검토' || isContractEnded(c);
 
       if (c.unpaidAmount > 0) out['unpaid'].push(c);
 

@@ -30,6 +30,7 @@ import { downloadContractsExcel } from '@/lib/contract-export';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
+import { isContractEnded, isAbnormalEnded, isNormalEnded } from '@/lib/contract-lifecycle';
 import { toast } from '@/lib/toast';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -107,21 +108,16 @@ export default function ContractPage() {
     const today_ = today;
     return contracts.filter((c) => {
       if (!matchesCompanyFilter(c.company, companyFilter)) return false;
-      // 퀵필터 분기
-      // 라이프사이클: 유지 = 운행 / 종료 = 해지·반납·채권
-      const ENDED = c.status === '해지' || c.status === '반납' || c.status === '채권';
-      // 정상종료 = 종결 상태이면서 미수 없음·채권 아님 (반납·해지·매각 정상 완료)
-      // 비정상종료 = 채권 OR 종결되었지만 미수 잔존
-      const isAbnormalEnded = ENDED && (c.status === '채권' || (c.unpaidAmount ?? 0) > 0);
-      const isNormalEnded = ENDED && !isAbnormalEnded;
+      // 퀵필터 분기 — 라이프사이클 SSOT 사용 (lib/contract-lifecycle)
+      const ENDED = isContractEnded(c);
       if (quickFilter === 'active') {
         if (ENDED) return false;
       } else if (quickFilter === 'ended') {
         if (!ENDED) return false;
       } else if (quickFilter === 'normalEnded') {
-        if (!isNormalEnded) return false;
+        if (!isNormalEnded(c)) return false;
       } else if (quickFilter === 'abnormalEnded') {
-        if (!isAbnormalEnded) return false;
+        if (!isAbnormalEnded(c)) return false;
       } else if (quickFilter === 'expire') {
         // 만기도래: status='운행' && returnScheduledDate D-90 이내 (아직 안 지남)
         if (c.status !== '운행') return false;
@@ -159,11 +155,9 @@ export default function ContractPage() {
     for (const c of contracts) {
       if (!matchesCompanyFilter(c.company, companyFilter)) continue;
       all++;
-      const isEnded = c.status === '해지' || c.status === '반납' || c.status === '채권';
-      if (isEnded) {
+      if (isContractEnded(c)) {
         ended++;
-        const isAbn = c.status === '채권' || (c.unpaidAmount ?? 0) > 0;
-        if (isAbn) abnormalEnded++; else normalEnded++;
+        if (isAbnormalEnded(c)) abnormalEnded++; else normalEnded++;
       } else active++;
       if (c.status === '운행' && c.returnScheduledDate) {
         const days = Math.round((new Date(c.returnScheduledDate).getTime() - new Date(today).getTime()) / 86400000);

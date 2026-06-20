@@ -28,6 +28,7 @@ import { downloadOverdueExcel } from '@/lib/contract-export';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { friendlyError } from '@/lib/friendly-error';
@@ -97,7 +98,7 @@ function needsRecovery(c: Contract, today: string, sentIds: Set<string>): boolea
   if (!legalGrounds && !debtFlagged) return false;
   // 이미 회수/종결된 케이스는 제외
   if (c.returnedDate) return false;
-  if (c.status === '반납' || c.status === '해지') return false;
+  if (isContractEnded(c)) return false;
   return true;
 }
 
@@ -159,7 +160,7 @@ export default function ReceivablesPage() {
   const isInspection = (c: Contract) => isInspectionOverdue(c, today);
   const isSold = (c: Contract) => c.vehicleStatus === '매각' || c.vehicleStatus === '매각대기';
   const isClosed = (c: Contract) =>
-    !isSold(c) && (c.status === '반납' || c.status === '해지' || c.status === '채권' || !!c.returnedDate);
+    !isSold(c) && (isContractEnded(c) || !!c.returnedDate);
   const isOther = (c: Contract) =>
     !isLatePay(c) && !isEngineLock(c) && !isInspection(c) && !isClosed(c) && !isSold(c) && c.status === '채권';
   const needsLock = (c: Contract) => needsEngineLockAction(c, today);
