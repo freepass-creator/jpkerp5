@@ -19,7 +19,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
 import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
-import type { TableSelection } from '@/lib/use-table-selection';
+import { useTableSelection } from '@/lib/use-table-selection';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { PageShell } from '@/components/ui/page-shell';
@@ -331,7 +331,9 @@ export default function Page() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createMode, setCreateMode] = useState<'차량' | '계약' | '입출금' | '현황'>('계약');
   const [smsOpen, setSmsOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // 행 선택 — lib/use-table-selection SSOT
+  const sel = useTableSelection();
+  const { selectedIds, setSelectedIds, toggleRow } = sel;
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Contract | null }>({
     open: false, x: 0, y: 0, row: null,
   });
@@ -464,28 +466,11 @@ export default function Page() {
     toast.success(`${targets.length}건 일괄 인도완료 처리`);
   }
 
-  const toggleRow = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
-
-  // 행 선택 어댑터 — Ctrl/Shift+click + Ctrl+A
-  const selAdapter = useMemo<TableSelection>(() => ({
-    selectedIds, setSelectedIds,
-    toggleRow,
-    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
-    clear: () => setSelectedIds(new Set()),
-    size: selectedIds.size,
-  }), [selectedIds, toggleRow]);
+  const clearSelection = useCallback(() => sel.clear(), [sel]);
+  const selAdapter = sel;
 
   // 퀵필터 변경 시 수동 정렬·선택 초기화 (필터 의도된 자동 정렬 우선)
-  useEffect(() => { setManualSort(null); setSelectedIds(new Set()); }, [view]);
+  useEffect(() => { setManualSort(null); sel.clear(); }, [view, sel]);
 
   function toggleSort(col: SortCol) {
     setManualSort((prev) => {

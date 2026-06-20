@@ -37,7 +37,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
 import { MissingText } from '@/components/ui/missing-badge';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
-import type { TableSelection } from '@/lib/use-table-selection';
+import { useTableSelection } from '@/lib/use-table-selection';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import type { Vehicle, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -149,24 +149,10 @@ export default function AssetPage() {
     router.replace(v ? `/asset?view=${v}` : '/asset');
   }, [searchParams, rawVehicles, router]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  function toggleRow(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  // 행 선택 hook 어댑터 — 기존 selectedIds/setSelectedIds 를 TableSelection 인터페이스로
-  const selAdapter = useMemo<TableSelection>(() => ({
-    selectedIds, setSelectedIds,
-    toggleRow,
-    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
-    clear: () => setSelectedIds(new Set()),
-    size: selectedIds.size,
-  }), [selectedIds]);
+  // 행 선택 — lib/use-table-selection SSOT
+  const sel = useTableSelection();
+  const { selectedIds, setSelectedIds, toggleRow } = sel;
+  const selAdapter = sel;
 
   const selected = useMemo(() => vehicles.find((v) => v.id === selectedId) ?? null, [vehicles, selectedId]);
 

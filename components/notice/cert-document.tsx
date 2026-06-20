@@ -43,12 +43,13 @@ export type CertDocProps = {
   pageTotal?: number;
 };
 
-function fmtCurrency(n: number): string { return (n ?? 0).toLocaleString('ko-KR'); }
+import { fmtKDate as fmtKDateBase, fmtKMoney } from '@/lib/format/korean';
 
+function fmtCurrency(n: number): string { return fmtKMoney(n ?? 0); }
+
+/** 계약서·증명서 빈칸 모드 (__년 __월 __일) */
 function fmtKDate(s: string): string {
-  if (!s) return '____년 __월 __일';
-  const [y, m, d] = s.split('-');
-  return `${y}년 ${parseInt(m, 10)}월 ${parseInt(d, 10)}일`;
+  return fmtKDateBase(s, { empty: 'underline' });
 }
 
 export function CertDocument({

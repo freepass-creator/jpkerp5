@@ -26,6 +26,7 @@ import type { BankTransaction, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { FilterSelect } from '@/components/ui/filter-select';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { useTableSelection } from '@/lib/use-table-selection';
 
 type Tab = 'all' | 'autodebit' | 'summary' | 'card' | 'corpcard';
 
@@ -81,7 +82,9 @@ export default function PaymentsPage() {
   const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:payments:company', 'all');
   const [subjectFilter, setSubjectFilter] = usePersistentState<string>('filter:payments:subject', 'all');
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // 행 선택 — lib/use-table-selection SSOT
+  const sel = useTableSelection();
+  const { selectedIds, setSelectedIds } = sel;
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
 
   const { rows: bankTx, loading: bankTxLoading, update: updateBankTx, updateMany: updateManyBankTx } = useBankTx();
@@ -91,13 +94,7 @@ export default function PaymentsPage() {
 
   const contractById = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
 
-  function toggleRow(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
+  const toggleRow = sel.toggleRow;
 
   /* ─── 매칭(분개) 뷰 ─── */
   const ledgerRows = useMemo(() => {

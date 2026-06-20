@@ -120,20 +120,9 @@ export function buildDocNo(prefix: string, seq: number, when: Date = new Date())
   return `JPK-${prefix}-${yy}${mm}-${String(seq).padStart(3, '0')}`;
 }
 
-/* ────────────────── 한국식 헬퍼 ────────────────── */
+/* ────────────────── 한국식 헬퍼 (lib/format/korean SSOT re-export) ────────────────── */
 
-export function fmtKDate(s: string): string {
-  if (!s) return '';
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s;
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
-
-export function fmtKMoney(n: number | string): string {
-  const num = typeof n === 'number' ? n : Number(String(n).replace(/[,\s]/g, ''));
-  if (!Number.isFinite(num)) return String(n);
-  return num.toLocaleString('ko-KR');
-}
+export { fmtKDate, fmtKMoney } from '@/lib/format/korean';
 
 /* ════════════════════════════════════════════════════════════════════
  *  1차 — 4종 초기 양식 등록

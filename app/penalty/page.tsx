@@ -21,7 +21,7 @@ import { useAuth } from '@/lib/use-auth';
 import { toast } from '@/lib/toast';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
-import type { TableSelection } from '@/lib/use-table-selection';
+import { useTableSelection } from '@/lib/use-table-selection';
 
 /**
  * 과태료 변경부과 — 처리중 / 처리완료 두 단계로 분리.
@@ -83,8 +83,9 @@ export default function PenaltyPage() {
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('in-progress');
-  /** 체크박스로 선택된 항목 ID — bulk 처리완료/다운로드용 */
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  /** 체크박스로 선택된 항목 — lib/use-table-selection SSOT */
+  const sel = useTableSelection();
+  const { selectedIds, setSelectedIds } = sel;
   const { openVehicle } = useVehicleDialog();
   /** 처리완료 탭 기간 필터 */
   const [period, setPeriod] = useState<Period>('이번달');
@@ -148,17 +149,10 @@ export default function PenaltyPage() {
     ));
   }
 
-  /** 체크박스 토글 */
-  function toggleSelect(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  /** 체크박스 토글 — sel.toggleRow alias (legacy 호출자) */
+  const toggleSelect = sel.toggleRow;
 
-  /** 현재 visible 행 전체 선택/해제 */
+  /** 현재 visible 행 전체 선택/해제 (penalty 만의 특수 로직 — 일부만 체크되어도 모두 선택) */
   function toggleSelectAll(visibleIds: string[]) {
     setSelectedIds((prev) => {
       const allChecked = visibleIds.every((id) => prev.has(id));
@@ -169,14 +163,7 @@ export default function PenaltyPage() {
     });
   }
 
-  // 행 선택 어댑터 — Ctrl/Shift+click + Ctrl+A
-  const selAdapter = useMemo<TableSelection>(() => ({
-    selectedIds, setSelectedIds,
-    toggleRow: toggleSelect,
-    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
-    clear: () => setSelectedIds(new Set()),
-    size: selectedIds.size,
-  }), [selectedIds]);
+  const selAdapter = sel;
 
   /** 선택된 매칭 완료건 일괄 처리완료 */
   function markSelectedCompleted() {

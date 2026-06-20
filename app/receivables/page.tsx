@@ -22,7 +22,7 @@ import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-syn
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { CompanyCell } from '@/components/ui/company-cell';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
-import type { TableSelection } from '@/lib/use-table-selection';
+import { useTableSelection } from '@/lib/use-table-selection';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { downloadOverdueExcel } from '@/lib/contract-export';
 import { useAuth } from '@/lib/use-auth';
@@ -130,20 +130,10 @@ export default function ReceivablesPage() {
   const [detailContract, setDetailContract] = useState<Contract | null>(null);
   /** 리스크 상세 → [수정] 시 풀 계약 다이얼로그 열기 */
   const [editContract, setEditContract] = useState<Contract | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  // 행 선택 어댑터 — Ctrl/Shift/Ctrl+A 호환
-  const selAdapter = useMemo<TableSelection>(() => ({
-    selectedIds, setSelectedIds,
-    toggleRow: (id: string) => setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    }),
-    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
-    clear: () => setSelectedIds(new Set()),
-    size: selectedIds.size,
-  }), [selectedIds]);
+  // 행 선택 — lib/use-table-selection SSOT
+  const sel = useTableSelection();
+  const { selectedIds, setSelectedIds } = sel;
+  const selAdapter = sel;
 
   const today = useLiveTodayKr();
 

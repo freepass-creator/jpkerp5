@@ -29,7 +29,7 @@ import { useLiveTodayKr } from '@/lib/use-live-today';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
-import type { TableSelection } from '@/lib/use-table-selection';
+import { useTableSelection } from '@/lib/use-table-selection';
 import { toast } from '@/lib/toast';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -63,29 +63,15 @@ export default function ContractPage() {
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:contract:company', 'all');
   const [quickFilter, setQuickFilter] = usePersistentState<QuickFilter>('filter:contract:quick', 'active');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // 행 선택 — lib/use-table-selection SSOT
+  const sel = useTableSelection();
+  const { selectedIds, setSelectedIds, toggleRow } = sel;
+  const selAdapter = sel;
   const [createOpen, setCreateOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
 
   // 필터/뷰 변경 시 선택 해제
-  useEffect(() => setSelectedIds(new Set()), [search, companyFilter, quickFilter]);
-
-  function toggleRow(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  // 행 선택 어댑터 — Ctrl/Shift+click + Ctrl+A
-  const selAdapter = useMemo<TableSelection>(() => ({
-    selectedIds, setSelectedIds,
-    toggleRow,
-    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
-    clear: () => setSelectedIds(new Set()),
-    size: selectedIds.size,
-  }), [selectedIds]);
+  useEffect(() => sel.clear(), [search, companyFilter, quickFilter]);
 
   function handleExcelAll() {
     if (filtered.length === 0) { toast.info('내보낼 계약 없음'); return; }

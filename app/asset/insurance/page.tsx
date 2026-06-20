@@ -30,7 +30,7 @@ import { toast } from '@/lib/toast';
 import type { Vehicle } from '@/lib/types';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
-import type { TableSelection } from '@/lib/use-table-selection';
+import { useTableSelection } from '@/lib/use-table-selection';
 
 type QF = 'all' | 'missing' | 'expire' | 'expired';
 
@@ -86,18 +86,10 @@ export default function AssetInsurancePage() {
   const [detailVehicleId, setDetailVehicleId] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Vehicle | null }>({ open: false, x: 0, y: 0, row: null });
   const [editPolicyId, setEditPolicyId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  function toggleRow(id: string) {
-    setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  }
-
-  const selAdapter = useMemo<TableSelection>(() => ({
-    selectedIds, setSelectedIds,
-    toggleRow,
-    selectAll: (ids: string[]) => setSelectedIds(new Set(ids)),
-    clear: () => setSelectedIds(new Set()),
-    size: selectedIds.size,
-  }), [selectedIds]);
+  // 행 선택 — lib/use-table-selection SSOT
+  const sel = useTableSelection();
+  const { selectedIds, setSelectedIds, toggleRow } = sel;
+  const selAdapter = sel;
 
   const today = useLiveTodayKr();
 
