@@ -506,7 +506,12 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
       toast.error(`회계기간 마감 — ${yyyymm}월 거래 등록 불가. 정정은 신규 회차로 처리하세요.`);
       return;
     }
-    void runMutation(async () => { commitAddInner(keepOpen, amt); });
+    void runMutation(async () => {
+      commitAddInner(keepOpen, amt);
+      // onUpdate 가 fire-and-forget 으로 RTDB sync 시작 — 그 사이 추가 클릭 차단.
+      // RTDB 평균 응답 < 500ms 이므로 0.6초 가드 충분.
+      await new Promise((r) => setTimeout(r, 600));
+    });
   }
 
   function commitAddInner(keepOpen: boolean, amt: number) {
