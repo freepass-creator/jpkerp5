@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ref, push, get, update as rtdbUpdate, remove as rtdbRemove } from 'firebase/database';
 import { Database, Upload, Warning, CheckCircle, MagnifyingGlass, ListChecks, Image, Truck, Skull } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -59,8 +60,13 @@ function countRealPayments(c: Contract): number {
 }
 
 export default function MigrateSheetPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const superAdmin = isSuperAdmin(user?.email);
+  // 위험 작업 (wipe·migrate) — superAdmin 아니면 즉시 redirect
+  useEffect(() => {
+    if (user && !superAdmin) router.replace('/');
+  }, [user, superAdmin, router]);
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [stats, setStats] = useState<{

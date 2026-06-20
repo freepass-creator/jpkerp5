@@ -18,7 +18,8 @@
  * UI: 미리보기 → 체크박스 선택 → 일괄 처리
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Truck, CheckCircle } from '@phosphor-icons/react';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -33,8 +34,13 @@ import { isContractEnded } from '@/lib/contract-lifecycle';
 import { todayKr } from '@/lib/mock-data';
 
 export default function BulkDeliverPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const superAdmin = isSuperAdmin(user?.email);
+  // 위험 작업 — superAdmin 아니면 즉시 redirect
+  useEffect(() => {
+    if (user && !superAdmin) router.replace('/');
+  }, [user, superAdmin, router]);
   const { contracts, update: updateContract } = useContracts();
   const { vehicles, update: updateVehicleMaster } = useVehicles();
   const [selected, setSelected] = useState<Set<string>>(new Set());

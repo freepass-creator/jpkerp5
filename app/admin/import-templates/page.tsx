@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ref, get, update as rtdbUpdate, push } from 'firebase/database';
 import { Upload, Warning, Download, FileXls, CheckCircle, Info, CaretDown, CaretRight } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -19,8 +20,13 @@ import {
 import type { Contract } from '@/lib/types';
 
 export default function ImportTemplatesPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const superAdmin = isSuperAdmin(user?.email);
+  // 위험 작업 — superAdmin 아니면 즉시 redirect
+  useEffect(() => {
+    if (user && !superAdmin) router.replace('/');
+  }, [user, superAdmin, router]);
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [contractParsed, setContractParsed] = useState<ParsedContractRow[] | null>(null);

@@ -1,10 +1,12 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ClipboardText, MagnifyingGlass, ArrowsClockwise, FileXls } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useAuditLogs } from '@/lib/firebase/audit-store';
+import { useRole } from '@/lib/use-role';
 import { exportToExcel } from '@/lib/excel-export';
 import { todayKr } from '@/lib/mock-data';
 import type { AuditAction, AuditEntityType } from '@/lib/types';
@@ -64,6 +66,11 @@ function entityHref(t: AuditEntityType, id?: string): string | null {
 }
 
 export default function AuditPage() {
+  // audit log = master 만 접근 (감사 이력은 민감 정보)
+  const router = useRouter();
+  const { isRealMaster, loading: roleLoading } = useRole();
+  useEffect(() => { if (!roleLoading && !isRealMaster) router.replace('/'); }, [isRealMaster, roleLoading, router]);
+
   const { rows, loading } = useAuditLogs(1000);
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = usePersistentState<AuditAction | 'all'>('filter:audit:action', 'all');

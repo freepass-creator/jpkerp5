@@ -13,8 +13,9 @@
  * 동작 변경 없음 (진단 + 수동 정렬만). 운영 데이터의 어느 한 쪽 자동 덮어쓰기 금지.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Wrench, Warning, CheckCircle, ArrowRight, ArrowLeft, MagnifyingGlass } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { showConfirm } from '@/lib/confirm';
@@ -23,6 +24,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { useRole } from '@/lib/use-role';
 import { displayCompanyName } from '@/lib/company-display';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { audit } from '@/lib/firebase/audit-store';
@@ -48,6 +50,11 @@ type StaleVehicleRow = {
 };
 
 export default function StatusDriftPage() {
+  // 위험 작업 (일괄 status 정렬) — master 만 접근
+  const router = useRouter();
+  const { isRealMaster, loading: roleLoading } = useRole();
+  useEffect(() => { if (!roleLoading && !isRealMaster) router.replace('/'); }, [isRealMaster, roleLoading, router]);
+
   const { vehicles, update: updateVehicle } = useVehicles();
   const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();

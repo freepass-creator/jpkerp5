@@ -1,9 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
+import { useRole } from '@/lib/use-role';
 import { isDevToolUser } from '@/lib/admin-emails';
 
 type ToolCard = {
@@ -60,6 +63,11 @@ const TOOLS: ToolCard[] = [
 ];
 
 export default function DevToolsPage() {
+  // 개발도구 = master 만 (dev-tools 정보 노출 차단)
+  const router = useRouter();
+  const { isRealMaster, loading: roleLoading } = useRole();
+  useEffect(() => { if (!roleLoading && !isRealMaster) router.replace('/'); }, [isRealMaster, roleLoading, router]);
+
   const { user } = useAuth();
   const admin = isDevToolUser(user?.email);
 
