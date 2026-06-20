@@ -23,6 +23,7 @@ import { MobileSaveFooter } from '@/components/mobile/save-footer';
 import { todayKr } from '@/lib/mock-data';
 import { addIntakeItem, markIntakeCommitted } from '@/lib/firebase/intake-store';
 import { markReturned } from '@/lib/contract-actions';
+import { useClosedPeriods, isDateInClosedPeriod } from '@/lib/firebase/closed-periods-store';
 
 export default function MobileReturn() {
   const router = useRouter();
@@ -31,6 +32,8 @@ export default function MobileReturn() {
   const { contracts, update: updateContract } = useContracts();
   const { vehicles, update: updateVehicleMaster } = useVehicles();
   const { user } = useAuth();
+  // 회계기간 마감 검사 (ERP #18) — 마감된 월 반납 처리 차단
+  const { closedPeriods } = useClosedPeriods();
   const [step, setStep] = useState<'pick' | 'form'>(preContractId ? 'form' : 'pick');
   const [contractId, setContractId] = useState(preContractId);
   const [q, setQ] = useState('');
@@ -77,6 +80,11 @@ export default function MobileReturn() {
 
   async function handleSave() {
     if (!contract || !returnedDate) return;
+    // 회계기간 마감 (ERP #18) — 반납일이 마감된 월에 속하면 차단
+    if (isDateInClosedPeriod(closedPeriods, returnedDate)) {
+      toast.error(`회계기간 마감 — ${returnedDate.slice(0, 7)}월 반납 등록 불가. 마감 해제 후 시도하세요.`);
+      return;
+    }
     setSaving(true);
     const by = user?.email ?? undefined;
     let intakeId: string | null = null;
@@ -119,7 +127,12 @@ export default function MobileReturn() {
       toast.success('반납 처리 완료');
       router.push(`/m/contract/${contract.id}`);
     } catch (e) {
-      toast.error(`처리 실패: ${(e as Error).message ?? String(e)}`);
+      // LockConflict (#22) — 다른 사용자가 먼저 수정
+      if ((e as Error)?.name === 'LockConflictError') {
+        toast.error('다른 사용자가 먼저 수정했습니다. 새로고침 후 다시 시도하세요.');
+      } else {
+        toast.error(`처리 실패: ${(e as Error).message ?? String(e)}`);
+      }
     } finally {
       setSaving(false);
     }
