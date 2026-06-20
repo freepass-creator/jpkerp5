@@ -132,6 +132,9 @@ export function SmsDialog({
     const user = auth?.currentUser;
     const idToken = user ? await user.getIdToken() : '';
 
+    // 멱등성 (ERP #16/#26) — 발송 세션 ID + recipient ID 조합 = 중복 발송 차단.
+    // 같은 키로 재호출 시 서버가 기존 응답 반환 (네트워크 실패 retry 안전).
+    const batchKey = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     let sent = 0, failed = 0, mocked = 0;
     for (const r of recipients) {
       try {
@@ -145,6 +148,7 @@ export function SmsDialog({
             tel: r.phone,
             message: preview(body, r),
             subject: TEMPLATES[templateIdx].label,
+            idempotencyKey: `${batchKey}-${r.contractId}`,
           }),
         });
         const json = await res.json();

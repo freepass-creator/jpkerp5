@@ -19,6 +19,8 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
+import { getAdminRtdb } from '@/lib/firebase/admin';
+import { randomUUID, createHash } from 'node:crypto';
 
 export const runtime = 'nodejs';
 
@@ -31,11 +33,16 @@ type Body = {
   tel?: string;
   message?: string;
   subject?: string;
+  /** ERP #16 멱등성 — 클라이언트가 생성한 키. 같은 키로 다시 호출 시 기존 응답 그대로 반환. */
+  idempotencyKey?: string;
 };
 
+const SMS_LOG_PATH = `${process.env.NEXT_PUBLIC_FIREBASE_DB_TENANT ?? 'jpkerp5'}/sms_log`;
+
 export async function POST(req: NextRequest) {
-  const actor = await requireAuth();
-  if (actor instanceof NextResponse) return actor;
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const actor = authResult;
 
   let body: Body;
   try { body = await req.json(); }
@@ -51,6 +58,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'tel & message required' }, { status: 400 });
   }
 
+  // ── 멱등성 (ERP #16) ─────────────
+  // idempotencyKey 명시되지 않으면 (tel + message + minute) 해시로 자동 생성 — 같은 1분 내 같은 메시지는 중복 차단.
+  const opKey = body.idempotencyKey ?? createHash('sha256')
+    .update(`${tel}|${message}|${Math.floor(Date.now() / 60000)}`)
+    .digest('hex').slice(0, 32);
+
+  let logRef: ReturnType<ReturnType<typeof getAdminRtdb>['ref']> | null = null;
+  try {
+    const db = getAdminRtdb();
+    logRef = db.ref(`${SMS_LOG_PATH}/${opKey}`);
+    const existing = await logRef.get();
+    if (existing.exists()) {
+      // 멱등성 — 이미 발송한 키. 기존 응답 그대로 반환 (중복 발송 방지)
+      const prev = existing.val();
+      return NextResponse.json({ ...prev.response, idempotent: true, sentAt: prev.sentAt });
+    }
+  } catch (e) {
+    console.warn('[sms idempotency check]', e);
+    // 검사 실패 시 발송은 진행 (가용성 우선)
+  }
+
   const apiKey    = process.env.ALIGO_API_KEY;
   const userId    = process.env.ALIGO_USER_ID;
   const senderKey = process.env.ALIGO_SENDER_KEY;
@@ -58,20 +86,41 @@ export async function POST(req: NextRequest) {
   const failover  = process.env.ALIGO_FAILOVER === 'sms' ? 'Y' : 'N';
   const dryRun    = process.env.ALIGO_DRY_RUN === 'true';
 
+  // ── 알림 ledger (ERP #27) — 발송 결과를 sms_log/{opKey} 에 영구 기록 ─────────────
+  async function logAndReturn(payload: Record<string, unknown>): Promise<NextResponse> {
+    if (logRef) {
+      try {
+        await logRef.set({
+          opKey,
+          actor: actor.email ?? actor.uid,
+          tel,
+          subject,
+          message: message.length > 200 ? `${message.slice(0, 200)}…` : message,
+          template_code: template_code ?? null,
+          channel: (payload.channel as string) ?? null,
+          ok: !!payload.ok,
+          response: payload,
+          sentAt: new Date().toISOString(),
+        });
+      } catch (e) { console.error('[sms log save]', e); }
+    }
+    return NextResponse.json(payload);
+  }
+
   if (!apiKey || !userId || !senderTel) {
     console.warn('[sms] env not configured — mock response');
-    return NextResponse.json({ ok: false, mock: true, reason: 'ALIGO_* env not configured' });
+    return logAndReturn({ ok: false, mock: true, reason: 'ALIGO_* env not configured' });
   }
 
   if (dryRun) {
     console.log('[sms DRY_RUN]', { tel, subject, message, template_code });
-    return NextResponse.json({ ok: true, dryRun: true, tel, template_code });
+    return logAndReturn({ ok: true, dryRun: true, tel, template_code });
   }
 
   // ── 알림톡 (template_code 있을 때) ─────────────
   if (template_code) {
     if (!senderKey) {
-      return NextResponse.json({ ok: false, error: 'ALIGO_SENDER_KEY 미설정 — 알림톡 발송 불가' });
+      return logAndReturn({ ok: false, error: 'ALIGO_SENDER_KEY 미설정 — 알림톡 발송 불가' });
     }
     const form = new URLSearchParams();
     form.append('apikey', apiKey);
@@ -95,10 +144,10 @@ export async function POST(req: NextRequest) {
       });
       const data = await r.json().catch(() => ({}));
       const ok = data.code === 0 || data.code === '0';
-      return NextResponse.json({ ok, channel: 'alimtalk', ...data });
+      return logAndReturn({ ok, channel: 'alimtalk', ...data });
     } catch (e) {
       console.error('[sms alimtalk]', e);
-      return NextResponse.json({ ok: false, error: (e as Error).message ?? String(e) });
+      return logAndReturn({ ok: false, channel: 'alimtalk', error: (e as Error).message ?? String(e) });
     }
   }
 
@@ -120,9 +169,9 @@ export async function POST(req: NextRequest) {
     });
     const data = await r.json().catch(() => ({}));
     const ok = data.result_code === '1' || data.result_code === 1;
-    return NextResponse.json({ ok, channel: 'sms', ...data });
+    return logAndReturn({ ok, channel: 'sms', ...data });
   } catch (e) {
     console.error('[sms sms]', e);
-    return NextResponse.json({ ok: false, error: (e as Error).message ?? String(e) });
+    return logAndReturn({ ok: false, channel: 'sms', error: (e as Error).message ?? String(e) });
   }
 }
