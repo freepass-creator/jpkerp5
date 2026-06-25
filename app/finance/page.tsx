@@ -16,6 +16,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVendors } from '@/lib/firebase/vendors-store';
+import { EntityFormDialog, type FieldDef } from '@/components/ui/entity-form-dialog';
 import type { BankTransaction, CardTransaction, Contract, Vendor, Company } from '@/lib/types';
 import { buildAllJournals, summarizeByAccount, ACCOUNTS, CLASS_LABEL, type LedgerSummary, type AccountClass } from '@/lib/gl-entries';
 import { useRole } from '@/lib/use-role';
@@ -647,6 +648,8 @@ export default function FinancePage() {
 
 /* ─────────────────── 거래처 보조원장 (vendor sub-ledger) ─────────────────── */
 
+const VENDOR_KINDS_SUB = ['공급사', '협력사', '외주', '고객', '기타'] as const;
+
 function VendorSubLedgerView({
   bankTx, vendors, contracts, contractById, companyFilter, companyMaster, inPeriod, search,
 }: {
@@ -660,6 +663,76 @@ function VendorSubLedgerView({
   search: string;
 }) {
   const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
+  const { add: addVendor, update: updateVendor } = useVendors();
+  const [vDialogOpen, setVDialogOpen] = useState(false);
+  const [vEditing, setVEditing] = useState<Vendor | null>(null);
+  const [vInitial, setVInitial] = useState<Record<string, string>>({});
+  const [vMode, setVMode] = useState<'view' | 'edit' | 'create'>('create');
+  const companyOptions = useMemo(() => companyMaster.map((c) => c.code), [companyMaster]);
+
+  function openVendorCreate(prefillName?: string) {
+    setVEditing(null);
+    setVMode('create');
+    setVInitial(prefillName ? { name: prefillName } : {});
+    setVDialogOpen(true);
+  }
+  function openVendorEdit(v: Vendor) {
+    setVEditing(v);
+    setVMode('view');
+    setVInitial({
+      name: v.name ?? '',
+      kind: v.kind ?? '',
+      bizNo: v.bizNo ?? '',
+      ceo: v.ceo ?? '',
+      bizType: v.bizType ?? '',
+      bizCategory: v.bizCategory ?? '',
+      address: v.address ?? '',
+      phone: v.phone ?? '',
+      email: v.email ?? '',
+      companyCode: v.companyCode ?? '',
+      notes: v.notes ?? '',
+    });
+    setVDialogOpen(true);
+  }
+  async function handleVendorSubmit(data: Record<string, string>) {
+    const cleanName = (data.name ?? '').trim();
+    if (!cleanName) { toast.error('거래처 이름은 필수입니다'); return; }
+    const dup = vendors.find((v) => v.name === cleanName && v.id !== vEditing?.id);
+    if (dup) { toast.error(`같은 이름의 거래처가 이미 있습니다: ${cleanName}`); return; }
+    const payload: Omit<Vendor, 'id'> = {
+      name: cleanName,
+      kind: (data.kind || undefined) as Vendor['kind'],
+      bizNo: data.bizNo || undefined,
+      ceo: data.ceo || undefined,
+      bizType: data.bizType || undefined,
+      bizCategory: data.bizCategory || undefined,
+      address: data.address || undefined,
+      phone: data.phone || undefined,
+      email: data.email || undefined,
+      companyCode: (data.companyCode || undefined) as Vendor['companyCode'],
+      notes: data.notes || undefined,
+      createdAt: vEditing?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      if (vEditing) { await updateVendor({ ...payload, id: vEditing.id }); toast.success(`거래처 수정: ${cleanName}`); }
+      else { await addVendor(payload); toast.success(`거래처 등록: ${cleanName}`); }
+      setVDialogOpen(false);
+    } catch (e) { toast.error(`저장 실패: ${(e as Error).message ?? String(e)}`); }
+  }
+  const vendorFields: FieldDef[] = [
+    { key: 'name', label: '거래처명', required: true, colSpan: 2 },
+    { key: 'kind', label: '종류', type: 'select', options: VENDOR_KINDS_SUB as unknown as string[], colSpan: 1 },
+    { key: 'companyCode', label: '소속 회사', type: 'select', options: companyOptions, colSpan: 1, placeholder: '전체 공유' },
+    { key: 'bizNo', label: '사업자번호', colSpan: 2 },
+    { key: 'ceo', label: '대표', colSpan: 1 },
+    { key: 'phone', label: '전화', colSpan: 1 },
+    { key: 'bizType', label: '업태', colSpan: 1 },
+    { key: 'bizCategory', label: '종목', colSpan: 1 },
+    { key: 'email', label: '이메일', colSpan: 2 },
+    { key: 'address', label: '주소', colSpan: 4 },
+    { key: 'notes', label: '메모', type: 'textarea', colSpan: 4 },
+  ];
 
   const stats = useMemo(() => {
     const byVendor = new Map<string, {
@@ -736,21 +809,32 @@ function VendorSubLedgerView({
     <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 12, height: 'calc(100vh - 220px)', minHeight: 460 }}>
       {/* 좌 — 거래처 목록 */}
       <div style={{ border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)', fontSize: 12, fontWeight: 700 }}>
-          거래처 ({vendorListRaw.length})
+        <div style={{ padding: '6px 8px 6px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-sunken)', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ flex: 1 }}>거래처 ({vendorListRaw.length})</span>
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={() => openVendorCreate()}
+            title="거래처 등록"
+            style={{ padding: '2px 8px', fontSize: 11 }}
+          >
+            + 등록
+          </button>
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>
           {vendorListRaw.length === 0 ? (
             <div className="muted center" style={{ padding: 24, fontSize: 12 }}>
-              등록된 거래처가 없습니다.
+              등록된 거래처가 없습니다 — 위 [+ 등록] 으로 시작하세요.
             </div>
           ) : vendorListRaw.map((v) => {
             const isActive = selectedVendor === v.name;
+            const existing = vendors.find((x) => x.name === v.name);
             return (
               <button
                 key={v.name}
                 type="button"
                 onClick={() => setSelectedVendor(v.name)}
+                onDoubleClick={() => existing ? openVendorEdit(existing) : openVendorCreate(v.name)}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left',
                   padding: '8px 12px',
@@ -849,6 +933,16 @@ function VendorSubLedgerView({
           </>
         )}
       </div>
+      <EntityFormDialog
+        open={vDialogOpen}
+        onOpenChange={setVDialogOpen}
+        title={vEditing ? `거래처 — ${vEditing.name}` : '거래처 등록'}
+        mode={vMode}
+        fields={vendorFields}
+        initial={vInitial}
+        size="lg"
+        onSubmit={handleVendorSubmit}
+      />
     </div>
   );
 }

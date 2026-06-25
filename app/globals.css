@@ -351,7 +351,8 @@ a { color: var(--text-link); text-decoration: none; }
 
 .sb-section {
   display: flex; flex-direction: column; gap: 1px;
-  padding: 6px 8px 4px;
+  /* 위아래 동일 padding — 아이콘 vertical 간격 통일 */
+  padding: 4px 8px;
 }
 .sb-section-label {
   font-size: 10px; color: var(--text-weak);
@@ -438,7 +439,8 @@ a { color: var(--text-link); text-decoration: none; }
 .sb-divider {
   height: 1px;
   background: var(--border);
-  margin: 4px 0;
+  /* section 내 아이콘 간격과 균형 — 너무 멀어지지 않게 */
+  margin: 2px 0;
 }
 
 /* ────────────── Page Shell — master-detail 공통 ──────────────
@@ -682,10 +684,11 @@ a { color: var(--text-link); text-decoration: none; }
 /* .font-pick 은 deprecated — chip 으로 통합. 잔존 호환만 위해 alias. */
 .font-pick { display: none; }
 :root[data-sidebar="collapsed"] .sb-divider {
-  margin: 8px 0;
+  /* expanded 와 동일 — 아이콘 간격 일치 */
+  margin: 2px 0;
 }
 .sb-foot {
-  padding: 6px 8px;
+  padding: 4px 8px;
   display: flex; flex-direction: column; gap: 1px;
 }
 
