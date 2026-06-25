@@ -12,7 +12,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Calendar, FileXls } from '@phosphor-icons/react';
+import { Calendar, FileXls, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -202,9 +202,9 @@ export default function ContractSchedulePage() {
           {periodMode !== 'all' && (
             <>
               <span className="filter-divider" />
-              <button type="button" className="chip" onClick={() => shiftPeriod(-1)} title="이전">◀</button>
+              <button type="button" className="chip" onClick={() => shiftPeriod(-1)} title="이전"><CaretLeft size={11} weight="bold" /></button>
               <strong className="mono" style={{ minWidth: 80, textAlign: 'center', fontSize: 12 }}>{periodLabel}</strong>
-              <button type="button" className="chip" onClick={() => shiftPeriod(1)} title="다음">▶</button>
+              <button type="button" className="chip" onClick={() => shiftPeriod(1)} title="다음"><CaretRight size={11} weight="bold" /></button>
             </>
           )}
         </>

@@ -26,7 +26,7 @@
 
 import { useMemo, useState, Fragment } from 'react';
 import { toast } from '@/lib/toast';
-import { MagnifyingGlass } from '@phosphor-icons/react';
+import { MagnifyingGlass, CaretLeft, CaretRight } from '@phosphor-icons/react';
 
 import { useVendors } from '@/lib/firebase/vendors-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -591,7 +591,7 @@ export function DailyLedgerView({
                   }}
 
                   title="CMS 매칭 이력 일치기"
-                >▶</button>
+                ><CaretRight size={11} weight="bold" /></button>
               )}
 
               {(r.txDate ?? '').slice(0, 10)}

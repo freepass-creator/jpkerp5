@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bank, Plus, Trash, FileXls } from '@phosphor-icons/react';
+import { Bank, Plus, Trash, FileXls, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
@@ -276,9 +276,9 @@ export default function FinancePage() {
           <button type="button" className={`chip ${periodMode === 'quarter' ? 'active' : ''}`} onClick={() => setPeriodMode('quarter')}>분기</button>
           <button type="button" className={`chip ${periodMode === 'year' ? 'active' : ''}`} onClick={() => setPeriodMode('year')}>연</button>
           <span className="filter-divider" />
-          <button type="button" className="chip" onClick={() => shiftPeriod(-1)} title="이전 기간">◀</button>
+          <button type="button" className="chip" onClick={() => shiftPeriod(-1)} title="이전 기간"><CaretLeft size={11} weight="bold" /></button>
           <strong className="mono" style={{ minWidth: 80, textAlign: 'center', fontSize: 12 }}>{periodLabel}</strong>
-          <button type="button" className="chip" onClick={() => shiftPeriod(1)} title="다음 기간">▶</button>
+          <button type="button" className="chip" onClick={() => shiftPeriod(1)} title="다음 기간"><CaretRight size={11} weight="bold" /></button>
           <button type="button" className="chip" onClick={gotoCurrent} title="현재 기간으로">당월</button>
           {/* 보조 dropdown — 맨 뒤 */}
           <span className="filter-divider" />

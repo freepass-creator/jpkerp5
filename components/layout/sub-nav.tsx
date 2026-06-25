@@ -65,11 +65,20 @@ export function SubNav({ items }: { items: SubNavItem[] }) {
           <span key={it.href} style={{ display: 'inline-flex', alignItems: 'center' }}>
             {it.separator && (
               <span aria-hidden="true" style={{
-                display: 'inline-block',
-                width: 1, height: 16,
-                background: 'var(--border)',
-                margin: '0 8px',
-              }} />
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                margin: '0 8px 0 16px',
+                padding: '2px 10px',
+                borderLeft: '2px solid var(--border-strong, var(--text-weak))',
+                fontSize: 10,
+                fontWeight: 700,
+                color: 'var(--text-sub)',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+              }}>
+                자동 집계
+              </span>
             )}
             <Link
               href={it.href}

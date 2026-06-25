@@ -13,6 +13,7 @@
 import type { Company } from '@/lib/types';
 import { displayCompanyName } from '@/lib/company-display';
 import { FilterSelect } from './filter-select';
+import { CaretLeft, CaretRight } from '@phosphor-icons/react';
 
 /** 회사 dropdown — 'all' + option list */
 export function CompanyFilter({
@@ -67,9 +68,9 @@ export function PeriodFilter({
       <button type="button" className={`chip ${mode === 'quarter' ? 'active' : ''}`} onClick={() => onModeChange('quarter')}>분기</button>
       <button type="button" className={`chip ${mode === 'year' ? 'active' : ''}`} onClick={() => onModeChange('year')}>연</button>
       <span className="filter-divider" />
-      <button type="button" className="chip" onClick={() => onShift(-1)} title="이전 기간">◀</button>
+      <button type="button" className="chip" onClick={() => onShift(-1)} title="이전 기간"><CaretLeft size={11} weight="bold" /></button>
       <strong className="mono" style={{ minWidth: 80, textAlign: 'center', fontSize: 12 }}>{label ?? auto}</strong>
-      <button type="button" className="chip" onClick={() => onShift(1)} title="다음 기간">▶</button>
+      <button type="button" className="chip" onClick={() => onShift(1)} title="다음 기간"><CaretRight size={11} weight="bold" /></button>
       <button type="button" className="chip" onClick={onCurrent} title="현재 기간으로">당월</button>
     </>
   );
