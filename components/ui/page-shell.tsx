@@ -25,7 +25,6 @@ import { MagnifyingGlass } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { MENU_LABELS, type MenuKey } from '@/components/layout/sidebar';
-import { APP_VERSION } from '@/lib/version';
 
 export type PageShellProps = {
   /** topbar title — 명시 (legacy/sub-page). menuKey 와 함께 쓰면 sub-title 처럼 작동 */
@@ -98,7 +97,6 @@ export function PageShell({
           <div style={{ flex: 1 }} />
           <div className="topbar-right">
             {topbarRight}
-            <span className="topbar-version" title={`렌터카매니저 v${APP_VERSION}`}>v{APP_VERSION}</span>
           </div>
         </header>
 

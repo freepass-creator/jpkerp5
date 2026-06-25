@@ -19,7 +19,6 @@
 import { type ReactNode } from 'react';
 import { MagnifyingGlass } from '@phosphor-icons/react';
 import { MENU_LABELS, type MenuKey } from '@/components/layout/sidebar';
-import { APP_VERSION } from '@/lib/version';
 
 export type AppTopbarProps = {
   /** 메뉴 키 — MENU_LABELS 에서 자동 라벨 */
@@ -76,7 +75,6 @@ export function AppTopbar({
       <div style={{ flex: 1 }} />
       <div className="topbar-right">
         {right}
-        <span className="topbar-version" title={`렌터카매니저 v${APP_VERSION}`}>v{APP_VERSION}</span>
       </div>
     </header>
   );
