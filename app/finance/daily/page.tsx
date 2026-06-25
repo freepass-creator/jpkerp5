@@ -42,8 +42,9 @@ type DailyRow = {
 
 export default function FinanceDailyPage() {
   const { user } = useAuth();
-  const { rows: bankTx, update: updateBank } = useBankTx();
-  const { rows: cardTx, update: updateCard } = useCardTx();
+  const { rows: bankTx, loading: bankLoading, update: updateBank } = useBankTx();
+  const { rows: cardTx, loading: cardLoading, update: updateCard } = useCardTx();
+  const dataLoading = bankLoading || cardLoading;
   const { contracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
 
@@ -348,7 +349,9 @@ export default function FinanceDailyPage() {
           </tr>
         </thead>
         <tbody>
-          {daily.length === 0 ? (
+          {dataLoading ? (
+            <EmptyRow colSpan={8}>거래 내역 불러오는 중…</EmptyRow>
+          ) : daily.length === 0 ? (
             <EmptyRow colSpan={8}>거래 내역 없음 — 입출금관리에서 등록</EmptyRow>
           ) : daily.map((r) => (
             <tr key={r.key}>

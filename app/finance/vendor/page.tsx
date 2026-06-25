@@ -27,8 +27,9 @@ type VendorRow = {
 };
 
 export default function FinanceVendorPage() {
-  const { rows: bankTx } = useBankTx();
-  const { rows: cardTx } = useCardTx();
+  const { rows: bankTx, loading: bankLoading } = useBankTx();
+  const { rows: cardTx, loading: cardLoading } = useCardTx();
+  const dataLoading = bankLoading || cardLoading;
 
   const vendorRows = useMemo<VendorRow[]>(() => {
     const m = new Map<string, VendorRow>();
@@ -89,7 +90,9 @@ export default function FinanceVendorPage() {
                 </tr>
               </thead>
               <tbody>
-                {vendorRows.length === 0 ? (
+                {dataLoading ? (
+                  <EmptyRow colSpan={6}>거래처 데이터 불러오는 중…</EmptyRow>
+                ) : vendorRows.length === 0 ? (
                   <EmptyRow colSpan={6}>거래처 데이터 없음 — bank_tx / card_tx 의 counterparty 채워지면 집계</EmptyRow>
                 ) : vendorRows.map((r) => (
                   <tr key={r.name}>

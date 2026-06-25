@@ -26,8 +26,9 @@ type GLRow = {
 };
 
 export default function FinanceGLPage() {
-  const { rows: bankTx } = useBankTx();
-  const { rows: cardTx } = useCardTx();
+  const { rows: bankTx, loading: bankLoading } = useBankTx();
+  const { rows: cardTx, loading: cardLoading } = useCardTx();
+  const dataLoading = bankLoading || cardLoading;
 
   const rows = useMemo<GLRow[]>(() => {
     const m = new Map<string, GLRow>();
@@ -83,7 +84,9 @@ export default function FinanceGLPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 ? (
+                {dataLoading ? (
+                  <EmptyRow colSpan={5}>거래 데이터 불러오는 중…</EmptyRow>
+                ) : rows.length === 0 ? (
                   <EmptyRow colSpan={5}>거래 데이터 없음</EmptyRow>
                 ) : rows.map((r) => (
                   <tr key={r.subject}>

@@ -29,7 +29,7 @@ type CustRow = {
 };
 
 export default function FinanceCustomerPage() {
-  const { contracts } = useContracts();
+  const { contracts, loading: contractsLoading } = useContracts();
 
   const rows = useMemo<CustRow[]>(() => {
     const m = new Map<string, CustRow>();
@@ -89,7 +89,9 @@ export default function FinanceCustomerPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 ? (
+                {contractsLoading ? (
+                  <EmptyRow colSpan={6}>임차인 데이터 불러오는 중…</EmptyRow>
+                ) : rows.length === 0 ? (
                   <EmptyRow colSpan={6}>임차인 데이터 없음</EmptyRow>
                 ) : rows.map((r) => (
                   <tr key={r.name}>

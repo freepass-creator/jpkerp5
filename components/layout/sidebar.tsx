@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import { APP_VERSION } from '@/lib/version';
+import { CarFrontIcon } from '@/components/ui/car-front-icon';
 
 type SidebarProps = Record<string, never>;
 
@@ -127,7 +128,7 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
       {/* ② 필수 운영 — 운영현황(항상 표시) · 리스크 현황 */}
       <div className="sb-section">
         <Link href="/" className={`sb-item ${pathname === '/' ? 'active' : ''}`} title="운영 현황 (필수)">
-          <Car size={14} weight={pathname === '/' ? 'fill' : 'regular'} />
+          <CarFrontIcon size={14} />
           <span>운영 현황</span>
         </Link>
         {show('receivables') && (
