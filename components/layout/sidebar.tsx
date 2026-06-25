@@ -8,6 +8,7 @@ import {
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
+import { APP_VERSION } from '@/lib/version';
 
 type SidebarProps = Record<string, never>;
 
@@ -209,9 +210,14 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
             <span>개발도구</span>
           </Link>
         )}
-        <Link href="/settings" className={`sb-item ${isActive('/settings') ? 'active' : ''}`} title="설정 — 메뉴 표시·직원·법인·계정">
+        <Link href="/settings" className={`sb-item ${isActive('/settings') ? 'active' : ''}`} title={`설정 — 메뉴 표시·직원·법인·계정 (v${APP_VERSION})`}>
           <Gear size={14} weight={isActive('/settings') ? 'fill' : 'regular'} />
           <span>설정</span>
+          {!collapsed && (
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-weak)', fontFamily: 'var(--font-mono)' }}>
+              v{APP_VERSION}
+            </span>
+          )}
         </Link>
       </div>
     </aside>
