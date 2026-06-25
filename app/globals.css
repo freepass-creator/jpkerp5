@@ -706,19 +706,8 @@ a { color: var(--text-link); text-decoration: none; }
   margin-left: 0;
   width: 32px; height: 32px;
 }
-/* 접힘 모드 — 접는 버튼과 메뉴 아이콘 hover 영역을 32×32 정사각형으로 통일 */
-:root[data-sidebar="collapsed"] .sb-section,
-:root[data-sidebar="collapsed"] .sb-foot {
-  padding-left: 12px;
-  padding-right: 12px;
-  align-items: center;
-}
-:root[data-sidebar="collapsed"] .sb-item {
-  width: 32px;
-  /* height 강제 X — 펼친 상태와 동일한 자연 높이 (padding 6px 12px 기반) */
-  padding: 6px 0;
-  justify-content: center;
-}
+/* 접힘 모드 — sb-section/sb-item override 없음 (펼친 상태와 동일 padding 사용).
+   라벨(span)만 숨겨서 아이콘 X 좌표를 펼침/접힘 양쪽에서 일치시킴. */
 :root[data-sidebar="collapsed"] .sb-item.active::before {
   display: none;
 }
