@@ -302,6 +302,20 @@ export default function FinancePage() {
           <button type="button" className={`chip chip-nav ${viewMode === 'autopay' ? 'active' : ''}`} onClick={() => setViewMode('autopay')}>자동이체</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'card' ? 'active' : ''}`} onClick={() => setViewMode('card')}>카드매출</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'corpcard' ? 'active' : ''}`} onClick={() => setViewMode('corpcard')}>법인카드</button>
+          {/* 입력 vs 자동집계 구분선 — "원장 하나, 투영 여럿" */}
+          <span aria-hidden="true" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            margin: '0 6px 0 10px',
+            padding: '2px 8px',
+            borderLeft: '2px solid var(--border-strong, var(--text-weak))',
+            fontSize: 10,
+            fontWeight: 700,
+            color: 'var(--text-sub)',
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+            whiteSpace: 'nowrap',
+          }}>자동 집계</span>
           <button type="button" className={`chip chip-nav ${viewMode === 'daily' ? 'active' : ''}`} onClick={() => setViewMode('daily')} title="자금일보 — 4 종류 통합 + 계정과목·매칭 편집">자금일보</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'vendors' ? 'active' : ''}`} onClick={() => setViewMode('vendors')} title="거래처 보조원장 — 거래처별 지출 타임라인·누적">거래처</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'customers' ? 'active' : ''}`} onClick={() => setViewMode('customers')} title="임차인 보조원장 — 계약자별 결제·미수 타임라인 + 유지/정상종료/비정상종료 구분">임차인</button>
