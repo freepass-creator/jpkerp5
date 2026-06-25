@@ -4,12 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Megaphone, Tray,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Megaphone, Tray, Gauge,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import { APP_VERSION } from '@/lib/version';
-import { CarFrontIcon } from '@/components/ui/car-front-icon';
 
 type SidebarProps = Record<string, never>;
 
@@ -128,7 +127,7 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
       {/* ② 필수 운영 — 운영현황(항상 표시) · 리스크 현황 */}
       <div className="sb-section">
         <Link href="/" className={`sb-item ${pathname === '/' ? 'active' : ''}`} title="운영 현황 (필수)">
-          <CarFrontIcon size={14} />
+          <Gauge size={14} weight={pathname === '/' ? 'fill' : 'regular'} />
           <span>운영 현황</span>
         </Link>
         {show('receivables') && (
