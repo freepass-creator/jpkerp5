@@ -46,7 +46,7 @@ export default function FinancePage() {
   }, [master, roleLoading, router]);
 
   const { rows: bankTx, loading: bankTxLoading, removeMany: removeManyBank, update: updateBank } = useBankTx();
-  const { rows: cardTx, removeMany: removeManyCard, update: updateCard } = useCardTx();
+  const { rows: cardTx, loading: cardTxLoading, removeMany: removeManyCard, update: updateCard } = useCardTx();
 
   async function handleTaxInvoiceExport() {
     const r = downloadTaxInvoiceExcel(contracts);
@@ -439,7 +439,9 @@ export default function FinancePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCard.length === 0 ? (
+                    {cardTxLoading ? (
+                      <EmptyRow colSpan={9}>카드매출 불러오는 중…</EmptyRow>
+                    ) : filteredCard.length === 0 ? (
                       <EmptyRow colSpan={9}>카드매출 내역 없음 — 우측 하단 [+ 신규 등록] 으로 추가</EmptyRow>
                     ) : filteredCard.map((t) => {
                       const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
@@ -477,7 +479,9 @@ export default function FinancePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCard.length === 0 ? (
+                    {cardTxLoading ? (
+                      <EmptyRow colSpan={9}>법인카드 지출 불러오는 중…</EmptyRow>
+                    ) : filteredCard.length === 0 ? (
                       <EmptyRow colSpan={9}>법인카드 지출 내역 없음 — 우측 하단 [+ 신규 등록] 으로 추가</EmptyRow>
                     ) : filteredCard.map((t) => {
                       const co = t.companyCode;

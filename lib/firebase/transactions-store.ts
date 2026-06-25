@@ -10,6 +10,50 @@ import { lockedUpdate } from './locked-update';
 const BANK_PATH = dbPath('bank_tx');
 const CARD_PATH = dbPath('card_tx');
 
+/**
+ * 모듈-level singleton 캐시 — 첫 hook 호출 시 1번만 subscribe.
+ * 페이지 이동·재진입 시에도 캐시 유지 → "거래 없음" 깜빡임 0.
+ *
+ * Listeners pattern: 각 hook 이 listener 등록 → 데이터 변경 시 모두 알림.
+ */
+type StoreCache<T> = {
+  rows: T[];
+  loading: boolean;
+  subscribed: boolean;
+  listeners: Set<() => void>;
+};
+const cache = new Map<string, StoreCache<unknown>>();
+
+function getOrInitCache<T>(path: string): StoreCache<T> {
+  let c = cache.get(path) as StoreCache<T> | undefined;
+  if (!c) {
+    c = { rows: [], loading: true, subscribed: false, listeners: new Set() };
+    cache.set(path, c as StoreCache<unknown>);
+  }
+  return c;
+}
+
+function notifyAll<T>(c: StoreCache<T>): void {
+  for (const fn of c.listeners) fn();
+}
+
+async function ensureSubscribed<T>(path: string): Promise<void> {
+  const c = getOrInitCache<T>(path);
+  if (c.subscribed) return;
+  c.subscribed = true;
+  if (!isFirebaseConfigured()) { c.loading = false; notifyAll(c); return; }
+  try { await ensureAuth(); }
+  catch { c.loading = false; notifyAll(c); return; }
+  const db = getRtdb();
+  if (!db) { c.loading = false; notifyAll(c); return; }
+  onValue(ref(db, path), (snap) => {
+    const val = snap.val();
+    c.rows = val ? Object.values<T>(val) as T[] : [];
+    c.loading = false;
+    notifyAll(c);
+  });
+}
+
 export function useBankTx() {
   return useTxStore<BankTransaction>(BANK_PATH, 'bank_tx');
 }
@@ -19,39 +63,26 @@ export function useCardTx() {
 }
 
 function useTxStore<T extends { id: string }>(path: string, auditType: AuditEntityType) {
-  const [rows, setRows] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+  const c = getOrInitCache<T>(path);
+  const [, force] = useState(0);
   const [configured] = useState(() => isFirebaseConfigured());
 
   useEffect(() => {
-    if (!configured) { setLoading(false); return; }
-    let unsub: (() => void) | undefined;
-    let cancelled = false;
-
-    (async () => {
-      try { await ensureAuth(); } catch { setLoading(false); return; }
-      if (cancelled) return;
-      const db = getRtdb();
-      if (!db) { setLoading(false); return; }
-      const r = ref(db, path);
-      unsub = onValue(r, (snap) => {
-        const val = snap.val();
-        setRows(val ? Object.values<T>(val) : []);
-        setLoading(false);
-      });
-    })();
-
-    return () => { cancelled = true; if (unsub) unsub(); };
-  }, [configured, path]);
+    const rerender = () => force((x) => x + 1);
+    c.listeners.add(rerender);
+    void ensureSubscribed<T>(path);
+    return () => { c.listeners.delete(rerender); };
+  }, [c, path]);
 
   return {
-    rows,
-    loading,
+    rows: c.rows,
+    loading: c.loading,
     configured,
     add: async (row: Omit<T, 'id'>) => {
       if (!configured) {
         const id = `local-${Date.now()}`;
-        setRows((prev) => [...prev, { ...row, id } as unknown as T]);
+        c.rows = [...c.rows, { ...row, id } as unknown as T];
+        notifyAll(c);
         return id;
       }
       await ensureAuth();
@@ -66,7 +97,8 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
     },
     update: async (id: string, patch: Partial<T>) => {
       if (!configured) {
-        setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+        c.rows = c.rows.map((r: T) => (r.id === id ? { ...r, ...patch } : r));
+        notifyAll(c);
         return;
       }
       await ensureAuth();
@@ -80,7 +112,8 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       const ids = Object.keys(patches);
       if (ids.length === 0) return;
       if (!configured) {
-        setRows((prev) => prev.map((r) => (patches[r.id] ? { ...r, ...patches[r.id] } : r)));
+        c.rows = c.rows.map((r: T) => (patches[r.id] ? { ...r, ...patches[r.id] } : r));
+        notifyAll(c);
         return;
       }
       await ensureAuth();
@@ -100,7 +133,8 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
           ...r,
           id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         })) as unknown as T[];
-        setRows((prev) => [...prev, ...stamped]);
+        c.rows = [...c.rows, ...stamped];
+        notifyAll(c);
         return stamped;
       }
       await ensureAuth();
@@ -128,7 +162,8 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
     },
     remove: async (id: string) => {
       if (!configured) {
-        setRows((prev) => prev.filter((r) => r.id !== id));
+        c.rows = c.rows.filter((r: T) => r.id !== id);
+        notifyAll(c);
         return;
       }
       await ensureAuth();
@@ -139,7 +174,8 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
     removeMany: async (ids: string[]) => {
       if (ids.length === 0) return 0;
       if (!configured) {
-        setRows((prev) => prev.filter((r) => !ids.includes(r.id)));
+        c.rows = c.rows.filter((r: T) => !ids.includes(r.id));
+        notifyAll(c);
         return ids.length;
       }
       await ensureAuth();

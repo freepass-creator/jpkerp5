@@ -39,32 +39,37 @@ export type ClosedPeriodsMap = Record<string, ClosedPeriod>; // YYYY-MM → entr
 
 const PATH = dbPath('closed_periods');
 
+// ── 모듈-level cache (페이지 이동·재진입 시 깜빡임 0) ──
+const closedCache: { rec: ClosedPeriodsMap; loading: boolean; subscribed: boolean; listeners: Set<() => void> } = {
+  rec: {}, loading: true, subscribed: false, listeners: new Set(),
+};
+function notifyClosedCache(): void { for (const fn of closedCache.listeners) fn(); }
+async function ensureClosedSubscribed(): Promise<void> {
+  if (closedCache.subscribed) return;
+  closedCache.subscribed = true;
+  if (!isFirebaseConfigured()) { closedCache.loading = false; notifyClosedCache(); return; }
+  try { await ensureAuth(); } catch { closedCache.loading = false; notifyClosedCache(); return; }
+  const db = getRtdb();
+  if (!db) { closedCache.loading = false; notifyClosedCache(); return; }
+  onValue(ref(db, PATH), (snap) => {
+    closedCache.rec = (snap.val() as ClosedPeriodsMap) ?? {};
+    closedCache.loading = false;
+    notifyClosedCache();
+  }, () => { closedCache.loading = false; notifyClosedCache(); });
+}
+
 export function useClosedPeriods(): {
   closedPeriods: ClosedPeriodsMap;
   loading: boolean;
 } {
-  const [closedPeriods, setClosedPeriods] = useState<ClosedPeriodsMap>({});
-  const [loading, setLoading] = useState(true);
-  const [configured] = useState(() => isFirebaseConfigured());
-
+  const [, force] = useState(0);
   useEffect(() => {
-    if (!configured) { setLoading(false); return; }
-    let unsub: (() => void) | undefined;
-    let cancelled = false;
-    (async () => {
-      try { await ensureAuth(); } catch { setLoading(false); return; }
-      if (cancelled) return;
-      const db = getRtdb();
-      if (!db) { setLoading(false); return; }
-      unsub = onValue(ref(db, PATH), (snap) => {
-        setClosedPeriods((snap.val() as ClosedPeriodsMap) ?? {});
-        setLoading(false);
-      }, () => { setLoading(false); });
-    })();
-    return () => { cancelled = true; if (unsub) unsub(); };
-  }, [configured]);
-
-  return { closedPeriods, loading };
+    const rerender = () => force((x) => x + 1);
+    closedCache.listeners.add(rerender);
+    void ensureClosedSubscribed();
+    return () => { closedCache.listeners.delete(rerender); };
+  }, []);
+  return { closedPeriods: closedCache.rec, loading: closedCache.loading };
 }
 
 /** YYYY-MM 이 마감 상태인가? */

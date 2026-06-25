@@ -6,9 +6,9 @@
  *   /notices/{noticeId} = Notice (body + comments 인라인)
  */
 
-import { ref, push, onValue, update as rtdbUpdate, remove as rtdbRemove } from 'firebase/database';
-import { useEffect, useState } from 'react';
+import { ref, push, update as rtdbUpdate, remove as rtdbRemove } from 'firebase/database';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from './client';
+import { useCachedSnapshot } from './cached-subscribe';
 
 const PATH = dbPath('notices');
 
@@ -87,28 +87,15 @@ export async function removeComment(noticeId: string, commentId: string): Promis
   await rtdbRemove(ref(db, `${PATH}/${noticeId}/comments/${commentId}`));
 }
 
-/** 모든 공지사항 실시간 구독 (최신순) */
+// 모듈 상수 — stable transform reference
+function noticesTransform(val: unknown): Notice[] {
+  if (!val) return [];
+  return Object.values<Notice>(val as Record<string, Notice>)
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+}
+
+/** 모든 공지사항 실시간 구독 (최신순) — 모듈-cache 공유 */
 export function useNotices(): { notices: Notice[]; loading: boolean } {
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    let unsub: (() => void) | undefined;
-    let cancelled = false;
-    (async () => {
-      try { await ensureAuth(); } catch { setLoading(false); return; }
-      if (cancelled) return;
-      const db = getRtdb();
-      if (!db) { setLoading(false); return; }
-      unsub = onValue(ref(db, PATH), (snap) => {
-        const val = (snap.val() ?? {}) as Record<string, Notice>;
-        const list = Object.values(val).sort((a, b) =>
-          (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
-        );
-        setNotices(list);
-        setLoading(false);
-      });
-    })();
-    return () => { cancelled = true; if (unsub) unsub(); };
-  }, []);
+  const { rows: notices, loading } = useCachedSnapshot<Notice>(PATH, noticesTransform);
   return { notices, loading };
 }

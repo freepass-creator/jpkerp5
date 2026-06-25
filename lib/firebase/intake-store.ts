@@ -15,9 +15,10 @@
  */
 
 import { ref, push, onValue, remove as rtdbRemove, update as rtdbUpdate } from 'firebase/database';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from './client';
 import { withMeta, type WriteMeta } from '../write-meta';
+import { useCachedSnapshot } from './cached-subscribe';
 import type {
   IntakeItem, IntakeRaw, IntakeSource, IntakeStatus,
   ClassifyResult, MatchResult,
@@ -145,40 +146,29 @@ export async function removeIntakeItem(itemId: string): Promise<void> {
   await rtdbRemove(ref(db, `${PATH}/${itemId}`));
 }
 
+// 모듈 상수 — stable transform reference (정렬만, 필터는 hook 안에서)
+function intakeSortTransform(val: unknown): IntakeItem[] {
+  if (!val) return [];
+  return Object.values<IntakeItem>(val as Record<string, IntakeItem>)
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+}
+
 /** 라이브 구독 — 기본은 처리 진행중 (pending/classifying/matching/matched) 만. */
 export function useIntakeItems(opts?: {
   status?: IntakeStatus | 'active';
   limit?: number;
 }): { items: IntakeItem[]; loading: boolean } {
-  const [items, setItems] = useState<IntakeItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const wantStatus = opts?.status ?? 'active';
   const limit = opts?.limit;
+  const { rows, loading } = useCachedSnapshot<IntakeItem>(PATH, intakeSortTransform);
 
-  useEffect(() => {
-    let unsub: (() => void) | undefined;
-    let cancelled = false;
-    (async () => {
-      try { await ensureAuth(); } catch { /* silent */ }
-      if (cancelled) return;
-      const db = getRtdb();
-      if (!db) { setLoading(false); return; }
-      unsub = onValue(ref(db, PATH), (snap) => {
-        const val = (snap.val() ?? {}) as Record<string, IntakeItem>;
-        let list = Object.values(val);
-        if (wantStatus === 'active') {
-          list = list.filter((i) => i.status !== 'committed' && i.status !== 'rejected');
-        } else {
-          list = list.filter((i) => i.status === wantStatus);
-        }
-        list.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
-        if (limit) list = list.slice(0, limit);
-        setItems(list);
-        setLoading(false);
-      }, () => setLoading(false));
-    })();
-    return () => { cancelled = true; if (unsub) unsub(); };
-  }, [wantStatus, limit]);
+  const items = useMemo(() => {
+    let list = wantStatus === 'active'
+      ? rows.filter((i) => i.status !== 'committed' && i.status !== 'rejected')
+      : rows.filter((i) => i.status === wantStatus);
+    if (limit) list = list.slice(0, limit);
+    return list;
+  }, [rows, wantStatus, limit]);
 
   return { items, loading };
 }

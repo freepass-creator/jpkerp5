@@ -5,36 +5,18 @@
  * 자동 집계(만기·반납·신규)와 별개로 사용자가 일자에 등록하는 메모/일정.
  */
 
-import { useEffect, useState } from 'react';
-import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
+import { useState } from 'react';
+import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { ManualSchedule } from '@/lib/types';
+import { useCachedSnapshot, setCacheRows } from './cached-subscribe';
 
 const PATH = dbPath('schedules');
 
 export function useSchedules() {
-  const [schedules, setSchedules] = useState<ManualSchedule[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { rows: schedules, loading } = useCachedSnapshot<ManualSchedule>(PATH);
   const [configured] = useState(() => isFirebaseConfigured());
-
-  useEffect(() => {
-    if (!configured) { setLoading(false); return; }
-    let unsub: (() => void) | undefined;
-    let cancelled = false;
-    (async () => {
-      try { await ensureAuth(); } catch { setLoading(false); return; }
-      if (cancelled) return;
-      const db = getRtdb(); if (!db) { setLoading(false); return; }
-      const r = ref(db, PATH);
-      unsub = onValue(r, (snap) => {
-        const val = snap.val();
-        setSchedules(val ? Object.values<ManualSchedule>(val) : []);
-        setLoading(false);
-      });
-    })();
-    return () => { cancelled = true; if (unsub) unsub(); };
-  }, [configured]);
 
   return {
     schedules,
@@ -44,7 +26,7 @@ export function useSchedules() {
     add: async (s: Omit<ManualSchedule, 'id'>): Promise<string> => {
       if (!configured) {
         const id = `local-${Date.now()}`;
-        setSchedules((prev) => [...prev, { ...s, id }]);
+        setCacheRows<ManualSchedule>(PATH, (prev) => [...prev, { ...s, id }]);
         return id;
       }
       await ensureAuth();
@@ -59,7 +41,7 @@ export function useSchedules() {
 
     remove: async (id: string): Promise<void> => {
       if (!configured) {
-        setSchedules((prev) => prev.filter((x) => x.id !== id));
+        setCacheRows<ManualSchedule>(PATH, (prev) => prev.filter((x) => x.id !== id));
         return;
       }
       await ensureAuth();
@@ -71,7 +53,7 @@ export function useSchedules() {
     toggleDone: async (id: string, done: boolean): Promise<void> => {
       const patch = { done, doneAt: done ? new Date().toISOString() : undefined };
       if (!configured) {
-        setSchedules((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+        setCacheRows<ManualSchedule>(PATH, (prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
         return;
       }
       await ensureAuth();

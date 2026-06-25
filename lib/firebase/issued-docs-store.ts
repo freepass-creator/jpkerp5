@@ -10,9 +10,10 @@
  * lib/doc-templates.ts 의 양식 시스템과 짝.
  */
 
-import { ref, push, onValue, update as rtdbUpdate, remove as rtdbRemove } from 'firebase/database';
-import { useEffect, useState } from 'react';
+import { ref, push, update as rtdbUpdate, remove as rtdbRemove } from 'firebase/database';
+import { useMemo } from 'react';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from './client';
+import { useCachedSnapshot } from './cached-subscribe';
 import type { DocTargetType, DocCategory } from '@/lib/doc-templates';
 
 const PATH = dbPath('issued_documents');
@@ -69,35 +70,21 @@ export async function removeIssuedDocument(docId: string): Promise<void> {
   await rtdbRemove(ref(db, `${PATH}/${docId}`));
 }
 
-/** 라이브 구독 — 최신순. */
+// 모듈 상수 — stable transform (정렬만, limit 은 hook 내부에서)
+function issuedDocsTransform(val: unknown): IssuedDocument[] {
+  if (!val) return [];
+  return Object.values<IssuedDocument>(val as Record<string, IssuedDocument>)
+    .sort((a, b) => (b.issuedAt ?? '').localeCompare(a.issuedAt ?? ''));
+}
+
+/** 라이브 구독 — 최신순 (모듈-cache 공유). */
 export function useIssuedDocuments(opts?: { limit?: number }): {
   items: IssuedDocument[];
   loading: boolean;
 } {
-  const [items, setItems] = useState<IssuedDocument[]>([]);
-  const [loading, setLoading] = useState(true);
   const limit = opts?.limit;
-
-  useEffect(() => {
-    let unsub: (() => void) | undefined;
-    let cancelled = false;
-    (async () => {
-      try { await ensureAuth(); } catch { /* silent */ }
-      if (cancelled) return;
-      const db = getRtdb();
-      if (!db) { setLoading(false); return; }
-      unsub = onValue(ref(db, PATH), (snap) => {
-        const val = (snap.val() ?? {}) as Record<string, IssuedDocument>;
-        let list = Object.values(val);
-        list.sort((a, b) => (b.issuedAt ?? '').localeCompare(a.issuedAt ?? ''));
-        if (limit) list = list.slice(0, limit);
-        setItems(list);
-        setLoading(false);
-      }, () => setLoading(false));
-    })();
-    return () => { cancelled = true; if (unsub) unsub(); };
-  }, [limit]);
-
+  const { rows, loading } = useCachedSnapshot<IssuedDocument>(PATH, issuedDocsTransform);
+  const items = useMemo(() => (limit ? rows.slice(0, limit) : rows), [rows, limit]);
   return { items, loading };
 }
 

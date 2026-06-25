@@ -6,11 +6,12 @@
  * 담당자 복수 지정 가능, 각자 인지·완료 상태 보유, 후속 진행 메모 누적.
  */
 
-import { useEffect, useState } from 'react';
-import { ref, onValue, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
+import { useState } from 'react';
+import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import type { ManualTodo, ManualTodoAssignee, ManualTodoFollowup } from '@/lib/types';
+import { useCachedSnapshot, setCacheRows } from './cached-subscribe';
 
 const PATH = dbPath('todos');
 
@@ -25,38 +26,22 @@ function rid(): string {
   return `fu-${Math.floor(Math.random() * 1_000_000_000).toString(36)}-${Math.floor(Math.random() * 1_000_000).toString(36)}`;
 }
 
-export function useTodos() {
-  const [todos, setTodos] = useState<ManualTodo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [configured] = useState(() => isFirebaseConfigured());
+// 모듈 상수 — stable transform
+function todosTransform(val: unknown): ManualTodo[] {
+  if (!val) return [];
+  return Object.values<ManualTodo>(val as Record<string, ManualTodo>).map((t) => ({
+    ...t,
+    assignees: Array.isArray(t.assignees) ? t.assignees : [],
+  }));
+}
 
-  useEffect(() => {
-    if (!configured) { setLoading(false); return; }
-    let unsub: (() => void) | undefined;
-    let cancelled = false;
-    (async () => {
-      try { await ensureAuth(); } catch { setLoading(false); return; }
-      if (cancelled) return;
-      const db = getRtdb(); if (!db) { setLoading(false); return; }
-      const r = ref(db, PATH);
-      unsub = onValue(r, (snap) => {
-        const val = snap.val();
-        const list = val ? Object.values<ManualTodo>(val) : [];
-        // 옛 스키마 안전망 — assignees 없으면 빈 배열로 보정
-        const normalized = list.map((t) => ({
-          ...t,
-          assignees: Array.isArray(t.assignees) ? t.assignees : [],
-        }));
-        setTodos(normalized);
-        setLoading(false);
-      });
-    })();
-    return () => { cancelled = true; if (unsub) unsub(); };
-  }, [configured]);
+export function useTodos() {
+  const { rows: todos, loading } = useCachedSnapshot<ManualTodo>(PATH, todosTransform);
+  const [configured] = useState(() => isFirebaseConfigured());
 
   async function persistUpdate(id: string, partial: Partial<ManualTodo>, auditLabel: string) {
     if (!configured) {
-      setTodos((prev) => prev.map((x) => (x.id === id ? { ...x, ...partial } : x)));
+      setCacheRows<ManualTodo>(PATH, (prev) => prev.map((x) => (x.id === id ? { ...x, ...partial } : x)));
       return;
     }
     await ensureAuth();
@@ -77,7 +62,7 @@ export function useTodos() {
       };
       if (!configured) {
         const id = `local-${Date.now()}`;
-        setTodos((prev) => [...prev, { ...payload, id }]);
+        setCacheRows<ManualTodo>(PATH, (prev) =>[...prev, { ...payload, id }]);
         return id;
       }
       await ensureAuth();
@@ -92,7 +77,7 @@ export function useTodos() {
 
     update: async (t: ManualTodo): Promise<void> => {
       if (!configured) {
-        setTodos((prev) => prev.map((x) => (x.id === t.id ? t : x)));
+        setCacheRows<ManualTodo>(PATH, (prev) =>prev.map((x) => (x.id === t.id ? t : x)));
         return;
       }
       await ensureAuth();
@@ -103,7 +88,7 @@ export function useTodos() {
 
     remove: async (id: string): Promise<void> => {
       if (!configured) {
-        setTodos((prev) => prev.filter((x) => x.id !== id));
+        setCacheRows<ManualTodo>(PATH, (prev) =>prev.filter((x) => x.id !== id));
         return;
       }
       await ensureAuth();
