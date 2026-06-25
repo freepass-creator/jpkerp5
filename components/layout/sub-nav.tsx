@@ -15,6 +15,8 @@ export type SubNavItem = {
   href: string;
   label: string;
   count?: number;
+  /** true 면 이 항목 앞에 시각 구분선 (입력 vs 파생 등 그룹 분리) */
+  separator?: boolean;
 };
 
 /** v4 ASSET_SUBTABS 와 라벨/href 동일 */
@@ -40,13 +42,17 @@ export const CONTRACT_SUB: SubNavItem[] = [
   { href: '/contract/ended', label: '종료' },
 ];
 
-// 입출금 관리 (구 재무관리) sub-nav — 계좌·자동이체·카드매출·법인카드
+// 입출금 관리 sub-nav — 입력 4 (계좌·자동이체·카드매출·법인카드) │ 파생 4 (자금일보·거래처·임차인·총계정원장)
+// "원장 하나, 투영 여럿" — 좌측은 입력 창구(사실), 우측은 자동 구현(파생)
 export const FINANCE_SUB: SubNavItem[] = [
   { href: '/finance', label: '계좌' },
   { href: '/finance/autopay', label: '자동이체' },
   { href: '/finance/card', label: '카드매출' },
   { href: '/finance/corpcard', label: '법인카드' },
-  { href: '/finance/daily', label: '자금일보' },
+  { href: '/finance/daily', label: '자금일보', separator: true },
+  { href: '/finance/vendor', label: '거래처' },
+  { href: '/finance/customer', label: '임차인' },
+  { href: '/finance/gl', label: '총계정원장' },
 ];
 
 export function SubNav({ items }: { items: SubNavItem[] }) {
@@ -56,17 +62,26 @@ export function SubNav({ items }: { items: SubNavItem[] }) {
       {items.map((it) => {
         const isActive = pathname === it.href;
         return (
-          <Link
-            key={it.href}
-            href={it.href}
-            className="tabs-trigger"
-            data-state={isActive ? 'active' : undefined}
-          >
-            <span>{it.label}</span>
-            {it.count !== undefined && it.count > 0 && (
-              <span className="count">{it.count}</span>
+          <span key={it.href} style={{ display: 'inline-flex', alignItems: 'center' }}>
+            {it.separator && (
+              <span aria-hidden="true" style={{
+                display: 'inline-block',
+                width: 1, height: 16,
+                background: 'var(--border)',
+                margin: '0 8px',
+              }} />
             )}
-          </Link>
+            <Link
+              href={it.href}
+              className="tabs-trigger"
+              data-state={isActive ? 'active' : undefined}
+            >
+              <span>{it.label}</span>
+              {it.count !== undefined && it.count > 0 && (
+                <span className="count">{it.count}</span>
+              )}
+            </Link>
+          </span>
         );
       })}
     </nav>
