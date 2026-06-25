@@ -255,12 +255,19 @@ a { color: var(--text-link); text-decoration: none; }
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   height: 100vh;
+  /* 사이드바 토글 시 아이콘 자리는 그대로, 우측 영역만 스스슥 늘어남/줄어듦 */
+  transition: grid-template-columns 0.22s ease;
 }
 :root[data-sidebar="collapsed"] .layout {
   grid-template-columns: 56px 1fr;
 }
 .sidebar { min-width: 0; }
-.sb-item > span { overflow: hidden; white-space: nowrap; text-overflow: clip; }
+.sb-item > span {
+  overflow: hidden; white-space: nowrap; text-overflow: clip;
+  /* 사이드바 접힘 시 max-width 0 으로 줄이며 fade — 아이콘은 그대로 (freepasserp 패턴) */
+  transition: opacity 0.12s ease, max-width 0.18s ease;
+  max-width: 200px;
+}
 .app {
   display: flex;
   flex-direction: column;
@@ -359,7 +366,7 @@ a { color: var(--text-link); text-decoration: none; }
   font-size: 10px; color: var(--text-weak);
   text-transform: uppercase; letter-spacing: 0.06em;
   /* sb-item padding-left 와 동일 → 라벨·아이콘 X 좌표 일치 */
-  padding: 4px 20px;
+  padding: 4px 12px;
   font-weight: var(--font-weight-medium);
 }
 
@@ -368,9 +375,9 @@ a { color: var(--text-link); text-decoration: none; }
 .sb-item,
 .page-shell-nav-item {
   display: flex; align-items: center; gap: 8px;
-  /* 좌측 padding 20px = collapsed 사이드바 폭 56px 의 (56 - 아이콘16) / 2 = 20px.
-     양쪽 모드(접/펼)에서 아이콘 X 좌표 절대 고정. */
-  padding: 6px 20px;
+  /* padding-left 12px — 사이드바 폭 변경(접/펼)에 무관 아이콘 X = 12 절대 고정 (freepasserp 패턴).
+     라벨은 max-width 0 으로 사라지므로 아이콘 자리는 그대로. */
+  padding: 6px 12px;
   border: none; background: transparent;
   border-radius: var(--radius);
   color: var(--text-sub); font-size: 12px; font-weight: var(--font-weight-medium);
@@ -697,12 +704,18 @@ a { color: var(--text-link); text-decoration: none; }
   display: flex; flex-direction: column; gap: 1px;
 }
 
-/* Collapsed sidebar state — icon-only */
+/* Collapsed sidebar state — icon-only.
+   라벨/카운트는 display:none 이 아닌 opacity+max-width 0 으로 처리 →
+   아이콘 X 좌표는 그대로, 라벨만 시각적으로 사라짐 (freepasserp 패턴). */
+:root[data-sidebar="collapsed"] .sb-item > span,
+:root[data-sidebar="collapsed"] .sb-count {
+  opacity: 0;
+  max-width: 0;
+  pointer-events: none;
+}
 :root[data-sidebar="collapsed"] .sb-brand-logo,
 :root[data-sidebar="collapsed"] .sb-brand-text,
 :root[data-sidebar="collapsed"] .sb-section-label,
-:root[data-sidebar="collapsed"] .sb-item > span,
-:root[data-sidebar="collapsed"] .sb-count,
 :root[data-sidebar="collapsed"] .sb-user {
   display: none;
 }
