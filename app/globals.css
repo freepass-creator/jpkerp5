@@ -715,8 +715,8 @@ a { color: var(--text-link); text-decoration: none; }
 }
 :root[data-sidebar="collapsed"] .sb-item {
   width: 32px;
-  height: 32px;
-  padding: 0;
+  /* height 강제 X — 펼친 상태와 동일한 자연 높이 (padding 6px 12px 기반) */
+  padding: 6px 0;
   justify-content: center;
 }
 :root[data-sidebar="collapsed"] .sb-item.active::before {
