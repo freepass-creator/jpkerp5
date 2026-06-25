@@ -35,7 +35,7 @@ import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
-import { MissingText } from '@/components/ui/missing-badge';
+import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
@@ -391,12 +391,12 @@ export default function AssetPage() {
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
                       <td className="center">
                         {regMissing
-                          ? <StatusBadge tone="red">미입력</StatusBadge>
+                          ? <MissingBadge />
                           : <StatusBadge tone="green">완료</StatusBadge>}
                       </td>
                       <td className="center">
                         {insMissing ? (
-                          <StatusBadge tone="red">미입력</StatusBadge>
+                          <MissingBadge />
                         ) : (() => {
                           // 만기 D-N 계산 — 30일 이내 임박은 주황, 만료는 빨강
                           const exp = v.insuranceExpiryDate;
@@ -428,7 +428,7 @@ export default function AssetPage() {
                             {v.loanCompany}
                           </StatusBadge>
                         ) : (
-                          <StatusBadge tone="red">미입력</StatusBadge>
+                          <MissingBadge />
                         )}
                       </td>
                       <td className="center">

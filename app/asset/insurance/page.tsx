@@ -20,6 +20,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
 import { InsuranceDetailDialog } from '@/components/insurance/insurance-detail-dialog';
+import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { useRole } from '@/lib/use-role';
@@ -270,7 +271,7 @@ export default function AssetInsurancePage() {
                         <td className="num mono" style={{ fontWeight: 600 }}>{totalPremium ? `₩${totalPremium.toLocaleString()}` : '-'}</td>
                         <td className="center mono dim">{installmentCount > 0 ? `${installmentCount}회 분납` : '-'}</td>
                         <td className="center">
-                          {status === 'missing' && <StatusBadge tone="red">미입력</StatusBadge>}
+                          {status === 'missing' && <MissingBadge />}
                           {status === 'expired' && <StatusBadge tone="red">만료</StatusBadge>}
                           {status === 'expire' && <StatusBadge tone="orange">임박</StatusBadge>}
                           {status === 'normal' && <StatusBadge tone="green">정상</StatusBadge>}

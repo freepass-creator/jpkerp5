@@ -62,6 +62,7 @@ const NEXT_STATES: Record<VehicleStatus, VehicleStatus[]> = {
 };
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
 import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
+import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { showConfirm } from '@/lib/confirm';
 import { Field } from '@/components/ui/editable-field';
@@ -240,7 +241,7 @@ function OperationOverviewTab({
 
       <Section title="등록 상태">
         <Grid2>
-          <KV k="자등증 입력" v={regOk ? <StatusBadge tone="green">완료</StatusBadge> : <StatusBadge tone="orange">미입력</StatusBadge>} />
+          <KV k="자등증 입력" v={regOk ? <StatusBadge tone="green">완료</StatusBadge> : <MissingBadge />} />
           <KV k="차량번호" v={vehicle.plate} mono />
           <KV k="제조사·모델" v={`${vehicle.vehicleMaker ?? '-'} ${vehicle.vehicleModelLine ?? vehicle.model ?? ''}`.trim() || undefined} />
           <KV k="차종·연료" v={[vehicle.vehicleType, vehicle.fuelType].filter(Boolean).join(' · ') || undefined} />

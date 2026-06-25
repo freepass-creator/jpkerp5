@@ -16,6 +16,7 @@ import {
 import { Section } from '@/components/ui/detail-primitives';
 import { isContractEnded } from '@/lib/contract-lifecycle';
 import { Field as SharedField } from '@/components/ui/editable-field';
+import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { DateInput } from '@/components/ui/date-input';
 import { toast } from '@/lib/toast';
@@ -1208,7 +1209,7 @@ function VehicleLocationEditor({ c, onUpdate, workingContext }: { c: Contract; o
         <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr auto', gap: '8px 12px', fontSize: 12, alignItems: 'center' }}>
           <span style={{ color: 'var(--text-weak)' }}>현재 위치</span>
           <span>
-            {oldLocation ? <strong>{oldLocation}</strong> : <span className="muted">미입력</span>}
+            {oldLocation ? <strong>{oldLocation}</strong> : <MissingText label="이전 위치" />}
             {workingContext && <span style={{ marginLeft: 8, color: 'var(--text-sub)' }}>/ {workingContext}</span>}
             {c.idleContact && <span className="dim mono" style={{ marginLeft: 8, fontSize: 11 }}>({c.idleContact})</span>}
           </span>
