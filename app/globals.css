@@ -351,13 +351,15 @@ a { color: var(--text-link); text-decoration: none; }
 
 .sb-section {
   display: flex; flex-direction: column; gap: 1px;
-  /* 위아래 동일 padding — 아이콘 vertical 간격 통일 */
-  padding: 4px 8px;
+  /* 좌우 padding 0 — .sb-item 자체가 사이드바 폭(56px collapsed / 172px expanded) 풀로 사용.
+     아이콘 X 좌표는 .sb-item padding-left 20px 로 양쪽 모드 동일하게 강제. */
+  padding: 4px 0;
 }
 .sb-section-label {
   font-size: 10px; color: var(--text-weak);
   text-transform: uppercase; letter-spacing: 0.06em;
-  padding: 4px 12px;
+  /* sb-item padding-left 와 동일 → 라벨·아이콘 X 좌표 일치 */
+  padding: 4px 20px;
   font-weight: var(--font-weight-medium);
 }
 
@@ -366,7 +368,9 @@ a { color: var(--text-link); text-decoration: none; }
 .sb-item,
 .page-shell-nav-item {
   display: flex; align-items: center; gap: 8px;
-  padding: 6px 12px;
+  /* 좌측 padding 20px = collapsed 사이드바 폭 56px 의 (56 - 아이콘16) / 2 = 20px.
+     양쪽 모드(접/펼)에서 아이콘 X 좌표 절대 고정. */
+  padding: 6px 20px;
   border: none; background: transparent;
   border-radius: var(--radius);
   color: var(--text-sub); font-size: 12px; font-weight: var(--font-weight-medium);
@@ -688,7 +692,8 @@ a { color: var(--text-link); text-decoration: none; }
   margin: 2px 0;
 }
 .sb-foot {
-  padding: 4px 8px;
+  /* sb-section 과 동일 — 아이콘 X 일치 */
+  padding: 4px 0;
   display: flex; flex-direction: column; gap: 1px;
 }
 
