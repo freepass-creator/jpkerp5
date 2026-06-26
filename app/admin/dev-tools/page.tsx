@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, CalendarX } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -52,6 +52,13 @@ const TOOLS: ToolCard[] = [
     desc: '자산 마스터(Vehicle.status) ↔ 계약 사본(Contract.vehicleStatus) 불일치 케이스 가시화 + 수동 정렬. plate 매칭 실패·고립 자산까지 한눈에.',
     icon: <Warning size={18} weight="duotone" />,
     variant: 'op',
+  },
+  {
+    href: '/admin/fix-1900-dates',
+    title: '1900년대 날짜 보정',
+    desc: '엑셀 2자리 연도 변환 버그로 1900년대로 잘못 저장된 계약일·만기일 검출 → 선택 → +100년 일괄 보정.',
+    icon: <CalendarX size={18} weight="duotone" />,
+    variant: 'danger',
   },
   {
     href: '/admin/migrate-sheet',
