@@ -388,7 +388,7 @@ export default function ContractPage() {
       <CreateDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        visibleModes={['계약']}
+        visibleModes={['계약', '현황']}
         initialMode="계약"
         onContractCreated={(newId) => {
           // 등록 즉시 detail 자동 오픈 — 직원이 추가 정보 점진 입력 (트렌드 UX)
