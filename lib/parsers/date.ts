@@ -96,7 +96,10 @@ function toFullYear(yy: string): string {
 }
 
 function toISODate(d: Date): string {
-  const y = d.getFullYear();
+  // 엑셀 자체의 2자리 연도 변환 규칙(00~29→20xx, 30~99→19xx) 때문에
+  // "30" 이상으로 입력된 연도가 셀 단계에서 이미 19xx로 잘못 박혀 들어오는 경우 보정.
+  // 렌트카 계약 도메인에서 1990년 이전 날짜는 나올 수 없음 → 안전하게 +100년 처리.
+  const y = d.getFullYear() < 1990 ? d.getFullYear() + 100 : d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
