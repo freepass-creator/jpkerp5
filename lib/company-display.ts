@@ -95,8 +95,19 @@ export function displayCompanyName(
   fallbackBizRegNo?: string,
   fallbackCorpRegNo?: string,
 ): string {
+  const matchByRegNo = (ident: string) => companies.find((co) => {
+    if (!co) return false;
+    if (co.corpRegNo && normalizeIdent(co.corpRegNo) === normalizeIdent(ident)) return true;
+    if (co.bizRegNo && normalizeIdent(co.bizRegNo) === normalizeIdent(ident)) return true;
+    return false;
+  });
+
   const raw = (rawCompany ?? '').trim();
   if (!raw) {
+    // raw(회사 매칭 단계를 못 거친 데이터) 없음 — fallback 식별번호로 마스터 매칭 먼저 시도
+    const fbMatched = (fallbackCorpRegNo && matchByRegNo(fallbackCorpRegNo))
+      || (fallbackBizRegNo && matchByRegNo(fallbackBizRegNo));
+    if (fbMatched) return (fbMatched.displayName ?? '').trim() || fbMatched.name;
     return fallbackNameFromIdent(fallbackBizRegNo, fallbackCorpRegNo) || '';
   }
 
@@ -107,11 +118,8 @@ export function displayCompanyName(
     if (co.code === raw) return true;
     if (co.name === raw) return true;
     if (stripCorpSuffix(co.name) === stripped) return true;
-    // raw가 법인번호/사업자번호 문자열이면 그것도 매칭
-    if (co.corpRegNo && normalizeIdent(co.corpRegNo) === normalizeIdent(raw)) return true;
-    if (co.bizRegNo && normalizeIdent(co.bizRegNo) === normalizeIdent(raw)) return true;
     return false;
-  });
+  }) ?? matchByRegNo(raw);
 
   if (matched) {
     // 사용자 입력 표기명 우선
