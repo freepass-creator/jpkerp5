@@ -10,7 +10,7 @@
  *  공용 부품: DetailTabContent (탭 wrapper), COL/COL_FLEX (표 컬럼 width 토큰).
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Vehicle, Contract, HistoryEntry, VehicleStatus } from '@/lib/types';
 
 /** VehicleStatus 별 다음 액션 안내 — 운영 현황 탭 라이프사이클 가이드 */
@@ -61,7 +61,7 @@ const NEXT_STATES: Record<VehicleStatus, VehicleStatus[]> = {
   '임시배차':   ['운행'],
 };
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
-import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
+import { AttachedFilePreview, FileLightbox } from '@/components/ui/attached-file-preview';
 import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { showConfirm } from '@/lib/confirm';
@@ -361,6 +361,7 @@ function SummaryTab({
   showAttachment?: boolean;
 }) {
   const { companies } = useCompanies();
+  const [certOpen, setCertOpen] = useState(false);
   return (
     <Stack>
       <Section title="제조사 스펙">
@@ -402,7 +403,24 @@ function SummaryTab({
         </>
       )}
 
-      <Section title="자동차등록증 정보">
+      <Section
+        title="자동차등록증 정보"
+        action={showAttachment && vehicle.registrationCertUrl ? (
+          <button
+            type="button"
+            onClick={() => setCertOpen(true)}
+            title="클릭하면 원본 확대"
+            style={{
+              marginLeft: 'auto',
+              background: 'transparent', border: 0, padding: 0,
+              color: 'var(--brand)', cursor: 'pointer',
+              fontSize: 13, fontWeight: 600, textDecoration: 'underline',
+            }}
+          >
+            {vehicle.registrationCertFileName || '원본 보기'}
+          </button>
+        ) : undefined}
+      >
         <Grid2>
           <KV k="VIN" v={vehicle.vin} mono />
           <KV k="용도" v={vehicle.vehicleUsage} />
@@ -426,14 +444,13 @@ function SummaryTab({
         </Grid2>
       </Section>
 
-      {showAttachment && (
-        <AttachedFilePreview
-          title="원본 자동차등록증"
-          url={vehicle.registrationCertUrl}
-          fileName={vehicle.registrationCertFileName}
-          uploadedAt={vehicle.registrationCertUploadedAt}
-        />
-      )}
+      <FileLightbox
+        url={vehicle.registrationCertUrl}
+        fileName={vehicle.registrationCertFileName}
+        title="자동차등록증"
+        open={certOpen}
+        onClose={() => setCertOpen(false)}
+      />
 
       {/* 비고 — 인라인 즉시 편집 (직원이 차량별 메모·발주처·특이사항 입력) */}
       <Section title="비고">

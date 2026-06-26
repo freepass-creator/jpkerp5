@@ -7,6 +7,8 @@
  *   <AttachedFilePreview title="보험증권" url={p.fileUrl} fileName={p.fileName} uploadedAt={p.uploadedAt} />
  *
  * 기본은 버튼만 표시 (페이지가 이미지/PDF로 지저분해지는 것 방지) — 누르면 원본을 lightbox로 확대 표시.
+ * 트리거(버튼)를 다른 위치(예: Section action 영역)에 직접 두고 싶으면 FileLightbox를 따로 써도 됨.
+ *
  * - 이미지 (.png/.jpg/.webp/.gif 또는 data:image) → <img>
  * - PDF 등 → <embed type="application/pdf">
  * - url 비었으면 안내 placeholder (showPlaceholder=true 일 때)
@@ -14,6 +16,64 @@
 
 import { useState } from 'react';
 import { Eye, X } from '@phosphor-icons/react';
+
+function isImageFile(url: string, fileName?: string): boolean {
+  return url.startsWith('data:image') || /\.(png|jpe?g|webp|gif)$/i.test(fileName ?? '');
+}
+
+/** lightbox 오버레이만 — 트리거는 호출 측에서 원하는 위치/모양으로 구현 */
+export function FileLightbox({
+  url, fileName, title, open, onClose,
+}: {
+  url?: string;
+  fileName?: string;
+  title?: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!open || !url) return null;
+  const isImage = isImageFile(url, fileName);
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000,
+        background: 'rgba(0,0,0,0.85)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: isImage ? 'zoom-out' : 'default',
+      }}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="닫기"
+        style={{
+          position: 'absolute', top: 16, right: 16,
+          background: 'rgba(255,255,255,0.12)', border: 0, borderRadius: '50%',
+          width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', cursor: 'pointer',
+        }}
+      >
+        <X size={18} weight="bold" />
+      </button>
+      {isImage ? (
+        <img
+          src={url}
+          alt={fileName ?? title}
+          onClick={(e) => e.stopPropagation()}
+          style={{ maxWidth: '94vw', maxHeight: '94vh', objectFit: 'contain', cursor: 'default' }}
+        />
+      ) : (
+        <embed
+          src={url}
+          type="application/pdf"
+          onClick={(e) => e.stopPropagation()}
+          style={{ width: '90vw', height: '90vh', border: 0, borderRadius: 'var(--radius-sm)', background: '#fff' }}
+        />
+      )}
+    </div>
+  );
+}
 
 export type AttachedFilePreviewProps = {
   /** 섹션 헤더 표기 (예: '보험증권', '자동차등록증', '할부계약서') */
@@ -47,8 +107,6 @@ export function AttachedFilePreview({
     );
   }
 
-  const isImage = url.startsWith('data:image') || /\.(png|jpe?g|webp|gif)$/i.test(fileName ?? '');
-
   return (
     <section className="detail-section">
       <div className="detail-section-header">
@@ -65,47 +123,7 @@ export function AttachedFilePreview({
           </span>
         )}
       </div>
-
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 2000,
-            background: 'rgba(0,0,0,0.85)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: isImage ? 'zoom-out' : 'default',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            aria-label="닫기"
-            style={{
-              position: 'absolute', top: 16, right: 16,
-              background: 'rgba(255,255,255,0.12)', border: 0, borderRadius: '50%',
-              width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', cursor: 'pointer',
-            }}
-          >
-            <X size={18} weight="bold" />
-          </button>
-          {isImage ? (
-            <img
-              src={url}
-              alt={fileName ?? title}
-              onClick={(e) => e.stopPropagation()}
-              style={{ maxWidth: '94vw', maxHeight: '94vh', objectFit: 'contain', cursor: 'default' }}
-            />
-          ) : (
-            <embed
-              src={url}
-              type="application/pdf"
-              onClick={(e) => e.stopPropagation()}
-              style={{ width: '90vw', height: '90vh', border: 0, borderRadius: 'var(--radius-sm)', background: '#fff' }}
-            />
-          )}
-        </div>
-      )}
+      <FileLightbox url={url} fileName={fileName} title={title} open={open} onClose={() => setOpen(false)} />
     </section>
   );
 }
