@@ -623,8 +623,9 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
         <table className="table">
           <thead>
             <tr>
-              <th style={{ width: COL.date }}>계약일</th>
               <th style={{ width: COL.contractNo }}>계약번호</th>
+              <th style={{ width: COL.date }}>계약일</th>
+              <th style={{ width: COL.date }}>종료일</th>
               <th style={COL_FLEX.customer}>계약자</th>
               <th className="center" style={{ width: COL.term }}>약정</th>
               <th className="num" style={{ width: COL.money }}>월대여료</th>
@@ -636,13 +637,14 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
           </thead>
           <tbody>
             {isEmpty ? (
-              <EmptyRow colSpan={9}>계약 이력 없음</EmptyRow>
+              <EmptyRow colSpan={10}>계약 이력 없음</EmptyRow>
             ) : contracts.map((c) => {
               const isActive = c.status === '운행' || c.status === '대기';
               return (
               <tr key={c.id} style={isActive ? { background: 'var(--brand-bg)' } : undefined}>
-                <td className="mono">{c.contractDate}</td>
                 <td className="mono dim">{c.contractNo || <span className="muted">-</span>}</td>
+                <td className="mono">{c.contractDate}</td>
+                <td className="mono dim">{c.returnScheduledDate || <span className="muted">-</span>}</td>
                 <td>
                   {isActive && (
                     <span style={{
