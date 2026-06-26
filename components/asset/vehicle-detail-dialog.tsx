@@ -432,6 +432,7 @@ function SummaryTab({
           url={vehicle.registrationCertUrl}
           fileName={vehicle.registrationCertFileName}
           uploadedAt={vehicle.registrationCertUploadedAt}
+          maxHeight={300}
         />
       )}
 
