@@ -183,13 +183,30 @@ export function VehicleRegRegisterDialog({
     let updated = 0, added = 0, fail = 0;
     for (const item of registerableItems) {
       try {
-        const { _status: _s, _error: _e, _existingId, _fileName: _fn, _fileDataUrl: _fileUrl, id: _id, ...rest } = item;
-        // OCR 원본 base64 는 vehicle 레코드에 저장 X — vehicles 노드 가벼움 (옛 방식 회복)
-        // 첨부 미리보기 필요 시 별도 vehicle_attachments 노드로 분리 작업 필요 (오픈 후)
+        const { _status: _s, _error: _e, _existingId, _fileName: fn, _fileDataUrl: fileDataUrl, id: _id, ...rest } = item;
+
+        // 등록증 원본 — Storage 업로드 후 URL을 vehicle 레코드에 보관 (자산 상세에서 미리보기)
+        let certFields: Pick<Vehicle, 'registrationCertUrl' | 'registrationCertFileName' | 'registrationCertUploadedAt'> = {};
+        if (fileDataUrl && rest.plate) {
+          try {
+            const { uploadDocument } = await import('@/lib/firebase/storage');
+            const { dataUrlToFile } = await import('@/lib/image-compress');
+            const file = dataUrlToFile(fileDataUrl, fn || `${rest.plate}.jpg`);
+            const up = await uploadDocument({ kind: 'registration', ownerKey: normPlate(rest.plate), file });
+            certFields = {
+              registrationCertUrl: up.url,
+              registrationCertFileName: up.fileName,
+              registrationCertUploadedAt: up.uploadedAt,
+            };
+          } catch (uploadErr) {
+            console.warn('등록증 첨부 업로드 실패 (등록은 계속 진행)', uploadErr);
+          }
+        }
+
         if (_existingId) {
           const existing = vehicles.find((v) => v.id === _existingId);
           if (existing) {
-            const merged = { ...existing, ...rest, id: existing.id } as Vehicle;
+            const merged = { ...existing, ...rest, ...certFields, id: existing.id } as Vehicle;
             await updateVehicle(merged);
             if (merged.status !== existing.status) {
               await syncContractStatusFromVehicle(merged, contracts, updateContract);
@@ -206,6 +223,7 @@ export function VehicleRegRegisterDialog({
             status: rest.status ?? deriveVehicleStatusFromContract(rest.plate),
             createdAt: new Date().toISOString(),
             ...rest,
+            ...certFields,
           } as Omit<Vehicle, 'id'>;
           const newId = await addVehicle(newVehicle);
           added++;

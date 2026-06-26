@@ -6,10 +6,13 @@
  *
  *   <AttachedFilePreview title="보험증권" url={p.fileUrl} fileName={p.fileName} uploadedAt={p.uploadedAt} />
  *
- * - 이미지 (.png/.jpg/.webp/.gif 또는 data:image) → <img>
+ * - 이미지 (.png/.jpg/.webp/.gif 또는 data:image) → <img>, 클릭하면 원본 크기로 확대(lightbox)
  * - PDF 등 → <embed type="application/pdf">
  * - url 비었으면 안내 placeholder (showPlaceholder=true 일 때)
  */
+
+import { useState } from 'react';
+import { X } from '@phosphor-icons/react';
 
 export type AttachedFilePreviewProps = {
   /** 섹션 헤더 표기 (예: '보험증권', '자동차등록증', '할부계약서') */
@@ -27,6 +30,8 @@ export type AttachedFilePreviewProps = {
 export function AttachedFilePreview({
   title, url, fileName, uploadedAt, showPlaceholder = false, maxHeight = 600,
 }: AttachedFilePreviewProps) {
+  const [zoomed, setZoomed] = useState(false);
+
   if (!url) {
     if (!showPlaceholder) return null;
     return (
@@ -56,9 +61,12 @@ export function AttachedFilePreview({
           <img
             src={url}
             alt={fileName ?? title}
+            onClick={() => setZoomed(true)}
+            title="클릭하면 원본 크기로 확대"
             style={{
               maxWidth: '100%', maxHeight,
               border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-sm)',
+              cursor: 'zoom-in',
             }}
           />
         ) : (
@@ -77,6 +85,38 @@ export function AttachedFilePreview({
           </div>
         )}
       </div>
+
+      {isImage && zoomed && (
+        <div
+          onClick={() => setZoomed(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2000,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'zoom-out',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setZoomed(false)}
+            aria-label="닫기"
+            style={{
+              position: 'absolute', top: 16, right: 16,
+              background: 'rgba(255,255,255,0.12)', border: 0, borderRadius: '50%',
+              width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', cursor: 'pointer',
+            }}
+          >
+            <X size={18} weight="bold" />
+          </button>
+          <img
+            src={url}
+            alt={fileName ?? title}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '94vw', maxHeight: '94vh', objectFit: 'contain', cursor: 'default' }}
+          />
+        </div>
+      )}
     </section>
   );
 }
