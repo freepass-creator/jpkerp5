@@ -13,6 +13,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVendors } from '@/lib/firebase/vendors-store';
@@ -64,6 +65,13 @@ function claimMonthLabel(month: string): string {
   const [y, m] = month.split('-');
   return `${y.slice(2)}년 ${Number(m)}월`;
 }
+const CLAIM_MONTH_SUBCOLS: Array<{ label: string; width: number }> = [
+  { label: '청구금액', width: 84 },
+  { label: '결제금액', width: 84 },
+  { label: '결제일자', width: 78 },
+  { label: '결제수단', width: 58 },
+  { label: '미납금액', width: 84 },
+];
 
 export default function FinancePage() {
   const router = useRouter();
@@ -133,10 +141,23 @@ export default function FinancePage() {
     }
   }
   const { contracts, update: updateContract } = useContracts();
+  const { vehicles } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const { vendors } = useVendors();
 
-  // 채권 — 계약별 월별 수납 현황 (가로확장). 계좌 업로드 → 매칭으로 schedules.payments 갱신될 때마다 자동 반영.
+  // 채권 — 차량 기준 월별 수납 현황 (가로확장). 계약자 없는 휴차 차량도 행으로 노출 (원본 엑셀과 동일 구성).
+  // 계좌 업로드 → 매칭으로 schedules.payments 갱신될 때마다 자동 반영.
+  const contractsByPlate = useMemo(() => {
+    const m = new Map<string, Contract[]>();
+    for (const c of contracts) {
+      if (!c.vehiclePlate) continue;
+      const arr = m.get(c.vehiclePlate) ?? [];
+      arr.push(c);
+      m.set(c.vehiclePlate, arr);
+    }
+    return m;
+  }, [contracts]);
+
   const claimMonths = useMemo(() => {
     const set = new Set<string>();
     for (const c of contracts) {
@@ -148,10 +169,13 @@ export default function FinancePage() {
   }, [contracts]);
 
   const claimRows = useMemo(() => {
-    return contracts
-      .filter((c) => c.vehiclePlate || c.customerName)
-      .map((c, i) => {
-        const byMonth = new Map<string, { charged: number; paid: number; paidAt: string; method: string; unpaid: number }>();
+    return vehicles.map((v, i) => {
+      const plateContracts = contractsByPlate.get(v.plate) ?? [];
+      const active = plateContracts.find((c) => c.status === '운행' || c.status === '대기');
+      const latest = active ?? [...plateContracts].sort((a, b) => (b.contractDate || '').localeCompare(a.contractDate || ''))[0];
+      // 한 차량에 계약(고객) 여러 번 거쳐갔어도 — 같은 차량 행에 전 기간 수납내역 합쳐서 표시
+      const byMonth = new Map<string, { charged: number; paid: number; paidAt: string; method: string; unpaid: number }>();
+      for (const c of plateContracts) {
         for (const s of c.schedules ?? []) {
           if (!s.dueDate) continue;
           const month = s.dueDate.slice(0, 7);
@@ -165,9 +189,10 @@ export default function FinancePage() {
             unpaid: balance(s),
           });
         }
-        return { no: i + 1, contract: c, byMonth };
-      });
-  }, [contracts]);
+      }
+      return { no: i + 1, vehicle: v, contract: latest, byMonth };
+    });
+  }, [vehicles, contractsByPlate]);
 
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:finance:company', 'all');
@@ -395,7 +420,15 @@ export default function FinancePage() {
             <div className="panel-body" style={(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl' || viewMode === 'claim') ? { padding: 14 } : undefined}>
               {viewMode === 'claim' && (
                 <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 230px)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-                  <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, width: 'max-content' }}>
+                  <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, tableLayout: 'fixed' }}>
+                    <colgroup>
+                      {CLAIM_FIXED_COLS.map((col) => <col key={col.key} style={{ width: col.width }} />)}
+                      {claimMonths.map((month) => (
+                        <Fragment key={month}>
+                          {CLAIM_MONTH_SUBCOLS.map((sub) => <col key={`${month}-${sub.label}`} style={{ width: sub.width }} />)}
+                        </Fragment>
+                      ))}
+                    </colgroup>
                     <thead>
                       <tr>
                         {CLAIM_FIXED_COLS.map((col, i) => (
@@ -404,10 +437,10 @@ export default function FinancePage() {
                             rowSpan={2}
                             style={{
                               position: 'sticky', left: CLAIM_FIXED_LEFTS[i], top: 0, zIndex: 4,
-                              width: col.width, minWidth: col.width, maxWidth: col.width,
                               background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
                               borderRight: i === CLAIM_FIXED_COLS.length - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
                               padding: '5px 6px', textAlign: col.align === 'num' ? 'right' : col.align === 'center' ? 'center' : 'left',
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                             }}
                           >
                             {col.label}
@@ -430,42 +463,44 @@ export default function FinancePage() {
                       </tr>
                       <tr>
                         {claimMonths.map((month) => (
-                          ['청구금액', '결제금액', '결제일자', '결제수단', '미납금액'].map((sub, j) => (
-                            <th
-                              key={`${month}-${sub}`}
-                              style={{
-                                position: 'sticky', top: 26, zIndex: 2,
-                                background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
-                                borderRight: j === 4 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
-                                padding: '4px 6px', textAlign: 'center', whiteSpace: 'nowrap', fontWeight: 400, color: 'var(--text-sub)',
-                                width: sub === '결제일자' ? 80 : 64, minWidth: sub === '결제일자' ? 80 : 64,
-                              }}
-                            >
-                              {sub}
-                            </th>
-                          ))
+                          <Fragment key={month}>
+                            {CLAIM_MONTH_SUBCOLS.map((sub, j) => (
+                              <th
+                                key={`${month}-${sub.label}`}
+                                style={{
+                                  position: 'sticky', top: 27, zIndex: 2,
+                                  background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
+                                  borderRight: j === CLAIM_MONTH_SUBCOLS.length - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
+                                  padding: '4px 6px', textAlign: 'center', whiteSpace: 'nowrap', fontWeight: 400, color: 'var(--text-sub)',
+                                  overflow: 'hidden', textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {sub.label}
+                              </th>
+                            ))}
+                          </Fragment>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {claimRows.length === 0 ? (
-                        <tr><td colSpan={CLAIM_FIXED_COLS.length + claimMonths.length * 5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-weak)' }}>계약 데이터 없음</td></tr>
-                      ) : claimRows.map(({ no, contract: c, byMonth }) => (
-                        <tr key={c.id}>
+                        <tr><td colSpan={CLAIM_FIXED_COLS.length + claimMonths.length * 5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-weak)' }}>차량 데이터 없음</td></tr>
+                      ) : claimRows.map(({ no, vehicle: v, contract: c, byMonth }) => (
+                        <tr key={v.id}>
                           {CLAIM_FIXED_COLS.map((col, i) => {
                             const raw: Record<string, string | number | undefined> = {
                               no,
-                              company: displayCompanyName(c.company, companyMaster),
-                              customerName: c.customerName,
-                              deposit: c.deposit ? `₩${c.deposit.toLocaleString()}` : '-',
-                              monthlyRent: c.monthlyRent ? `₩${c.monthlyRent.toLocaleString()}` : '-',
+                              company: displayCompanyName(v.company, companyMaster),
+                              customerName: c?.customerName || '-',
+                              deposit: c?.deposit ? `₩${c.deposit.toLocaleString()}` : '-',
+                              monthlyRent: c?.monthlyRent ? `₩${c.monthlyRent.toLocaleString()}` : '-',
                               installment: '-',
                               depositTransferDate: '-',
-                              paymentDay: c.paymentDay ? `${c.paymentDay}일` : '-',
-                              registeredDate: c.createdAt ? c.createdAt.slice(0, 10) : '-',
-                              vehiclePlate: c.vehiclePlate || '-',
-                              contractDate: c.contractDate || '-',
-                              returnScheduledDate: c.returnScheduledDate || '-',
+                              paymentDay: c?.paymentDay ? `${c.paymentDay}일` : '-',
+                              registeredDate: (c?.createdAt || v.createdAt) ? (c?.createdAt || v.createdAt).slice(0, 10) : '-',
+                              vehiclePlate: v.plate || '-',
+                              contractDate: c?.contractDate || '-',
+                              returnScheduledDate: c?.returnScheduledDate || '-',
                             };
                             return (
                               <td
@@ -473,7 +508,6 @@ export default function FinancePage() {
                                 className="mono"
                                 style={{
                                   position: 'sticky', left: CLAIM_FIXED_LEFTS[i], zIndex: 1,
-                                  width: col.width, minWidth: col.width, maxWidth: col.width,
                                   background: 'var(--bg-main)', borderBottom: '1px solid var(--border)',
                                   borderRight: i === CLAIM_FIXED_COLS.length - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
                                   padding: '4px 6px', textAlign: col.align === 'num' ? 'right' : col.align === 'center' ? 'center' : 'left',
@@ -488,11 +522,11 @@ export default function FinancePage() {
                             const m = byMonth.get(month);
                             return (
                               <Fragment key={month}>
-                                <td className="mono" style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>{m?.charged ? fmtNum(m.charged) : ''}</td>
-                                <td className="mono" style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>{m?.paid ? fmtNum(m.paid) : ''}</td>
-                                <td className="mono dim" style={{ padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{m?.paidAt || ''}</td>
-                                <td className="dim" style={{ padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>{m?.method || ''}</td>
-                                <td className="mono" style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid var(--border)', borderRight: '2px solid var(--border-strong, var(--text-weak))', color: m?.unpaid ? 'var(--red-text)' : undefined }}>{m?.unpaid ? fmtNum(m.unpaid) : ''}</td>
+                                <td className="mono" style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m?.charged ? fmtNum(m.charged) : ''}</td>
+                                <td className="mono" style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m?.paid ? fmtNum(m.paid) : ''}</td>
+                                <td className="mono dim" style={{ padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m?.paidAt || ''}</td>
+                                <td className="dim" style={{ padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m?.method || ''}</td>
+                                <td className="mono" style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid var(--border)', borderRight: '2px solid var(--border-strong, var(--text-weak))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: m?.unpaid ? 'var(--red-text)' : undefined }}>{m?.unpaid ? fmtNum(m.unpaid) : ''}</td>
                               </Fragment>
                             );
                           })}
