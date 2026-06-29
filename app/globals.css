@@ -1405,9 +1405,6 @@ input[type="radio"]:disabled {
 .table tbody tr:hover td { background: var(--bg-hover); }
 .table tbody tr.selected td { background: var(--bg-selected); }
 
-/* 채권 탭 — CSS Grid 행(display:contents 래퍼) 호버. 일부 셀이 sticky+inline background 라 !important 로 우선시킴 */
-.claim-row:hover > div { background: var(--bg-hover) !important; }
-
 /* 정렬 가능 헤더 */
 .table th.sortable {
   cursor: pointer;
