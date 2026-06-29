@@ -6,13 +6,14 @@
  * 표 기반 (대시보드 카드 X) — 자산/계약과 동일한 list-first 패턴.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bank, Plus, Trash, FileXls, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useVendors } from '@/lib/firebase/vendors-store';
@@ -35,138 +36,165 @@ import { PageShell } from '@/components/ui/page-shell';
 import { CompanyFilter } from '@/components/ui/filter-bar';
 import { FilterSelect } from '@/components/ui/filter-select';
 import { usePersistentState } from '@/lib/use-persistent-state';
-import { useClaimSheet, type ClaimSheet, type Cell as ClaimCell } from '@/lib/firebase/claim-sheet-store';
-import * as XLSX from 'xlsx';
+import { effectiveAmount, balance } from '@/lib/payment-schedule';
+import type { Vehicle } from '@/lib/types';
 
 const fmtNum = (v: number) => v ? v.toLocaleString('ko-KR') : '';
 
-/** 채권 시트 — 원본 엑셀 그대로 렌더 (계산 없음). 좌측 N개 컬럼만 freeze(L열=12번째까지). */
-const CLAIM_FREEZE_COUNT = 12;
-const CLAIM_NO_COL_WIDTH = 40;
-const CLAIM_OTHER_COL_WIDTH = 86;
-function claimColWidth(i: number): number {
-  return i === 0 ? CLAIM_NO_COL_WIDTH : CLAIM_OTHER_COL_WIDTH;
-}
-function claimFrozenLefts(n: number): number[] {
+/**
+ * 채권 — 차량 기준 월별 수납 현황 (가로확장). CSS Grid 로 렌더 — <table>의 colgroup/rowSpan
+ * 정렬 오차(스크롤 시 텍스트 겹침) 문제를 피하기 위해 grid-column 을 셀마다 명시적으로 지정.
+ * 좌측 12개 컬럼(L열 상당) sticky left + 상단 2행 sticky top 으로 고정.
+ */
+const CLAIM_FIXED_COLS: Array<{ key: string; label: string; width: number; align?: 'num' | 'center' }> = [
+  { key: 'no', label: 'NO', width: 36, align: 'center' },
+  { key: 'company', label: '소속', width: 80 },
+  { key: 'customerName', label: '코드명', width: 80 },
+  { key: 'deposit', label: '보증금', width: 90, align: 'num' },
+  { key: 'monthlyRent', label: '대여료', width: 90, align: 'num' },
+  { key: 'installment', label: '분납여부', width: 70, align: 'center' },
+  { key: 'depositTransferDate', label: '보증금이체일', width: 90, align: 'center' },
+  { key: 'paymentDay', label: '결제일', width: 60, align: 'center' },
+  { key: 'registeredDate', label: '최초등록일', width: 90, align: 'center' },
+  { key: 'vehiclePlate', label: '차량번호', width: 90, align: 'center' },
+  { key: 'contractDate', label: '시작', width: 90, align: 'center' },
+  { key: 'returnScheduledDate', label: '종료', width: 90, align: 'center' },
+];
+const CLAIM_FIXED_LEFTS: number[] = (() => {
   let acc = 0;
-  const out: number[] = [];
-  for (let i = 0; i < n; i++) { out.push(acc); acc += claimColWidth(i); }
-  return out;
-}
-function claimCellText(v: string | number | null | undefined): string {
-  if (v == null || v === '') return '';
-  return typeof v === 'number' ? v.toLocaleString('ko-KR') : String(v);
+  return CLAIM_FIXED_COLS.map((c) => { const left = acc; acc += c.width; return left; });
+})();
+const CLAIM_MONTH_SUBCOLS: Array<{ label: string; width: number }> = [
+  { label: '청구금액', width: 84 },
+  { label: '결제금액', width: 84 },
+  { label: '결제일자', width: 78 },
+  { label: '결제수단', width: 58 },
+  { label: '미납금액', width: 84 },
+];
+const CLAIM_HEADER_ROW1_H = 27;
+const CLAIM_HEADER_ROW2_H = 25;
+
+function claimMonthLabel(month: string): string {
+  const [y, m] = month.split('-');
+  return `${y.slice(2)}년 ${Number(m)}월`;
 }
 
-/** 채권 탭 — 업로드된 엑셀 그대로 표시. 좌측 CLAIM_FREEZE_COUNT개 컬럼 freeze. */
-function ClaimSheetView({
-  sheet, uploading, onUpload,
-}: {
-  sheet: ClaimSheet | null;
-  uploading: boolean;
-  onUpload: (file: File) => void;
-}) {
-  const inputId = 'jpk-claim-upload';
-  const headers = sheet?.headers ?? [];
-  const topRow = sheet?.topRow ?? [];
-  const rows = sheet?.rows ?? [];
-  const freezeN = Math.min(CLAIM_FREEZE_COUNT, headers.length);
-  const lefts = claimFrozenLefts(freezeN);
-  const hasTopRow = topRow.some((v) => v != null && v !== '');
-  const headerTop = hasTopRow ? 25 : 0;
+type ClaimMonthCell = { charged: number; paid: number; paidAt: string; method: string; unpaid: number };
+type ClaimRow = { no: number; vehicle: Vehicle; contract: Contract | undefined; byMonth: Map<string, ClaimMonthCell> };
+
+/** 채권 표 — 차량당 1행, 컬럼은 그리드 좌표로 명시 지정 (헤더/본문 폭 어긋남 방지) */
+function ClaimGridView({ rows, months }: { rows: ClaimRow[]; months: string[] }) {
+  const companies = useCompanies().companies;
+  const gridTemplateColumns = useMemo(() => {
+    const fixed = CLAIM_FIXED_COLS.map((c) => `${c.width}px`).join(' ');
+    const monthly = months.map(() => CLAIM_MONTH_SUBCOLS.map((s) => `${s.width}px`).join(' ')).join(' ');
+    return [fixed, monthly].filter(Boolean).join(' ');
+  }, [months]);
+
+  const headerCellStyle = (left: number | undefined, top: number, borderRightStrong: boolean): CSSProperties => ({
+    position: 'sticky', left, top, zIndex: left !== undefined ? 4 : 3,
+    background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
+    borderRight: borderRightStrong ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
+    padding: '5px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-        <FileXls size={14} weight="duotone" style={{ color: 'var(--text-sub)' }} />
-        <span style={{ fontSize: 12 }}>
-          {sheet ? `${sheet.fileName} · ${rows.length}행 · 업로드 ${sheet.uploadedAt.slice(0, 16).replace('T', ' ')}` : '업로드된 채권 시트 없음'}
-        </span>
-        <div style={{ flex: 1 }} />
-        <input
-          id={inputId} type="file" accept=".xlsx,.xls,.csv" className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ''; }}
-        />
-        <button className="btn btn-sm btn-primary" type="button" disabled={uploading} onClick={() => document.getElementById(inputId)?.click()}>
-          <Plus size={12} weight="bold" /> {uploading ? '업로드 중...' : '엑셀 업로드'}
-        </button>
-      </div>
+    <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 230px)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns, fontSize: 11, width: 'max-content' }}>
+        {/* 헤더 1행 — 좌측 고정 컬럼 라벨 (2행 분량 차지) + 월 라벨 */}
+        {CLAIM_FIXED_COLS.map((col, i) => (
+          <div key={`h1-${col.key}`} style={{ ...headerCellStyle(CLAIM_FIXED_LEFTS[i], 0, i === CLAIM_FIXED_COLS.length - 1), gridRow: '1 / 3', gridColumn: i + 1 }}>
+            {col.label}
+          </div>
+        ))}
+        {months.map((month, mi) => (
+          <div
+            key={`h1-${month}`}
+            style={{ ...headerCellStyle(undefined, 0, true), gridRow: 1, gridColumn: `${CLAIM_FIXED_COLS.length + mi * CLAIM_MONTH_SUBCOLS.length + 1} / span ${CLAIM_MONTH_SUBCOLS.length}` }}
+          >
+            {claimMonthLabel(month)}
+          </div>
+        ))}
+        {/* 헤더 2행 — 월별 5개 하위 라벨 */}
+        {months.map((month, mi) => CLAIM_MONTH_SUBCOLS.map((sub, si) => (
+          <div
+            key={`h2-${month}-${sub.label}`}
+            style={{
+              ...headerCellStyle(undefined, CLAIM_HEADER_ROW1_H, si === CLAIM_MONTH_SUBCOLS.length - 1),
+              gridRow: 2, gridColumn: CLAIM_FIXED_COLS.length + mi * CLAIM_MONTH_SUBCOLS.length + si + 1,
+              fontWeight: 400, color: 'var(--text-sub)',
+            }}
+          >
+            {sub.label}
+          </div>
+        )))}
 
-      {!sheet ? (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-weak)' }}>
-          엑셀 업로드해서 채권 현황을 등록하세요.
-        </div>
-      ) : (
-        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 280px)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-          <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, tableLayout: 'fixed' }}>
-            <colgroup>
-              {headers.map((_, i) => <col key={i} style={{ width: claimColWidth(i) }} />)}
-            </colgroup>
-            <thead>
-              {hasTopRow && (
-                <tr>
-                  {topRow.map((v, i) => (
-                    <th
-                      key={i}
-                      style={{
-                        position: 'sticky', left: i < freezeN ? lefts[i] : undefined, top: 0, zIndex: i < freezeN ? 4 : 2,
-                        background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
-                        borderRight: i === freezeN - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
-                        padding: '4px 6px', textAlign: 'center', whiteSpace: 'nowrap', fontWeight: 400, color: 'var(--text-sub)',
-                        overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {claimCellText(v)}
-                    </th>
-                  ))}
-                </tr>
-              )}
-              <tr>
-                {headers.map((h, i) => (
-                  <th
-                    key={i}
-                    style={{
-                      position: 'sticky', left: i < freezeN ? lefts[i] : undefined, top: headerTop, zIndex: i < freezeN ? 4 : 2,
-                      background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
-                      borderRight: i === freezeN - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
-                      padding: '5px 6px', textAlign: 'center', whiteSpace: 'nowrap',
-                      overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {claimCellText(h)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, ri) => (
-                <tr key={ri} className="claim-row">
-                  {headers.map((_, i) => {
-                    const v = row[i];
-                    const isNum = typeof v === 'number';
-                    return (
-                      <td
-                        key={i}
-                        className={isNum ? 'mono' : undefined}
-                        style={{
-                          position: i < freezeN ? 'sticky' : undefined, left: i < freezeN ? lefts[i] : undefined, zIndex: i < freezeN ? 1 : undefined,
-                          background: i < freezeN ? 'var(--bg-main)' : undefined,
-                          borderBottom: '1px solid var(--border)',
-                          borderRight: i === freezeN - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
-                          padding: '4px 6px', textAlign: isNum ? 'right' : 'center',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {claimCellText(v)}
-                      </td>
-                    );
-                  })}
-                </tr>
+        {/* 본문 */}
+        {rows.length === 0 ? (
+          <div style={{ gridRow: 3, gridColumn: `1 / span ${CLAIM_FIXED_COLS.length + months.length * CLAIM_MONTH_SUBCOLS.length}`, padding: 24, textAlign: 'center', color: 'var(--text-weak)' }}>
+            차량 데이터 없음
+          </div>
+        ) : rows.map(({ no, vehicle: v, contract: c, byMonth }, ri) => {
+          const gridRow = ri + 3;
+          const raw: Record<string, string | number> = {
+            no,
+            company: displayCompanyName(v.company, companies),
+            customerName: c?.customerName || '-',
+            deposit: c?.deposit ? `₩${c.deposit.toLocaleString()}` : '-',
+            monthlyRent: c?.monthlyRent ? `₩${c.monthlyRent.toLocaleString()}` : '-',
+            installment: '-',
+            depositTransferDate: '-',
+            paymentDay: c?.paymentDay ? `${c.paymentDay}일` : '-',
+            registeredDate: (c?.createdAt || v.createdAt).slice(0, 10),
+            vehiclePlate: v.plate || '-',
+            contractDate: c?.contractDate || '-',
+            returnScheduledDate: c?.returnScheduledDate || '-',
+          };
+          return (
+            <div key={v.id} className="claim-row" style={{ display: 'contents' }}>
+              {CLAIM_FIXED_COLS.map((col, i) => (
+                <div
+                  key={col.key}
+                  className="mono"
+                  style={{
+                    gridRow, gridColumn: i + 1,
+                    position: 'sticky', left: CLAIM_FIXED_LEFTS[i], zIndex: 1,
+                    background: 'var(--bg-main)', borderBottom: '1px solid var(--border)',
+                    borderRight: i === CLAIM_FIXED_COLS.length - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
+                    padding: '4px 6px', display: 'flex', alignItems: 'center',
+                    justifyContent: col.align === 'num' ? 'flex-end' : col.align === 'center' ? 'center' : 'flex-start',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}
+                >
+                  {raw[col.key]}
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              {months.map((month, mi) => {
+                const m = byMonth.get(month);
+                const base = CLAIM_FIXED_COLS.length + mi * CLAIM_MONTH_SUBCOLS.length;
+                const cellStyle = (si: number, extra?: CSSProperties): CSSProperties => ({
+                  gridRow, gridColumn: base + si + 1,
+                  borderBottom: '1px solid var(--border)',
+                  borderRight: si === CLAIM_MONTH_SUBCOLS.length - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
+                  padding: '4px 6px', display: 'flex', alignItems: 'center',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  ...extra,
+                });
+                return (
+                  <Fragment key={month}>
+                    <div className="mono" style={cellStyle(0, { justifyContent: 'flex-end' })}>{m?.charged ? fmtNum(m.charged) : ''}</div>
+                    <div className="mono" style={cellStyle(1, { justifyContent: 'flex-end' })}>{m?.paid ? fmtNum(m.paid) : ''}</div>
+                    <div className="mono dim" style={cellStyle(2, { justifyContent: 'center' })}>{m?.paidAt || ''}</div>
+                    <div className="dim" style={cellStyle(3, { justifyContent: 'center' })}>{m?.method || ''}</div>
+                    <div className="mono" style={cellStyle(4, { justifyContent: 'flex-end', color: m?.unpaid ? 'var(--red-text)' : undefined })}>{m?.unpaid ? fmtNum(m.unpaid) : ''}</div>
+                  </Fragment>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -239,45 +267,58 @@ export default function FinancePage() {
     }
   }
   const { contracts, update: updateContract } = useContracts();
+  const { vehicles } = useVehicles();
   const { companies: companyMaster } = useCompanies();
   const { vendors } = useVendors();
 
-  // 채권 — 엑셀(채권불러오기.xlsx) 업로드 그대로 표시. 계산/매칭 없음 — 다시 업로드하면 통째로 교체.
-  const { sheet: claimSheet, save: saveClaimSheet } = useClaimSheet();
-  const [claimUploading, setClaimUploading] = useState(false);
-
-  async function handleClaimUpload(file: File) {
-    setClaimUploading(true);
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-      const sheetName = wb.SheetNames.includes('채권') ? '채권' : wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-      const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null }) as unknown[][];
-      const toCell = (v: unknown): ClaimCell => {
-        if (v == null) return null;
-        if (v instanceof Date) {
-          const y = v.getFullYear(), m = String(v.getMonth() + 1).padStart(2, '0'), d = String(v.getDate()).padStart(2, '0');
-          return `${y}-${m}-${d}`;
-        }
-        if (typeof v === 'number' || typeof v === 'string') return v;
-        return String(v);
-      };
-      const topRow = (aoa[0] ?? []).map(toCell);
-      const headers = (aoa[1] ?? []).map(toCell);
-      const rows = aoa.slice(2).filter((r) => r.some((v) => v != null && String(v).trim() !== '')).map((r) => r.map(toCell));
-      await saveClaimSheet({
-        topRow, headers, rows,
-        fileName: file.name, sheetName,
-        uploadedAt: new Date().toISOString(),
-      });
-      toast.success(`채권 시트 업로드 완료 — ${rows.length}행`);
-    } catch (e) {
-      toast.error(`업로드 실패: ${(e as Error).message ?? String(e)}`);
-    } finally {
-      setClaimUploading(false);
+  // 채권 — 차량 기준 월별 수납 현황 (가로확장). 계약자 없는 휴차 차량도 행으로 노출.
+  // 계좌 업로드 → autoMatchAll/applyMatch 로 schedules.payments 갱신될 때마다 자동 반영.
+  const contractsByPlate = useMemo(() => {
+    const m = new Map<string, Contract[]>();
+    for (const c of contracts) {
+      if (!c.vehiclePlate) continue;
+      const arr = m.get(c.vehiclePlate) ?? [];
+      arr.push(c);
+      m.set(c.vehiclePlate, arr);
     }
-  }
+    return m;
+  }, [contracts]);
+
+  const claimMonths = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of contracts) {
+      for (const s of c.schedules ?? []) {
+        if (s.dueDate) set.add(s.dueDate.slice(0, 7));
+      }
+    }
+    return Array.from(set).sort().reverse(); // 최신월 먼저
+  }, [contracts]);
+
+  const claimRows = useMemo(() => {
+    return vehicles.map((v, i) => {
+      const plateContracts = contractsByPlate.get(v.plate) ?? [];
+      const active = plateContracts.find((c) => c.status === '운행' || c.status === '대기');
+      const latest = active ?? [...plateContracts].sort((a, b) => (b.contractDate || '').localeCompare(a.contractDate || ''))[0];
+      // 한 차량에 계약(고객) 여러 번 거쳐갔어도 — 같은 차량 행에 전 기간 수납내역 합쳐서 표시
+      const byMonth = new Map<string, { charged: number; paid: number; paidAt: string; method: string; unpaid: number }>();
+      for (const c of plateContracts) {
+        for (const s of c.schedules ?? []) {
+          if (!s.dueDate) continue;
+          const month = s.dueDate.slice(0, 7);
+          const payments = s.payments ?? [];
+          const lastPayment = payments[payments.length - 1];
+          byMonth.set(month, {
+            charged: effectiveAmount(s),
+            paid: s.paidAmount ?? 0,
+            paidAt: s.paidAt ?? lastPayment?.date ?? '',
+            method: lastPayment?.source ?? '',
+            unpaid: balance(s),
+          });
+        }
+      }
+      return { no: i + 1, vehicle: v, contract: latest, byMonth };
+    });
+  }, [vehicles, contractsByPlate]);
 
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:finance:company', 'all');
@@ -504,7 +545,7 @@ export default function FinancePage() {
           <div className="panel" style={(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl' || viewMode === 'claim') ? { background: 'transparent', border: 'none', padding: 0 } : undefined}>
             <div className="panel-body" style={(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl' || viewMode === 'claim') ? { padding: 14 } : undefined}>
               {viewMode === 'claim' && (
-                <ClaimSheetView sheet={claimSheet} uploading={claimUploading} onUpload={handleClaimUpload} />
+                <ClaimGridView rows={claimRows} months={claimMonths} />
               )}
               {viewMode === 'daily' && (
                 <DailyLedgerView

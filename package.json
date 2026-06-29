@@ -1,6 +1,6 @@
 {
   "name": "jpkerp5",
-  "version": "5.0.37",
+  "version": "5.0.38",
   "private": true,
   "scripts": {
     "dev": "next dev --turbo -p 7502",
