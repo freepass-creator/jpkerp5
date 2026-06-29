@@ -727,6 +727,7 @@ export default function AssetPage() {
                 await syncContractStatusFromVehicle(v, contracts, updateContract);
               }, { onConflict: () => setOpenId(null) });
             }}
+            onUpdateContract={(c) => { void safeUpdate(() => updateContract(c)); }}
             onClose={() => setOpenId(null)}
             onEdit={(v) => setEditVehicle(v)}
           />

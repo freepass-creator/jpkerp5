@@ -71,6 +71,7 @@ import { EmptyRow } from '@/components/ui/empty-row';
 import { Section, Stack, Grid2 } from '@/components/ui/detail-primitives';
 import { VehiclePhotosSection, VehiclePhotosByKind } from '@/components/vehicle-photos-section';
 import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
+import { markTerminated, revertToOperating } from '@/lib/contract-actions';
 import { COL, COL_FLEX } from '@/lib/table-cols';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
@@ -606,7 +607,7 @@ function ComplianceTab({ vehicle, contracts }: { vehicle: Vehicle; contracts: Co
 }
 
 /* ─── 탭4: 계약이력 — 자산 다른 탭(요약/할부/보험)과 동일 section.detail-section wrapper ─── */
-function ContractListTab({ contracts }: { contracts: Contract[] }) {
+function ContractListTab({ contracts, onUpdateContract }: { contracts: Contract[]; onUpdateContract?: (c: Contract) => void }) {
   const totalUnpaid = contracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
   const isEmpty = contracts.length === 0;
   return (
@@ -626,6 +627,7 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
               <th style={{ width: COL.contractNo }}>계약번호</th>
               <th style={{ width: COL.date }}>계약일</th>
               <th style={{ width: COL.date }}>종료일</th>
+              <th style={{ width: COL.date }} title="고객 미납 등으로 차량을 회수한 날짜 — 수기 입력 시 계약이 해지 처리됨">회수일</th>
               <th style={COL_FLEX.customer}>계약자</th>
               <th className="center" style={{ width: COL.term }}>약정</th>
               <th className="num" style={{ width: COL.money }}>월대여료</th>
@@ -637,7 +639,7 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
           </thead>
           <tbody>
             {isEmpty ? (
-              <EmptyRow colSpan={10}>계약 이력 없음</EmptyRow>
+              <EmptyRow colSpan={11}>계약 이력 없음</EmptyRow>
             ) : contracts.map((c) => {
               const isActive = c.status === '운행' || c.status === '대기';
               return (
@@ -645,6 +647,21 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
                 <td className="mono dim">{c.contractNo || <span className="muted">-</span>}</td>
                 <td className="mono">{c.contractDate}</td>
                 <td className="mono dim">{c.returnScheduledDate || <span className="muted">-</span>}</td>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="date"
+                    className="input-compact"
+                    value={c.returnedDate ?? ''}
+                    disabled={!onUpdateContract}
+                    onChange={(e) => {
+                      if (!onUpdateContract) return;
+                      const date = e.target.value;
+                      onUpdateContract(date ? markTerminated(c, date) : revertToOperating(c));
+                    }}
+                    style={{ width: 116, fontSize: 11 }}
+                    title="입력하면 계약이 해지 처리되고, 비우면 운행으로 되돌립니다"
+                  />
+                </td>
                 <td>
                   {isActive && (
                     <span style={{
@@ -880,13 +897,15 @@ export type VehicleDialogTab =
   | 'operation' | 'risk' | 'asset' | 'contract' | 'payment' | 'photos';
 
 export function VehicleDetailDialog({
-  vehicle, history, contracts, view, onUpdate, onClose, onEdit, initialTab,
+  vehicle, history, contracts, view, onUpdate, onUpdateContract, onClose, onEdit, initialTab,
 }: {
   vehicle: Vehicle;
   history: HistoryEntry[];
   contracts: Contract[];
   view: 'status' | 'registered';
   onUpdate: (v: Vehicle) => void;
+  /** 회수일 수기 입력 등 — 계약 이력에서 직접 계약 수정 */
+  onUpdateContract?: (c: Contract) => void;
   onClose: () => void;
   onEdit?: (v: Vehicle) => void;
   /** 진입 페이지 컨텍스트별 default 탭. 미지정 시 view 별 첫 탭 */
@@ -945,7 +964,7 @@ export function VehicleDetailDialog({
               content: <AssetTab vehicle={vehicle} repairHistory={repairHistory} contracts={sortedContracts} onUpdate={onUpdate} />
             },
             { value: 'contract', label: `계약 관리${sortedContracts.length > 0 ? ` (${sortedContracts.length})` : ''}`,
-              content: <ContractListTab contracts={sortedContracts} />
+              content: <ContractListTab contracts={sortedContracts} onUpdateContract={onUpdateContract} />
             },
             { value: 'payment', label: '수납 관리',
               content: <PaymentManagementTab contracts={sortedContracts} />

@@ -79,6 +79,7 @@ export function GlobalDialogsProvider({ children }: { children: ReactNode }) {
             // Vehicle 상태 변경 시 linked Contract.vehicleStatus 도 동기화 (자산 페이지 패턴 일치).
             await syncContractStatusFromVehicle(v, contracts, updateContract);
           }}
+          onUpdateContract={(c) => { void updateContract(c); }}
           onClose={() => setOpenState(null)}
         />
       )}
