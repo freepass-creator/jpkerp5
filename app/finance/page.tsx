@@ -6,7 +6,7 @@
  * 표 기반 (대시보드 카드 X) — 자산/계약과 동일한 list-first 패턴.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bank, Plus, Trash, FileXls, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -35,8 +35,35 @@ import { PageShell } from '@/components/ui/page-shell';
 import { CompanyFilter } from '@/components/ui/filter-bar';
 import { FilterSelect } from '@/components/ui/filter-select';
 import { usePersistentState } from '@/lib/use-persistent-state';
+import { effectiveAmount, balance } from '@/lib/payment-schedule';
 
 const fmtNum = (v: number) => v ? v.toLocaleString('ko-KR') : '';
+
+/** 채권 가로확장 표 — 좌측 고정(freeze) 컬럼 12개. width는 sticky left 오프셋 계산에 사용. */
+const CLAIM_FIXED_COLS: Array<{ key: string; label: string; width: number; align?: 'num' | 'center' }> = [
+  { key: 'no', label: 'NO', width: 36, align: 'center' },
+  { key: 'company', label: '소속', width: 80 },
+  { key: 'customerName', label: '코드명', width: 80 },
+  { key: 'deposit', label: '보증금', width: 90, align: 'num' },
+  { key: 'monthlyRent', label: '대여료', width: 90, align: 'num' },
+  { key: 'installment', label: '분납여부', width: 70, align: 'center' },
+  { key: 'depositTransferDate', label: '보증금이체일', width: 90, align: 'center' },
+  { key: 'paymentDay', label: '결제일', width: 60, align: 'center' },
+  { key: 'registeredDate', label: '최초등록일', width: 90, align: 'center' },
+  { key: 'vehiclePlate', label: '차량번호', width: 90, align: 'center' },
+  { key: 'contractDate', label: '시작', width: 90, align: 'center' },
+  { key: 'returnScheduledDate', label: '종료', width: 90, align: 'center' },
+];
+const CLAIM_FIXED_LEFTS: number[] = (() => {
+  let acc = 0;
+  return CLAIM_FIXED_COLS.map((c) => { const left = acc; acc += c.width; return left; });
+})();
+const CLAIM_FIXED_TOTAL_WIDTH = CLAIM_FIXED_COLS.reduce((s, c) => s + c.width, 0);
+
+function claimMonthLabel(month: string): string {
+  const [y, m] = month.split('-');
+  return `${y.slice(2)}년 ${Number(m)}월`;
+}
 
 export default function FinancePage() {
   const router = useRouter();
@@ -109,10 +136,43 @@ export default function FinancePage() {
   const { companies: companyMaster } = useCompanies();
   const { vendors } = useVendors();
 
+  // 채권 — 계약별 월별 수납 현황 (가로확장). 계좌 업로드 → 매칭으로 schedules.payments 갱신될 때마다 자동 반영.
+  const claimMonths = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of contracts) {
+      for (const s of c.schedules ?? []) {
+        if (s.dueDate) set.add(s.dueDate.slice(0, 7));
+      }
+    }
+    return Array.from(set).sort().reverse(); // 최신월 먼저 (좌측 고정 컬럼 바로 다음부터 오른쪽으로 과거)
+  }, [contracts]);
+
+  const claimRows = useMemo(() => {
+    return contracts
+      .filter((c) => c.vehiclePlate || c.customerName)
+      .map((c, i) => {
+        const byMonth = new Map<string, { charged: number; paid: number; paidAt: string; method: string; unpaid: number }>();
+        for (const s of c.schedules ?? []) {
+          if (!s.dueDate) continue;
+          const month = s.dueDate.slice(0, 7);
+          const payments = s.payments ?? [];
+          const lastPayment = payments[payments.length - 1];
+          byMonth.set(month, {
+            charged: effectiveAmount(s),
+            paid: s.paidAmount ?? 0,
+            paidAt: s.paidAt ?? lastPayment?.date ?? '',
+            method: lastPayment?.source ?? '',
+            unpaid: balance(s),
+          });
+        }
+        return { no: i + 1, contract: c, byMonth };
+      });
+  }, [contracts]);
+
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:finance:company', 'all');
   const [directionFilter, setDirectionFilter] = usePersistentState<'all' | 'deposit' | 'withdraw'>('filter:finance:direction', 'all');
-  const [viewMode, setViewMode] = usePersistentState<'account' | 'autopay' | 'card' | 'corpcard' | 'daily' | 'vendors' | 'customers' | 'gl'>('filter:finance:view', 'account');
+  const [viewMode, setViewMode] = usePersistentState<'claim' | 'account' | 'autopay' | 'card' | 'corpcard' | 'daily' | 'vendors' | 'customers' | 'gl'>('filter:finance:view', 'account');
   const [createOpen, setCreateOpen] = useState(false);
   const [periodMode, setPeriodMode] = usePersistentState<'month' | 'quarter' | 'year'>('filter:finance:period', 'month');
   const [periodAnchor, setPeriodAnchor] = useState<{ y: number; m: number }>(() => {
@@ -299,6 +359,7 @@ export default function FinancePage() {
       topbarRight={
         <>
           {/* view 토글 버튼 — 우측 끝 (.chip-nav) */}
+          <button type="button" className={`chip chip-nav ${viewMode === 'claim' ? 'active' : ''}`} onClick={() => setViewMode('claim')} title="계약별 월별 수납 현황 — 가로확장 (채권불러오기 양식)">채권</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'account' ? 'active' : ''}`} onClick={() => setViewMode('account')}>계좌</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'autopay' ? 'active' : ''}`} onClick={() => setViewMode('autopay')}>자동이체</button>
           <button type="button" className={`chip chip-nav ${viewMode === 'card' ? 'active' : ''}`} onClick={() => setViewMode('card')}>카드매출</button>
@@ -328,10 +389,119 @@ export default function FinancePage() {
     >
         <div className="dashboard" style={{
           gridTemplateColumns: '1fr',
-          ...(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl' ? { padding: 0 } : {}),
+          ...(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl' || viewMode === 'claim' ? { padding: 0 } : {}),
         }}>
-          <div className="panel" style={(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl') ? { background: 'transparent', border: 'none', padding: 0 } : undefined}>
-            <div className="panel-body" style={(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl') ? { padding: 14 } : undefined}>
+          <div className="panel" style={(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl' || viewMode === 'claim') ? { background: 'transparent', border: 'none', padding: 0 } : undefined}>
+            <div className="panel-body" style={(viewMode === 'vendors' || viewMode === 'customers' || viewMode === 'gl' || viewMode === 'claim') ? { padding: 14 } : undefined}>
+              {viewMode === 'claim' && (
+                <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 230px)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+                  <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, width: 'max-content' }}>
+                    <thead>
+                      <tr>
+                        {CLAIM_FIXED_COLS.map((col, i) => (
+                          <th
+                            key={col.key}
+                            rowSpan={2}
+                            style={{
+                              position: 'sticky', left: CLAIM_FIXED_LEFTS[i], top: 0, zIndex: 4,
+                              width: col.width, minWidth: col.width, maxWidth: col.width,
+                              background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
+                              borderRight: i === CLAIM_FIXED_COLS.length - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
+                              padding: '5px 6px', textAlign: col.align === 'num' ? 'right' : col.align === 'center' ? 'center' : 'left',
+                            }}
+                          >
+                            {col.label}
+                          </th>
+                        ))}
+                        {claimMonths.map((month) => (
+                          <th
+                            key={month}
+                            colSpan={5}
+                            style={{
+                              position: 'sticky', top: 0, zIndex: 2,
+                              background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
+                              borderRight: '2px solid var(--border-strong, var(--text-weak))',
+                              padding: '5px 6px', textAlign: 'center', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {claimMonthLabel(month)}
+                          </th>
+                        ))}
+                      </tr>
+                      <tr>
+                        {claimMonths.map((month) => (
+                          ['청구금액', '결제금액', '결제일자', '결제수단', '미납금액'].map((sub, j) => (
+                            <th
+                              key={`${month}-${sub}`}
+                              style={{
+                                position: 'sticky', top: 26, zIndex: 2,
+                                background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
+                                borderRight: j === 4 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
+                                padding: '4px 6px', textAlign: 'center', whiteSpace: 'nowrap', fontWeight: 400, color: 'var(--text-sub)',
+                                width: sub === '결제일자' ? 80 : 64, minWidth: sub === '결제일자' ? 80 : 64,
+                              }}
+                            >
+                              {sub}
+                            </th>
+                          ))
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {claimRows.length === 0 ? (
+                        <tr><td colSpan={CLAIM_FIXED_COLS.length + claimMonths.length * 5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-weak)' }}>계약 데이터 없음</td></tr>
+                      ) : claimRows.map(({ no, contract: c, byMonth }) => (
+                        <tr key={c.id}>
+                          {CLAIM_FIXED_COLS.map((col, i) => {
+                            const raw: Record<string, string | number | undefined> = {
+                              no,
+                              company: displayCompanyName(c.company, companyMaster),
+                              customerName: c.customerName,
+                              deposit: c.deposit ? `₩${c.deposit.toLocaleString()}` : '-',
+                              monthlyRent: c.monthlyRent ? `₩${c.monthlyRent.toLocaleString()}` : '-',
+                              installment: '-',
+                              depositTransferDate: '-',
+                              paymentDay: c.paymentDay ? `${c.paymentDay}일` : '-',
+                              registeredDate: c.createdAt ? c.createdAt.slice(0, 10) : '-',
+                              vehiclePlate: c.vehiclePlate || '-',
+                              contractDate: c.contractDate || '-',
+                              returnScheduledDate: c.returnScheduledDate || '-',
+                            };
+                            return (
+                              <td
+                                key={col.key}
+                                className="mono"
+                                style={{
+                                  position: 'sticky', left: CLAIM_FIXED_LEFTS[i], zIndex: 1,
+                                  width: col.width, minWidth: col.width, maxWidth: col.width,
+                                  background: 'var(--bg-main)', borderBottom: '1px solid var(--border)',
+                                  borderRight: i === CLAIM_FIXED_COLS.length - 1 ? '2px solid var(--border-strong, var(--text-weak))' : '1px solid var(--border)',
+                                  padding: '4px 6px', textAlign: col.align === 'num' ? 'right' : col.align === 'center' ? 'center' : 'left',
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {raw[col.key]}
+                              </td>
+                            );
+                          })}
+                          {claimMonths.map((month) => {
+                            const m = byMonth.get(month);
+                            return (
+                              <Fragment key={month}>
+                                <td className="mono" style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>{m?.charged ? fmtNum(m.charged) : ''}</td>
+                                <td className="mono" style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>{m?.paid ? fmtNum(m.paid) : ''}</td>
+                                <td className="mono dim" style={{ padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{m?.paidAt || ''}</td>
+                                <td className="dim" style={{ padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>{m?.method || ''}</td>
+                                <td className="mono" style={{ padding: '4px 6px', textAlign: 'right', borderBottom: '1px solid var(--border)', borderRight: '2px solid var(--border-strong, var(--text-weak))', color: m?.unpaid ? 'var(--red-text)' : undefined }}>{m?.unpaid ? fmtNum(m.unpaid) : ''}</td>
+                              </Fragment>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               {viewMode === 'daily' && (
                 <DailyLedgerView
                   bankTx={bankTx}
