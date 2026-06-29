@@ -140,7 +140,7 @@ function ClaimSheetView({
             </thead>
             <tbody>
               {rows.map((row, ri) => (
-                <tr key={ri}>
+                <tr key={ri} className="claim-row">
                   {headers.map((_, i) => {
                     const v = row[i];
                     const isNum = typeof v === 'number';

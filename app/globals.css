@@ -1405,6 +1405,9 @@ input[type="radio"]:disabled {
 .table tbody tr:hover td { background: var(--bg-hover); }
 .table tbody tr.selected td { background: var(--bg-selected); }
 
+/* 채권 탭 — sticky 컬럼이 inline background 를 갖고 있어 !important 로 hover 우선시킴 */
+.claim-row:hover td { background: var(--bg-hover) !important; }
+
 /* 정렬 가능 헤더 */
 .table th.sortable {
   cursor: pointer;
