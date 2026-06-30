@@ -119,6 +119,9 @@ export function buildSettlementPatches(
 ): { id: string; patch: Partial<BankTransaction> }[] {
   const settlementId = `cms_${candidate.depositId}`;
   const patches: { id: string; patch: Partial<BankTransaction> }[] = [];
+  const feeLabel = candidate.estimatedFee > 0
+    ? ` (수수료 ${candidate.estimatedFee.toLocaleString('ko-KR')}원 = 총액 ${candidate.itemsSum.toLocaleString('ko-KR')} - 집금액 ${candidate.depositAmount.toLocaleString('ko-KR')})`
+    : '';
   patches.push({
     id: candidate.depositId,
     patch: {
@@ -127,7 +130,11 @@ export function buildSettlementPatches(
       settlementGrossAmount: candidate.itemsSum,
       settlementFeeAmount: candidate.estimatedFee,
       settlementItemCount: candidate.items.length,
-      source: 'CMS집금',   // 식별 라벨
+      source: 'CMS집금',
+      // ★ 세무 중복 방지 — 개별 건에서 이미 대여료수입 인식됨.
+      //   집금건은 "수수료비용" 계정으로 전환 (실제 이체금은 채권 정산, 추가 수익 아님).
+      subject: 'CMS수수료',
+      memo: `CMS집금 정산${feeLabel}`,
     },
   });
   for (const item of candidate.items) {
