@@ -31,7 +31,7 @@ export type CmsMatchCandidate = {
   confidence: 'high' | 'medium' | 'low';  // feeRate 가 0.1%±0.05% 면 high
 };
 
-const DATE_TOLERANCE_DAYS = 3;
+const DATE_TOLERANCE_DAYS = 7;  // 영업일+4일 기준 — 주말 낀 경우 최대 7일 달력일
 const MIN_FEE_RATE = 0.0005;   // 0.05%
 const MAX_FEE_RATE = 0.003;    // 0.3%
 
@@ -56,7 +56,12 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
     if ((t.amount ?? 0) > 0 && /CMS|집금|cms/i.test(`${t.counterparty ?? ''} ${t.memo ?? ''}`)) {
       depositCandidates.push(t);
     }
-    if (t.source === '자동이체') {
+    // CMS 개별건 — 전통적인 자동이체 채널 + 계좌 채널로 들어왔지만 계약에 매칭된 입금건도 포함
+    // (은행 계좌명세에 CMS 개별건이 계좌 채널로 함께 들어오는 경우 대응)
+    const isCmsItem =
+      t.source === '자동이체' ||
+      (t.source === '계좌' && !!t.matchedContractId && (t.amount ?? 0) > 0);
+    if (isCmsItem) {
       const co = t.companyCode ?? '';
       const arr = itemsByCompany.get(co);
       if (arr) arr.push(t);
