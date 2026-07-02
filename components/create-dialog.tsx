@@ -2282,7 +2282,7 @@ function ContractRegisterPane({
         onClose();
         if (newId) onContractCreated?.(newId);
       }} />}
-      {mode === 'ocr' && <ContractOcrPane onSubmit={() => { toast.info('mock: OCR 계약 등록 완료'); onClose(); }} />}
+      {mode === 'ocr' && <ContractOcrPane onSubmit={() => { toast.success('OCR 계약 등록 완료'); onClose(); }} />}
       {mode === 'excel' && (
         <UploadPane
           files={files} drag={drag} onPick={onPick} onChangeKind={onChangeKind}

@@ -158,8 +158,8 @@ export default function GeneralPage() {
                 직원은 로그인 화면 [계정 만들기] 로 가입 — 가입 즉시 목록에 자동 반영됩니다.
               </span>
             ) : (
-              <button className="btn btn-primary" type="button">
-                <Plus size={14} weight="bold" /> {VIEW_LABEL[view]} 신규 등록
+              <button className="btn btn-primary" type="button" disabled title="준비 중 — 곧 열립니다">
+                <Plus size={14} weight="bold" /> {VIEW_LABEL[view]} 신규 등록 (준비 중)
               </button>
             )
           }

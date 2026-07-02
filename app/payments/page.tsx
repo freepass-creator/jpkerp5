@@ -14,10 +14,10 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
 import { applicableSubjects } from '@/lib/ledger-subjects';
-import { autoMatchAll, applyMatch, reverseMatch, applyFifoPayment, autoMatchCardAll, applyCardMatch } from '@/lib/receipt-match';
+import { autoMatchAll, applyMatch, reverseMatch, applyFifoPayment, autoMatchCardAll, applyCardMatch, reverseCardMatch, applyFifoCardPayment } from '@/lib/receipt-match';
 import { findAllSettlements, buildSettlementPatch } from '@/lib/settlement-match';
 import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
-import { ReceiptMatchDialog } from '@/components/receipt-match-dialog';
+import { ReceiptMatchDialog, CardMatchDialog } from '@/components/receipt-match-dialog';
 import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { audit } from '@/lib/firebase/audit-store';
 import { todayKr } from '@/lib/mock-data';
@@ -87,9 +87,10 @@ export default function PaymentsPage() {
   const sel = useTableSelection();
   const { selectedIds, setSelectedIds } = sel;
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
+  const [cardMatchTarget, setCardMatchTarget] = useState<import('@/lib/types').CardTransaction | null>(null);
 
   const { rows: bankTx, loading: bankTxLoading, update: updateBankTx, updateMany: updateManyBankTx } = useBankTx();
-  const { rows: cardTx, loading: cardTxLoading, updateMany: updateManyCardTx } = useCardTx();
+  const { rows: cardTx, loading: cardTxLoading, updateMany: updateManyCardTx, update: updateCard } = useCardTx();
   const { contracts, update: updateContract, updateMany: updateManyContracts } = useContracts();
   const { companies: companyMaster } = useCompanies();
 
@@ -192,6 +193,38 @@ export default function PaymentsPage() {
     if (leftover > 0) {
       toast.info(`선입선출 적용 — 잉여 ₩${formatCurrency(leftover)} 원 추가 매칭 필요`);
     }
+  }
+
+  async function handleCardManualMatch(tx: import('@/lib/types').CardTransaction, contract: Contract, scheduleSeq: number) {
+    const { txPatch, contractPatch } = applyCardMatch(tx, contract, scheduleSeq);
+    await updateCard(tx.id, txPatch);
+    await updateContract({ ...contract, ...contractPatch });
+    void audit.match('card_tx', tx.id, `${contract.contractNo} ${scheduleSeq}회차 카드 매칭 — 매출 ₩${formatCurrency(tx.amount)}`, {
+      contractId: contract.id, scheduleSeq, amount: tx.amount, txDate: tx.txDate,
+    });
+  }
+
+  async function handleCardReverse(tx: import('@/lib/types').CardTransaction) {
+    const c = tx.matchedContractId ? contractById.get(tx.matchedContractId) : undefined;
+    if (!c) {
+      await updateCard(tx.id, { matchedContractId: undefined, matchedScheduleId: undefined });
+      void audit.unmatch('card_tx', tx.id, `카드 매칭 해제 (계약 없음) ₩${formatCurrency(tx.amount)}`);
+      return;
+    }
+    const { txPatch, contractPatch } = reverseCardMatch(tx, c, todayKr());
+    await updateCard(tx.id, txPatch);
+    await updateContract({ ...c, ...contractPatch });
+    void audit.unmatch('card_tx', tx.id, `${c.contractNo} 카드 매칭 해제 ₩${formatCurrency(tx.amount)}`, { contractId: c.id });
+  }
+
+  async function handleCardFifo(tx: import('@/lib/types').CardTransaction, contract: Contract) {
+    const { txPatch, contractPatch, leftover } = applyFifoCardPayment(tx, contract);
+    await updateCard(tx.id, txPatch);
+    await updateContract({ ...contract, ...contractPatch });
+    void audit.match('card_tx', tx.id, `${contract.contractNo} 카드 선입선출 ₩${formatCurrency(tx.amount)}${leftover > 0 ? ` (잉여 ${formatCurrency(leftover)})` : ''}`, {
+      contractId: contract.id, amount: tx.amount, leftover,
+    });
+    if (leftover > 0) toast.info(`선입선출 적용 — 잉여 ₩${formatCurrency(leftover)} 원 추가 매칭 필요`);
   }
 
   async function handleAutoMatchCardAll() {
@@ -543,7 +576,7 @@ export default function PaymentsPage() {
                 <SummaryTable rows={daily} companyMaster={companyMaster} />
               )}
               {tab === 'card' && (
-                <CardTable rows={cardRows} loading={cardTxLoading} />
+                <CardTable rows={cardRows} loading={cardTxLoading} onOpenMatch={setCardMatchTarget} />
               )}
               {tab === 'corpcard' && (
                 <CorpCardTable rows={corpCardRows} loading={cardTxLoading} />
@@ -639,6 +672,16 @@ export default function PaymentsPage() {
           onApply={handleManualMatch}
           onReverse={handleReverse}
           onFifo={handleFifo}
+        />
+        <CardMatchDialog
+          open={!!cardMatchTarget}
+          onOpenChange={(v) => !v && setCardMatchTarget(null)}
+          tx={cardMatchTarget}
+          contracts={contracts}
+          companyMaster={companyMaster}
+          onApply={handleCardManualMatch}
+          onReverse={handleCardReverse}
+          onFifo={handleCardFifo}
         />
       </div>
     </div>
@@ -838,7 +881,7 @@ function SummaryTable({
 
 /* ─────────────────── 카드 매출 ─────────────────── */
 
-function CardTable({ rows, loading }: { rows: Array<import('@/lib/types').CardTransaction & { contract?: Contract }>; loading?: boolean }) {
+function CardTable({ rows, loading, onOpenMatch }: { rows: Array<import('@/lib/types').CardTransaction & { contract?: Contract }>; loading?: boolean; onOpenMatch: (tx: import('@/lib/types').CardTransaction) => void }) {
   return (
     <table className="table">
       <thead>
@@ -875,12 +918,18 @@ function CardTable({ rows, loading }: { rows: Array<import('@/lib/types').CardTr
             <td className="num mono">₩{formatCurrency(r.amount)}</td>
             <td>
               {r.contract ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={() => onOpenMatch(r)}
+                  title="매칭 확인 / 해제"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11 }}
+                >
                   <span className="plate">{r.contract.vehiclePlate}</span>
                   <span>{r.contract.customerName}</span>
-                </span>
+                </button>
               ) : (
-                <button className="btn btn-sm" type="button" disabled title="수동 매칭 — Phase 2">
+                <button className="btn btn-sm" type="button" onClick={() => onOpenMatch(r)} title="계약·회차 수동 매칭">
                   <LinkSimple /> 매칭
                 </button>
               )}

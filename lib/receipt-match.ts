@@ -400,6 +400,75 @@ export function applyCardMatch(
   };
 }
 
+/**
+ * 카드 매출 매칭 해제 — cardTxId 로 연결된 payment entry 제거 + 회차 상태 원복.
+ * reverseMatch(계좌)의 카드 버전 — payment entry 필터 기준이 cardTxId.
+ */
+export function reverseCardMatch(
+  tx: CardTransaction,
+  contract: Contract,
+  today: string,
+): {
+  txPatch: Partial<CardTransaction>;
+  contractPatch: Partial<Contract> & { schedules: PaymentScheduleInline[] };
+} {
+  const schedules = (contract.schedules ?? []).map((s) => {
+    const filtered = (s.payments ?? []).filter((p) => p.cardTxId !== tx.id);
+    if (filtered.length === (s.payments ?? []).length) return { ...s };
+    const paid = filtered.reduce((sum, p) => sum + p.amount, 0);
+    const lastDate = filtered.reduce<string>((mx, p) => p.date > mx ? p.date : mx, '');
+    let status = s.status;
+    if (s.status !== '면제') {
+      if (paid >= s.amount) status = '완료';
+      else if (paid > 0) status = '부분납';
+      else status = s.dueDate < today ? '연체' : '예정';
+    }
+    return { ...s, payments: filtered, paidAmount: paid, paidAt: lastDate || undefined, status };
+  });
+  return {
+    txPatch: {
+      matchedContractId: undefined,
+      matchedScheduleId: undefined,
+    },
+    contractPatch: {
+      schedules,
+      unpaidAmount: totalUnpaid(schedules),
+      unpaidSeqCount: totalUnpaidCount(schedules),
+      currentSeq: computeCurrentSeq(schedules, today),
+    },
+  };
+}
+
+/**
+ * 카드 매출 FIFO 결제 — 회차 미지정(자금일보 수동 매칭) 시 가장 오래된 미납부터 차감.
+ * applyFifoPayment(계좌)의 카드 버전 — source='카드', cardTxId 기록.
+ */
+export function applyFifoCardPayment(
+  tx: CardTransaction,
+  contract: Contract,
+): {
+  txPatch: Partial<CardTransaction>;
+  contractPatch: Partial<Contract> & { schedules: PaymentScheduleInline[] };
+  leftover: number;
+} {
+  const schedules = contract.schedules ?? [];
+  const { schedules: newSched, leftover } = applyPayment(schedules, tx.amount, tx.txDate, '카드', { cardTxId: tx.id });
+  return {
+    txPatch: {
+      matchedContractId: contract.id,
+    },
+    contractPatch: {
+      schedules: newSched,
+      unpaidAmount: totalUnpaid(newSched),
+      unpaidSeqCount: totalUnpaidCount(newSched),
+      currentSeq: computeCurrentSeq(newSched, tx.txDate),
+      lastPaidDate: tx.txDate,
+      lastPaidAmount: tx.amount,
+    },
+    leftover,
+  };
+}
+
 /** 카드 매출 일괄 자동매칭 — high confidence만 */
 export type CardAutoMatchResult = {
   tx: CardTransaction;

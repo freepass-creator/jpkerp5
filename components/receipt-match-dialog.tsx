@@ -3,10 +3,10 @@
 import { useMemo, useState } from 'react';
 import { LinkSimple, X as XIcon, CheckCircle, MagnifyingGlass } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import type { BankTransaction, Contract } from '@/lib/types';
+import type { BankTransaction, CardTransaction, Contract } from '@/lib/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { displayCompanyName } from '@/lib/company-display';
-import { findCandidates, applyMatch, reverseMatch, applyFifoPayment } from '@/lib/receipt-match';
+import { findCandidates, applyMatch, reverseMatch, applyFifoPayment, findCardCandidates } from '@/lib/receipt-match';
 import { todayKr } from '@/lib/mock-data';
 import { matchesSearch } from '@/lib/filter-helpers';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -251,6 +251,233 @@ export function ReceiptMatchDialog({
                                 >
                                   매칭
                                 </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogBody>
+        <DialogFooter>
+          {alreadyMatched && (
+            <button className="btn btn-danger" type="button" onClick={handleReverse}>
+              <XIcon size={12} /> 매칭 해제
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          <DialogClose asChild>
+            <button className="btn">닫기</button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </DialogRoot>
+  );
+}
+
+/**
+ * 카드 매출 수동 매칭 다이얼로그 — ReceiptMatchDialog 의 카드 버전.
+ * 카드 매출은 출금 개념이 없고 고객명 기준 후보 검색. 회차 선택 또는 선입선출.
+ */
+export function CardMatchDialog({
+  open,
+  onOpenChange,
+  tx,
+  contracts,
+  companyMaster,
+  onApply,
+  onReverse,
+  onFifo,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  tx: CardTransaction | null;
+  contracts: Contract[];
+  companyMaster: Parameters<typeof displayCompanyName>[1];
+  onApply: (tx: CardTransaction, contract: Contract, scheduleSeq: number) => Promise<void> | void;
+  onReverse: (tx: CardTransaction) => Promise<void> | void;
+  onFifo: (tx: CardTransaction, contract: Contract) => Promise<void> | void;
+}) {
+  const [search, setSearch] = useState('');
+  const [pickedId, setPickedId] = useState<string | null>(null);
+
+  const candidates = useMemo(() => (tx ? findCardCandidates(tx, contracts) : []), [tx, contracts]);
+  const filteredContracts = useMemo(() => {
+    if (!search.trim()) return contracts.slice(0, 50);
+    return contracts
+      .filter((c) => matchesSearch(search, [c.vehiclePlate, c.customerName, c.contractNo, c.driverName]))
+      .slice(0, 50);
+  }, [contracts, search]);
+  const picked = pickedId ? contracts.find((c) => c.id === pickedId) : null;
+
+  if (!tx) return null;
+  const alreadyMatched = !!tx.matchedContractId;
+
+  async function handleApply(contractId: string, scheduleSeq: number) {
+    const c = contracts.find((x) => x.id === contractId);
+    if (!c || !tx) return;
+    await onApply(tx, c, scheduleSeq);
+    onOpenChange(false);
+  }
+  async function handleReverse() {
+    if (!tx) return;
+    await onReverse(tx);
+    onOpenChange(false);
+  }
+  async function handleFifo() {
+    if (!picked || !tx) return;
+    await onFifo(tx, picked);
+    onOpenChange(false);
+  }
+
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogContent title={alreadyMatched ? '카드 매칭 해제' : '카드 매출 매칭'} mode="edit">
+        <DialogBody className="p-0" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span className="mono">{formatDate(tx.txDate)}</span>
+              <span className="mono" style={{ fontWeight: 600, color: 'var(--green-text)' }}>매출 ₩{formatCurrency(tx.amount)}</span>
+              <span style={{ color: 'var(--text-sub)' }}>· 고객 {tx.customerName || '-'}</span>
+              {tx.approvalNo && <span style={{ color: 'var(--text-weak)', fontSize: 11 }}>· 승인 {tx.approvalNo}</span>}
+            </div>
+          </div>
+
+          {alreadyMatched ? (
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {(() => {
+                const c = contracts.find((x) => x.id === tx.matchedContractId);
+                return c ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                    <span className="plate">{c.vehiclePlate}</span>
+                    <span>{c.customerName}</span>
+                    <span className="dim">·</span>
+                    <span className="dim">{displayCompanyName(c.company, companyMaster)}</span>
+                  </div>
+                ) : <div style={{ fontSize: 12, color: 'var(--text-weak)' }}>매칭된 계약을 찾을 수 없습니다 (삭제됨)</div>;
+              })()}
+              <div style={{ fontSize: 12, color: 'var(--text-sub)' }}>
+                매칭을 해제하면 해당 회차 수납이 원복됩니다.
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              {candidates.length > 0 && (
+                <div className="detail-section" style={{ margin: '12px 16px' }}>
+                  <div className="detail-section-header">
+                    <CheckCircle size={12} weight="duotone" />
+                    <span className="title">추천 매칭 후보 ({candidates.length})</span>
+                  </div>
+                  <div className="detail-section-body">
+                    <table className="table" style={{ fontSize: 11 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: 70 }}>신뢰도</th>
+                          <th style={{ width: 110 }}>차량번호</th>
+                          <th>계약자</th>
+                          <th className="center" style={{ width: 60 }}>회차</th>
+                          <th style={{ width: 110 }}>예정일</th>
+                          <th className="num" style={{ width: 120 }}>금액</th>
+                          <th style={{ width: 80 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {candidates.slice(0, 8).map((cand) => (
+                          <tr key={`${cand.contract.id}-${cand.scheduleSeq}`}>
+                            <td>
+                              <StatusBadge tone={cand.confidence === 'high' ? 'green' : cand.confidence === 'medium' ? 'blue' : 'neutral'}>
+                                {cand.confidence === 'high' ? '높음' : cand.confidence === 'medium' ? '중간' : '낮음'}
+                              </StatusBadge>
+                            </td>
+                            <td className="mono">{cand.contract.vehiclePlate}</td>
+                            <td>{cand.contract.customerName}</td>
+                            <td className="center mono">{cand.scheduleSeq}회</td>
+                            <td className="mono">{formatDate(cand.scheduleDueDate)}</td>
+                            <td className="num mono">₩{formatCurrency(cand.scheduleAmount)}</td>
+                            <td>
+                              <button type="button" className="btn btn-sm btn-primary" onClick={() => handleApply(cand.contract.id, cand.scheduleSeq)}>
+                                <LinkSimple size={11} /> 매칭
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="detail-section" style={{ margin: '12px 16px' }}>
+                <div className="detail-section-header">
+                  <MagnifyingGlass size={12} weight="duotone" />
+                  <span className="title">수동 — 계약 검색</span>
+                </div>
+                <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input
+                    className="input"
+                    placeholder="차량번호 / 계약자명 / 계약번호 / 주운전자 검색"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    autoFocus
+                  />
+                  <div style={{ maxHeight: 200, overflow: 'auto', border: '1px solid var(--border-soft)' }}>
+                    {filteredContracts.length === 0 ? (
+                      <div style={{ padding: 16, fontSize: 11, color: 'var(--text-weak)', textAlign: 'center' }}>검색 결과 없음</div>
+                    ) : (
+                      <table className="table" style={{ fontSize: 11 }}>
+                        <tbody>
+                          {filteredContracts.map((c) => (
+                            <tr key={c.id} className={pickedId === c.id ? 'selected-row' : undefined} style={{ cursor: 'pointer' }} onClick={() => setPickedId(c.id === pickedId ? null : c.id)}>
+                              <td className="mono" style={{ width: 110 }}>{c.vehiclePlate}</td>
+                              <td>{c.customerName}</td>
+                              <td className="dim">{displayCompanyName(c.company, companyMaster)}</td>
+                              <td className="num mono dim">미수 ₩{formatCurrency(c.unpaidAmount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {picked && (
+                <div className="detail-section" style={{ margin: '12px 16px' }}>
+                  <div className="detail-section-header">
+                    <span className="title">{picked.vehiclePlate} {picked.customerName} — 회차 선택</span>
+                    <button type="button" className="btn btn-sm" onClick={handleFifo} title="선입선출 — 가장 오래된 미납부터 자동 차감">
+                      선입선출 적용
+                    </button>
+                  </div>
+                  <div className="detail-section-body">
+                    {(picked.schedules ?? []).filter((s) => s.status !== '완료').length === 0 ? (
+                      <div style={{ padding: 12, fontSize: 11, color: 'var(--text-weak)', textAlign: 'center' }}>미납·예정 회차가 없습니다.</div>
+                    ) : (
+                      <table className="table" style={{ fontSize: 11 }}>
+                        <thead>
+                          <tr>
+                            <th className="center" style={{ width: 50 }}>회차</th>
+                            <th style={{ width: 110 }}>예정일</th>
+                            <th className="num" style={{ width: 120 }}>예정금액</th>
+                            <th className="num" style={{ width: 120 }}>입금액</th>
+                            <th className="center" style={{ width: 80 }}>상태</th>
+                            <th style={{ width: 80 }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(picked.schedules ?? []).filter((s) => s.status !== '완료').map((s) => (
+                            <tr key={s.seq}>
+                              <td className="center mono">{s.seq}</td>
+                              <td className="mono">{formatDate(s.dueDate)}</td>
+                              <td className="num mono">₩{formatCurrency(s.amount)}</td>
+                              <td className="num mono">₩{formatCurrency(s.paidAmount)}</td>
+                              <td className="center"><StatusBadge tone={scheduleStatusTone(s.status)}>{s.status}</StatusBadge></td>
+                              <td>
+                                <button type="button" className="btn btn-sm btn-primary" onClick={() => handleApply(picked.id, s.seq)}>매칭</button>
                               </td>
                             </tr>
                           ))}

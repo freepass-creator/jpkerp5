@@ -14,7 +14,7 @@
  */
 
 import type { BankTransaction, CardTransaction, Contract } from '@/lib/types';
-import { applyFifoPayment, reverseMatch } from '@/lib/receipt-match';
+import { applyFifoPayment, reverseMatch, applyFifoCardPayment, reverseCardMatch } from '@/lib/receipt-match';
 import { todayKr } from '@/lib/mock-data';
 
 /**
@@ -179,11 +179,43 @@ type CardUpdater = (id: string, patch: Partial<CardTransaction>) => Promise<void
 export async function updateCardTxWithMatchSync(
   oldTx: CardTransaction,
   patch: Partial<CardTransaction>,
-  _contracts: Contract[],
+  contracts: Contract[],
   updateCard: CardUpdater,
-  _updateContract: ContractUpdater,
+  updateContract: ContractUpdater,
 ): Promise<void> {
-  // TODO: 카드 거래 자동 매칭 — applyCardMatch 활용 (scheduleSeq 결정 필요).
-  // 현재는 단순 patch 반영. 카드 매칭은 /payments 페이지의 autoMatchCardAll 사용.
-  await updateCard(oldTx.id, patch);
+  const oldMatchId = oldTx.matchedContractId;
+  const newMatchId = patch.matchedContractId !== undefined ? patch.matchedContractId : oldMatchId;
+  const newAmount = patch.amount ?? oldTx.amount ?? 0;
+  const matchChanged = oldMatchId !== newMatchId;
+  const amountChanged = oldMatchId && (oldTx.amount ?? 0) !== newAmount;
+
+  if (!matchChanged && !amountChanged) {
+    await updateCard(oldTx.id, patch);
+    return;
+  }
+
+  let resolvedPatch: Partial<CardTransaction> = { ...patch };
+
+  // 1) 이전 매칭 해제 — cardTxId 로 연결된 회차 결제 원복
+  if (oldMatchId) {
+    const oldContract = contracts.find((c) => c.id === oldMatchId);
+    if (oldContract) {
+      const { txPatch, contractPatch } = reverseCardMatch(oldTx, oldContract, todayKr());
+      resolvedPatch = { ...txPatch, ...resolvedPatch };
+      await updateContract({ ...oldContract, ...contractPatch });
+    }
+  }
+
+  // 2) 새 매칭 적용 — 금액 > 0 이면 FIFO 로 미납 회차 차감
+  if (newMatchId && newAmount > 0) {
+    const newContract = contracts.find((c) => c.id === newMatchId);
+    if (newContract) {
+      const mergedTx: CardTransaction = { ...oldTx, ...patch, matchedContractId: newMatchId };
+      const { txPatch, contractPatch } = applyFifoCardPayment(mergedTx, newContract);
+      resolvedPatch = { ...resolvedPatch, ...txPatch };
+      await updateContract({ ...newContract, ...contractPatch });
+    }
+  }
+
+  await updateCard(oldTx.id, resolvedPatch);
 }

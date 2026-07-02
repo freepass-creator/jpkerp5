@@ -20,6 +20,7 @@ import { BottomBar } from '@/components/layout/bottom-bar';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { buildCompanyOptions } from '@/lib/filter-helpers';
@@ -45,7 +46,7 @@ export default function FinanceDailyPage() {
   const { rows: bankTx, loading: bankLoading, update: updateBank } = useBankTx();
   const { rows: cardTx, loading: cardLoading, update: updateCard } = useCardTx();
   const dataLoading = bankLoading || cardLoading;
-  const { contracts } = useContracts();
+  const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
 
   const contractById = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
@@ -114,8 +115,9 @@ export default function FinanceDailyPage() {
     }
     for (const t of bankTx) {
       const day = (t.txDate ?? '').slice(0, 10);
-      if (!day) continue;
+      if (!day || !inPeriod(day)) continue;
       const companyCode = t.companyCode || (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
+      if (companyFilter !== 'all' && companyCode !== companyFilter) continue;
       const cur = bucket(companyCode, day);
       cur.deposit += t.amount ?? 0;
       cur.withdraw += t.withdraw ?? 0;
@@ -129,8 +131,9 @@ export default function FinanceDailyPage() {
     for (const t of cardTx) {
       if ((t.kind ?? '매출') !== '매출') continue;
       const day = (t.txDate ?? '').slice(0, 10);
-      if (!day) continue;
+      if (!day || !inPeriod(day)) continue;
       const companyCode = (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
+      if (companyFilter !== 'all' && companyCode !== companyFilter) continue;
       const cur = bucket(companyCode, day);
       cur.deposit += t.amount ?? 0;
       cur.netChange = cur.deposit - cur.withdraw;
@@ -142,7 +145,7 @@ export default function FinanceDailyPage() {
       depoSubjects: Object.entries(_depo).map(([s, v]) => `${s} ₩${v.toLocaleString('ko-KR')}`).join(' / '),
       drawSubjects: Object.entries(_draw).map(([s, v]) => `${s} ₩${v.toLocaleString('ko-KR')}`).join(' / '),
     })).sort((a, b) => b.date.localeCompare(a.date) || a.companyCode.localeCompare(b.companyCode));
-  }, [bankTx, cardTx, contractById]);
+  }, [bankTx, cardTx, contractById, companyFilter, periodMode, periodAnchor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totals = useMemo(() => {
     let inSum = 0, outSum = 0;
@@ -323,8 +326,16 @@ export default function FinanceDailyPage() {
             inPeriod={inPeriod}
             search={search}
             companyFilter={companyFilter}
-            onUpdateBank={(id, patch) => void updateBank(id, patch)}
-            onUpdateCard={(id, patch) => void updateCard(id, patch)}
+            onUpdateBank={(id, patch) => {
+              const old = bankTx.find((t) => t.id === id);
+              if (!old) return;
+              void updateBankTxWithMatchSync(old, patch, contracts, updateBank, updateContract);
+            }}
+            onUpdateCard={(id, patch) => {
+              const old = cardTx.find((t) => t.id === id);
+              if (!old) return;
+              void updateCardTxWithMatchSync(old, patch, contracts, updateCard, updateContract);
+            }}
           />
         </div>
       </section>
