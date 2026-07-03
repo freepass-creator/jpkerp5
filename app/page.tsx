@@ -1117,7 +1117,21 @@ export default function Page() {
         x={ctxMenu.x}
         y={ctxMenu.y}
         onClose={() => setCtxMenu({ open: false, x: 0, y: 0, row: null })}
-        items={ctxMenu.row ? ([
+        items={ctxMenu.row ? (isOrphanRow(ctxMenu.row) ? ([
+          // 계약 없는 휴차 차량(오펀 행) — 계약 액션(인도/반납/SMS/계약서발행/삭제)은 무의미.
+          // 특히 '계약서 발행'은 /contract/vehicle-orphan-* 을 열어 무한 로딩됨 → 아예 제외.
+          {
+            label: '상세 보기',
+            icon: <MagnifyingGlass size={12} weight="bold" />,
+            onClick: () => { if (ctxMenu.row) ctxAction_openDetail(ctxMenu.row); },
+          },
+          { type: 'separator' },
+          {
+            label: '차량번호 복사',
+            onClick: () => { if (ctxMenu.row?.vehiclePlate) navigator.clipboard.writeText(ctxMenu.row.vehiclePlate).catch(() => toast.error('복사 실패')); },
+            disabled: !ctxMenu.row.vehiclePlate,
+          },
+        ] satisfies ContextMenuItem[]) : ([
           {
             label: '상세 보기',
             icon: <MagnifyingGlass size={12} weight="bold" />,
@@ -1154,7 +1168,7 @@ export default function Page() {
             onClick: () => { if (ctxMenu.row) ctxAction_delete(ctxMenu.row); },
             danger: true,
           },
-        ] satisfies ContextMenuItem[]) : []}
+        ] satisfies ContextMenuItem[])) : []}
       />
     </PageShell>
   );
