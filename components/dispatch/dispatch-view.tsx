@@ -21,6 +21,7 @@ import {
   type DispatchOrder, type DispatchKind, type DispatchStatus, type DispatchPriority,
 } from '@/lib/firebase/dispatch-store';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { DispatchDetailDialog } from '@/components/dispatch/dispatch-detail-dialog';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/lib/toast';
 import {
@@ -69,6 +70,7 @@ export function DispatchView() {
   const [kindFilter, setKindFilter] = useState<DispatchKind | 'all'>('all');
   const [q, setQ] = useState('');
   const [newOpen, setNewOpen] = useState(false);
+  const [detailOrder, setDetailOrder] = useState<DispatchOrder | null>(null);
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -181,7 +183,7 @@ export function DispatchView() {
                 </td></tr>
               )}
               {filtered.map((o) => (
-                <tr key={o.id}>
+                <tr key={o.id} onClick={() => setDetailOrder(o)} style={{ cursor: 'pointer' }}>
                   <td><StatusBadge tone={STATUS_TONE[o.status]}>{STATUS_LABEL[o.status]}</StatusBadge></td>
                   <td>{DISPATCH_LABEL[o.kind]}</td>
                   <td>
@@ -192,7 +194,7 @@ export function DispatchView() {
                       </div>
                     )}
                     {o.contractId && (
-                      <Link href={`/contract/${o.contractId}`} style={{ fontSize: 10.5, color: 'var(--brand)', textDecoration: 'none' }}>
+                      <Link href={`/contract/${o.contractId}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 10.5, color: 'var(--brand)', textDecoration: 'none' }}>
                         연결 계약 →
                       </Link>
                     )}
@@ -217,6 +219,7 @@ export function DispatchView() {
       </section>
 
       {newOpen && <NewOrderDialog onClose={() => setNewOpen(false)} creatorEmail={user?.email ?? undefined} />}
+      <DispatchDetailDialog order={detailOrder} onClose={() => setDetailOrder(null)} />
     </div>
   );
 }
