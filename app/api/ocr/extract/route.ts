@@ -783,7 +783,8 @@ export async function POST(req: NextRequest) {
       doc_label: spec.label,
       extracted: parsed,
       model: MODEL,
-      _debug: { plate: plateDebug },
+      // _debug 는 Gemini 원문(문서 텍스트=PII)을 담으므로 개발 환경에서만 노출
+      ...(process.env.NODE_ENV !== 'production' ? { _debug: { plate: plateDebug } } : {}),
       usage: {
         input_tokens: response.usageMetadata?.promptTokenCount ?? 0,
         output_tokens: response.usageMetadata?.candidatesTokenCount ?? 0,
