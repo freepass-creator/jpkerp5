@@ -77,8 +77,15 @@ export default function PenaltyPage() {
 
   const [allItems, setItems, itemsReady] = usePenaltyStore();
   const [companies] = useCompanyStore();
-  const items = useMemo(() => allItems.filter((p) => !p.deletedAt), [allItems]);
   const findCompany = (code?: string) => code ? companies.find((c) => c.code === code) : undefined;
+  // 로드 시 _company 재조회 (파생값이라 저장 안 함) — _contract.partner_code 기준.
+  // _phase/_processedAt/_contract 는 스토어가 영속 저장하므로 새로고침해도 유지됨.
+  const items = useMemo(
+    () => allItems
+      .filter((p) => !p.deletedAt)
+      .map((p) => (p._company ? p : { ...p, _company: findCompany(p._contract?.partner_code) })),
+    [allItems, companies], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const [busy, setBusy] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
