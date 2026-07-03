@@ -402,12 +402,19 @@ export default function Page() {
     await syncContractAndVehicleStatus(updated, vehicles, rtdbUpdate, updateVehicleMaster);
   }, [rtdbUpdate, vehicles, updateVehicleMaster]);
 
+  // 계약 없는 휴차 차량(오펀 행) — RTDB contracts 노드에 없는 가짜 행. 계약 액션 불가.
+  const isOrphanRow = (c: Contract) => c.id.startsWith('vehicle-orphan-');
+
   // 우클릭 컨텍스트 메뉴 액션 — 빠른 인도/반납/연락/SMS/삭제
   function ctxAction_openDetail(c: Contract) {
     setSelectedId(c.id);
     setDetailOpen(true);
   }
   function ctxAction_markDelivered(c: Contract) {
+    if (isOrphanRow(c)) {
+      toast.info(`${c.vehiclePlate} 는 계약이 없는 휴차 차량입니다 — 계약 등록 후 인도 처리하세요.`);
+      return;
+    }
     if (c.deliveredDate) {
       toast.info(`${c.vehiclePlate} 는 이미 인도 완료 (${c.deliveredDate})`);
       return;
@@ -416,6 +423,10 @@ export default function Page() {
     void updateContract(markDelivered(c, today));
   }
   async function ctxAction_markReturned(c: Contract) {
+    if (isOrphanRow(c)) {
+      toast.info(`${c.vehiclePlate} 는 계약이 없는 휴차 차량입니다 — 반납할 계약이 없습니다.`);
+      return;
+    }
     if (c.returnedDate) {
       toast.info(`${c.vehiclePlate} 는 이미 반납 완료 (${c.returnedDate})`);
       return;
@@ -430,6 +441,10 @@ export default function Page() {
     setSmsOpen(true);
   }
   async function ctxAction_delete(c: Contract) {
+    if (isOrphanRow(c)) {
+      toast.info(`${c.vehiclePlate} 는 계약이 없는 휴차 차량입니다 — 삭제는 자산 관리에서 하세요.`);
+      return;
+    }
     if (!await showConfirm({ title: `정말 ${c.contractNo} ${c.vehiclePlate} ${c.customerName} 계약을 삭제하시겠습니까?\n(돌이킬 수 없음)`, danger: true })) return;
     void rtdbRemove(c.id);
   }
@@ -437,8 +452,9 @@ export default function Page() {
   // 선택된 계약 일괄 삭제 — SUPER_ADMIN 만
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return;
-    const list = Array.from(selectedIds).map((id) => contracts.find((c) => c.id === id)).filter(Boolean) as Contract[];
-    if (list.length === 0) return;
+    const list = (Array.from(selectedIds).map((id) => contracts.find((c) => c.id === id)).filter(Boolean) as Contract[])
+      .filter((c) => !isOrphanRow(c));
+    if (list.length === 0) { toast.info('삭제할 계약이 없습니다 (휴차 차량은 자산 관리에서 삭제).'); return; }
     const preview = list.slice(0, 5).map((c) => `· ${c.vehiclePlate} ${c.customerName}`).join('\n');
     const more = list.length > 5 ? `\n... 외 ${list.length - 5}건` : '';
     if (!await showConfirm({ title: `정말 ${list.length}건 계약을 삭제하시겠습니까?\n\n${preview}${more}\n\n(돌이킬 수 없음)`, danger: true })) return;
@@ -454,17 +470,22 @@ export default function Page() {
   async function handleBulkMarkDelivered() {
     if (selectedIds.size === 0) return;
     const list = Array.from(selectedIds).map((id) => contracts.find((c) => c.id === id)).filter(Boolean) as Contract[];
-    const targets = list.filter((c) => !c.deliveredDate);
+    const targets = list.filter((c) => !c.deliveredDate && !isOrphanRow(c));
     if (targets.length === 0) {
-      toast.info('선택 항목 모두 이미 인도 완료됨');
+      toast.info('인도 처리할 계약이 없습니다 (이미 인도 완료 또는 계약 없는 휴차 차량).');
       return;
     }
     if (!await showConfirm({ title: `${targets.length}건을 일괄 인도완료 처리하시겠습니까?\n(deliveredDate = 계약시작일, status = '운행')` })) return;
     // 상태값 SSOT (ERP #4) — markDelivered 가 부수효과 통합
     const updated = targets.map((c) => markDelivered(c, c.contractDate));
-    // updateContract 헬퍼 한 건씩 — Vehicle 마스터 status 도 함께 동기화 (양립 보장)
-    for (const c of updated) updateContract(c);
-    toast.success(`${targets.length}건 일괄 인도완료 처리`);
+    // updateContract 헬퍼 한 건씩 순차 await — Vehicle 마스터 status 동기화 경합 방지 + 실패 감지
+    let done = 0;
+    const failed: string[] = [];
+    for (const c of updated) {
+      try { await updateContract(c); done++; } catch { failed.push(c.vehiclePlate ?? c.contractNo ?? c.id); }
+    }
+    if (failed.length > 0) toast.error(`${done}건 처리, ${failed.length}건 실패: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? ' 외' : ''}`);
+    else toast.success(`${done}건 일괄 인도완료 처리`);
   }
 
   const clearSelection = useCallback(() => sel.clear(), [sel]);
