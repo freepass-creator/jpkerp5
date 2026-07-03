@@ -9,7 +9,7 @@
  *  · detail 다이얼로그 진입 시 해당 차량 attachments 만 별도 fetch
  */
 
-import { ref, onValue, get, set, update as rtdbUpdate, remove } from 'firebase/database';
+import { ref, onValue, get, set, update as rtdbUpdate, remove, runTransaction } from 'firebase/database';
 import { useEffect, useState } from 'react';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from './client';
 
@@ -83,17 +83,20 @@ export async function removeVehicleAttachments(vehicleId: string): Promise<void>
   await remove(ref(db, `${PATH}/${vehicleId}`));
 }
 
-/** 차량 사진 1장 추가 — vehicle_attachments/{vehicleId}/photos 어레이에 append. */
+/** 차량 사진 1장 추가 — vehicle_attachments/{vehicleId}/photos 어레이에 append.
+ *  runTransaction 으로 원자 처리 — 여러 장 동시 업로드 시 read-modify-set 경합으로 유실되던 것 방지. */
 export async function addVehiclePhoto(vehicleId: string, photo: VehiclePhoto): Promise<void> {
   await ensureAuth();
   const db = getRtdb();
   if (!db) return;
-  const existing = (await fetchVehicleAttachments(vehicleId)) ?? {};
-  const next: VehicleAttachments = {
-    ...existing,
-    photos: [...(existing.photos ?? []), photo],
-  };
-  await set(ref(db, `${PATH}/${vehicleId}`), pruneUndefined(next as unknown as Record<string, unknown>));
+  const cleanPhoto = pruneUndefined(photo as unknown as Record<string, unknown>);
+  await runTransaction(ref(db, `${PATH}/${vehicleId}`), (current: VehicleAttachments | null) => {
+    const cur = current ?? {};
+    return pruneUndefined({
+      ...cur,
+      photos: [...(cur.photos ?? []), cleanPhoto],
+    } as unknown as Record<string, unknown>);
+  });
 }
 
 /**
@@ -148,12 +151,14 @@ export async function removeVehiclePhoto(vehicleId: string, photoId: string): Pr
   await ensureAuth();
   const db = getRtdb();
   if (!db) return;
-  const existing = (await fetchVehicleAttachments(vehicleId)) ?? {};
-  const next: VehicleAttachments = {
-    ...existing,
-    photos: (existing.photos ?? []).filter((p) => p.id !== photoId),
-  };
-  await set(ref(db, `${PATH}/${vehicleId}`), pruneUndefined(next as unknown as Record<string, unknown>));
+  // runTransaction 으로 원자 삭제 — 동시 추가/삭제 경합 방지
+  await runTransaction(ref(db, `${PATH}/${vehicleId}`), (current: VehicleAttachments | null) => {
+    if (!current) return current;
+    return pruneUndefined({
+      ...current,
+      photos: (current.photos ?? []).filter((p) => p.id !== photoId),
+    } as unknown as Record<string, unknown>);
+  });
 }
 
 /**
