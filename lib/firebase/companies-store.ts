@@ -6,6 +6,7 @@ import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } fro
 import { useDataContext } from '@/lib/data-context';
 import type { Company } from '@/lib/types';
 import { lockedUpdate } from './locked-update';
+import { audit } from './audit-store';
 
 import { genCode } from '@/lib/code';
 
@@ -43,6 +44,7 @@ export function useCompanies(): {
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
       await set(newRef, pruneUndefined({ ...payload, id }));
+      void audit.create('company', id, `법인 등록 ${payload.name ?? ''} ${payload.bizRegNo ?? payload.corpRegNo ?? ''}`.trim());
       return id;
     },
     update: async (c) => {
@@ -53,12 +55,15 @@ export function useCompanies(): {
       await lockedUpdate<Company>(`${COMPANIES_PATH}/${c.id}`, c.updatedAt, () => ({
         ...c, updatedAt: new Date().toISOString(),
       }));
+      void audit.update('company', c.id, `법인 수정 ${c.name ?? ''}`.trim());
     },
     remove: async (id) => {
       if (!configured) return;
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
+      const target = companies.find((x) => x.id === id);
       await rtdbRemove(ref(db, `${COMPANIES_PATH}/${id}`));
+      void audit.delete('company', id, `법인 삭제 ${target?.name ?? id}`);
     },
   };
 }
