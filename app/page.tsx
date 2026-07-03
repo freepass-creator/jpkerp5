@@ -23,6 +23,7 @@ import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { isContractEnded, isContractActive, isOperating } from '@/lib/contract-lifecycle';
 import { downloadContractsExcel } from '@/lib/contract-export';
+import { addMonthsKeepDay } from '@/lib/payment-schedule';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { PageShell } from '@/components/ui/page-shell';
 import { FilterSelect } from '@/components/ui/filter-select';
@@ -598,11 +599,10 @@ export default function Page() {
   function handleExtend(contractId: string, months: number) {
     const c = contracts.find((x) => x.id === contractId);
     if (!c) return;
-    const base = c.returnScheduledDate ? new Date(c.returnScheduledDate) : new Date(todayKr());
-    base.setMonth(base.getMonth() + months);
+    const fromDate = c.returnScheduledDate ?? todayKr();
     void rtdbUpdate({
       ...c,
-      returnScheduledDate: base.toISOString().slice(0, 10),
+      returnScheduledDate: addMonthsKeepDay(fromDate, months),
       termMonths: c.termMonths + months,
       totalSeq: c.totalSeq + months,
       notes: `${c.notes ?? ''}${c.notes ? ' / ' : ''}${todayKr()} ${months}개월 연장`.trim(),

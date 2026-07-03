@@ -17,6 +17,7 @@
 import type { Contract } from './types';
 import { todayKr } from './mock-data';
 import { isContractEnded } from './contract-lifecycle';
+import { getExpiryDate } from './contract-stage';
 
 export type AlertSeverity = 'overdue' | 'urgent' | 'soon';
 
@@ -66,7 +67,10 @@ export function buildAlertsForContract(c: Contract, today: string): AlertItem[] 
   if (c.insuranceExpiryDate) add('보험만기', c.insuranceExpiryDate);
   if (c.vehicleTaxDueDate) add('자동차세', c.vehicleTaxDueDate);
   if (c.customerLicenseExpiry) add('면허만기', c.customerLicenseExpiry);
-  if (c.returnScheduledDate && !c.returnedDate) add('반납임박', c.returnScheduledDate);
+  {
+    const exp = getExpiryDate(c);
+    if (exp && !c.returnedDate) add('반납임박', exp);
+  }
 
   return out;
 }

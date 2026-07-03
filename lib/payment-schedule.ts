@@ -188,6 +188,16 @@ export function migrateLegacySchedules<T extends PaymentScheduleInline>(schedule
   });
 }
 
+/**
+ * 만기·연장 날짜 계산 SSOT — iso + months, iso 의 day-of-month 유지 (월말 clamp, 타임존 안전).
+ * Date.setMonth() (clamp 없음 + UTC 시프트) 대신 이 문자열 기반 함수를 만기 계산 전반에 사용.
+ */
+export function addMonthsKeepDay(iso: string, months: number): string {
+  if (!iso) return '';
+  const day = parseInt(iso.split('-')[2] ?? '1', 10) || 1;
+  return addMonths(iso, months, day);
+}
+
 /** YYYY-MM-DD + n개월 → 같은 day-of-month 의 다음 달 (월말 보정) */
 function addMonths(iso: string, months: number, day: number): string {
   if (!iso) return '';

@@ -9,6 +9,8 @@
 import { useMemo, useState } from 'react';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { isContractEnded } from '@/lib/contract-lifecycle';
+import { getExpiryDate } from '@/lib/contract-stage';
+import { todayKr } from '@/lib/mock-data';
 import { CurrencyKrw, ArrowUUpLeft, ShieldWarning, IdentificationCard, MagnifyingGlass, X } from '@phosphor-icons/react';
 import { ContractListItem } from '@/components/mobile/contract-list-item';
 import { formatCurrency } from '@/lib/utils';
@@ -32,6 +34,7 @@ export default function MobileRisk() {
   const groups = useMemo(() => {
     const todayDate = new Date();
     const dayMs = 24 * 60 * 60 * 1000;
+    const todayStr = todayKr();
     const out: Record<RiskKind, typeof contracts> = {
       'unpaid':           [],
       'overdue-return':   [],
@@ -46,10 +49,10 @@ export default function MobileRisk() {
 
       if (c.unpaidAmount > 0) out['unpaid'].push(c);
 
-      if (!c.returnedDate && c.returnScheduledDate) {
-        const ret = new Date(c.returnScheduledDate);
-        const diff = Math.floor((ret.getTime() - todayDate.getTime()) / dayMs);
-        if (diff < 0) out['overdue-return'].push(c);
+      if (!c.returnedDate) {
+        // 만기 SSOT + 문자열 비교 (기존 new Date() 시분초 포함으로 오후엔 하루 어긋나던 것 제거)
+        const exp = getExpiryDate(c);
+        if (exp && exp < todayStr) out['overdue-return'].push(c);
       }
 
       if (!inactive) {

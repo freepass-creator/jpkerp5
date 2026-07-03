@@ -13,6 +13,7 @@
 import type { Contract, Company } from '@/lib/types';
 import { stripCorpSuffix } from '@/lib/company-display';
 import { monthsBetween } from '@/lib/utils';
+import { getExpiryDate } from '@/lib/contract-stage';
 
 export type CertDocProps = {
   contract: Contract;
@@ -87,17 +88,8 @@ export function CertDocument({
   const recipientAddr = customerAddr || '';
   void senderBiz; void senderShort;  // 페이지푸터에서 사용 안 함
 
-  // 계약 종료일 — termMonths 우선, 없으면 returnScheduledDate
-  const contractEndDate = (() => {
-    if (contract.contractDate && contract.termMonths && contract.termMonths > 0) {
-      const base = new Date(contract.contractDate);
-      if (!Number.isNaN(base.getTime())) {
-        base.setMonth(base.getMonth() + contract.termMonths);
-        return base.toISOString().slice(0, 10);
-      }
-    }
-    return contract.returnScheduledDate ?? '';
-  })();
+  // 계약 종료일 — 만기 SSOT(getExpiryDate: 문자열 addMonths, 월말 clamp) 재사용
+  const contractEndDate = getExpiryDate(contract) ?? '';
 
   // 잔여 계약기간 — 해지일 ~ 약정 종료일까지 (년/개월/일)
   const remainingYMD = (() => {

@@ -16,6 +16,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { CompanyCell } from '@/components/ui/company-cell';
 import { useLiveTodayKr } from '@/lib/use-live-today';
+import { daysToExpiry } from '@/lib/contract-stage';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { downloadContractsExcel } from '@/lib/contract-export';
 import { useVehicleDialog } from '@/lib/global-dialogs';
@@ -29,13 +30,11 @@ export default function ExpirePage() {
   const { openVehicle } = useVehicleDialog();
 
   const all = useMemo(() => {
+    // 만기 SSOT(getExpiryDate 기반 daysToExpiry) 사용 — 운영현황·상세와 D-N 일치
     return contracts
-      .filter((c) => c.returnScheduledDate && c.status === '운행')
-      .map((c) => {
-        const daysLeft = Math.round((new Date(c.returnScheduledDate!).getTime() - new Date(today).getTime()) / 86400000);
-        return { contract: c, daysLeft };
-      })
-      .filter(({ daysLeft }) => daysLeft <= 90)
+      .filter((c) => c.status === '운행')
+      .map((c) => ({ contract: c, daysLeft: daysToExpiry(c, today) }))
+      .filter((x): x is { contract: typeof x.contract; daysLeft: number } => x.daysLeft !== null && x.daysLeft <= 90)
       .sort((a, b) => a.daysLeft - b.daysLeft);
   }, [contracts, today]);
 

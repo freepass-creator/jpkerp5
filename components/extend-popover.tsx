@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Plus, X } from '@phosphor-icons/react';
+import { addMonthsKeepDay } from '@/lib/payment-schedule';
 
 type Props = {
   currentReturnDate?: string;
@@ -32,9 +33,8 @@ export function ExtendPopover({ currentReturnDate, customerName, vehiclePlate, o
 
   function preview(months: number): string {
     if (!currentReturnDate) return '';
-    const d = new Date(currentReturnDate);
-    d.setMonth(d.getMonth() + months);
-    return d.toISOString().slice(0, 10);
+    // 문자열 기반 — 미리보기와 실제 저장(handleExtend)이 같은 산술이어야 하루 안 밀림
+    return addMonthsKeepDay(currentReturnDate, months);
   }
 
   function handleConfirm(months: number) {

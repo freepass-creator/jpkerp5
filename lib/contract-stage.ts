@@ -9,6 +9,7 @@
 import type { Contract } from '@/lib/types';
 import { todayKr } from '@/lib/mock-data';
 import { daysSince } from '@/lib/utils';
+import { addMonthsKeepDay } from '@/lib/payment-schedule';
 
 export type Stage =
   | '구매대기' | '등록대기'
@@ -18,14 +19,13 @@ export type Stage =
   | '휴차대기' | '매각검토' | '매각대기' | '매각'
   | '휴차' | '임시배차';
 
-/** 만기일 — contractDate + termMonths 기준 (계약 기간이 진실). */
+/** 만기일 — contractDate + termMonths 기준 (계약 기간이 진실).
+ *  문자열 기반 addMonthsKeepDay 사용 — 월말 clamp + 타임존 안전 (기존 Date.setMonth 는
+ *  clamp 없어 1/31+1개월=3/3, UTC 파싱으로 하루 밀림 → 회차 dueDate 와 만기 표시가 어긋났음). */
 export function getExpiryDate(c: Contract): string | null {
   if (c.contractDate && c.termMonths && c.termMonths > 0) {
-    const base = new Date(c.contractDate);
-    if (!Number.isNaN(base.getTime())) {
-      base.setMonth(base.getMonth() + c.termMonths);
-      return base.toISOString().slice(0, 10);
-    }
+    const expiry = addMonthsKeepDay(c.contractDate, c.termMonths);
+    if (expiry) return expiry;
   }
   return c.returnScheduledDate ?? null;
 }
