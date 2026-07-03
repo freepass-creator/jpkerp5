@@ -17,7 +17,7 @@
  *   />
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Icon } from '@phosphor-icons/react';
 import { Dialog, DialogContent, DialogClose, DialogFooter } from './dialog';
 import { cn } from '@/lib/cn';
@@ -110,6 +110,22 @@ export function EntityFormDialog({
     onOpenChange(false);
   }
 
+  // 이중 제출 방지 (ERP #16 멱등성) — 제출 중 버튼 비활성 + ref 가드로 rapid 더블클릭 차단.
+  // 등록/복제 버튼이 disabled 없어 더블클릭 시 마스터가 2건 생성되던 것 방지.
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
+  async function doSubmit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      await Promise.resolve(onSubmit(data));
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  }
+
   // 키보드 단축키 — Esc 닫기 / Ctrl+S 저장
   const canSave =
     (currentMode === 'edit' && dirtyCount > 0) ||
@@ -118,7 +134,7 @@ export function EntityFormDialog({
   useDialogShortcuts({
     open,
     onClose: handleClose,
-    onSave: canSave ? () => onSubmit(data) : undefined,
+    onSave: canSave ? () => void doSubmit() : undefined,
   });
 
   // 모드별 색깔 dot 헤더
@@ -191,18 +207,18 @@ export function EntityFormDialog({
               )}
               <button
                 className="btn btn-primary"
-                disabled={dirtyCount === 0}
-                onClick={() => onSubmit(data)}
+                disabled={dirtyCount === 0 || submitting}
+                onClick={() => void doSubmit()}
               >
-                저장
+                {submitting ? '저장 중…' : '저장'}
               </button>
             </>
           ) : (
             // create / duplicate
             <>
               <DialogClose asChild><button className="btn">취소</button></DialogClose>
-              <button className="btn btn-primary" onClick={() => onSubmit(data)}>
-                {defaultSubmitLabel}
+              <button className="btn btn-primary" disabled={submitting} onClick={() => void doSubmit()}>
+                {submitting ? '처리 중…' : defaultSubmitLabel}
               </button>
             </>
           )}
