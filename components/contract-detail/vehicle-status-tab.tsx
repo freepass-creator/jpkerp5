@@ -24,7 +24,7 @@ import { showConfirm } from '@/lib/confirm';
 import { formatCurrency, formatDateFull, daysSince, monthsBetween } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
 import {
-  currentStage, stageLabel, daysToExpiry,
+  currentStage, stageLabel, daysToExpiry, getExpiryDate,
   getVehicleState, getContractState, getPaymentState,
   type Stage,
 } from '@/lib/contract-stage';
@@ -299,7 +299,9 @@ export function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: C
   /** 연장 처리 — 새 반납예정일 + (선택) 월대여료 갱신, 운행 복귀 */
   function commitRenewal() {
     if (!renewNewReturn) { toast.error('새 반납예정일을 입력하세요'); return; }
-    if (renewNewReturn <= c.contractDate) { toast.error('반납예정일은 계약일 이후여야 합니다'); return; }
+    // 연장이므로 현재 만기 이후여야 함 (계약일 기준이면 단축을 연장으로 통과시켜 기간 drift 유발)
+    const currentExpiry = getExpiryDate(c) ?? c.contractDate;
+    if (renewNewReturn <= currentExpiry) { toast.error(`새 반납예정일은 현재 만기(${currentExpiry}) 이후여야 합니다`); return; }
     const newRent = renewNewRent ? parseInt(renewNewRent.replace(/[^0-9]/g, ''), 10) || c.monthlyRent : c.monthlyRent;
     // 새 종료일까지 약정개월 재계산 — calendar months (나누기 X)
     const newTerm = Math.max(c.termMonths, monthsBetween(c.contractDate, renewNewReturn));
