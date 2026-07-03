@@ -524,6 +524,16 @@ export default function PenaltyPage() {
                 <PenaltyRegisterDialog open={registerOpen} onOpenChange={setRegisterOpen} onCreate={handleCreate} />
               </>
             )}
+            {phase === 'completed' && (
+              <button
+                className="btn btn-primary"
+                onClick={handleDownloadCompletedFiltered}
+                disabled={completedFiltered.length === 0 || busy}
+                title="처리완료 탭의 현재 기간 필터 항목 변경부과 PDF 재다운로드"
+              >
+                <FileZip size={14} weight="bold" /> {busy ? '생성 중...' : `변경부과 재다운로드 (${completedFiltered.length}건)`}
+              </button>
+            )}
           </>
         }
       >
