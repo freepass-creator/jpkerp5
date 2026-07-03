@@ -11,7 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import type { Browser } from 'puppeteer-core';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { requireAuth } from '@/lib/api-auth';
 import {
   renderOfficialPageHtml,
@@ -273,7 +273,17 @@ async function buildBundlePdf(req: BuildRequest): Promise<Uint8Array> {
     if (items[i].fileDataUrl) {
       await imageToPdfPage(out, items[i].fileDataUrl);
     } else {
-      out.addPage([595, 842]); // 빈 페이지
+      // 이미지 없음 — 백지 대신 명확한 경고 페이지 (모르고 발송 방지).
+      // pdf-lib 은 한글 폰트 미임베드라 ASCII 배너로 표기.
+      const page = out.addPage([595, 842]);
+      const font = await out.embedFont(StandardFonts.HelveticaBold);
+      page.drawRectangle({ x: 40, y: 40, width: 515, height: 762, borderColor: rgb(0.8, 0.1, 0.1), borderWidth: 2 });
+      page.drawText('NOTICE IMAGE MISSING', { x: 95, y: 470, size: 24, font, color: rgb(0.8, 0.1, 0.1) });
+      page.drawText('(gojiseo original image not attached)', { x: 95, y: 445, size: 11, font, color: rgb(0.4, 0.4, 0.4) });
+      const noticeNo = (items[i].notice_no ?? '').replace(/[^\x20-\x7E]/g, '');
+      const plateDigits = (items[i].car_number ?? '').replace(/[^0-9]/g, '');
+      page.drawText(`notice_no: ${noticeNo || '-'}`, { x: 95, y: 410, size: 12, font, color: rgb(0.3, 0.3, 0.3) });
+      page.drawText(`plate(digits): ${plateDigits || '-'}`, { x: 95, y: 392, size: 12, font, color: rgb(0.3, 0.3, 0.3) });
     }
   }
 
