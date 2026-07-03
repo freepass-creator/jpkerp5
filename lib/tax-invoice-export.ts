@@ -24,10 +24,11 @@ export function contractToSelectionRow(c: Contract, billingMonth: string): Selec
   const supply = Math.round(total / 1.1);
   const vat = total - supply;
   const today = new Date().toISOString();
-  const dayOnly = today.match(/-(\d{2})T/)?.[1] ?? '';
+  // 전자세금계산서 업로드용 작성일자는 YYYY-MM-DD 전체 (기존엔 '일(DD)'만 넣어 날짜 파싱 실패)
+  const writeDate = today.slice(0, 10);
 
   return {
-    '작성일자': dayOnly,
+    '작성일자': writeDate,
     '공급받는자 등록번호': c.customerIdentNo ?? '',
     '공급받는자 상호': c.customerName ?? '',
     '공급받는자 성명': '',                       // contracts에 ceo 없음 — 비워서 사용자 채움

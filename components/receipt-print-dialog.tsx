@@ -20,7 +20,7 @@
  *  - 닫기
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { Printer, X } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ReceiptDocument, RECEIPT_PRINT_CSS } from './receipt-document';
@@ -56,6 +56,19 @@ export function ReceiptPrintDialog({
     window.print();
   }, []);
 
+  // 라벨에 'Ctrl+P'라 적혀 있으나 핸들러가 없던 것 — 실제 바인딩 추가 (열려있을 때만)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        handlePrint();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, handlePrint]);
+
   if (!contract) return null;
 
   return (
@@ -77,7 +90,7 @@ export function ReceiptPrintDialog({
                 period={period}
                 vehiclePlate={contract.vehiclePlate}
                 paymentDate={paymentDate}
-                receiptNo={receiptNo}
+                receiptNo={receiptNo ?? (contract.contractNo ? `${contract.contractNo}-${(paymentDate ?? '').replace(/-/g, '')}` : undefined)}
                 manager={contract.manager}
               />
             </div>

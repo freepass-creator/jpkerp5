@@ -67,7 +67,8 @@ export default function FinanceVendorPage() {
       add(t.counterparty || '', t.amount ?? 0, t.withdraw ?? 0, (t.txDate ?? '').slice(0, 10));
     }
     for (const t of cardTx) {
-      const name = ('counterparty' in t ? (t as { counterparty?: string }).counterparty : undefined) ?? '';
+      // CardTransaction 엔 counterparty 필드가 없어 항상 ''이던 것 → 가맹점(merchant) 사용
+      const name = t.merchant ?? t.customerName ?? '';
       add(name, t.amount ?? 0, 0, (t.txDate ?? '').slice(0, 10));
     }
     // 마스터에는 있지만 거래 없는 거래처도 표시 (count 0)

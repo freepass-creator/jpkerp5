@@ -139,7 +139,7 @@ export default function MobileContractDetail() {
         />
         <ActionBtn
           icon={<Paperclip size={22} weight="duotone" />}
-          label="첨부"
+          label="공유"
           onClick={() => triggerFileShare()}
         />
         <ActionBtn
