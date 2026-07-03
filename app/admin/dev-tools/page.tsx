@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -51,6 +51,20 @@ const TOOLS: ToolCard[] = [
     title: '차량상태 drift 진단',
     desc: '자산 마스터(Vehicle.status) ↔ 계약 사본(Contract.vehicleStatus) 불일치 케이스 가시화 + 수동 정렬. plate 매칭 실패·고립 자산까지 한눈에.',
     icon: <Warning size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/admin/integrity',
+    title: '정합성 점검',
+    desc: '차량 마스터 ↔ 계약·보험·과태료 참조무결성 진단 — plate 고아·날짜 역전·핵심 필수 누락. 읽기 전용.',
+    icon: <ShieldWarning size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/admin/closing',
+    title: '회계기간 마감',
+    desc: '월별 마감 처리 — 마감된 기간은 수납·인도·반납 등 거래 쓰기 차단. (직접 URL 진입만 되던 것 노출)',
+    icon: <LockKey size={18} weight="duotone" />,
     variant: 'op',
   },
   {
