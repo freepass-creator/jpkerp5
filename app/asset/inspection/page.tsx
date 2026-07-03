@@ -24,6 +24,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { useVehicleDialog } from '@/lib/global-dialogs';
+import { toast } from '@/lib/toast';
 
 export default function AssetInspectionPage() {
   const { contracts, loading: contractsLoading } = useContracts();
@@ -71,7 +72,12 @@ export default function AssetInspectionPage() {
       }
       bottomBar={
         <BottomBar
-          left={<button className="btn btn-primary" type="button">+ 검사 등록</button>}
+          left={<button className="btn btn-primary" type="button" onClick={() => {
+            const ids = Array.from(sel.selectedIds);
+            if (ids.length !== 1) { toast.info('검사를 등록할 차량 1대를 목록에서 선택하세요 (행 더블클릭으로도 상세가 열립니다).'); return; }
+            const row = upcoming.find(({ c }) => c.id === ids[0]);
+            if (row?.c.vehiclePlate) openVehicle(row.c.vehiclePlate, 'asset'); else toast.error('차량번호가 없어 상세를 열 수 없습니다.');
+          }}>+ 검사 등록</button>}
           right={
             <button
               className="btn"

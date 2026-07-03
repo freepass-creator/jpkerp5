@@ -25,12 +25,14 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { useVehicleDialog } from '@/lib/global-dialogs';
+import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
 
 export default function PurchasePage() {
   const { vehicles, loading: vehiclesLoading, update: updateVehicle } = useVehicles();
   const { contracts, update: updateContract } = useContracts();
   const { companies: companyMaster } = useCompanies();
   const [busy, setBusy] = useState(false);
+  const [regOpen, setRegOpen] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: { id: string; plate?: string; vin?: string } | null }>({ open: false, x: 0, y: 0, row: null });
   const { openVehicle } = useVehicleDialog();
 
@@ -91,7 +93,7 @@ export default function PurchasePage() {
       }
       bottomBar={
         <BottomBar
-          left={<button className="btn btn-primary" type="button">+ 차량 매입 등록</button>}
+          left={<button className="btn btn-primary" type="button" onClick={() => setRegOpen(true)}>+ 차량 매입 등록</button>}
           right={
             <button
               className="btn"
@@ -227,6 +229,7 @@ export default function PurchasePage() {
           { label: 'VIN 복사', icon: <Copy size={12} weight="bold" />, onClick: () => { if (ctxMenu.row?.vin) navigator.clipboard.writeText(ctxMenu.row.vin); }, disabled: !ctxMenu.row.vin },
         ] satisfies ContextMenuItem[]) : []}
       />
+      <VehicleRegRegisterDialog open={regOpen} onOpenChange={setRegOpen} />
     </MasterPageShell>
   );
 }

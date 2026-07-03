@@ -130,7 +130,12 @@ export default function AssetLoanPage() {
         <BottomBar
           left={
             <>
-              <button className="btn btn-primary" type="button"><Plus size={14} weight="bold" /> 할부 등록</button>
+              <button className="btn btn-primary" type="button" onClick={() => {
+                const ids = Array.from(sel.selectedIds).filter((id) => !id.startsWith('contract-derived-'));
+                if (ids.length !== 1) { toast.info('할부를 등록/수정할 차량 1대를 목록에서 선택하세요 (행 더블클릭으로도 상세가 열립니다).'); return; }
+                const v = filtered.find((x) => x.id === ids[0]);
+                if (v?.plate) openVehicle(v.plate, 'asset'); else toast.error('차량번호가 없어 상세를 열 수 없습니다.');
+              }}><Plus size={14} weight="bold" /> 할부 등록</button>
               <span className="btn-sep" />
               <button
                 className="btn"
