@@ -31,24 +31,24 @@ export const ASSET_SUB: SubNavItem[] = [
   { href: '/asset/disposal',   label: '자산처분' },
 ];
 
+// '계약자'(/contract/customer)·'종료'(/contract/ended) 는 실제 라우트가 없어
+// [contractId] 동적 라우트에 걸려 무한 로딩 → 제거 (2026-07-03 감사).
 export const CONTRACT_SUB: SubNavItem[] = [
   { href: '/contract', label: '전체' },
-  { href: '/contract/customer', label: '계약자' },
   { href: '/contract/expire', label: '만기임박' },
   { href: '/contract/return', label: '반납' },
   { href: '/contract/overdue', label: '미수금' },
   { href: '/contract/schedule', label: '계약스케줄' },
   { href: '/contract/idle', label: '휴차' },
-  { href: '/contract/ended', label: '종료' },
 ];
 
 // 입출금 관리 sub-nav — 입력 4 (계좌·자동이체·카드매출·법인카드) │ 파생 4 (자금일보·거래처·임차인·총계정원장)
 // "원장 하나, 투영 여럿" — 좌측은 입력 창구(사실), 우측은 자동 구현(파생)
+// 계좌·자동이체·카드매출·법인카드는 /finance 한 페이지의 viewMode(우상단 칩)로 전환.
+// /finance/autopay·/card·/corpcard 는 라우트가 없어 404 → sub-nav에서 제거하고
+// '입출금(계좌·자동이체·카드)' 단일 진입점만 노출 (2026-07-03 감사).
 export const FINANCE_SUB: SubNavItem[] = [
-  { href: '/finance', label: '계좌' },
-  { href: '/finance/autopay', label: '자동이체' },
-  { href: '/finance/card', label: '카드매출' },
-  { href: '/finance/corpcard', label: '법인카드' },
+  { href: '/finance', label: '입출금·카드' },
   { href: '/finance/daily', label: '자금일보', separator: true },
   { href: '/finance/vendor', label: '거래처' },
   { href: '/finance/customer', label: '임차인' },

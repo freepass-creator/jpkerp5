@@ -206,7 +206,7 @@ export default function PenaltyPage() {
       toast.info(dupCount > 0 ? `처리중 ${dupCount}건이 모두 중복입니다. 중복 정리 후 다시 시도하세요.` : '처리할 항목이 없습니다.');
       return;
     }
-    if (dupCount > 0 && !confirm(`중복 ${dupCount}건은 자동 제외하고 ${target.length}건만 PDF 생성합니다. 진행할까요?`)) return;
+    if (dupCount > 0 && !await showConfirm({ title: `중복 ${dupCount}건은 자동 제외하고 ${target.length}건만 PDF 생성합니다. 진행할까요?` })) return;
     setBusy(true);
     setPdfProgress({ done: 0, total: 0 });
     try {

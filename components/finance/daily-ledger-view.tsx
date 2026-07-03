@@ -249,13 +249,13 @@ export function DailyLedgerView({
 
       if (!matchesCompanyFilter(co, companyFilter)) continue;
 
-      const isSales = (t.kind ?? '留ㅼ텧') === '留ㅼ텧';
+      const isSales = (t.kind ?? '매출') === '매출';
 
       out.push({
 
         id: t.id,
 
-        kind: (isSales ? '카드留ㅼ텧' : '법인카드') as Kind,
+        kind: (isSales ? '카드매출' : '법인카드') as Kind,
 
         source: 'card',
 
@@ -271,7 +271,7 @@ export function DailyLedgerView({
 
         memo: isSales ? (t.approvalNo ? `승인 ${t.approvalNo}` : '카드留ㅼ텧') : (t.category ?? '법인카드'),
 
-        subject: isSales ? '카드留ㅼ텧' : (t.category ?? ''),
+        subject: isSales ? '카드매출' : (t.category ?? ''),
 
         matchedContractId: t.matchedContractId ?? '',
 

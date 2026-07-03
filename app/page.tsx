@@ -1219,9 +1219,7 @@ function SidePanel({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {meta}
-          <button className="btn btn-sm btn-ghost" title="새로고침">
-            <ArrowsClockwise size={12} />
-          </button>
+          {/* 실시간 RTDB 구독이라 수동 새로고침 불필요 — no-op 버튼 제거 (2026-07-03 감사) */}
         </div>
       </div>
       <div className="panel-body">
