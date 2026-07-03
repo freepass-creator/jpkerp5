@@ -162,7 +162,7 @@ export function SmsDialog({
     if (mocked > 0 && sent === 0 && failed === 0) {
       toast.warning(`Aligo 환경변수 미설정 — mock ${mocked}건 처리. .env.local 등록 필요.`);
     } else if (failed > 0) {
-      toast.error(`발송 완료 — 성공 ${sent} · 실패 ${failed}${mocked > 0 ? ` · mock ${mocked}` : ''}`);
+      toast.error(`발송 결과 — 성공 ${sent} · 실패 ${failed}${mocked > 0 ? ` · mock ${mocked}` : ''}`);
     } else {
       toast.success(`발송 완료 — ${sent}건${mocked > 0 ? ` (+ mock ${mocked})` : ''}`);
     }

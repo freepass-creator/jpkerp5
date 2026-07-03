@@ -215,6 +215,12 @@ export default function PenaltyPage() {
       return;
     }
     if (dupCount > 0 && !await showConfirm({ title: `중복 ${dupCount}건은 자동 제외하고 ${target.length}건만 PDF 생성합니다. 진행할까요?` })) return;
+    // 미매칭 건 경고 — 임차인 미확정이면 사실확인서 임차인/차량 정보가 빈 채로 발행됨
+    const unmatched = target.filter((i) => !i._contract?.contractor_name).length;
+    if (unmatched > 0 && !await showConfirm({
+      title: `임차인 미매칭 ${unmatched}건 포함`,
+      description: '미매칭 건은 사실확인서의 임차인·차량 정보가 비어 발행됩니다. 계속할까요? (편집으로 임차인 지정 후 발행 권장)',
+    })) return;
     setBusy(true);
     setPdfProgress({ done: 0, total: 0 });
     try {
