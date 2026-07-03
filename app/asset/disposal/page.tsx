@@ -228,8 +228,8 @@ export default function AssetDisposalPage() {
                       제작연월: v.manufacturedDate ?? '',
                       매입가: v.purchasePrice ?? '',
                       상태: v.status ?? '',
-                      매각예상가: '',
-                      매각일: v.disposalCertUploadedAt?.slice(0, 10) ?? '',
+                      매각가: v.salePrice ?? '',
+                      매각일: v.saleDate?.slice(0, 10) ?? '',
                     })),
                     columns: [
                       { key: '회사', header: '회사', width: 14 },
@@ -239,7 +239,7 @@ export default function AssetDisposalPage() {
                       { key: '제작연월', header: '제작연월', width: 12, type: 'mono' },
                       { key: '매입가', header: '매입가', width: 14, type: 'number' },
                       { key: '상태', header: '상태', width: 12, type: 'center' },
-                      { key: '매각예상가', header: '매각예상가', width: 14, type: 'number' },
+                      { key: '매각가', header: '매각가', width: 14, type: 'number' },
                       { key: '매각일', header: '매각일', width: 14, type: 'date' },
                     ],
                   });

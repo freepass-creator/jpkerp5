@@ -152,8 +152,14 @@ export function InsuranceRegisterDialog({
   const dupPolicyCount = doneItems.filter((i) => i.policyNo && existingPolicyNos.has(i.policyNo)).length;
 
   async function handleCommitAll(): Promise<void> {
-    if (registerableItems.length === 0) {
-      toast.info('등록 가능한 항목이 없습니다. 차량번호 누락 행은 직접 입력 후 시도하세요.');
+    // 체크박스 선택이 있으면 그 항목만, 없으면 등록 가능 전체 (기존엔 선택 무시하고 항상 전체)
+    const toCommit = selectedIds.size > 0
+      ? registerableItems.filter((i) => selectedIds.has(i.id))
+      : registerableItems;
+    if (toCommit.length === 0) {
+      toast.info(registerableItems.length === 0
+        ? '등록 가능한 항목이 없습니다. 차량번호 누락 행은 직접 입력 후 시도하세요.'
+        : '선택한 항목 중 등록 가능한 것이 없습니다.');
       return;
     }
     setBusy(true);
@@ -163,11 +169,11 @@ export function InsuranceRegisterDialog({
       const { addIntakeItem } = await import('@/lib/firebase/intake-store');
       intakeId = await addIntakeItem({
         source: 'desktop-ocr-insurance',
-        raw: { mode: 'manual', kind: 'insurance', payload: { itemCount: registerableItems.length } },
+        raw: { mode: 'manual', kind: 'insurance', payload: { itemCount: toCommit.length } },
       });
     } catch (e) { console.warn('[intake] insurance addIntakeItem 실패', e); }
     let success = 0, fail = 0, vehicleCreated = 0;
-    for (const item of registerableItems) {
+    for (const item of toCommit) {
       try {
         const { _status: _s, _error: _e, _matchedVehicleId: _m, _fileDataUrl: fileUrl, _fileName: fn, id: itemId, ...rest } = item;
         // 수정 모드 — prefillPolicy 와 같은 id면 update

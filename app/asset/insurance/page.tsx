@@ -351,7 +351,7 @@ export default function AssetInsurancePage() {
             // 매칭된 차량 (plate 기준) 의 보험 캐시 필드 동기화 — 자산관리 본 페이지의 "보험 미입력" 카운트도 즉시 반영
             if (!p.carNumber) return;
             const key = p.carNumber.replace(/\s/g, '');
-            const v = vehicles.find((x) => x.plate.replace(/\s/g, '') === key);
+            const v = vehicles.find((x) => (x.plate ?? '').replace(/\s/g, '') === key);
             if (!v) return;
             void updateVehicle({
               ...v,
