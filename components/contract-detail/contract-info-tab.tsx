@@ -18,7 +18,8 @@ import { type EditableTabHandle } from '@/components/ui/edit-buttons';
 import { InlineTextEdit } from '@/components/ui/inline-text-edit';
 import { InlinePhoneEdit } from '@/components/ui/inline-phone-edit';
 import { InlineDateEdit } from '@/components/ui/inline-date-edit';
-import { formatCurrency, formatDateFull } from '@/lib/utils';
+import { formatCurrency, formatDateFull, monthsBetween } from '@/lib/utils';
+import { addMonthsKeepDay } from '@/lib/payment-schedule';
 import { contractIdentMasked } from '@/lib/ident';
 import type { Contract, AdditionalDriver } from '@/lib/types';
 
@@ -210,16 +211,16 @@ export const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUp
             <EditableField label="계약일" value={editing ? (draft.contractDate ?? '') : (formatDateFull(c.contractDate) || '-')} editing={editing} mono onChange={(v) => set('contractDate', v || '')} placeholder="YYYY-MM-DD" />
             <EditableField label="인도일" value={editing ? (draft.deliveredDate ?? '') : (formatDateFull(c.deliveredDate) || '-')} editing={editing} mono onChange={(v) => set('deliveredDate', v || undefined)} placeholder="YYYY-MM-DD" />
             {editing ? (
-              <EditableField label="반납예정(종료일)" value={draft.returnScheduledDate ?? ''} editing mono onChange={(v) => set('returnScheduledDate', v || undefined)} placeholder="YYYY-MM-DD" />
+              <EditableField label="반납예정(종료일)" value={draft.returnScheduledDate ?? ''} editing mono onChange={(v) => setDraft((d) => ({ ...d, returnScheduledDate: v || undefined, ...(d.contractDate && v ? { termMonths: monthsBetween(d.contractDate, v) } : {}) }))} placeholder="YYYY-MM-DD" />
             ) : (
               <div className="detail-field">
                 <div className="label">반납예정(종료일)</div>
                 <div className="value">
-                  <InlineDateEdit value={c.returnScheduledDate} onSave={(v) => onUpdate({ ...c, returnScheduledDate: v })} />
+                  <InlineDateEdit value={c.returnScheduledDate} onSave={(v) => onUpdate({ ...c, returnScheduledDate: v, ...(c.contractDate && v ? { termMonths: monthsBetween(c.contractDate, v) } : {}) })} />
                 </div>
               </div>
             )}
-            <EditableField label="약정기간(개월)" value={editing ? String(draft.termMonths) : `${c.termMonths}개월 ${c.longTerm ? '(장기)' : '(단기)'}`} editing={editing} mono onChange={(v) => set('termMonths', Number(v) || 0)} />
+            <EditableField label="약정기간(개월)" value={editing ? String(draft.termMonths) : `${c.termMonths}개월 ${c.longTerm ? '(장기)' : '(단기)'}`} editing={editing} mono onChange={(v) => setDraft((d) => { const t = Number(v) || 0; return { ...d, termMonths: t, ...(d.contractDate && t > 0 ? { returnScheduledDate: addMonthsKeepDay(d.contractDate, t) } : {}) }; })} />
           </div>
           <div>
             <EditableField label="월 대여료" value={editing ? String(draft.monthlyRent ?? 0) : `₩${formatCurrency(c.monthlyRent)}`} editing={editing} mono onChange={(v) => set('monthlyRent', Number(v.replace(/[,\s]/g, '')) || 0)} />

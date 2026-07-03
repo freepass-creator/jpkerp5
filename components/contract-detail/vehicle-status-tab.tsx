@@ -28,6 +28,7 @@ import {
   getVehicleState, getContractState, getPaymentState,
   type Stage,
 } from '@/lib/contract-stage';
+import { extendSchedules } from '@/lib/payment-schedule';
 import {
   vehicleStateTone, contractStateTone, paymentStateTone,
 } from '@/lib/status-tones';
@@ -312,6 +313,7 @@ export function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: C
       termMonths: newTerm,
       monthlyRent: newRent,
       totalSeq: newTerm,
+      schedules: extendSchedules({ ...c, monthlyRent: newRent }, newTerm),   // 연장분 회차 append
       notes: [c.notes, `[${actionDate}] 연장 처리 — 새 반납예정일 ${renewNewReturn}${renewMemo ? ' / ' + renewMemo : ''}`].filter(Boolean).join('\n'),
     });
     setRenewPicker(false); setRenewNewReturn(''); setRenewNewRent(''); setRenewMemo('');

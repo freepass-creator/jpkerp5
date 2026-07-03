@@ -198,6 +198,33 @@ export function addMonthsKeepDay(iso: string, months: number): string {
   return addMonths(iso, months, day);
 }
 
+/**
+ * 계약 연장 시 부족한 회차를 '예정'으로 append (기존 회차·납부 기록 전부 보존).
+ * 연장은 termMonths 만 늘리고 schedules 를 안 늘려 회차수 < 기간 → 연장분 청구 누락되던 것 방지.
+ */
+export function extendSchedules(
+  c: { contractDate: string; monthlyRent: number; paymentDay: number; paymentTiming?: '선불' | '후불'; schedules?: PaymentScheduleInline[] },
+  newTermMonths: number,
+): PaymentScheduleInline[] {
+  const existing = c.schedules ?? [];
+  const maxSeq = existing.reduce((m, s) => Math.max(m, s.seq), 0);
+  if (maxSeq >= newTermMonths || !c.contractDate) return existing;
+  const isPostpaid = c.paymentTiming === '후불';
+  const out = [...existing];
+  for (let seq = maxSeq + 1; seq <= newTermMonths; seq++) {
+    const offset = isPostpaid ? seq : seq - 1;
+    out.push({
+      seq,
+      dueDate: addMonths(c.contractDate, offset, c.paymentDay),
+      amount: c.monthlyRent,
+      status: '예정',
+      paidAmount: 0,
+      payments: [],
+    });
+  }
+  return out;
+}
+
 /** YYYY-MM-DD + n개월 → 같은 day-of-month 의 다음 달 (월말 보정) */
 function addMonths(iso: string, months: number, day: number): string {
   if (!iso) return '';

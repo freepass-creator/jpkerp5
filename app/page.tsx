@@ -23,7 +23,7 @@ import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { isContractEnded, isContractActive, isOperating } from '@/lib/contract-lifecycle';
 import { downloadContractsExcel } from '@/lib/contract-export';
-import { addMonthsKeepDay } from '@/lib/payment-schedule';
+import { addMonthsKeepDay, extendSchedules } from '@/lib/payment-schedule';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { PageShell } from '@/components/ui/page-shell';
 import { FilterSelect } from '@/components/ui/filter-select';
@@ -600,11 +600,13 @@ export default function Page() {
     const c = contracts.find((x) => x.id === contractId);
     if (!c) return;
     const fromDate = c.returnScheduledDate ?? todayKr();
+    const newTerm = c.termMonths + months;
     void rtdbUpdate({
       ...c,
       returnScheduledDate: addMonthsKeepDay(fromDate, months),
-      termMonths: c.termMonths + months,
-      totalSeq: c.totalSeq + months,
+      termMonths: newTerm,
+      totalSeq: newTerm,
+      schedules: extendSchedules(c, newTerm),   // 연장분 회차 append — 청구 누락 방지
       notes: `${c.notes ?? ''}${c.notes ? ' / ' : ''}${todayKr()} ${months}개월 연장`.trim(),
     });
   }
