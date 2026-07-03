@@ -110,7 +110,7 @@ function buildContext(items: PenaltyWorkItem[], staff: IssueContext['staff'], op
     staff,
     docNo: opts?.docNo ?? fallbackDocNo,
     sendDate: opts?.sendDate ?? today,
-    recipient: opts?.recipient ?? first.issuer ?? '관할 경찰서장',
+    recipient: opts?.recipient || first.issuer || '관할 경찰서장',
   };
 }
 
@@ -244,7 +244,7 @@ function bundleFileName(items: PenaltyWorkItem[]): string {
  */
 function groupKey(item: PenaltyWorkItem): string {
   const company = item._company?.code ?? 'NOCOMP';
-  const issuer = item.issuer ?? 'unknown';
+  const issuer = item.issuer || 'unknown';   // 빈 문자열('')도 unknown 으로 (nullish → falsy)
   return `${company}__${issuer}`;
 }
 

@@ -184,6 +184,7 @@ export function parsePenalty(text: string, lines: string[]): PenaltyParsed {
 
   if (d.doc_type === '통행료' && !d.description) d.description = '통행료 미납';
 
-  d.amount = d.penalty_amount || d.toll_amount || 0;
+  // 범칙금(fine)만 있는 고지서가 amount=0 으로 표기되던 것 보정 — 과태료·범칙금·통행료 순
+  d.amount = d.penalty_amount || d.fine_amount || d.toll_amount || 0;
   return d;
 }

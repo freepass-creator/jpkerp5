@@ -96,6 +96,8 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
           contractor_name: matched.customerName,
           contractor_phone: matched.customerPhone,
           contractor_kind: matched.customerKind,
+          contractor_ident: matched.customerIdent,      // 사실확인서 식별번호 — 기존 누락으로 항상 공란이던 것
+          contractor_address: matched.customerAddress,  // 계약에 주소 없으면 '' (수기 보완)
           start_date: matched.startDate,
           end_date: matched.endDate,
           product_type: '장기렌트',

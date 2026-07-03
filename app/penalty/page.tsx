@@ -47,6 +47,7 @@ const PENALTY_FIELDS: FieldDef[] = [
   { key: 'doc_type',    label: '구분',      type: 'select', options: ['과태료', '범칙금', '통행료', '주정차위반', '속도위반', '신호위반', '기타'] },
   { key: 'notice_no',   label: '고지서번호', colSpan: 2 },
   { key: 'issuer',      label: '발급기관', colSpan: 2 },
+  { key: 'law_article', label: '적용법조', colSpan: 2 },
   { key: 'date',        label: '위반일시', placeholder: 'YYYY-MM-DD HH:mm' },
   { key: 'issue_date',  label: '발송일',   type: 'date' },
   { key: 'location',    label: '위반장소', colSpan: 2 },
@@ -271,7 +272,10 @@ export default function PenaltyPage() {
         amount: d.amount ? Number(d.amount) : it.amount,
         due_date: d.due_date ?? it.due_date,
         pay_account: d.pay_account ?? it.pay_account,
-        _contract: (d.contractor_name || d.start_date) ? {
+        law_article: d.law_article ?? it.law_article,
+        // spread 병합 — billing_party/electronic_contract/signature/end_reason 등 폼에 없는 필드 보존
+        _contract: (d.contractor_name || d.start_date || it._contract) ? {
+          ...it._contract,
           contractor_name: d.contractor_name,
           contractor_kind: d.contractor_kind,
           contractor_phone: d.contractor_phone,
@@ -279,7 +283,7 @@ export default function PenaltyPage() {
           contractor_address: d.contractor_address,
           start_date: d.start_date,
           end_date: d.end_date,
-          product_type: '장기렌트',
+          product_type: it._contract?.product_type ?? '장기렌트',
           partner_code: partnerCode,
         } : it._contract,
         _company: findCompany(partnerCode) ?? it._company,
@@ -301,6 +305,7 @@ export default function PenaltyPage() {
     amount: editing.amount ? String(editing.amount) : '',
     due_date: editing.due_date,
     pay_account: editing.pay_account,
+    law_article: editing.law_article ?? '',
     contractor_name: editing._contract?.contractor_name ?? '',
     contractor_kind: editing._contract?.contractor_kind ?? '',
     contractor_phone: editing._contract?.contractor_phone ?? '',
@@ -363,7 +368,8 @@ export default function PenaltyPage() {
   }
 
   // 행 선택 - 현재 visible (in-progress 또는 completed) 기준
-  const visibleRows = phase === 'in-progress' ? inProgress : completed;
+  // 선택 인덱스 소스 = 렌더 소스(visible)와 동일해야 shift-범위 선택이 맞음 (완료탭 기간필터 시 어긋나던 것)
+  const visibleRows = visible;
   const rowSel = useRowSelection({ ids: visibleRows.map((i) => i.id), selection: sel });
   useCtrlASelectAll(rowSel, sel);
 
