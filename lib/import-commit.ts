@@ -177,6 +177,10 @@ export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
     totalSeq: termMonths,
     unpaidAmount: 0,      // 초기값 — 수납 매칭 시 갱신
     unpaidSeqCount: 0,
+    // 회차표 생성 — 누락 시 계약스케줄 0행 + 수납 자동매칭/FIFO 불가 (수기 등록 경로와 동일하게)
+    schedules: termMonths > 0
+      ? generateSchedules({ contractDate, termMonths, monthlyRent, paymentDay })
+      : undefined,
   };
 }
 

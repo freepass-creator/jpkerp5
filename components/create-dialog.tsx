@@ -37,6 +37,7 @@ import {
 } from '@/lib/import-commit';
 import { todayKr } from '@/lib/mock-data';
 import { generateSchedules } from '@/lib/payment-schedule';
+import { normalizeKoreanDate } from '@/lib/parsers/date';
 import { autoMatchAll, autoMatchCardAll, applyMatch, applyCardMatch, applyFifoPayment } from '@/lib/receipt-match';
 import { dedupAgainst } from '@/lib/dedup';
 import { enrichBankTxBatch, enrichCardTxBatch } from '@/lib/channel-matching';
@@ -2888,9 +2889,16 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
           licenseNo: String(raw.contractor_license_no ?? ''),
           licenseType: '1종 보통',
           monthlyRent: String(raw.monthly_amount ?? ''),
-          contractDate: String(raw.start_date ?? raw.contract_date ?? ''),
-          endDate: String(raw.end_date ?? ''),
-          termMonths: Number(raw.rental_period_months ?? 12) || 12,
+          // OCR 날짜는 '2026.05.20' 등 비ISO 가능 — 정규화 없이 저장하면 회차 dueDate/기간필터/정렬 전부 오작동
+          contractDate: normalizeKoreanDate(String(raw.start_date ?? raw.contract_date ?? '')),
+          endDate: normalizeKoreanDate(String(raw.end_date ?? '')),
+          termMonths: (() => {
+            // 시작·종료일이 있으면 실제 기간 우선 (OCR 개월수는 fallback) — 수기·엑셀 경로와 동일 규칙
+            const s = normalizeKoreanDate(String(raw.start_date ?? raw.contract_date ?? ''));
+            const e = normalizeKoreanDate(String(raw.end_date ?? ''));
+            if (s && e) { const m = monthsBetween(s, e); if (m > 0) return m; }
+            return Number(raw.rental_period_months ?? 12) || 12;
+          })(),
         });
       } catch (e) {
         out.push({
@@ -2922,29 +2930,11 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
     setSaving(true);
     try {
       const { genCode } = await import('@/lib/code');
-      // 1) 신규 차량 — 매칭 안 된 plate만 vehicles 노드에 추가
-      const newVehiclesByPlate = new Map<string, string>();
-      const toCreateVehicles: Array<Omit<import('@/lib/types').Vehicle, 'id'>> = [];
-      for (const r of valid) {
-        if (r.matchedVehicleId) continue;
-        const plateKey = r.plate.trim();
-        if (newVehiclesByPlate.has(plateKey)) continue;
-        newVehiclesByPlate.set(plateKey, '');
-        toCreateVehicles.push({
-          plate: plateKey,
-          model: r.model.trim() || '미정',
-          company: (r.company || '기타') as import('@/lib/types').CompanyCode,
-          status: '운행',
-          notes: `계약서 OCR — ${r.fileName}`,
-          createdAt: new Date().toISOString(),
-        });
-      }
-      if (toCreateVehicles.length > 0) {
-        await addVehicles(toCreateVehicles);
-      }
+      // 신규 차량 사전 생성 제거 — 아래 upsertVehicleFromContract 가 미등록 plate 를 자동 생성한다.
+      // (기존엔 addVehicles 로 먼저 만든 뒤 stale vehicles 목록으로 upsert 를 또 돌려 같은 차가 2대 생겼음)
 
-      // 2) 계약 일괄 등록
-      const today = new Date().toISOString().slice(0, 10);
+      // 계약 일괄 등록
+      const today = todayKr();
       const newContracts = valid.map((r) => {
         const monthly = parseInt((r.monthlyRent || '0').replace(/[^0-9]/g, ''), 10) || 0;
         const start = r.contractDate || today;
@@ -2961,6 +2951,7 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
           vehicleModel: r.model.trim() || '미정',
           vehicleStatus: '운행' as const,
           contractDate: start,
+          deliveredDate: start,   // status='운행' 인데 인도일 없으면 3경로(수기/엑셀/OCR) 불일치
           returnScheduledDate: r.endDate || undefined,
           termMonths: r.termMonths,
           longTerm: r.termMonths >= 12,
@@ -2973,16 +2964,25 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
           totalSeq: r.termMonths,
           unpaidAmount: 0,
           unpaidSeqCount: 0,
+          // 회차표 — 누락 시 수납 매칭/FIFO 불가 (수기·엑셀 경로와 동일)
+          schedules: r.termMonths > 0
+            ? generateSchedules({ contractDate: start, termMonths: r.termMonths, monthlyRent: monthly, paymentDay: 1 })
+            : undefined,
         };
       });
       await addContracts(newContracts);
-      // 차량 자동 동기화 — 신규 계약에 대해 vehicle upsert (currentContractId 갱신 + 신규 vehicle 생성)
+      // 차량 자동 동기화 — upsert 가 미등록 plate 를 자동 생성 + currentContractId 갱신.
+      // ctx.vehicles 가 stale 상태라 같은 plate 를 두 번 upsert 하면 중복 생성 → plate 당 1회만.
       const syncCtx2 = { vehicles, companies, addVehicle, updateVehicle };
+      const upsertedPlates = new Set<string>();
       for (const c of newContracts) {
+        const p = (c.vehiclePlate ?? '').trim();
+        if (p && upsertedPlates.has(p)) continue;
+        if (p) upsertedPlates.add(p);
         try { await upsertVehicleFromContract(c as Contract, syncCtx2); }
         catch (e) { console.error('legacy contracts vehicle sync failed', (c as Contract).contractNo, e); }
       }
-      toast.success(`${valid.length}건 계약 등록${toCreateVehicles.length > 0 ? ` (신규 차량 ${toCreateVehicles.length}대 자동 생성)` : ''}`);
+      toast.success(`${valid.length}건 계약 등록 (미등록 차량은 자동 생성)`);
       onSubmit();
     } catch (e) {
       toast.error('계약 등록 실패: ' + ((e as Error).message ?? String(e)));
