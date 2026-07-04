@@ -17,6 +17,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useInsurances } from '@/lib/firebase/insurance-store';
+import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { usePenaltyStore } from '@/lib/use-penalty-store';
 import { useRole } from '@/lib/use-role';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -28,11 +29,13 @@ export default function IntegrityPage() {
   const { vehicles } = useVehicles();
   const { contracts } = useContracts();
   const { policies } = useInsurances();
+  const { rows: bankTx } = useBankTx();
+  const { rows: cardTx } = useCardTx();
   const [penalties] = usePenaltyStore();
 
   const issues = useMemo(
-    () => computeDataIntegrity({ vehicles, contracts, insurances: policies, penalties }),
-    [vehicles, contracts, policies, penalties],
+    () => computeDataIntegrity({ vehicles, contracts, insurances: policies, penalties, bankTx, cardTx }),
+    [vehicles, contracts, policies, penalties, bankTx, cardTx],
   );
 
   const high = issues.filter((i) => i.sev === 'high').length;

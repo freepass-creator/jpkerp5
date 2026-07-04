@@ -10,15 +10,15 @@
  * 순수 함수 (읽기 전용). 저장·기존 리스크 로직 무변경.
  */
 
-import type { Contract, Vehicle, InsurancePolicy } from './types';
+import type { Contract, Vehicle, InsurancePolicy, BankTransaction, CardTransaction } from './types';
 import type { PenaltyWorkItem } from './penalty-pdf';
 
 export type IntegritySeverity = 'high' | 'mid';
 
 export type IntegrityIssue = {
   sev: IntegritySeverity;
-  kind: '필수누락' | '날짜역전' | 'plate고아';
-  entity: '차량' | '계약' | '보험' | '과태료';
+  kind: '필수누락' | '날짜역전' | 'plate고아' | '유령매칭';
+  entity: '차량' | '계약' | '보험' | '과태료' | '거래';
   target: string;   // 사람이 식별할 라벨 (plate/이름)
   detail: string;
   plate?: string;
@@ -39,10 +39,13 @@ export type IntegrityInput = {
   contracts: Contract[];
   insurances: InsurancePolicy[];
   penalties: PenaltyWorkItem[];
+  /** 유령 매칭 검사용 (선택) — 과거 '매칭 해제 미영속' 버그가 남긴 잔재 검출 */
+  bankTx?: BankTransaction[];
+  cardTx?: CardTransaction[];
 };
 
 export function computeDataIntegrity(input: IntegrityInput): IntegrityIssue[] {
-  const { vehicles, contracts, insurances, penalties } = input;
+  const { vehicles, contracts, insurances, penalties, bankTx = [], cardTx = [] } = input;
   const out: IntegrityIssue[] = [];
 
   // 차량 마스터 plate 집합 (변경 이력 포함) — 고아 판정용 O(1) 조회
@@ -97,6 +100,39 @@ export function computeDataIntegrity(input: IntegrityInput): IntegrityIssue[] {
     const p = normPlate(pen.car_number);
     if (p && !plateSet.has(p)) {
       out.push({ sev: 'mid', kind: 'plate고아', entity: '과태료', target: `${pen.car_number} · ${pen.notice_no ?? ''}`.trim(), detail: `차량 ${pen.car_number} 가 차량 마스터에 없음`, plate: pen.car_number });
+    }
+  }
+
+  // 4) 유령 매칭 — 거래는 matchedContractId 를 갖는데, 그 계약의 payments 에 해당 거래 entry 가 없음.
+  //    과거 '매칭 해제 미영속' 버그(patch undefined 미기록)가 남긴 잔재: 화면에서 해제했지만
+  //    거래엔 매칭이 살아있어 tx↔계약이 어긋난 상태. 해당 거래에서 매칭 해제→재매칭으로 정리.
+  if (bankTx.length > 0 || cardTx.length > 0) {
+    const contractById = new Map(contracts.map((c) => [c.id, c]));
+    const hasEntry = (c: Contract, pred: (p: { txId?: string; cardTxId?: string }) => boolean): boolean =>
+      (c.schedules ?? []).some((s) => (s.payments ?? []).some(pred));
+
+    for (const t of bankTx) {
+      if (!t.matchedContractId) continue;
+      if ((t.amount ?? 0) <= 0) continue;              // 출금·0원은 회차 entry 없는 매칭도 정상
+      if (t.settlementRole === 'item') continue;       // CMS 구성건은 집금건이 대표 매칭
+      const c = contractById.get(t.matchedContractId);
+      const label = `${(t.txDate ?? '').slice(0, 10)} ${t.counterparty ?? ''} ₩${(t.amount ?? 0).toLocaleString()}`.trim();
+      if (!c) {
+        out.push({ sev: 'high', kind: '유령매칭', entity: '거래', target: label, detail: '매칭된 계약이 존재하지 않음 (삭제됨) — 거래에서 매칭 해제 필요' });
+      } else if (!hasEntry(c, (p) => p.txId === t.id)) {
+        out.push({ sev: 'mid', kind: '유령매칭', entity: '거래', target: label, detail: `계약(${c.vehiclePlate ?? '?'} ${c.customerName ?? ''})에 이 입금 기록이 없음 — 매칭 해제 후 재매칭 권장`, plate: c.vehiclePlate });
+      }
+    }
+    for (const t of cardTx) {
+      if (!t.matchedContractId) continue;
+      if ((t.amount ?? 0) <= 0 || t.kind === '법인카드') continue;
+      const c = contractById.get(t.matchedContractId);
+      const label = `${(t.txDate ?? '').slice(0, 10)} 카드 ${t.customerName ?? ''} ₩${(t.amount ?? 0).toLocaleString()}`.trim();
+      if (!c) {
+        out.push({ sev: 'high', kind: '유령매칭', entity: '거래', target: label, detail: '매칭된 계약이 존재하지 않음 (삭제됨) — 거래에서 매칭 해제 필요' });
+      } else if (!hasEntry(c, (p) => p.cardTxId === t.id)) {
+        out.push({ sev: 'mid', kind: '유령매칭', entity: '거래', target: label, detail: `계약(${c.vehiclePlate ?? '?'} ${c.customerName ?? ''})에 이 카드수납 기록이 없음 — 매칭 해제 후 재매칭 권장`, plate: c.vehiclePlate });
+      }
     }
   }
 
