@@ -95,6 +95,16 @@ type RenderContext = {
 };
 
 /** "{{key}}" 또는 "{{company.name}}" 같은 placeholder 치환. 못 찾으면 빈 문자열. */
+/** HTML 이스케이프 — 치환값이 dangerouslySetInnerHTML 로 렌더되므로 필수 (stored XSS 방어) */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function renderBody(template: DocTemplate, ctx: RenderContext): string {
   return template.body.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, path: string) => {
     const parts = path.split('.');
@@ -109,7 +119,8 @@ export function renderBody(template: DocTemplate, ctx: RenderContext): string {
         return '';
       }
     }
-    return cur == null ? '' : String(cur);
+    // 치환값 이스케이프 — 고객명/OCR 텍스트에 마크업이 있어도 실행되지 않게 (penalty-templates 와 동일 방어)
+    return cur == null ? '' : escapeHtml(String(cur));
   });
 }
 

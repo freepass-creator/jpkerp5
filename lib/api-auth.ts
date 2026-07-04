@@ -24,8 +24,12 @@ export async function requireAuth(): Promise<AuthedActor | NextResponse> {
   const auth = h.get('authorization') ?? '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
 
-  // 로컬 dev: admin SDK 자격 없음 → token 미검증, 통과 (NEXT_PUBLIC_* 만으로 동작)
+  // 로컬 dev: admin SDK 자격 없음 → token 미검증, 통과 (NEXT_PUBLIC_* 만으로 동작).
+  // 단 프로덕션에서 admin key 누락은 오설정 — graceful skip 하면 전 API 무인증 통과라 차단 (fail-closed).
   if (!HAS_ADMIN_KEY) {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ ok: false, error: 'server auth misconfigured (FIREBASE_ADMIN_KEY)' }, { status: 500 });
+    }
     return { uid: 'local-dev', email: 'local@dev' };
   }
 

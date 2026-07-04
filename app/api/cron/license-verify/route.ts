@@ -42,9 +42,15 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const dry = url.searchParams.get('dry') === '1';
 
-  const cronSig = req.headers.get('x-vercel-cron-signature');
+  // cron 인증 — Bearer CRON_SECRET 값 대조만 신뢰.
+  // (기존: x-vercel-cron-signature 헤더 "존재"만 확인 → 아무 값이나 담으면 통과,
+  //  CRON_SECRET 미설정이면 조건 전체 스킵 → 무인증 공개. 둘 다 차단)
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && !cronSig && req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!cronSecret) {
+    if (isProd) return NextResponse.json({ ok: false, error: 'CRON_SECRET 미설정 — cron 차단' }, { status: 401 });
+    // 로컬 dev 는 시크릿 없이 허용 (수동 테스트)
+  } else if (req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized cron' }, { status: 401 });
   }
 

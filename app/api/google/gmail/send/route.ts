@@ -151,8 +151,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'to, subject 필수' }, { status: 400 });
     }
 
-    const from = body.from || process.env.GMAIL_SENDER || process.env.GOOGLE_IMPERSONATE_USER;
-    if (!from) return NextResponse.json({ ok: false, error: 'GMAIL_SENDER 또는 from 필요' }, { status: 500 });
+    // 발신자(임퍼소네이션 대상)는 서버 env 고정 — body.from 을 수용하면 인증된 직원이
+    // 도메인 내 임의 계정으로 발신 위장 가능 (Domain-Wide Delegation 오남용 차단)
+    const from = process.env.GMAIL_SENDER || process.env.GOOGLE_IMPERSONATE_USER;
+    if (!from) return NextResponse.json({ ok: false, error: 'GMAIL_SENDER env 필요' }, { status: 500 });
 
     const gmail = getGmailClient(from);
     const raw = buildRfc822(body, from);
