@@ -4,7 +4,7 @@ import type {
   Contract, Vehicle, CompanyCode, VehicleStatus, BankTransaction, CardTransaction, Company,
 } from './types';
 import { normalizeIdent, inferKind, formatIdent, type CustomerKind } from './ident';
-import { generateSchedules, distributeUnpaid, computeCurrentSeq as computeCurrentSeqFromSchedules } from './payment-schedule';
+import { generateSchedules, distributeUnpaid, computeCurrentSeq as computeCurrentSeqFromSchedules, recalcSchedule } from './payment-schedule';
 import { todayKr } from './mock-data';
 import { toStr, toNum, toDate, get, type Row } from './parse-helpers';
 import { monthsBetween } from './utils';
@@ -449,7 +449,25 @@ export function applySnapshotToContract(
     monthlyRent: patch.monthlyRent,
     paymentDay,
   });
-  const distributed = distributeUnpaid(baseSchedules, patch.unpaidAmount, today, patch.lastPaidDate);
+  let distributed = distributeUnpaid(baseSchedules, patch.unpaidAmount, today, patch.lastPaidDate);
+
+  // 스냅샷 재업로드 시 실입금 보존 — 기존 계약의 계좌/카드/수동/현금 entry('정산' 가상분 제외)를
+  // 같은 회차에 되살림. 기존엔 회차 전량 재생성으로 실입금 이력이 가짜 '정산'으로 대체돼
+  // 감사추적이 소실됐음. 실입금 있는 회차는 가상 '정산' 대신 실입금 기준으로 재계산.
+  if (existing?.schedules?.length) {
+    const realBySeq = new Map<number, NonNullable<Contract['schedules']>[number]['payments']>();
+    for (const s of existing.schedules) {
+      const real = (s.payments ?? []).filter((p) => p.source !== '정산');
+      if (real.length > 0) realBySeq.set(s.seq, real);
+    }
+    if (realBySeq.size > 0) {
+      distributed = distributed.map((s) => {
+        const real = realBySeq.get(s.seq);
+        if (!real || real.length === 0) return s;
+        return recalcSchedule({ ...s, payments: [...real] }, today);
+      });
+    }
+  }
   const currentSeqFromSched = computeCurrentSeqFromSchedules(distributed, today);
 
   if (existing) {
@@ -899,17 +917,20 @@ export function parseCardTxRow(
     '승인NO', '거래NO', 'No', 'NO',
     'approvalNo', 'transactionId',
   ));
-  const amount = toNum(get(row, '금액', '매입금액', '거래금액', '매출액', '이용금액', '사용금액', '결제금액', 'amount'));
-  if (!txDate || amount <= 0) return null;
+  const amountRaw = toNum(get(row, '금액', '매입금액', '거래금액', '매출액', '이용금액', '사용금액', '결제금액', 'amount'));
+  // 취소전표 — 음수 금액 또는 구분='취소' 행. 버리면 매출이 과대되므로 음수 매출로 보존.
+  const kindRawEarly = toStr(get(row, '구분', '종류', '거래종류', 'kind'));
+  const isCancel = amountRaw < 0 || kindRawEarly.includes('취소');
+  const amount = isCancel ? -Math.abs(amountRaw) : amountRaw;
+  if (!txDate || amount === 0) return null;
 
   // 카드뒤4 — 두 가지 alias: 카드번호(앞 마스킹, 뒤 4자리), 별도 끝4자리 컬럼
   const cardRaw = toStr(get(row, '카드번호', '카드No', 'cardLast4', 'last4'));
   const last4 = (cardRaw.match(/\d{4}\s*$/) ?? [''])[0].trim() || undefined;
 
-  // kind 우선순위: variantHint > 컬럼명 > default '매출'
-  const kindRaw = toStr(get(row, '구분', '종류', '거래종류', 'kind'));
+  // kind 우선순위: variantHint > 컬럼명 > default '매출' (취소는 음수 매출로 이미 처리)
   const kind: '매출' | '법인카드' = variantHint
-    ?? (kindRaw === '법인카드' || kindRaw === '지출' ? '법인카드' : '매출');
+    ?? (kindRawEarly === '법인카드' || kindRawEarly === '지출' ? '법인카드' : '매출');
 
   // 법인카드 — 승인번호 없으면 (txDate, amount, merchant, last4) 조합으로 pseudo-key 만들어 통과.
   // 매출은 승인번호 필수 (취소·정산 추적 필요).

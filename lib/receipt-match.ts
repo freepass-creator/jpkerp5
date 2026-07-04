@@ -16,7 +16,7 @@
  */
 
 import type { BankTransaction, CardTransaction, Contract, PaymentEntry, PaymentScheduleInline } from './types';
-import { applyPayment, totalUnpaid, totalUnpaidCount, computeCurrentSeq, addPaymentEntry } from './payment-schedule';
+import { applyPayment, totalUnpaid, totalUnpaidCount, computeCurrentSeq, addPaymentEntry, distributeEntry } from './payment-schedule';
 
 /** 이름 정규화 — 공백 제거, 소문자 */
 function normName(s: string): string {
@@ -218,12 +218,21 @@ export function applyMatch(
     by: actorEmail,
     at: new Date().toISOString(),
   };
-  const { schedule: nextTarget } = addPaymentEntry(schedules[idx], entry, tx.txDate);
+  const { schedule: nextTarget, leftover } = addPaymentEntry(schedules[idx], entry, tx.txDate);
   schedules[idx] = nextTarget;
 
-  const newUnpaid = totalUnpaid(schedules);
-  const newUnpaidCount = totalUnpaidCount(schedules);
-  const newCurrentSeq = computeCurrentSeq(schedules, tx.txDate);
+  // 초과분 이월 — 부분납 회차에 전액 매칭 시 잘린 잔액이 어디에도 기록되지 않고
+  // 증발하던 것(tx 는 전액 매칭 표시) → 남은 금액을 다른 미납 회차에 FIFO 분배.
+  // 같은 txId 로 기록되므로 reverseMatch(txId 필터)로 한 번에 원복 가능.
+  let finalSchedules = schedules;
+  if (leftover > 0) {
+    const { schedules: rolled } = distributeEntry(schedules, { ...entry, amount: leftover }, tx.txDate);
+    finalSchedules = rolled;
+  }
+
+  const newUnpaid = totalUnpaid(finalSchedules);
+  const newUnpaidCount = totalUnpaidCount(finalSchedules);
+  const newCurrentSeq = computeCurrentSeq(finalSchedules, tx.txDate);
 
   return {
     txPatch: {
@@ -234,7 +243,7 @@ export function applyMatch(
       subject: tx.subject ?? '대여료수입',
     },
     contractPatch: {
-      schedules,
+      schedules: finalSchedules,
       unpaidAmount: newUnpaid,
       unpaidSeqCount: newUnpaidCount,
       currentSeq: newCurrentSeq,
@@ -381,8 +390,15 @@ export function applyCardMatch(
     by: actorEmail,
     at: new Date().toISOString(),
   };
-  const { schedule: nextTarget } = addPaymentEntry(schedules[idx], entry, tx.txDate);
+  const { schedule: nextTarget, leftover } = addPaymentEntry(schedules[idx], entry, tx.txDate);
   schedules[idx] = nextTarget;
+
+  // 초과분 이월 — applyMatch(계좌)와 동일. 같은 cardTxId 라 reverseCardMatch 로 원복 가능.
+  let finalSchedules = schedules;
+  if (leftover > 0) {
+    const { schedules: rolled } = distributeEntry(schedules, { ...entry, amount: leftover }, tx.txDate);
+    finalSchedules = rolled;
+  }
 
   return {
     txPatch: {
@@ -390,10 +406,10 @@ export function applyCardMatch(
       matchedScheduleId: String(scheduleSeq),
     },
     contractPatch: {
-      schedules,
-      unpaidAmount: totalUnpaid(schedules),
-      unpaidSeqCount: totalUnpaidCount(schedules),
-      currentSeq: computeCurrentSeq(schedules, tx.txDate),
+      schedules: finalSchedules,
+      unpaidAmount: totalUnpaid(finalSchedules),
+      unpaidSeqCount: totalUnpaidCount(finalSchedules),
+      currentSeq: computeCurrentSeq(finalSchedules, tx.txDate),
       lastPaidDate: tx.txDate,
       lastPaidAmount: tx.amount,
     },
