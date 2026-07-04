@@ -420,7 +420,7 @@ export default function Page() {
       toast.info(`${c.vehiclePlate} 는 이미 인도 완료 (${c.deliveredDate})`);
       return;
     }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayKr();   // UTC 기준이면 KST 00~09시 처리 시 전날로 기록됨
     void updateContract(markDelivered(c, today));
   }
   async function ctxAction_markReturned(c: Contract) {
@@ -433,7 +433,7 @@ export default function Page() {
       return;
     }
     if (!await showConfirm({ title: `${c.vehiclePlate} ${c.customerName} 을 오늘 반납 처리하시겠습니까?` })) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayKr();   // UTC 기준이면 KST 00~09시 처리 시 전날로 기록됨
     // 상태값 SSOT (ERP #4) — markReturned 가 일할 자동 정산 + 부수효과 통합
     void updateContract(markReturned(c, today));
   }
@@ -526,7 +526,7 @@ export default function Page() {
   const viewCounts = useMemo<Record<View, number>>(() => {
     const scoped = contracts.filter((c) => matchesCompany(c, companyFilter));
     return {
-      전체: scoped.length,
+      전체: scoped.filter((c) => matchesView(c, '전체')).length,   // 목록과 동일 기준 (종료건 제외)
       계약중: scoped.filter((c) => matchesView(c, '계약중')).length,
       확정대기: scoped.filter((c) => matchesView(c, '확정대기')).length,
       만기경과: scoped.filter((c) => matchesView(c, '만기경과')).length,
@@ -599,7 +599,13 @@ export default function Page() {
   function handleExtend(contractId: string, months: number) {
     const c = contracts.find((x) => x.id === contractId);
     if (!c) return;
-    const fromDate = c.returnScheduledDate ?? todayKr();
+    if (!c.termMonths || c.termMonths <= 0) {
+      // 무기한(장기) 계약은 termMonths=0 — 0+N개월로 만들면 과거 만기가 생겨 즉시 만기경과로 붕괴
+      toast.info(`${c.vehiclePlate} 는 무기한(장기) 계약입니다 — 상세에서 약정기간을 먼저 지정하세요.`);
+      return;
+    }
+    // 연장 기준일 = 만기 SSOT (returnScheduledDate 가 비었거나 어긋난 계약도 일관)
+    const fromDate = getExpiryDate(c) ?? todayKr();
     const newTerm = c.termMonths + months;
     void rtdbUpdate({
       ...c,
@@ -607,6 +613,8 @@ export default function Page() {
       termMonths: newTerm,
       totalSeq: newTerm,
       schedules: extendSchedules(c, newTerm),   // 연장분 회차 append — 청구 누락 방지
+      // 연장대기 상태에서 연장 확정 시 운행 복귀 (연장대기 칩에 잔류하던 것)
+      ...(c.vehicleStatus === '연장대기' ? { vehicleStatus: '운행' as const } : {}),
       notes: `${c.notes ?? ''}${c.notes ? ' / ' : ''}${todayKr()} ${months}개월 연장`.trim(),
     });
   }

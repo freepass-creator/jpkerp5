@@ -19,6 +19,7 @@
 
 import type { Contract } from './types';
 import { applyReturnedProration } from './returned-proration';
+import { todayKr } from './mock-data';
 
 /** 인도 — 운행 시작 */
 export function markDelivered(c: Contract, deliveredDate: string): Contract {
@@ -45,7 +46,7 @@ export function markReturned(c: Contract, returnedDate: string): Contract {
 export function markTerminated(c: Contract, terminatedDate?: string): Contract {
   return {
     ...c,
-    returnedDate: terminatedDate ?? c.returnedDate ?? new Date().toISOString().slice(0, 10),
+    returnedDate: terminatedDate ?? c.returnedDate ?? todayKr(),   // UTC 였으면 KST 00~09시 해지가 전날로 기록
     status: '해지' as const,
     endReason: '중도해지',
   };
