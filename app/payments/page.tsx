@@ -376,6 +376,8 @@ export default function PaymentsPage() {
 
     // 1) 계좌 + 자동이체 (BankTransaction)
     for (const t of bankTx) {
+      // CMS 묶음: 집금 입금(deposit)과 구성 자동이체(item)가 같은 돈 — item 은 집계 제외 (이중집계 방지)
+      if (t.settlementRole === 'item') continue;
       const day = t.txDate.slice(0, 10);
       const companyCode = t.companyCode || (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
       const cur = bucket(companyCode, day);
@@ -389,14 +391,19 @@ export default function PaymentsPage() {
       cur.txCount++;
     }
 
-    // 2) 카드 매출 (CardTransaction) — 무조건 입금/카드매출 계정으로 잡힘
+    // 2) 카드 (CardTransaction) — 매출은 입금, 법인카드는 지출 (기존엔 법인카드 지출까지 입금으로 합산됐음)
     for (const t of cardTx) {
       const day = t.txDate.slice(0, 10);
-      const companyCode = (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
+      const companyCode = t.companyCode || (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
       const cur = bucket(companyCode, day);
-      cur.deposit += t.amount ?? 0;
+      if ((t.kind ?? '매출') === '매출') {
+        cur.deposit += t.amount ?? 0;
+        cur._depo['카드매출'] = (cur._depo['카드매출'] ?? 0) + (t.amount ?? 0);
+      } else {
+        cur.withdraw += t.amount ?? 0;
+        cur._draw['법인카드'] = (cur._draw['법인카드'] ?? 0) + (t.amount ?? 0);
+      }
       cur.netChange = cur.deposit - cur.withdraw;
-      cur._depo['카드매출'] = (cur._depo['카드매출'] ?? 0) + (t.amount ?? 0);
       cur.txCount++;
     }
 

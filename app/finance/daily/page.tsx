@@ -114,6 +114,8 @@ export default function FinanceDailyPage() {
       return cur;
     }
     for (const t of bankTx) {
+      // CMS 묶음: 집금 입금과 구성 자동이체(item)는 같은 돈 — item 제외 (이중집계 방지)
+      if (t.settlementRole === 'item') continue;
       const day = (t.txDate ?? '').slice(0, 10);
       if (!day || !inPeriod(day)) continue;
       const companyCode = t.companyCode || (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
