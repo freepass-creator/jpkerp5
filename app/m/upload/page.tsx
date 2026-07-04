@@ -226,7 +226,7 @@ export default function MobileUpload() {
     if (drafts.length === 0) return;
     let matched = 0;
     let pending = 0;
-    let fail = 0;
+    const failedIds = new Set<string>();
     for (const d of drafts) {
       updateDraft(d.id, { uploading: true });
       try {
@@ -234,11 +234,13 @@ export default function MobileUpload() {
         if (r.matched) matched++;
         else pending++;
       } catch (e) {
-        fail++;
+        failedIds.add(d.id);
         toast.error(`${d.file.name} 실패: ${(e as Error).message}`);
       }
     }
-    setDrafts([]);
+    // 실패한 파일은 draft 에 남겨 재시도 가능하게 (기존엔 전멸시켜 재선택 강제)
+    setDrafts((arr) => arr.filter((d) => failedIds.has(d.id)).map((d) => ({ ...d, uploading: false })));
+    const fail = failedIds.size;
     const parts: string[] = [];
     if (matched > 0) parts.push(`${matched}개 자동 매칭`);
     if (pending > 0) parts.push(`${pending}개 미매칭 (수동)`);
@@ -455,14 +457,8 @@ function PendingCard({ item, userEmail }: { item: PendingUpload; userEmail?: str
           onCancel={() => setMatching(false)}
           onMatch={async (contractId, vehicleId, customerKey) => {
             try {
-              await matchUpload(item.id, {
-                matchedContractId: contractId,
-                matchedVehicleId: vehicleId,
-                matchedCustomerKey: customerKey,
-                matchedBy: userEmail,
-                subCategory: item.subCategory,
-              });
-              // 분류에 따라 적절한 노드로 이관
+              // 목적지 write 를 먼저 — matchUpload(status='matched')를 먼저 쓰면
+              // 중간 실패 시 미매칭 목록에서 사라지는데 파일은 어디에도 없는 유실 창구가 됨
               if (item.kind === 'image' && vehicleId) {
                 const photoKind: VehiclePhotoKind =
                   item.subCategory === 'product' ? 'product'
@@ -488,6 +484,14 @@ function PendingCard({ item, userEmail }: { item: PendingUpload; userEmail?: str
                   by: userEmail,
                 });
               }
+              // 목적지 저장 성공 후에만 매칭 마킹 + pending 제거
+              await matchUpload(item.id, {
+                matchedContractId: contractId,
+                matchedVehicleId: vehicleId,
+                matchedCustomerKey: customerKey,
+                matchedBy: userEmail,
+                subCategory: item.subCategory,
+              });
               await removePendingUpload(item.id);
               toast.success('매칭 완료');
             } catch (e) {

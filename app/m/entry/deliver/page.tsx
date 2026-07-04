@@ -59,8 +59,16 @@ export default function MobileDeliver() {
   const matches = useMemo(() => {
     const query = q.trim().toLowerCase().replace(/[^\w가-힣]/g, '');
     if (!query) return [];
+    // 검색도 대기 목록과 동일 조건 — 종료·매각·휴차 계약이 검색에 떠서
+    // 인도 처리하면 죽은 계약이 '운행'으로 부활하던 것 차단
     return contracts
-      .filter((c) => !c.deliveredDate)
+      .filter((c) => {
+        if (c.deliveredDate) return false;
+        const s = c.vehicleStatus;
+        if (s === '휴차' || s === '휴차대기' || s === '매각' || s === '매각대기' || s === '매각검토') return false;
+        if (isContractEnded(c)) return false;
+        return true;
+      })
       .filter((c) => `${c.vehiclePlate ?? ''}${c.customerName ?? ''}`.toLowerCase().replace(/[^\w가-힣]/g, '').includes(query))
       .slice(0, 20);
   }, [contracts, q]);

@@ -63,8 +63,10 @@ export default function MobileReturn() {
   const matches = useMemo(() => {
     const query = q.trim().toLowerCase().replace(/[^\w가-힣]/g, '');
     if (!query) return [];
+    // 검색도 대기 목록과 동일 조건 — 인도 전(예약) 계약까지 반납 처리되던 것 차단
     return contracts
       .filter((c) => !c.returnedDate)
+      .filter((c) => c.vehicleStatus === '운행' || c.vehicleStatus === '연장대기' || c.vehicleStatus === '종료대기')
       .filter((c) => `${c.vehiclePlate ?? ''}${c.customerName ?? ''}`.toLowerCase().replace(/[^\w가-힣]/g, '').includes(query))
       .slice(0, 20);
   }, [contracts, q]);

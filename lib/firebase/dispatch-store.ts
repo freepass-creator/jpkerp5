@@ -22,7 +22,7 @@
 
 import { ref, push, onValue, update as rtdbUpdate, get, remove as rtdbRemove } from 'firebase/database';
 import { useEffect, useState } from 'react';
-import { getRtdb, dbPath, ensureAuth, pruneUndefined } from './client';
+import { getRtdb, dbPath, ensureAuth, pruneUndefined, getFirebaseAuth } from './client';
 import { withMeta, type WriteMeta } from '../write-meta';
 
 const PATH = dbPath('dispatch_orders');
@@ -83,6 +83,9 @@ export type DispatchOrder = {
   acknowledgedAt?: string;
   startedAt?: string;
   doneAt?: string;
+  /** 마지막 상태 전이 수행자·시각 — 누가 확인/시작/완료했는지 */
+  statusChangedBy?: string;
+  statusChangedAt?: string;
   /** 댓글 dictionary (commentId → DispatchComment) */
   comments?: Record<string, DispatchComment>;
   _meta?: WriteMeta;
@@ -157,7 +160,13 @@ export async function updateDispatchStatus(
   await ensureAuth();
   const db = getRtdb();
   if (!db) return;
-  await rtdbUpdate(ref(db, `${PATH}/${orderId}`), pruneUndefined(patch));
+  // 수행자 기록 — 누가 확인/시작/완료했는지 (기존엔 actor 없이 raw patch 라 감사 추적 불가)
+  const actor = getFirebaseAuth()?.currentUser?.email ?? undefined;
+  await rtdbUpdate(ref(db, `${PATH}/${orderId}`), pruneUndefined({
+    ...patch,
+    statusChangedBy: actor,
+    statusChangedAt: new Date().toISOString(),
+  }));
 }
 
 /** 본인 요청받은 업무 라이브 구독 — 모바일 홈/orders 페이지에서 사용
