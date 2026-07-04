@@ -73,18 +73,24 @@ export async function updateBankTxWithMatchSync(
 
   // 1) 이전 매칭 해제
   let resolvedPatch: Partial<BankTransaction> = { ...patch };
+  // 같은 계약에 재적용(금액 변경)하는 경우 — 해제 결과를 2단계 기준으로 사용해야 함.
+  // stale 원본을 쓰면 옛 entry 가 남은 채 새 entry 가 추가돼 이중 차감됨.
+  let reversedContract: Contract | undefined;
   if (oldMatchId) {
     const oldContract = contracts.find((c) => c.id === oldMatchId);
     if (oldContract) {
       const { txPatch, contractPatch } = reverseMatch(oldTx, oldContract, todayKr());
       resolvedPatch = { ...txPatch, ...resolvedPatch };
-      await updateContract({ ...oldContract, ...contractPatch });
+      reversedContract = { ...oldContract, ...contractPatch };
+      await updateContract(reversedContract);
     }
   }
 
   // 2) 새 매칭 적용 (있고 입금액 > 0)
   if (newMatchId && newDeposit > 0) {
-    const newContract = contracts.find((c) => c.id === newMatchId);
+    const newContract = (newMatchId === oldMatchId && reversedContract)
+      ? reversedContract
+      : contracts.find((c) => c.id === newMatchId);
     if (newContract) {
       const txDate = patch.txDate ?? oldTx.txDate ?? todayKr();
       // 중복 감지 — 직접 수납 후 계좌 매칭 시 양쪽 등록 사고 방지
@@ -197,18 +203,23 @@ export async function updateCardTxWithMatchSync(
   let resolvedPatch: Partial<CardTransaction> = { ...patch };
 
   // 1) 이전 매칭 해제 — cardTxId 로 연결된 회차 결제 원복
+  // 같은 계약 재적용(금액 변경) 시 해제 결과를 2단계 기준으로 (stale 원본이면 이중 차감)
+  let reversedContract: Contract | undefined;
   if (oldMatchId) {
     const oldContract = contracts.find((c) => c.id === oldMatchId);
     if (oldContract) {
       const { txPatch, contractPatch } = reverseCardMatch(oldTx, oldContract, todayKr());
       resolvedPatch = { ...txPatch, ...resolvedPatch };
-      await updateContract({ ...oldContract, ...contractPatch });
+      reversedContract = { ...oldContract, ...contractPatch };
+      await updateContract(reversedContract);
     }
   }
 
   // 2) 새 매칭 적용 — 금액 > 0 이면 FIFO 로 미납 회차 차감
   if (newMatchId && newAmount > 0) {
-    const newContract = contracts.find((c) => c.id === newMatchId);
+    const newContract = (newMatchId === oldMatchId && reversedContract)
+      ? reversedContract
+      : contracts.find((c) => c.id === newMatchId);
     if (newContract) {
       const mergedTx: CardTransaction = { ...oldTx, ...patch, matchedContractId: newMatchId };
       const { txPatch, contractPatch } = applyFifoCardPayment(mergedTx, newContract);
