@@ -85,6 +85,16 @@ function safeName(s: string | undefined, fallback = '미지정'): string {
 
 /* ────────────────── 컨텍스트 빌더 ────────────────── */
 
+/** 그룹 항목 id 들의 결정적 5자리 해시 — 같은 묶음이면 언제 생성해도 같은 문서번호. */
+function stableGroupHash(items: PenaltyWorkItem[]): string {
+  const key = items.map((i) => i.id).sort().join('|');
+  let h = 0;
+  for (let i = 0; i < key.length; i++) {
+    h = (h * 31 + key.charCodeAt(i)) >>> 0;   // uint32 rolling hash
+  }
+  return String(h % 100000).padStart(5, '0');
+}
+
 function buildContext(items: PenaltyWorkItem[], staff: IssueContext['staff'], opts?: {
   recipient?: string;
   docNo?: string;
@@ -100,7 +110,9 @@ function buildContext(items: PenaltyWorkItem[], staff: IssueContext['staff'], op
     ceo: '', bizNo: '', corpNo: '', hqAddress: '', bizType: '', bizCategory: '', phone: '',
   };
   const today = new Date().toISOString().slice(0, 10);
-  const fallbackDocNo = `${company.code}-${today.slice(0, 4)}-${Date.now().toString().slice(-5)}`;
+  // 문서번호 — 그룹 항목 id 기반 결정적 생성. Date.now() 는 호출마다 달라져
+  // 미리보기·실제 다운로드·재다운로드의 공문번호가 전부 달랐음 (감사/재발급 추적 불가).
+  const fallbackDocNo = `${company.code}-${today.slice(0, 4)}-${stableGroupHash(items)}`;
 
   return {
     company,
