@@ -262,8 +262,11 @@ export async function syncContractStatusFromVehicle(
 ): Promise<{ updatedCount: number }> {
   const plate = (vehicle.plate ?? '').trim();
   if (!plate || !vehicle.status) return { updatedCount: 0 };
+  // 활성 계약만 sync — 종료 계약(반납/해지/채권)의 vehicleStatus 는 종료 시점 기록이므로 보존
+  // (기존엔 과거 계약까지 현재 자산 상태로 덮여 종료 기록이 파괴됨)
   const targets = contracts.filter((c) =>
     (c.vehiclePlate ?? '').trim() === plate &&
+    (c.status === '운행' || c.status === '대기') &&
     c.vehicleStatus !== vehicle.status,
   );
   for (const c of targets) {

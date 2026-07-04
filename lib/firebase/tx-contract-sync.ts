@@ -140,33 +140,44 @@ export async function applyMultiContractMatch(
   updateBank: BankUpdater,
   updateContract: ContractUpdater,
 ): Promise<void> {
+  // 계약별 최신 상태를 로컬 Map 으로 체이닝 — stale 스냅샷 기반 재적용 시
+  // 옛 entry 미제거 상태 위에 새 entry 가 쌓여 이중 계상되던 것 방지.
+  const working = new Map<string, Contract>();
+  const getWorking = (id: string): Contract | undefined =>
+    working.get(id) ?? contracts.find((c) => c.id === id);
+  const setWorking = (c: Contract) => working.set(c.id, c);
+
   // 1) 기존 단일 매칭 reverse
   if (oldTx.matchedContractId) {
-    const old = contracts.find((c) => c.id === oldTx.matchedContractId);
+    const old = getWorking(oldTx.matchedContractId);
     if (old) {
       const { contractPatch } = reverseMatch(oldTx, old, todayKr());
-      await updateContract({ ...old, ...contractPatch });
+      setWorking({ ...old, ...contractPatch });
     }
   }
   // 2) 기존 다중 매칭 reverse — payment entry txId 기준 제거
   for (const m of oldTx.matches ?? []) {
-    const old = contracts.find((c) => c.id === m.contractId);
+    const old = getWorking(m.contractId);
     if (!old) continue;
     const { contractPatch } = reverseMatch(oldTx, old, todayKr());
-    await updateContract({ ...old, ...contractPatch });
+    setWorking({ ...old, ...contractPatch });
   }
-  // 3) 새 매칭 적용
+  // 3) 새 매칭 적용 — 같은 계약에 split 이 2행이어도 체이닝돼 첫 분배가 유실되지 않음
   const appliedMatches: Array<{ contractId: string; amount: number; matchedAt: string }> = [];
   const matchedAt = new Date().toISOString();
   for (const s of splits) {
     if (s.amount <= 0) continue;
-    const c = contracts.find((x) => x.id === s.contractId);
+    const c = getWorking(s.contractId);
     if (!c) continue;
     // 거래의 일부 금액만 분배하기 위해 임시 tx 객체
     const partialTx: BankTransaction = { ...oldTx, amount: s.amount, matchedContractId: s.contractId };
     const { contractPatch } = applyFifoPayment(partialTx, c);
-    await updateContract({ ...c, ...contractPatch });
+    setWorking({ ...c, ...contractPatch });
     appliedMatches.push({ contractId: s.contractId, amount: s.amount, matchedAt });
+  }
+  // 계약당 1회 커밋
+  for (const c of working.values()) {
+    await updateContract(c);
   }
   // 4) BankTx 패치 — matchedContractId 는 단일 매칭 호환용으로 첫번째 split 사용
   const txPatch: Partial<BankTransaction> = {

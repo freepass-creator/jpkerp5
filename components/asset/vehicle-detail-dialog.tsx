@@ -135,7 +135,9 @@ function OperationOverviewTab({
 
   async function changeStatus(next: VehicleStatus) {
     if (!await showConfirm({ title: `차량 상태를 [${vehicle.status}] → [${next}] 로 변경하시겠습니까?` })) return;
-    onUpdate({ ...vehicle, status: next });
+    // 매각 전환 시 saleDate stamp — 자산대장 감가 컷오프 (처분 페이지와 동일 규칙)
+    const saleDate = next === '매각' && !vehicle.saleDate ? todayKr() : vehicle.saleDate;
+    onUpdate({ ...vehicle, status: next, saleDate });
   }
 
   // 등록 체크리스트 — 각 단계별 prerequisites

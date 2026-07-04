@@ -14,6 +14,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Plus, Trash, FileXls, MagnifyingGlass, Copy, X } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { exportToExcel } from '@/lib/excel-export';
+import { todayKr } from '@/lib/mock-data';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
@@ -603,7 +604,9 @@ export default function AssetPage() {
                   let changed = 0, syncedContracts = 0;
                   for (const v of targets) {
                     if (v.status === next) continue;
-                    const merged = { ...v, status: next };
+                    // 매각 전환 시 saleDate stamp — 없으면 자산대장 감가가 오늘까지 계속 진행돼 장부가·처분손익 왜곡
+                    const saleDate = next === '매각' && !v.saleDate ? todayKr() : v.saleDate;
+                    const merged = { ...v, status: next, saleDate };
                     try {
                       await updateVehicle(merged);
                       changed++;

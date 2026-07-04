@@ -115,7 +115,9 @@ export function VehicleRegRegisterDialog({
         seatingCapacity: n('seats') ?? existing?.seatingCapacity,
         displacementCc: n('displacement') ?? existing?.displacementCc,
         fuelType: s('fuel_type') ?? existing?.fuelType,
-        purchasePrice: n('acquisition_price') ?? existing?.purchasePrice,
+        // 매입가는 사용자 입력이 원천 — 기존값 우선, OCR 출고가는 신규일 때만 초기값으로.
+        // (기존: OCR 우선이라 자등증 재등록 시 중고 매입가가 신차 출고가로 조용히 교체 → 감가·장부가 왜곡)
+        purchasePrice: existing?.purchasePrice ?? n('acquisition_price'),
         _existingId: existing?.id,
       };
     },
