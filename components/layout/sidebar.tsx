@@ -101,7 +101,6 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sb-brand">
-        {!collapsed && <span className="sb-brand-text">성유민바보</span>}
         <button
           className="sb-brand-collapse"
           type="button"

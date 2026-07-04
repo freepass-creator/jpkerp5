@@ -42,16 +42,19 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const dry = url.searchParams.get('dry') === '1';
 
-  // cron 인증 — Bearer CRON_SECRET 값 대조만 신뢰.
-  // (기존: x-vercel-cron-signature 헤더 "존재"만 확인 → 아무 값이나 담으면 통과,
-  //  CRON_SECRET 미설정이면 조건 전체 스킵 → 무인증 공개. 둘 다 차단)
+  // cron 인증 — CRON_SECRET 설정 시 Bearer 값 대조 (헤더 존재만 확인하던 우회 제거).
+  // 미설정이면 Vercel cron 헤더 존재 시 허용(현행 유지 — 운영 cron 이 매일 돌고 있어 차단 시 장애)
+  // + 경고 로그. env 등록 후 이 fallback 을 제거할 것.
   const cronSecret = process.env.CRON_SECRET;
-  const isProd = process.env.NODE_ENV === 'production';
-  if (!cronSecret) {
-    if (isProd) return NextResponse.json({ ok: false, error: 'CRON_SECRET 미설정 — cron 차단' }, { status: 401 });
-    // 로컬 dev 는 시크릿 없이 허용 (수동 테스트)
-  } else if (req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ ok: false, error: 'unauthorized cron' }, { status: 401 });
+  if (cronSecret) {
+    if (req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ ok: false, error: 'unauthorized cron' }, { status: 401 });
+    }
+  } else if (process.env.NODE_ENV === 'production') {
+    console.error('[cron] CRON_SECRET 미설정 — 서명 검증 없이 동작 중. Vercel env 등록 필요.');
+    if (!req.headers.get('x-vercel-cron-signature')) {
+      return NextResponse.json({ ok: false, error: 'unauthorized cron' }, { status: 401 });
+    }
   }
 
   const env = getRimsEnv();

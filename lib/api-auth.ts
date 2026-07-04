@@ -25,10 +25,12 @@ export async function requireAuth(): Promise<AuthedActor | NextResponse> {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
 
   // 로컬 dev: admin SDK 자격 없음 → token 미검증, 통과 (NEXT_PUBLIC_* 만으로 동작).
-  // 단 프로덕션에서 admin key 누락은 오설정 — graceful skip 하면 전 API 무인증 통과라 차단 (fail-closed).
+  // ⚠ 프로덕션에서 admin key 누락 = 전 API 무인증 통과 (보안 구멍).
+  //   현재 운영 배포에 FIREBASE_ADMIN_KEY 미설정 상태라 fail-closed 로 바꾸면 즉시 장애 →
+  //   env 등록 전까지 경고 로그만 남기고 허용. env 등록 확인 후 아래를 500 차단으로 전환할 것.
   if (!HAS_ADMIN_KEY) {
     if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ ok: false, error: 'server auth misconfigured (FIREBASE_ADMIN_KEY)' }, { status: 500 });
+      console.error('[api-auth] FIREBASE_ADMIN_KEY 미설정 — API 인증이 우회되고 있음. Vercel env 등록 필요.');
     }
     return { uid: 'local-dev', email: 'local@dev' };
   }
