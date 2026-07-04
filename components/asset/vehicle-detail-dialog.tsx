@@ -10,7 +10,7 @@
  *  공용 부품: DetailTabContent (탭 wrapper), COL/COL_FLEX (표 컬럼 width 토큰).
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Vehicle, Contract, HistoryEntry, VehicleStatus } from '@/lib/types';
 
 /** VehicleStatus 별 다음 액션 안내 — 운영 현황 탭 라이프사이클 가이드 */
@@ -61,7 +61,7 @@ const NEXT_STATES: Record<VehicleStatus, VehicleStatus[]> = {
   '임시배차':   ['운행'],
 };
 import { DetailDialogShell } from '@/components/ui/detail-dialog-shell';
-import { AttachedFilePreview } from '@/components/ui/attached-file-preview';
+import { AttachedFilePreview, FileLightbox } from '@/components/ui/attached-file-preview';
 import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { showConfirm } from '@/lib/confirm';
@@ -71,6 +71,7 @@ import { EmptyRow } from '@/components/ui/empty-row';
 import { Section, Stack, Grid2 } from '@/components/ui/detail-primitives';
 import { VehiclePhotosSection, VehiclePhotosByKind } from '@/components/vehicle-photos-section';
 import { contractStatusTone, vehicleStatusTone } from '@/lib/status-tones';
+import { markTerminated, revertToOperating } from '@/lib/contract-actions';
 import { COL, COL_FLEX } from '@/lib/table-cols';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
@@ -363,6 +364,7 @@ function SummaryTab({
   showAttachment?: boolean;
 }) {
   const { companies } = useCompanies();
+  const [certOpen, setCertOpen] = useState(false);
   return (
     <Stack>
       <Section title="제조사 스펙">
@@ -404,7 +406,24 @@ function SummaryTab({
         </>
       )}
 
-      <Section title="자동차등록증 정보">
+      <Section
+        title="자동차등록증 정보"
+        action={showAttachment && vehicle.registrationCertUrl ? (
+          <button
+            type="button"
+            onClick={() => setCertOpen(true)}
+            title="클릭하면 원본 확대"
+            style={{
+              marginLeft: 'auto',
+              background: 'transparent', border: 0, padding: 0,
+              color: 'var(--brand)', cursor: 'pointer',
+              fontSize: 13, fontWeight: 600, textDecoration: 'underline',
+            }}
+          >
+            {vehicle.registrationCertFileName || '원본 보기'}
+          </button>
+        ) : undefined}
+      >
         <Grid2>
           <KV k="VIN" v={vehicle.vin} mono />
           <KV k="용도" v={vehicle.vehicleUsage} />
@@ -428,14 +447,13 @@ function SummaryTab({
         </Grid2>
       </Section>
 
-      {showAttachment && (
-        <AttachedFilePreview
-          title="원본 자동차등록증"
-          url={vehicle.registrationCertUrl}
-          fileName={vehicle.registrationCertFileName}
-          uploadedAt={vehicle.registrationCertUploadedAt}
-        />
-      )}
+      <FileLightbox
+        url={vehicle.registrationCertUrl}
+        fileName={vehicle.registrationCertFileName}
+        title="자동차등록증"
+        open={certOpen}
+        onClose={() => setCertOpen(false)}
+      />
 
       {/* 비고 — 인라인 즉시 편집 (직원이 차량별 메모·발주처·특이사항 입력) */}
       <Section title="비고">
@@ -591,7 +609,7 @@ function ComplianceTab({ vehicle, contracts }: { vehicle: Vehicle; contracts: Co
 }
 
 /* ─── 탭4: 계약이력 — 자산 다른 탭(요약/할부/보험)과 동일 section.detail-section wrapper ─── */
-function ContractListTab({ contracts }: { contracts: Contract[] }) {
+function ContractListTab({ contracts, onUpdateContract }: { contracts: Contract[]; onUpdateContract?: (c: Contract) => void }) {
   const totalUnpaid = contracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
   const isEmpty = contracts.length === 0;
   return (
@@ -608,8 +626,10 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
         <table className="table">
           <thead>
             <tr>
-              <th style={{ width: COL.date }}>계약일</th>
               <th style={{ width: COL.contractNo }}>계약번호</th>
+              <th style={{ width: COL.date }}>계약일</th>
+              <th style={{ width: COL.date }}>종료일</th>
+              <th style={{ width: COL.date }} title="고객 미납 등으로 차량을 회수한 날짜 — 수기 입력 시 계약이 해지 처리됨">회수일</th>
               <th style={COL_FLEX.customer}>계약자</th>
               <th className="center" style={{ width: COL.term }}>약정</th>
               <th className="num" style={{ width: COL.money }}>월대여료</th>
@@ -621,13 +641,29 @@ function ContractListTab({ contracts }: { contracts: Contract[] }) {
           </thead>
           <tbody>
             {isEmpty ? (
-              <EmptyRow colSpan={9}>계약 이력 없음</EmptyRow>
+              <EmptyRow colSpan={11}>계약 이력 없음</EmptyRow>
             ) : contracts.map((c) => {
               const isActive = c.status === '운행' || c.status === '대기';
               return (
               <tr key={c.id} style={isActive ? { background: 'var(--brand-bg)' } : undefined}>
-                <td className="mono">{c.contractDate}</td>
                 <td className="mono dim">{c.contractNo || <span className="muted">-</span>}</td>
+                <td className="mono">{c.contractDate}</td>
+                <td className="mono dim">{c.returnScheduledDate || <span className="muted">-</span>}</td>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="date"
+                    className="input-compact"
+                    value={c.returnedDate ?? ''}
+                    disabled={!onUpdateContract}
+                    onChange={(e) => {
+                      if (!onUpdateContract) return;
+                      const date = e.target.value;
+                      onUpdateContract(date ? markTerminated(c, date) : revertToOperating(c));
+                    }}
+                    style={{ width: 116, fontSize: 11 }}
+                    title="입력하면 계약이 해지 처리되고, 비우면 운행으로 되돌립니다"
+                  />
+                </td>
                 <td>
                   {isActive && (
                     <span style={{
@@ -863,13 +899,15 @@ export type VehicleDialogTab =
   | 'operation' | 'risk' | 'asset' | 'contract' | 'payment' | 'photos';
 
 export function VehicleDetailDialog({
-  vehicle, history, contracts, view, onUpdate, onClose, onEdit, initialTab,
+  vehicle, history, contracts, view, onUpdate, onUpdateContract, onClose, onEdit, initialTab,
 }: {
   vehicle: Vehicle;
   history: HistoryEntry[];
   contracts: Contract[];
   view: 'status' | 'registered';
   onUpdate: (v: Vehicle) => void;
+  /** 회수일 수기 입력 등 — 계약 이력에서 직접 계약 수정 */
+  onUpdateContract?: (c: Contract) => void;
   onClose: () => void;
   onEdit?: (v: Vehicle) => void;
   /** 진입 페이지 컨텍스트별 default 탭. 미지정 시 view 별 첫 탭 */
@@ -928,7 +966,7 @@ export function VehicleDetailDialog({
               content: <AssetTab vehicle={vehicle} repairHistory={repairHistory} contracts={sortedContracts} onUpdate={onUpdate} />
             },
             { value: 'contract', label: `계약 관리${sortedContracts.length > 0 ? ` (${sortedContracts.length})` : ''}`,
-              content: <ContractListTab contracts={sortedContracts} />
+              content: <ContractListTab contracts={sortedContracts} onUpdateContract={onUpdateContract} />
             },
             { value: 'payment', label: '수납 관리',
               content: <PaymentManagementTab contracts={sortedContracts} />

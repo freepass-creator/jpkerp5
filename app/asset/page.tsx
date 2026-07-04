@@ -387,7 +387,7 @@ export default function AssetPage() {
                     return (
                     <tr key={v.id} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => { setSelectedId(v.id); const idx = filtered.findIndex((x) => x.id === v.id); rowSel.onRowClick(e, v.id, idx); }} onDoubleClick={() => { setOpenTab('asset'); setOpenId(v.id); }} onContextMenu={(e) => { const idx = filtered.findIndex((x) => x.id === v.id); rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v })); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedIds.has(v.id) || selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
-                      <td><CompanyCell raw={v.company} master={companyMaster} /></td>
+                      <td><CompanyCell raw={v.company} master={companyMaster} fallbackCorpRegNo={v.ownerRegNo} /></td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
                       <td className="center">
@@ -518,7 +518,7 @@ export default function AssetPage() {
                   ) : filtered.map((v) => (
                     <tr key={v.id} onMouseDown={rowSel.onRowMouseDown} onClick={(e) => { setSelectedId(v.id); const idx = filtered.findIndex((x) => x.id === v.id); rowSel.onRowClick(e, v.id, idx); }} onDoubleClick={() => { setOpenTab('asset'); setOpenId(v.id); }} onContextMenu={(e) => { const idx = filtered.findIndex((x) => x.id === v.id); rowSel.onRowContextMenu(e, v.id, idx, () => setCtxMenu({ open: true, x: e.clientX, y: e.clientY, row: v })); }} style={{ cursor: 'pointer', verticalAlign: 'middle' }} className={selectedIds.has(v.id) || selectedId === v.id ? 'selected-row' : undefined}>
                       <td className="checkbox-col"><input type="checkbox" checked={selectedIds.has(v.id)} onChange={() => toggleRow(v.id)} onClick={(e) => e.stopPropagation()} aria-label="행 선택" /></td>
-                      <td><CompanyCell raw={v.company} master={companyMaster} /></td>
+                      <td><CompanyCell raw={v.company} master={companyMaster} fallbackCorpRegNo={v.ownerRegNo} /></td>
                       <td className="mono">{v.plate || '-'}</td>
                       <td>{v.vehicleMaker || '-'}</td>
                       <td>{v.vehicleModelLine || v.model || '-'}</td>
@@ -730,6 +730,7 @@ export default function AssetPage() {
                 await syncContractStatusFromVehicle(v, contracts, updateContract);
               }, { onConflict: () => setOpenId(null) });
             }}
+            onUpdateContract={(c) => { void safeUpdate(() => updateContract(c)); }}
             onClose={() => setOpenId(null)}
             onEdit={(v) => setEditVehicle(v)}
           />

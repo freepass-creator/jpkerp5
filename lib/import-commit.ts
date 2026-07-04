@@ -196,6 +196,7 @@ export type SnapshotPatch = {
   vehicleModel: string;
   customerName: string;
   customerPhone1: string;
+  customerKind?: CustomerKind;
   contractDate: string;
   returnScheduledDate: string;
   termMonths: number;
@@ -396,6 +397,7 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
     ? Math.floor(paymentDayRaw)
     : (period.start ? parseInt(period.start.slice(8, 10), 10) || 1 : 1);
   const paymentMethod = toStr(get(row, '결제방법', '결제수단', 'paymentMethod')) || '이체';
+  const customerKind = pickCustomerKind(get(row, '구분', 'customerKind'));
   // 손님 있는 계약 행은 차량상태 컬럼 무시 — 항상 '운행'
   const vehicleStatus: VehicleStatus = '운행';
 
@@ -414,6 +416,7 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
     vehicleModel,
     customerName,
     customerPhone1: phone,
+    customerKind,
     contractDate: period.start,
     returnScheduledDate: period.end,
     termMonths: period.months,
@@ -458,6 +461,7 @@ export function applySnapshotToContract(
       vehicleStatus: patch.vehicleStatus || existing.vehicleStatus,
       customerName: patch.customerName || existing.customerName,
       customerPhone1: patch.customerPhone1 || existing.customerPhone1,
+      customerKind: patch.customerKind ?? existing.customerKind,
       contractDate: patch.contractDate || existing.contractDate,
       returnScheduledDate: patch.returnScheduledDate || existing.returnScheduledDate,
       termMonths: patch.termMonths || existing.termMonths,
@@ -484,6 +488,7 @@ export function applySnapshotToContract(
     company: (patch.company || '기타') as Contract['company'],
     customerName: patch.customerName,
     customerPhone1: patch.customerPhone1,
+    customerKind: patch.customerKind,
     vehiclePlate: patch.vehiclePlate,
     vehicleModel: patch.vehicleModel,
     vehicleStatus: patch.vehicleStatus || '운행',

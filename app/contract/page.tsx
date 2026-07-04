@@ -315,7 +315,7 @@ export default function ContractPage() {
                       <th style={{ width: 56 }}>회사</th>
                       <th style={{ width: 110 }}>계약번호</th>
                       <th style={{ width: 96 }}>차량번호</th>
-                      <th style={{ minWidth: 180 }}>계약자</th>
+                      <th style={{ width: 100 }}>계약자</th>
                       <th style={{ width: 110 }}>연락처</th>
                       <th style={{ width: 90 }}>계약일</th>
                       <th style={{ width: 90 }}>만기일</th>
@@ -388,7 +388,7 @@ export default function ContractPage() {
       <CreateDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        visibleModes={['계약']}
+        visibleModes={['계약', '현황']}
         initialMode="계약"
         onContractCreated={(newId) => {
           // 등록 즉시 detail 자동 오픈 — 직원이 추가 정보 점진 입력 (트렌드 UX)

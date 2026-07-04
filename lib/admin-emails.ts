@@ -8,6 +8,7 @@
  */
 export const SUPER_ADMIN_EMAILS: ReadonlyArray<string> = [
   'pyh@teamjpk.com',
+  'sym@teamjpk.com', // 2026-06-26 영구 부여 — 사장님 승인, ERP 수정 업무 전반 담당.
 ];
 
 export const ADMIN_EMAILS: ReadonlyArray<string> = [

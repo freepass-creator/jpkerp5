@@ -11,3 +11,13 @@ export function fileToDataUrl(file: File): Promise<string> {
     r.readAsDataURL(file);
   });
 }
+
+/** dataURL → File — Storage 업로드 직전, placeholder 단계에서 들고있던 dataURL을 다시 File로 복원 */
+export function dataUrlToFile(dataUrl: string, fileName: string): File {
+  const [meta, data] = dataUrl.split(',');
+  const mime = meta.match(/:(.*?);/)?.[1] ?? 'application/octet-stream';
+  const bin = atob(data);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new File([bytes], fileName, { type: mime });
+}
