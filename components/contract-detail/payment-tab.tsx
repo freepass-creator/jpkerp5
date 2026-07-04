@@ -71,7 +71,9 @@ export function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contrac
         </div>
       </Section>
 
-      <DepositSection c={c} onUpdate={onUpdate} />
+      {/* key=계약id — uncontrolled defaultValue 가 계약 전환 시 이전 계약 값으로 남아
+          blur 시 새 계약에 잘못 저장되던 것 방지 (remount 로 초기화) */}
+      <DepositSection key={c.id} c={c} onUpdate={onUpdate} />
 
       <Section icon={<CurrencyKrw size={12} weight="duotone" />} title="회차별 스케줄" bodyPadding={0}>
         <ScheduleTable c={c} onUpdate={onUpdate} />
@@ -260,8 +262,9 @@ function generatePaymentHistory(c: Contract): PaymentLog[] {
   if (c.schedules && c.schedules.length > 0) {
     for (const s of c.schedules) {
       const pays = s.payments ?? [];
-      // legacy: payments 없는 회차의 paidAmount → 정산 entry 1건으로 환원
-      if (pays.length === 0 && s.paidAmount > 0) {
+      // legacy: payments 없는 회차의 paidAmount → 정산 entry 1건으로 환원.
+      // 면제 회차는 제외 — 면제는 입금이 아니므로 정산 entry 를 날조하면 안 됨.
+      if (pays.length === 0 && s.paidAmount > 0 && s.status !== '면제') {
         logs.push({
           date: s.paidAt ?? s.dueDate, seq: s.seq, amount: s.paidAmount, source: '정산',
           memo: '스냅샷 자동 정리',
@@ -410,7 +413,8 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
   const schedulesNorm: PaymentScheduleInline[] = (c.schedules && c.schedules.length > 0)
     ? c.schedules.map((s) => {
         if (s.payments && s.payments.length > 0) return s;
-        if (s.paidAmount > 0) {
+        // 면제 회차 제외 — 면제의 paidAmount(=amount 관례)를 입금으로 날조하면 이력·누적이 부풀음
+        if (s.paidAmount > 0 && s.status !== '면제') {
           return { ...s, payments: [{ date: s.paidAt ?? s.dueDate, amount: s.paidAmount, source: '정산', memo: '스냅샷 자동 정리' }] };
         }
         return { ...s, payments: [] };
@@ -614,16 +618,31 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
 
   async function handleExempt(seq: number) {
     if (!await showConfirm({ title: `${seq}회차를 '면제'로 처리하시겠습니까?\n(미수에서 제외됨)`, danger: true })) return;
-    const next = schedulesNorm.map((s) => s.seq === seq ? { ...s, status: '면제' as ScheduleStatus, paidAmount: s.amount } : { ...s });
+    // paidAmount 는 실납부 합만 유지 — amount 로 채우면 "payments 없고 paidAmount>0" 휴리스틱이
+    // 가짜 '정산' 입금 entry 를 날조해 입금 이력·누적 납부액이 부풀었음
+    const next = schedulesNorm.map((s) => s.seq === seq ? { ...s, status: '면제' as ScheduleStatus } : { ...s });
     persist(next);
   }
 
   async function handleRevert(seq: number) {
-    if (!await showConfirm({ title: `${seq}회차의 모든 입금·할인·면제 처리를 취소하시겠습니까?`, danger: true })) return;
+    const target = schedulesNorm.find((s) => s.seq === seq);
+    // 계좌/카드 자동매칭 entry 는 거래 측 매칭 링크가 살아있어 여기서 지우면 정합성 파손 →
+    // 해당 거래(자금일보/수납 매칭)에서 해제하도록 안내하고 보존. 수동/현금/정산만 취소.
+    const linked = (target?.payments ?? []).filter((p) => p.txId || p.cardTxId);
+    if (!await showConfirm({
+      title: `${seq}회차의 수동 입금·할인·면제 처리를 취소하시겠습니까?`,
+      description: linked.length > 0 ? `계좌/카드 매칭 입금 ${linked.length}건은 보존됩니다 — 해당 거래에서 매칭 해제하세요.` : undefined,
+      danger: true,
+    })) return;
     const today = todayKr();
     const next = schedulesNorm.map((s) => {
       if (s.seq !== seq) return { ...s };
-      return { ...s, payments: [], discounts: [], paidAmount: 0, discountAmount: 0, paidAt: undefined, status: (s.dueDate < today ? '연체' : '예정') as ScheduleStatus };
+      const kept = (s.payments ?? []).filter((p) => p.txId || p.cardTxId);
+      const paid = kept.reduce((sum, p) => sum + p.amount, 0);
+      const lastDate = kept.reduce<string>((mx, p) => p.date > mx ? p.date : mx, '');
+      const status: ScheduleStatus =
+        paid >= s.amount ? '완료' : paid > 0 ? '부분납' : (s.dueDate < today ? '연체' : '예정');
+      return { ...s, payments: kept, discounts: [], paidAmount: paid, discountAmount: 0, paidAt: lastDate || undefined, status };
     });
     persist(next);
   }

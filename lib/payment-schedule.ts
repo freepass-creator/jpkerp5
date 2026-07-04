@@ -94,7 +94,9 @@ export function recalcContract<T extends Contract>(c: T, today: string): T {
       : s.dueDate;
     const withDueDate = s.dueDate !== expectedDueDate ? { ...s, dueDate: expectedDueDate } : s;
     if (returnedCutoff && withDueDate.dueDate > returnedCutoff) {
-      return { ...withDueDate, status: '면제' as const, paidAmount: withDueDate.amount, paidAt: withDueDate.paidAt };
+      // paidAmount 는 실납부 합만 — amount 로 채우면 "payments 없고 paidAmount>0" 휴리스틱이
+      // 가짜 '정산' 입금을 날조해 입금 이력이 부풀었음 (면제는 입금이 아님)
+      return { ...withDueDate, status: '면제' as const, paidAmount: sumPayments(withDueDate), paidAt: withDueDate.paidAt };
     }
     return recalcSchedule(withDueDate, today);
   });

@@ -154,9 +154,12 @@ export default function ContractDocPage() {
     setHydrated(true);
   }, [contract, hydrated]);
 
-  // sender 로드 시 회사 정보 자동 채움
+  // sender 로드 시 회사 정보 자동 채움 — 1회만 (companies 리스너 재발행 때마다
+  // 사용자가 수정해 둔 임대인 상호/계좌가 마스터 값으로 덮이던 것 방지)
+  const [senderHydrated, setSenderHydrated] = useState(false);
   useEffect(() => {
-    if (!sender) return;
+    if (!sender || senderHydrated) return;
+    setSenderHydrated(true);
     setCoName(sender.name ?? '');
     setCoCeo(sender.ceo ?? '');
     setCoBizNo(sender.bizRegNo ?? '');
@@ -167,7 +170,7 @@ export default function ContractDocPage() {
       setCoAcct(acct.accountNo ?? '');
       setCoHolder(acct.accountHolder ?? '');
     }
-  }, [sender]);
+  }, [sender, senderHydrated]);
 
   /* 자동 연동 핸들러 */
   const handleStartChange = useCallback((newStart: string) => {
