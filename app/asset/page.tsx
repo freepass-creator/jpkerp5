@@ -48,7 +48,8 @@ import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
-import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
+import { syncContractStatusFromVehicle, vehicleMatchesPlate } from '@/lib/entity-sync';
+import { buildMergedVehicles } from '@/lib/use-merged-vehicles';
 import { safeUpdate } from '@/lib/safe-update';
 import { setVehicleAttachments } from '@/lib/firebase/vehicle-attachments-store';
 import { VehicleRegRegisterDialog } from '@/components/asset/vehicle-reg-register-dialog';
@@ -82,27 +83,9 @@ export default function AssetPage() {
    * 운영현황과 양방향 연동: 운영현황에 있는 차량은 자산관리에도 보임.
    * 등록증/제조사 정보가 비어 있으면 "등록증 미입력" 상태로 별도 표시.
    */
-  const vehicles = useMemo<Vehicle[]>(() => {
-    const byPlate = new Map<string, Vehicle>();
-    for (const v of rawVehicles) {
-      const p = v.plate?.trim();
-      if (p) byPlate.set(p, v);
-    }
-    for (const c of contracts) {
-      const p = c.vehiclePlate?.trim();
-      if (!p || byPlate.has(p)) continue;
-      byPlate.set(p, {
-        id: `contract-derived-${c.id}`,
-        plate: p,
-        model: c.vehicleModel ?? '',
-        company: c.company,
-        status: (c.vehicleStatus ?? '운행') as Vehicle['status'],
-        createdAt: c.contractDate ?? '',
-        notes: '계약에서 자동 인식 — 등록증 정보 미입력',
-      } as Vehicle);
-    }
-    return Array.from(byPlate.values());
-  }, [rawVehicles, contracts]);
+  // 병합 로직 SSOT (use-merged-vehicles) — 인라인 복제 제거.
+  // normPlate 키 + plateHistory 인식으로 표기차이·번호변경 유령 중복행 방지.
+  const vehicles = useMemo<Vehicle[]>(() => buildMergedVehicles(rawVehicles, contracts), [rawVehicles, contracts]);
 
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset:company', 'all');
@@ -717,11 +700,15 @@ export default function AssetPage() {
           }
         />
 
-        {openId && (
+        {openId && (() => {
+          const openVehicle = vehicles.find((v) => v.id === openId);
+          // 열려있는 동안 차량 소실(타 세션 삭제·합성id→실id 전환) 시 크래시(undefined.plate) 대신 미표시
+          if (!openVehicle) return null;
+          return (
           <VehicleDetailDialog
-            vehicle={vehicles.find((v) => v.id === openId)!}
-            history={history.filter((h) => h.scope === 'vehicle' && h.vehiclePlate === vehicles.find((v) => v.id === openId)?.plate)}
-            contracts={contracts.filter((c) => c.vehiclePlate === vehicles.find((v) => v.id === openId)?.plate)}
+            vehicle={openVehicle}
+            history={history.filter((h) => h.scope === 'vehicle' && vehicleMatchesPlate(openVehicle, h.vehiclePlate))}
+            contracts={contracts.filter((c) => vehicleMatchesPlate(openVehicle, c.vehiclePlate))}
             view={assetView}
             initialTab={openTab}
             onUpdate={(v) => {
@@ -734,7 +721,8 @@ export default function AssetPage() {
             onClose={() => setOpenId(null)}
             onEdit={(v) => setEditVehicle(v)}
           />
-        )}
+          );
+        })()}
 
         <VehicleRegRegisterDialog
           open={vehicleRegOpen || !!editVehicle}

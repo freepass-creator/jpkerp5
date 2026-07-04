@@ -22,7 +22,7 @@ import { useClosedPeriods, isDateInClosedPeriod } from '@/lib/firebase/closed-pe
 import { todayKr } from '@/lib/mock-data';
 import { recalcSchedule } from '@/lib/payment-schedule';
 import { toast } from '@/lib/toast';
-import { showConfirm } from '@/lib/confirm';
+import { showConfirm, showPrompt } from '@/lib/confirm';
 import type {
   Contract, PaymentScheduleInline, PaymentEntry, ScheduleStatus, DepositDeduction,
 } from '@/lib/types';
@@ -122,13 +122,13 @@ function DepositSection({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) 
   function patchDate(field: 'depositReceivedDate' | 'depositRefundedDate', d: string) {
     onUpdate({ ...c, [field]: d || undefined });
   }
-  function addDeduction() {
-    const reason = window.prompt('차감 사유 (예: 미납 회차, 차량 손상, 클리닝):');
-    if (!reason) return;
-    const amountStr = window.prompt('차감 금액 (원):');
+  async function addDeduction() {
+    const reason = await showPrompt({ title: '보증금 차감 사유', placeholder: '예: 미납 회차, 차량 손상, 클리닝' });
+    if (!reason?.trim()) return;
+    const amountStr = await showPrompt({ title: '차감 금액 (원)', placeholder: '숫자만' });
     if (!amountStr) return;
     const amount = Number(amountStr.replace(/[,\s]/g, '')) || 0;
-    if (amount <= 0) return;
+    if (amount <= 0) { toast.error('금액이 올바르지 않습니다'); return; }
     const next: DepositDeduction = {
       id: `dd-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       date: new Date().toISOString().slice(0, 10),

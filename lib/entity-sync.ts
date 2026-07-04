@@ -86,11 +86,28 @@ export async function reassignVehiclesToCompany(
 }
 
 /** plate 기준 차량 찾기 (정규화 비교) */
+/**
+ * 차량 ↔ 차량번호 매칭 SSOT — normPlate 정규화 + 번호변경 이력(plateHistory) 포함.
+ * 페이지마다 raw trim 비교를 재구현하면 표기 차이·번호변경 케이스에서
+ * 같은 차가 2행 생기거나 sync 가 조용히 빠짐 → 반드시 이 헬퍼 사용.
+ */
+export function vehicleMatchesPlate(
+  v: Pick<Vehicle, 'plate' | 'plateHistory'>,
+  plate?: string,
+): boolean {
+  const key = normPlate(plate);
+  if (!key) return false;
+  if (normPlate(v.plate) === key) return true;
+  return (v.plateHistory ?? []).some((h) => normPlate(h) === key);
+}
+
 export function findVehicleByPlate(vehicles: Vehicle[], plate?: string): Vehicle | undefined {
   if (!plate) return undefined;
   const key = normPlate(plate);
   if (!key) return undefined;
-  return vehicles.find((v) => normPlate(v.plate) === key);
+  // 현재 plate 정확 일치 우선, 없으면 번호변경 이력에서 탐색
+  return vehicles.find((v) => normPlate(v.plate) === key)
+    ?? vehicles.find((v) => (v.plateHistory ?? []).some((h) => normPlate(h) === key));
 }
 
 /** 보험증권의 회사 식별자 (companyCode 또는 bizNo) → 회사 마스터 매칭 */

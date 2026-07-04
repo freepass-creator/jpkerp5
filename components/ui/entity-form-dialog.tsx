@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogClose, DialogFooter } from './dialog';
 import { cn } from '@/lib/cn';
 import { useDialogShortcuts, countChanges } from '@/lib/use-dialog-shortcuts';
 import { showConfirm } from '@/lib/confirm';
+import { toast } from '@/lib/toast';
 
 export type FieldDef = {
   key: string;
@@ -116,6 +117,16 @@ export function EntityFormDialog({
   const [submitting, setSubmitting] = useState(false);
   async function doSubmit() {
     if (submittingRef.current) return;
+    // 필수값 검증 (오류검증 SSOT) — required 표시만 있고 검증이 없어
+    // 빈 필수 필드로도 저장되던 것 차단. 모든 EntityFormDialog 폼 공통.
+    const missing = allSections
+      .flatMap((sec) => sec.fields)
+      .filter((f) => f.required && !(data[f.key] ?? '').trim())
+      .map((f) => f.label);
+    if (missing.length > 0) {
+      toast.error(`필수 입력 누락: ${missing.join(', ')}`);
+      return;
+    }
     submittingRef.current = true;
     setSubmitting(true);
     try {

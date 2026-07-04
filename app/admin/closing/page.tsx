@@ -18,7 +18,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import { useClosedPeriods, closePeriod, reopenPeriod, isPeriodClosed } from '@/lib/firebase/closed-periods-store';
-import { showConfirm } from '@/lib/confirm';
+import { showConfirm, showPrompt } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
 
 function monthsAgo(n: number): string[] {
@@ -61,7 +61,7 @@ export default function AdminClosingPage() {
       description: '재오픈 사유는 audit log 에 영구 기록됩니다.',
       confirmLabel: '재오픈', danger: true,
     })) return;
-    const reason = window.prompt('재오픈 사유를 입력하세요 (필수)', '');
+    const reason = await showPrompt({ title: '재오픈 사유 (필수)', description: 'audit log 에 영구 기록됩니다.', placeholder: '사유 입력', multiline: true });
     if (!reason || !reason.trim()) { toast.info('사유 없음 — 취소'); return; }
     try {
       await reopenPeriod(yyyymm, actor, reason);

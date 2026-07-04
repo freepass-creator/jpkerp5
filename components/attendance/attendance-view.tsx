@@ -19,7 +19,7 @@ import {
 } from '@/lib/firebase/attendance-store';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { toast } from '@/lib/toast';
-import { showConfirm } from '@/lib/confirm';
+import { showConfirm, showPrompt } from '@/lib/confirm';
 import { Calendar, CheckCircle, XCircle, ClockCounterClockwise, FunnelSimple } from '@phosphor-icons/react';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'all';
@@ -232,8 +232,8 @@ function ApproveBtn({ r, approverEmail }: { r: AttendanceRequest; approverEmail?
 
 function RejectBtn({ r }: { r: AttendanceRequest }) {
   async function handle() {
-    const reason = window.prompt(`${r.applicantName ?? r.applicantEmail}의 ${ATTENDANCE_LABEL[r.type]} 반려 사유:`);
-    if (!reason) return;
+    const reason = await showPrompt({ title: '반려 사유', description: `${r.applicantName ?? r.applicantEmail}의 ${ATTENDANCE_LABEL[r.type]} 반려`, placeholder: '사유 입력', multiline: true });
+    if (!reason?.trim()) return;
     try {
       await updateAttendanceStatus(r.id, { status: 'rejected', rejectionReason: reason });
       toast.success('반려 처리');
@@ -254,8 +254,8 @@ function DetailDialog({ req, onClose, approverEmail }: { req: AttendanceRequest;
     } catch (e) { toast.error(`실패: ${(e as Error).message}`); }
   }
   async function reject() {
-    const reason = window.prompt('반려 사유:');
-    if (!reason) return;
+    const reason = await showPrompt({ title: '반려 사유', placeholder: '사유 입력', multiline: true });
+    if (!reason?.trim()) return;
     try {
       await updateAttendanceStatus(req.id, { status: 'rejected', rejectionReason: reason });
       toast.success('반려 처리'); onClose();

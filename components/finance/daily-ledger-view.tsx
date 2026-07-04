@@ -26,6 +26,8 @@
 
 import { useMemo, useState, Fragment } from 'react';
 import { toast } from '@/lib/toast';
+
+import { showPrompt } from '@/lib/confirm';
 import { MagnifyingGlass, CaretLeft, CaretRight } from '@phosphor-icons/react';
 
 import { useVendors } from '@/lib/firebase/vendors-store';
@@ -402,7 +404,7 @@ export function DailyLedgerView({
 
   async function handleQuickVendorAdd(row: UnifiedRow) {
 
-    const name = window.prompt('??거래泥??대쫫 (?뺣퉬공장·공급??외???');
+    const name = await showPrompt({ title: '새 거래처 등록', placeholder: '거래처 이름 (정비공장·공급사 등)' });
 
     if (!name?.trim() || row.source !== 'bank') return;
 

@@ -16,6 +16,7 @@
 
 import type { Contract, Vehicle } from '@/lib/types';
 import { applyReturnedProration } from '@/lib/returned-proration';
+import { findVehicleByPlate } from '@/lib/entity-sync';
 import { audit } from './audit-store';
 
 /**
@@ -41,8 +42,8 @@ export async function syncContractAndVehicleStatus(
   }
   await updateContract(toWrite); // throw 가능 — 호출자 catch
   if (!toWrite.vehiclePlate || !toWrite.vehicleStatus) return;
-  const plate = toWrite.vehiclePlate.trim();
-  const v = vehicles.find((x) => (x.plate ?? '').trim() === plate);
+  // plate 매칭 SSOT — raw trim 비교면 표기차이·번호변경 차량의 sync 가 조용히 빠짐
+  const v = findVehicleByPlate(vehicles, toWrite.vehiclePlate);
   if (v && v.status !== toWrite.vehicleStatus) {
     try {
       await updateVehicleMaster({ ...v, status: toWrite.vehicleStatus });

@@ -56,3 +56,45 @@ export function showConfirm(options: ConfirmOptions): Promise<boolean> {
 export function _setConfirmListener(fn: ((p: Pending) => void) | null): void {
   listener = fn;
 }
+
+/* ──────────────── 입력 다이얼로그 (window.prompt 대체) ────────────────
+ *
+ * **원칙: window.prompt() 금지. showPrompt() 사용.**
+ *
+ *   const reason = await showPrompt({ title: '반려 사유', placeholder: '사유 입력' });
+ *   if (reason == null) return;   // 취소
+ */
+
+export type PromptOptions = {
+  title: string;
+  description?: string;
+  placeholder?: string;
+  /** 초기값 */
+  initial?: string;
+  confirmLabel?: string;
+  /** 여러 줄 입력 (textarea) */
+  multiline?: boolean;
+};
+
+type PendingPrompt = {
+  options: PromptOptions;
+  resolve: (value: string | null) => void;
+};
+
+let promptListener: ((p: PendingPrompt) => void) | null = null;
+
+export function showPrompt(options: PromptOptions): Promise<string | null> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (!promptListener) {
+    // 미마운트 fallback — 네이티브 prompt
+    return Promise.resolve(window.prompt(options.title, options.initial ?? ''));
+  }
+  return new Promise((resolve) => {
+    promptListener!({ options, resolve });
+  });
+}
+
+/** PromptDialogHost 가 mount 시 호출 — 외부에서 사용 X. */
+export function _setPromptListener(fn: ((p: PendingPrompt) => void) | null): void {
+  promptListener = fn;
+}
