@@ -11,6 +11,19 @@ const BANK_PATH = dbPath('bank_tx');
 const CARD_PATH = dbPath('card_tx');
 
 /**
+ * patch → RTDB update 인자 변환.
+ * undefined 값은 "필드 삭제" 의도이므로 null 로 변환 (RTDB 는 null 로 필드를 지움).
+ * pruneUndefined(JSON round-trip)를 patch 전체에 쓰면 키가 사라져 삭제가 무시된다.
+ */
+function patchToRtdb(patch: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(patch)) {
+    out[k] = v === undefined ? null : pruneUndefined(v);
+  }
+  return out;
+}
+
+/**
  * 모듈-level singleton 캐시 — 첫 hook 호출 시 1번만 subscribe.
  * 페이지 이동·재진입 시에도 캐시 유지 → "거래 없음" 깜빡임 0.
  *
@@ -105,8 +118,10 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       const db = getRtdb(); if (!db) return;
       // patch 형식 update — updatedAt 자동 갱신.
       // 동시편집 보호: patch 는 expectedUpdatedAt 모르므로 raw rtdbUpdate (BankTx/CardTx 는 매칭 작업 위주, 충돌 거의 없음).
-      await rtdbUpdate(ref(db, `${path}/${id}`),
-        pruneUndefined({ ...patch, updatedAt: new Date().toISOString() } as unknown as Record<string, unknown>));
+      // ⚠ patch 의 undefined 는 "필드 삭제" 의도 — RTDB 삭제는 null 이어야 함.
+      //   pruneUndefined(JSON round-trip)로 키를 지우면 아무것도 안 써져서
+      //   매칭 해제(matchedContractId: undefined)가 DB에 영속되지 않던 결함 수정.
+      await rtdbUpdate(ref(db, `${path}/${id}`), patchToRtdb({ ...patch, updatedAt: new Date().toISOString() }));
     },
     updateMany: async (patches: Record<string, Partial<T>>) => {
       const ids = Object.keys(patches);
@@ -121,10 +136,11 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       const updates: Record<string, unknown> = {};
       for (const [id, patch] of Object.entries(patches)) {
         for (const [k, v] of Object.entries(patch ?? {})) {
-          updates[`${id}/${k}`] = v;
+          // undefined = 필드 삭제 의도 → RTDB null (키 제거하면 아무것도 안 써짐)
+          updates[`${id}/${k}`] = v === undefined ? null : pruneUndefined(v);
         }
       }
-      await rtdbUpdate(ref(db, path), pruneUndefined(updates));
+      await rtdbUpdate(ref(db, path), updates);
     },
     addMany: async (items: Array<Omit<T, 'id'>>) => {
       if (items.length === 0) return [] as T[];
