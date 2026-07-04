@@ -845,8 +845,16 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
   if (collectionStatus && /미납|연체|미수|취소|정지|보류|실패/.test(collectionStatus)) return null;
 
   const useSingle = deposit <= 0 && withdraw <= 0 && Math.abs(amountSingle) > 0;
-  const finalDeposit = useSingle ? (amountSingle > 0 ? amountSingle : 0) : deposit;
-  const finalWithdraw = useSingle ? (amountSingle < 0 ? -amountSingle : 0) : withdraw;
+  // 단일 '거래금액' 컬럼 + 별도 '구분' 컬럼(입금/출금) 형식 은행 — 양수여도 구분이 출금이면 출금.
+  // (기존엔 무조건 입금 처리돼 출금이 입금으로 뒤집혔음)
+  const directionRaw = toStr(get(row, '구분', '입출구분', '거래구분', '입출금구분', 'direction'));
+  const isWithdrawDirection = /출금|지급|인출|출금액|이체출/.test(directionRaw);
+  const finalDeposit = useSingle
+    ? (amountSingle > 0 && !isWithdrawDirection ? amountSingle : 0)
+    : deposit;
+  const finalWithdraw = useSingle
+    ? (amountSingle < 0 ? -amountSingle : (isWithdrawDirection ? amountSingle : 0))
+    : withdraw;
   if (finalDeposit <= 0 && finalWithdraw <= 0) return null;
 
   // 거래상대 — 14가지 alias + memo fallback

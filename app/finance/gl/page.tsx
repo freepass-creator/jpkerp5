@@ -1,12 +1,11 @@
 'use client';
 
 /**
- * /finance/gl — 총계정원장 (계정과목별 집계).
+ * /finance/gl — 총계정원장 (계정과목별 차변·대변·잔액).
  *
- * 입력: bank_tx + card_tx 의 subject (계정과목)
- * 출력: 계정과목별 입금합·출금합·순증감·거래건수
- *
- * Phase 1: stub — 계정과목 1차 분류. 차후 세무 보고용 양식 export.
+ * 분개 엔진(lib/gl-entries — buildAllJournals/summarizeByAccount) 기반 복식부기.
+ * 기존 subject 단순합산 stub 은 ① 내부이체 미제외 ② 법인카드 지출을 입금 합산
+ * ③ CMS 묶음 이중집계로 숫자가 왜곡됐음 → 엔진으로 교체 (/finance 총계정원장 view 와 동일 산식).
  */
 
 import { useMemo } from 'react';
@@ -14,45 +13,31 @@ import { Receipt } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { FINANCE_SUB } from '@/components/layout/sub-nav';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
+import { buildAllJournals, summarizeByAccount, CLASS_LABEL, type AccountClass, type LedgerSummary } from '@/lib/gl-entries';
 import { formatCurrency } from '@/lib/utils';
 import { EmptyRow } from '@/components/ui/empty-row';
 
-type GLRow = {
-  subject: string;
-  inSum: number;
-  outSum: number;
-  net: number;
-  count: number;
-};
+const CLASS_ORDER: AccountClass[] = ['asset', 'liability', 'revenue', 'expense', 'equity'];
 
 export default function FinanceGLPage() {
   const { rows: bankTx, loading: bankLoading } = useBankTx();
   const { rows: cardTx, loading: cardLoading } = useCardTx();
   const dataLoading = bankLoading || cardLoading;
 
-  const rows = useMemo<GLRow[]>(() => {
-    const m = new Map<string, GLRow>();
-    function add(subj: string, inn: number, out: number) {
-      const key = subj || '(미분류)';
-      const r = m.get(key) ?? { subject: key, inSum: 0, outSum: 0, net: 0, count: 0 };
-      r.inSum += inn;
-      r.outSum += out;
-      r.net = r.inSum - r.outSum;
-      r.count++;
-      m.set(key, r);
+  const journals = useMemo(() => buildAllJournals(bankTx, cardTx), [bankTx, cardTx]);
+  const summary = useMemo<LedgerSummary[]>(() => summarizeByAccount(journals), [journals]);
+
+  const grouped = useMemo(() => {
+    const g = new Map<AccountClass, LedgerSummary[]>();
+    for (const s of summary) {
+      const arr = g.get(s.account.class) ?? [];
+      arr.push(s);
+      g.set(s.account.class, arr);
     }
-    for (const t of bankTx) add(t.subject ?? '', t.amount ?? 0, t.withdraw ?? 0);
-    for (const t of cardTx) add(t.category ?? '', t.amount ?? 0, 0);
-    return Array.from(m.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
-  }, [bankTx, cardTx]);
+    return g;
+  }, [summary]);
 
-  const total = useMemo(() => {
-    let inn = 0, out = 0, count = 0;
-    for (const r of rows) { inn += r.inSum; out += r.outSum; count += r.count; }
-    return { inn, out, net: inn - out, count };
-  }, [rows]);
-
-  const unmatched = useMemo(() => rows.find((r) => r.subject === '(미분류)')?.count ?? 0, [rows]);
+  const totalDebit = useMemo(() => journals.reduce((s, j) => s + j.amount, 0), [journals]);
 
   return (
     <MasterPageShell
@@ -62,48 +47,53 @@ export default function FinanceGLPage() {
     >
       <div className="dashboard">
         <div className="panel" style={{ marginBottom: 12 }}>
-          <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
-            <Kpi label="계정과목 수" value={`${rows.length}종`} />
-            <Kpi label="총 입금" value={`₩${formatCurrency(total.inn)}`} tone="green" />
-            <Kpi label="총 출금" value={`₩${formatCurrency(total.out)}`} tone="red" />
-            <Kpi label="순증감" value={`${total.net >= 0 ? '+' : ''}₩${formatCurrency(Math.abs(total.net))}`} tone={total.net >= 0 ? 'green' : 'red'} />
-            <Kpi label="미분류" value={`${unmatched}건`} tone={unmatched > 0 ? 'red' : undefined} />
+          <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            <Kpi label="계정과목" value={`${summary.length}종`} />
+            <Kpi label="분개" value={`${journals.length}건`} />
+            <Kpi label="차변 합" value={`₩${formatCurrency(totalDebit)}`} tone="green" />
+            <Kpi label="대변 합" value={`₩${formatCurrency(totalDebit)}`} tone="red" />
+          </div>
+          <div style={{ padding: '0 16px 12px', fontSize: 11, color: 'var(--text-sub)' }}>
+            자동 분개 (계좌·자동이체·카드매출·법인카드) — 내부이체 제외 · CMS 묶음 중복 제거 · 복식부기 (차변=대변).
+            회사·기간 필터가 필요하면 [입출금·카드] → 총계정원장 view 사용.
           </div>
         </div>
 
         <div className="panel">
-          <div className="panel-body">
+          <div className="panel-body" style={{ padding: 0 }}>
             <table className="table" style={{ fontSize: 12 }}>
               <thead>
                 <tr>
+                  <th style={{ width: 70 }}>분류</th>
+                  <th style={{ width: 70 }}>코드</th>
                   <th>계정과목</th>
-                  <th className="num">입금</th>
-                  <th className="num">출금</th>
-                  <th className="num">순증감</th>
-                  <th className="center">건수</th>
+                  <th className="num" style={{ width: 140 }}>차변</th>
+                  <th className="num" style={{ width: 140 }}>대변</th>
+                  <th className="num" style={{ width: 140 }}>잔액</th>
+                  <th className="center" style={{ width: 70 }}>건수</th>
                 </tr>
               </thead>
               <tbody>
                 {dataLoading ? (
-                  <EmptyRow colSpan={5}>거래 데이터 불러오는 중…</EmptyRow>
-                ) : rows.length === 0 ? (
-                  <EmptyRow colSpan={5}>거래 데이터 없음</EmptyRow>
-                ) : rows.map((r) => (
-                  <tr key={r.subject}>
-                    <td>
-                      <strong>{r.subject}</strong>
-                      {r.subject === '(미분류)' && (
-                        <span className="muted" style={{ marginLeft: 6, fontSize: 10 }}>← 분류 필요</span>
-                      )}
-                    </td>
-                    <td className="num">{r.inSum ? `₩${formatCurrency(r.inSum)}` : '-'}</td>
-                    <td className="num">{r.outSum ? `₩${formatCurrency(r.outSum)}` : '-'}</td>
-                    <td className="num" style={{ color: r.net >= 0 ? 'var(--green-text)' : 'var(--red-text)', fontWeight: 700 }}>
-                      {r.net >= 0 ? '+' : ''}₩{formatCurrency(Math.abs(r.net))}
-                    </td>
-                    <td className="center">{r.count}</td>
-                  </tr>
-                ))}
+                  <EmptyRow colSpan={7}>거래 데이터 불러오는 중…</EmptyRow>
+                ) : summary.length === 0 ? (
+                  <EmptyRow colSpan={7}>분개 없음 — 입출금 관리에서 거래 등록</EmptyRow>
+                ) : CLASS_ORDER.flatMap((cls) => {
+                  const rows = grouped.get(cls) ?? [];
+                  return rows.map((s, i) => (
+                    <tr key={s.accountKey}>
+                      <td className="dim">{i === 0 ? CLASS_LABEL[cls] : ''}</td>
+                      <td className="mono dim">{s.account.code}</td>
+                      <td style={{ fontWeight: 600 }}>{s.account.name}</td>
+                      <td className="num mono">{s.debit ? `₩${formatCurrency(s.debit)}` : '-'}</td>
+                      <td className="num mono">{s.credit ? `₩${formatCurrency(s.credit)}` : '-'}</td>
+                      <td className="num mono" style={{ fontWeight: 700 }}>
+                        ₩{formatCurrency(Math.abs(s.balance))}
+                      </td>
+                      <td className="center dim">{s.entryCount}</td>
+                    </tr>
+                  ));
+                })}
               </tbody>
             </table>
           </div>

@@ -20,6 +20,7 @@ import { PERIODS, type Period, periodRange, isInRange } from '@/lib/period-filte
 import { useAuth } from '@/lib/use-auth';
 import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
+import { audit } from '@/lib/firebase/audit-store';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
@@ -132,15 +133,23 @@ export default function PenaltyPage() {
     });
   }
 
+  // soft delete (ERP 원칙) — 하드삭제하면 감사추적·통지번호 dedup 이력이 소실됨.
+  // items memo 의 !deletedAt 필터가 화면에서 숨김. audit 로그 병행.
   function removeItem(id: string) {
-    setItems((p) => p.filter((i) => i.id !== id));
+    const target = allItems.find((i) => i.id === id);
+    setItems((p) => p.map((i) => i.id === id ? { ...i, deletedAt: new Date().toISOString() } : i));
+    void audit.delete('penalty', id, `과태료 삭제 ${target?.car_number ?? id} ${target?.notice_no ?? ''}`.trim());
   }
 
   async function clearInProgress() {
     const n = items.filter((i) => (i._phase ?? 'in-progress') === 'in-progress').length;
     if (n === 0) return;
     if (!await showConfirm({ title: `처리중 ${n}건을 전체 초기화할까요? 처리완료 이력은 유지됩니다.` })) return;
-    setItems((prev) => prev.filter((i) => i._phase === 'completed'));
+    const now = new Date().toISOString();
+    setItems((prev) => prev.map((i) =>
+      (!i.deletedAt && i._phase !== 'completed') ? { ...i, deletedAt: now } : i,
+    ));
+    void audit.delete('penalty', 'batch', `과태료 처리중 전체 초기화 ${n}건 (soft delete)`);
   }
 
   /** 매칭 완료 (회사 + 임차인) 케이스만 처리완료 가능 */
