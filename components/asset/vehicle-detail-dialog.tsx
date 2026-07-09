@@ -65,6 +65,7 @@ import { AttachedFilePreview, FileLightbox } from '@/components/ui/attached-file
 import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { showConfirm } from '@/lib/confirm';
+import { toast } from '@/lib/toast';
 import { Field } from '@/components/ui/editable-field';
 import { InlineTextEdit } from '@/components/ui/inline-text-edit';
 import { EmptyRow } from '@/components/ui/empty-row';
@@ -322,6 +323,35 @@ function OperationOverviewTab({
 
 /** 자산 첨부 파일 요약 — 자등증/보험/할부/검사/GPS/매도증 6종 일괄 표시 (다운로드 링크). */
 function AttachmentSummary({ vehicle }: { vehicle: Vehicle }) {
+  const [backing, setBacking] = useState(false);
+
+  // Drive 미러 백업 — Firebase 가 원본, Google 공유드라이브에 백업본. 실패해도 ERP 흐름 무관(non-blocking).
+  async function handleDriveBackup(attachedCount: number) {
+    if (attachedCount === 0) { toast.info('백업할 첨부 파일이 없습니다'); return; }
+    setBacking(true);
+    try {
+      const { getFirebaseAuth } = await import('@/lib/firebase/client');
+      const idToken = (await getFirebaseAuth()?.currentUser?.getIdToken()) ?? '';
+      if (!idToken) { toast.error('로그인 세션 만료 — 다시 로그인해주세요'); return; }
+      const { driveMirrorVehicleDocs } = await import('@/lib/google/drive-mirror');
+      const { uploaded, failed, details } = await driveMirrorVehicleDocs({
+        vehicle,
+        companyName: vehicle.company ?? '미상',
+        idToken,
+      });
+      if (uploaded > 0 && failed === 0) toast.success(`Drive 백업 완료 — ${uploaded}건`);
+      else if (uploaded > 0) toast.info(`${uploaded}건 백업, ${failed}건 실패`);
+      else {
+        const firstErr = details.find((d) => !d.result.ok)?.result.error ?? '실패';
+        toast.error(`Drive 백업 실패: ${firstErr}`);
+      }
+    } catch (e) {
+      toast.error(`Drive 백업 오류: ${(e as Error).message ?? String(e)}`);
+    } finally {
+      setBacking(false);
+    }
+  }
+
   const items: { label: string; url?: string; fileName?: string; uploadedAt?: string }[] = [
     { label: '자동차등록증',     url: vehicle.registrationCertUrl,  fileName: vehicle.registrationCertFileName,  uploadedAt: vehicle.registrationCertUploadedAt },
     { label: '보험가입증명서',   url: vehicle.insuranceCertUrl,     fileName: vehicle.insuranceCertFileName,     uploadedAt: vehicle.insuranceCertUploadedAt },
@@ -333,8 +363,18 @@ function AttachmentSummary({ vehicle }: { vehicle: Vehicle }) {
   const attached = items.filter((it) => !!it.url).length;
   return (
     <Section title="첨부 파일">
-      <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-sub)' }}>
-        등록 완료 <strong style={{ color: 'var(--brand)' }}>{attached}</strong> / {items.length}
+      <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-sub)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span>등록 완료 <strong style={{ color: 'var(--brand)' }}>{attached}</strong> / {items.length}</span>
+        <button
+          className="btn btn-sm"
+          type="button"
+          onClick={() => handleDriveBackup(attached)}
+          disabled={backing || attached === 0}
+          style={{ marginLeft: 'auto' }}
+          title="첨부 서류를 Google Drive 공유드라이브에 미러 백업 (Firebase가 원본, Drive는 백업본)"
+        >
+          {backing ? '백업 중…' : 'Drive 백업'}
+        </button>
       </div>
       <div className="detail-grid-2">
         {items.map((it) => (

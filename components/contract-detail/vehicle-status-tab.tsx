@@ -1135,12 +1135,53 @@ function AttachmentList({ c }: { c: Contract }) {
     { label: '면허증 사본',      url: c.customerLicenseCertUrl,      fileName: c.customerLicenseCertFileName,      uploadedAt: c.customerLicenseCertUploadedAt },
   ];
   const attached = items.filter((it) => !!it.url).length;
+  const [backing, setBacking] = useState(false);
+
+  // Drive 미러 백업 — 계약서·면허증 + 차량 서류 전체. Firebase 원본, Drive 백업본(non-blocking).
+  async function handleDriveBackup() {
+    if (attached === 0) { toast.info('백업할 첨부 파일이 없습니다'); return; }
+    setBacking(true);
+    try {
+      const { getFirebaseAuth } = await import('@/lib/firebase/client');
+      const idToken = (await getFirebaseAuth()?.currentUser?.getIdToken()) ?? '';
+      if (!idToken) { toast.error('로그인 세션 만료 — 다시 로그인해주세요'); return; }
+      const { driveMirrorContractDocs, driveMirrorVehicleDocs } = await import('@/lib/google/drive-mirror');
+      const companyName = c.company ?? '미상';
+      const r1 = await driveMirrorContractDocs({ contract: c, companyName, idToken });
+      const r2 = vehicle ? await driveMirrorVehicleDocs({ vehicle, companyName, idToken }) : null;
+      const uploaded = r1.uploaded + (r2?.uploaded ?? 0);
+      const failed = r1.failed + (r2?.failed ?? 0);
+      if (uploaded > 0 && failed === 0) toast.success(`Drive 백업 완료 — ${uploaded}건`);
+      else if (uploaded > 0) toast.info(`${uploaded}건 백업, ${failed}건 실패`);
+      else {
+        const firstErr = [...r1.details, ...(r2?.details ?? [])].find((d) => !d.result.ok)?.result.error ?? '실패';
+        toast.error(`Drive 백업 실패: ${firstErr}`);
+      }
+    } catch (e) {
+      toast.error(`Drive 백업 오류: ${(e as Error).message ?? String(e)}`);
+    } finally {
+      setBacking(false);
+    }
+  }
 
   return (
     <Section
       icon={<FileText size={12} weight="duotone" />}
       title="첨부 파일"
-      action={<span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-weak)' }}>{attached}/{items.length}</span>}
+      action={
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-weak)' }}>{attached}/{items.length}</span>
+          <button
+            className="btn btn-sm"
+            type="button"
+            onClick={handleDriveBackup}
+            disabled={backing || attached === 0}
+            title="계약서·면허증·차량 서류를 Google Drive 공유드라이브에 미러 백업 (Firebase가 원본)"
+          >
+            {backing ? '백업 중…' : 'Drive 백업'}
+          </button>
+        </div>
+      }
     >
       <div className="detail-grid-2">
         {items.map((it) => (
