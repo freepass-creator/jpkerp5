@@ -17,6 +17,7 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { formatCurrency } from '@/lib/utils';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { isContractEnded } from '@/lib/contract-lifecycle';
+import { effectiveAmount } from '@/lib/payment-schedule';
 
 type CustRow = {
   name: string;
@@ -40,10 +41,12 @@ export default function FinanceCustomerPage() {
       };
       r.contractCount++;
       if (!isContractEnded(c)) r.active++;
-      // schedules 청구 누적 + 입금 누적
+      // schedules 청구 누적 + 입금 누적.
+      //   면제(반납 후 미도래 등)는 실제 청구 아님 → 제외. 할인 반영(effectiveAmount)
+      //   — gross 로 합산하면 반납계약 청구액이 폭증해 청구−입금≠미수가 됐음.
       const schedules = c.schedules ?? [];
       for (const s of schedules) {
-        r.billed += s.amount ?? 0;
+        if (s.status !== '면제') r.billed += effectiveAmount(s);
         r.paid += s.paidAmount ?? 0;
       }
       r.unpaid += c.unpaidAmount ?? 0;

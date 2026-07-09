@@ -107,7 +107,17 @@ export function CompanyDetailDialog({
           <span>대표 {cur.ceo || '-'}</span>
         </>
       }
-      onEdit={() => setEditing(true)}
+      onEdit={() => {
+        // [수정] 진입 시 최신 company 로 draft 재스냅샷 — 안 하면 다이얼로그 여는 동안
+        // 다른 곳에서 갱신된 값이 옛 draft 로 되돌려짐(동시편집 손실).
+        setDraft({
+          ...company,
+          bizRegNo: cleanReg(company.bizRegNo),
+          corpRegNo: cleanReg(company.corpRegNo),
+          contactPhone: cleanReg(company.contactPhone),
+        });
+        setEditing(true);
+      }}
       editing={editing}
       onSave={() => void handleSave()}
       onCancel={handleCancel}

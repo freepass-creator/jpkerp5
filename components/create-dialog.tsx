@@ -2335,7 +2335,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: (newContractId?: string) =
     setExteriorColor(matchedVehicle.exteriorColor ?? '');
     setInteriorColor(matchedVehicle.interiorColor ?? '');
   }, [matchedVehicle]);
-  const [contractDate, setContractDate] = useState(new Date().toISOString().slice(0, 10));
+  const [contractDate, setContractDate] = useState(todayKr());   // KST — UTC 는 0~9시 전날로 프리필돼 회차 dueDate 가 하루 당겨짐
   const [returnDate, setReturnDate] = useState('');
   const [monthlyRent, setMonthlyRent] = useState('');
   const [paymentDay, setPaymentDay] = useState('1');
