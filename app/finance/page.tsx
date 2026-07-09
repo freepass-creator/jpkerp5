@@ -99,8 +99,12 @@ export default function FinancePage() {
     if (selectedIds.size === 0) return;
     if (!await showConfirm({ title: `선택한 ${selectedIds.size}건의 거래내역을 삭제하시겠습니까?`, danger: true })) return;
     try {
-      await removeManyBank(Array.from(selectedIds));
+      const requested = selectedIds.size;
+      const removed = await removeManyBank(Array.from(selectedIds));
       setSelectedIds(new Set());
+      const skipped = requested - removed;
+      if (skipped > 0) toast.info(`${removed}건 삭제 — 회계마감월 거래 ${skipped}건은 삭제되지 않음(#18)`);
+      else toast.success(`${removed}건 삭제`);
     } catch (e) {
       toast.error(`삭제 실패: ${(e as Error).message ?? String(e)}`);
     }

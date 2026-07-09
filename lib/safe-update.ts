@@ -16,6 +16,7 @@
  */
 
 import { LockConflictError } from './firebase/locked-update';
+import { PeriodClosedError } from './firebase/closed-periods-store';
 import { toast } from './toast';
 import { friendlyError } from './friendly-error';
 
@@ -38,6 +39,11 @@ export async function safeUpdate<T>(
     if (e instanceof LockConflictError) {
       toast.error(opts.conflictMessage ?? '다른 사용자가 먼저 수정했습니다. 새로고침 후 다시 시도하세요.');
       opts.onConflict?.();
+      return null;
+    }
+    if (e instanceof PeriodClosedError) {
+      // #18 — 마감월 거래 금융편집·삭제 차단. 정정은 신규 분개(전기오류수정)로.
+      toast.error(e.message);
       return null;
     }
     toast.error(`${opts.errorPrefix ?? '저장 실패'} — ${friendlyError(e)}`);
