@@ -411,10 +411,8 @@ function AdminSettings() {
     setBusy(true);
     setRun(null);
     try {
-      const { getFirebaseAuth } = await import('@/lib/firebase/client');
-      const auth = getFirebaseAuth();
-      const user = auth?.currentUser;
-      const idToken = user ? await user.getIdToken() : '';
+      const { getCurrentIdToken } = await import('@/lib/firebase/client');
+      const idToken = await getCurrentIdToken();
       const res = await fetch(`/api/cron/license-verify${dry ? '?dry=1' : ''}`, {
         headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
       });

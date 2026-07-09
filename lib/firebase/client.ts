@@ -60,6 +60,12 @@ export function getFirebaseAuth(): Auth | null {
   return _auth;
 }
 
+/** 현재 로그인 사용자의 Firebase ID 토큰 (없으면 ''). API 라우트 Authorization 헤더용 — 여러 곳 중복 취득 통합. */
+export async function getCurrentIdToken(): Promise<string> {
+  const user = getFirebaseAuth()?.currentUser;
+  return user ? await user.getIdToken() : '';
+}
+
 /**
  * RTDB 호출 전 로그인 상태 보장 — 미로그인이면 reject.
  * AuthGate 가 화면을 가리고 있으므로 사용자는 정상적으로 도달하면 항상 로그인 상태.

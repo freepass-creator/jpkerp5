@@ -330,8 +330,8 @@ function AttachmentSummary({ vehicle }: { vehicle: Vehicle }) {
     if (attachedCount === 0) { toast.info('백업할 첨부 파일이 없습니다'); return; }
     setBacking(true);
     try {
-      const { getFirebaseAuth } = await import('@/lib/firebase/client');
-      const idToken = (await getFirebaseAuth()?.currentUser?.getIdToken()) ?? '';
+      const { getCurrentIdToken } = await import('@/lib/firebase/client');
+      const idToken = await getCurrentIdToken();
       if (!idToken) { toast.error('로그인 세션 만료 — 다시 로그인해주세요'); return; }
       const { driveMirrorVehicleDocs } = await import('@/lib/google/drive-mirror');
       const { uploaded, failed, details } = await driveMirrorVehicleDocs({

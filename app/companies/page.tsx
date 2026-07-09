@@ -668,10 +668,8 @@ function InfoEditor({ draft, onChange }: { draft: Company; onChange: (c: Company
       const fd = new FormData();
       fd.append('file', file);
       fd.append('type', 'business_reg');
-      const { getFirebaseAuth } = await import('@/lib/firebase/client');
-      const auth = getFirebaseAuth();
-      const user = auth?.currentUser;
-      const idToken = user ? await user.getIdToken() : '';
+      const { getCurrentIdToken } = await import('@/lib/firebase/client');
+      const idToken = await getCurrentIdToken();
       const res = await fetch('/api/ocr/extract', {
         method: 'POST',
         headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
