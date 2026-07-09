@@ -43,7 +43,7 @@ export function useAuditLogs(limit = 500) {
  * 인증 안 됐으면 by 없이 기록 (anonymous).
  * 실패해도 throw 안 함 — audit 실패가 본 동작을 막으면 안 됨.
  */
-export async function logAudit(entry: Omit<AuditLog, 'id' | 'at'> & { at?: string }): Promise<void> {
+export async function logAudit(entry: Omit<AuditLog, 'id' | 'at' | 'userId'> & { at?: string }): Promise<void> {
   try {
     if (!isFirebaseConfigured()) return;
     await ensureAuth();
@@ -59,6 +59,8 @@ export async function logAudit(entry: Omit<AuditLog, 'id' | 'at'> & { at?: strin
       at: entry.at ?? new Date().toISOString(),
       by: entry.by ?? user?.email ?? undefined,
       byUid: entry.byUid ?? user?.uid ?? undefined,
+      // Rules .validate 가 필수로 요구하는 필드 — 항상 문자열 보장(익명/시스템도 기록되게). 미기록 시 규칙 배포하면 전 감사 유실.
+      userId: entry.byUid ?? user?.uid ?? 'system',
       action: entry.action,
       entityType: entry.entityType,
       entityId: entry.entityId,

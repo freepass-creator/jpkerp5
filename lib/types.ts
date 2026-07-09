@@ -720,7 +720,8 @@ export type AuditLog = {
   id: string;
   at: string;              // ISO timestamp
   by?: string;             // 사용자 email (없으면 시스템)
-  byUid?: string;          // Firebase UID
+  byUid?: string;          // Firebase UID (표시용)
+  userId: string;          // Firebase UID — Rules .validate 필수 자식 + 인덱스 키. byUid 와 동일값, 없으면 'system'
   action: AuditAction;
   entityType: AuditEntityType;
   entityId?: string;       // 대상 ID (있을 때)
