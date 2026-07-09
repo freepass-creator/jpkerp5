@@ -30,7 +30,9 @@ type Options<T = Record<string, unknown>> = {
   freezeLeftCols?: number;
 };
 
-type Cell = { v: string | number; s?: Record<string, unknown> };
+// t(cell type) 를 명시하지 않으면 xlsx-js-style 이 숫자값도 텍스트('s')로 저장 →
+// 엑셀에서 합계·정렬이 안 됨. 숫자는 반드시 t:'n' 으로 기록.
+type Cell = { v: string | number; t?: 's' | 'n'; s?: Record<string, unknown> };
 
 function styleFor(type?: ExcelColumn['type'], v?: unknown): Record<string, unknown> {
   if (type === 'number') return STYLE_NUM;
@@ -73,7 +75,7 @@ export function exportToExcel<T = Record<string, unknown>>(opts: Options<T>): { 
     const cells: Cell[] = opts.columns.map((c) => {
       const raw = c.getter ? c.getter(r) : (r as Record<string, unknown>)[c.key];
       const v = (raw == null ? '' : raw) as string | number;
-      return { v, s: styleFor(c.type, v) };
+      return { v, t: typeof v === 'number' ? 'n' : 's', s: styleFor(c.type, v) };
     });
     aoa.push(cells);
   }

@@ -4,6 +4,7 @@
  */
 
 import * as XLSX from 'xlsx-js-style';
+import { todayKr } from './mock-data';
 
 const FONT = '맑은 고딕';
 
@@ -50,6 +51,9 @@ const styleNegative = {
   font: { name: FONT, sz: 10, color: { rgb: 'DC2626' } },
 };
 
+// 숫자 셀 — t:'n' 을 명시하지 않으면 xlsx-js-style 이 텍스트로 저장해 엑셀 합계·정렬이 안 됨.
+const numCell = (v: number, s: Record<string, unknown> = styleNum) => ({ v, t: 'n' as const, s });
+
 export type DailySummaryRow = {
   companyCode: string;
   date: string;
@@ -87,7 +91,7 @@ export function downloadDailyLedgerExcel(
   const summaryHeaders = ['회사', '일자', '거래수', '입금합계', '출금합계', '순증감', '잔액', '주요 입금 (계정과목)', '주요 출금 (계정과목)'];
   const summaryAoa: (string | number)[][] = [
     [meta?.title ?? '자금일보 — 일자별 집계'],
-    [meta?.period ? `기간: ${meta.period}` : `기준: ${new Date().toISOString().slice(0, 10)}`],
+    [meta?.period ? `기간: ${meta.period}` : `기준: ${todayKr()}`],
     [],
     summaryHeaders,
     ...daily.map((r) => [
@@ -106,7 +110,7 @@ export function downloadDailyLedgerExcel(
 
   // 셀 스타일
   ws1['A1'] = { v: meta?.title ?? '자금일보 — 일자별 집계', s: styleTitle };
-  ws1['A2'] = { v: meta?.period ? `기간: ${meta.period}` : `기준: ${new Date().toISOString().slice(0, 10)}`, s: { font: { name: FONT, sz: 10, color: { rgb: '666666' } } } };
+  ws1['A2'] = { v: meta?.period ? `기간: ${meta.period}` : `기준: ${todayKr()}`, s: { font: { name: FONT, sz: 10, color: { rgb: '666666' } } } };
 
   // 헤더 (4행)
   for (let c = 0; c < summaryHeaders.length; c++) {
@@ -120,11 +124,11 @@ export function downloadDailyLedgerExcel(
     const row = 4 + i;
     ws1[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: r.companyCode || '(미지정)', s: styleCell };
     ws1[XLSX.utils.encode_cell({ r: row, c: 1 })] = { v: r.date, s: styleDate };
-    ws1[XLSX.utils.encode_cell({ r: row, c: 2 })] = { v: r.txCount, s: styleNum };
-    ws1[XLSX.utils.encode_cell({ r: row, c: 3 })] = { v: r.deposit, s: styleNum };
-    ws1[XLSX.utils.encode_cell({ r: row, c: 4 })] = { v: r.withdraw, s: styleNum };
-    ws1[XLSX.utils.encode_cell({ r: row, c: 5 })] = { v: r.netChange, s: r.netChange < 0 ? styleNegative : styleNum };
-    ws1[XLSX.utils.encode_cell({ r: row, c: 6 })] = { v: r.endBalance, s: styleNum };
+    ws1[XLSX.utils.encode_cell({ r: row, c: 2 })] = numCell(r.txCount);
+    ws1[XLSX.utils.encode_cell({ r: row, c: 3 })] = numCell(r.deposit);
+    ws1[XLSX.utils.encode_cell({ r: row, c: 4 })] = numCell(r.withdraw);
+    ws1[XLSX.utils.encode_cell({ r: row, c: 5 })] = numCell(r.netChange, r.netChange < 0 ? styleNegative : styleNum);
+    ws1[XLSX.utils.encode_cell({ r: row, c: 6 })] = numCell(r.endBalance);
     ws1[XLSX.utils.encode_cell({ r: row, c: 7 })] = { v: r.depoSubjects, s: styleCell };
     ws1[XLSX.utils.encode_cell({ r: row, c: 8 })] = { v: r.drawSubjects, s: styleCell };
   }
@@ -166,11 +170,13 @@ export function downloadDailyLedgerExcel(
     ws2[XLSX.utils.encode_cell({ r: row, c: 3 })] = { v: r.subject, s: styleCell };
     ws2[XLSX.utils.encode_cell({ r: row, c: 4 })] = { v: r.counterparty, s: styleCell };
     ws2[XLSX.utils.encode_cell({ r: row, c: 5 })] = { v: r.memo, s: styleCell };
-    ws2[XLSX.utils.encode_cell({ r: row, c: 6 })] = { v: r.deposit, s: styleNum };
-    ws2[XLSX.utils.encode_cell({ r: row, c: 7 })] = { v: r.withdraw, s: styleNum };
-    ws2[XLSX.utils.encode_cell({ r: row, c: 8 })] = { v: r.balance, s: styleNum };
+    ws2[XLSX.utils.encode_cell({ r: row, c: 6 })] = numCell(r.deposit);
+    ws2[XLSX.utils.encode_cell({ r: row, c: 7 })] = numCell(r.withdraw);
+    ws2[XLSX.utils.encode_cell({ r: row, c: 8 })] = numCell(r.balance);
     ws2[XLSX.utils.encode_cell({ r: row, c: 9 })] = { v: r.matchedContractNo, s: styleCell };
-    ws2[XLSX.utils.encode_cell({ r: row, c: 10 })] = { v: r.matchedScheduleSeq, s: styleNum };
+    ws2[XLSX.utils.encode_cell({ r: row, c: 10 })] = typeof r.matchedScheduleSeq === 'number'
+      ? numCell(r.matchedScheduleSeq)
+      : { v: r.matchedScheduleSeq, s: styleNum };
   }
   ws2['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }];
   ws2['!cols'] = [
@@ -181,6 +187,6 @@ export function downloadDailyLedgerExcel(
   XLSX.utils.book_append_sheet(wb, ws2, '거래원장');
 
   // 다운로드
-  const fileName = `자금일보-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+  const fileName = `자금일보-${todayKr().replace(/-/g, '')}.xlsx`;
   XLSX.writeFile(wb, fileName, { bookType: 'xlsx', compression: true });
 }

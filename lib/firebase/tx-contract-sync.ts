@@ -61,7 +61,10 @@ export async function updateBankTxWithMatchSync(
   updateContract: ContractUpdater,
 ): Promise<void> {
   const oldMatchId = oldTx.matchedContractId;
-  const newMatchId = patch.matchedContractId !== undefined ? patch.matchedContractId : oldMatchId;
+  // 'in' 으로 판정 — 명시적 undefined(매칭 해제 의도)와 키 부재(기존 유지)를 구분.
+  //   !== undefined 로는 vendor 재지정 등 해제 흐름({matchedContractId: undefined})이
+  //   '변경 없음'으로 오인돼 reverseMatch 를 건너뛰고 계약에 유령 payment 가 남는다.
+  const newMatchId = 'matchedContractId' in patch ? patch.matchedContractId : oldMatchId;
   const newDeposit = patch.amount ?? oldTx.amount ?? 0;
   const matchChanged = oldMatchId !== newMatchId;
   const amountChanged = oldMatchId && (oldTx.amount ?? 0) !== newDeposit;
@@ -201,7 +204,8 @@ export async function updateCardTxWithMatchSync(
   updateContract: ContractUpdater,
 ): Promise<void> {
   const oldMatchId = oldTx.matchedContractId;
-  const newMatchId = patch.matchedContractId !== undefined ? patch.matchedContractId : oldMatchId;
+  // 'in' 으로 판정 — 명시적 undefined(해제)와 키 부재(유지)를 구분 (은행 버전과 동일).
+  const newMatchId = 'matchedContractId' in patch ? patch.matchedContractId : oldMatchId;
   const newAmount = patch.amount ?? oldTx.amount ?? 0;
   const matchChanged = oldMatchId !== newMatchId;
   const amountChanged = oldMatchId && (oldTx.amount ?? 0) !== newAmount;

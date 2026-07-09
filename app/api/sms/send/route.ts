@@ -69,8 +69,9 @@ export async function POST(req: NextRequest) {
     const db = getAdminRtdb();
     logRef = db.ref(`${SMS_LOG_PATH}/${opKey}`);
     const existing = await logRef.get();
-    if (existing.exists()) {
-      // 멱등성 — 이미 발송한 키. 기존 응답 그대로 반환 (중복 발송 방지)
+    // 성공한 발송만 멱등 차단 — 실패·mock(ok:false)까지 막으면 같은 1분 내 재시도가
+    // 영구 불가해진다(전송 실패 후 재발송 원천 차단). 실패 기록은 아래에서 덮어씀.
+    if (existing.exists() && existing.val()?.ok === true) {
       const prev = existing.val();
       return NextResponse.json({ ...prev.response, idempotent: true, sentAt: prev.sentAt });
     }

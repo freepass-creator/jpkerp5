@@ -97,10 +97,8 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { user } = useAuth();
 
-  // 'all' → 모든 status (loadAll), 'active' → 처리 진행중 (default)
-  const { items, loading } = useIntakeItems({
-    status: statusFilter === 'all' || statusFilter === 'active' ? statusFilter as 'active' : statusFilter,
-  });
+  // 'all' → 전체, 'active' → 처리 진행중(default), 그 외 → 해당 status
+  const { items, loading } = useIntakeItems({ status: statusFilter });
 
   const filtered = useMemo(() => {
     let list = items;

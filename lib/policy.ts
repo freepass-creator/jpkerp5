@@ -117,7 +117,10 @@ export function usePolicies(): {
         setLoading(false);
       }, () => { setLoading(false); });
     })();
-    return () => { cancelled = true; if (unsub) unsub(); };
+    // 구독을 소유한 컴포넌트가 unmount 되면 플래그도 리셋 — 안 하면 재방문 시
+    // policySubscribed 가 true 로 남아 재구독을 건너뛰고, setPolicy 후 React state 가
+    // 갱신 안 돼 설정 입력이 얼어붙는다 (usePolicies 소비자는 settings 페이지 단독).
+    return () => { cancelled = true; if (unsub) unsub(); policySubscribed = false; };
   }, [configured]);
 
   return { policies, loading, setPolicy };

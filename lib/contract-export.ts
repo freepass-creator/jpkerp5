@@ -107,7 +107,8 @@ export function downloadContractsExcel(
     const c = contracts[i];
     const row = 4 + i;
     const set = (col: number, v: string | number, s = styleCell) => {
-      ws[XLSX.utils.encode_cell({ r: row, c: col })] = { v, s };
+      // 숫자는 t:'n' 명시 — 없으면 xlsx-js-style 이 텍스트로 저장해 엑셀 합계·정렬 불가.
+      ws[XLSX.utils.encode_cell({ r: row, c: col })] = { v, t: typeof v === 'number' ? 'n' : 's', s };
     };
     set(0, c.contractNo ?? '');
     set(1, displayCompanyName(c.company, companyMaster));
@@ -200,7 +201,7 @@ export function downloadOverdueExcel(
       : 0;
     const row = 4 + i;
     const set = (col: number, v: string | number, s = styleCell) => {
-      ws[XLSX.utils.encode_cell({ r: row, c: col })] = { v, s };
+      ws[XLSX.utils.encode_cell({ r: row, c: col })] = { v, t: typeof v === 'number' ? 'n' : 's', s };
     };
     set(0, displayCompanyName(c.company, companyMaster));
     set(1, c.vehiclePlate);

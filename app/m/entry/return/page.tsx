@@ -63,10 +63,13 @@ export default function MobileReturn() {
   const matches = useMemo(() => {
     const query = q.trim().toLowerCase().replace(/[^\w가-힣]/g, '');
     if (!query) return [];
-    // 검색도 대기 목록과 동일 조건 — 인도 전(예약) 계약까지 반납 처리되던 것 차단
+    // 검색은 인도된 활성 계약 전체 — 차가 잠시 비운행(휴차·임시배차·정비·사고)이어도
+    // 계약은 살아있으므로 반납 처리 가능해야 함. 인도 전(예약: 구매대기/인도대기 등)과
+    // 종료(반납/해지/매각/채권)는 여전히 제외.
+    const RETURNABLE = new Set(['운행', '연장대기', '종료대기', '휴차', '휴차대기', '임시배차', '정비', '사고']);
     return contracts
       .filter((c) => !c.returnedDate)
-      .filter((c) => c.vehicleStatus === '운행' || c.vehicleStatus === '연장대기' || c.vehicleStatus === '종료대기')
+      .filter((c) => RETURNABLE.has(c.vehicleStatus))
       .filter((c) => `${c.vehiclePlate ?? ''}${c.customerName ?? ''}`.toLowerCase().replace(/[^\w가-힣]/g, '').includes(query))
       .slice(0, 20);
   }, [contracts, q]);

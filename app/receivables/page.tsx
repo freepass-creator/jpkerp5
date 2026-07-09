@@ -98,9 +98,11 @@ function needsRecovery(c: Contract, today: string, sentIds: Set<string>): boolea
   const legalGrounds = days >= 10 && sentIds.has(c.id);
   const debtFlagged = c.status === '채권';
   if (!legalGrounds && !debtFlagged) return false;
-  // 이미 회수/종결된 케이스는 제외
+  // 이미 회수/종결된 케이스는 제외.
+  //   단, 수동 채권화(status='채권')는 회수 대상으로 유지 — '채권'이
+  //   ENDED_CONTRACT_STATUSES 에 포함되므로 debtFlagged 는 종료 판정에서 제외.
   if (c.returnedDate) return false;
-  if (isContractEnded(c)) return false;
+  if (!debtFlagged && isContractEnded(c)) return false;
   return true;
 }
 
@@ -114,8 +116,10 @@ export default function ReceivablesPage() {
   const { contracts, loading: contractsLoading, update: rtdbUpdate } = useContracts();
   const { vehicles, update: updateVehicleMaster } = useVehicles();
   // 미수 페이지에서도 Contract.vehicleStatus 변경 시 Vehicle 마스터 status 자동 동기화
-  const updateContract = useCallback((updated: Contract) => {
-    void syncContractAndVehicleStatus(updated, vehicles, rtdbUpdate, updateVehicleMaster);
+  // Promise 를 반환해야 호출자(toggleDebtFlag/commitEngineLock/EngineLockDialog)의
+  // await + try/catch 가 RTDB 쓰기 실패(LockConflictError 등)를 실제로 잡는다.
+  const updateContract = useCallback((updated: Contract): Promise<void> => {
+    return syncContractAndVehicleStatus(updated, vehicles, rtdbUpdate, updateVehicleMaster);
   }, [rtdbUpdate, vehicles, updateVehicleMaster]);
   const { companies: companyMaster } = useCompanies();
   const { entries: history, add: addHistory } = useHistoryEntries();
@@ -223,10 +227,13 @@ export default function ReceivablesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, today, noticeSentIds]);
 
-  // 현재 선택 chip 의 count 가 0 되면 [전체] 로 자동 전환
+  // 현재 선택 chip 의 count 가 0 되면 [전체] 로 자동 전환.
+  //   로딩 중(contracts=[])엔 모든 count 가 0 이라 저장된 필터가 새로고침마다
+  //   '전체'로 리셋·영속화되므로 데이터 도착 전에는 건너뜀.
   useEffect(() => {
+    if (contractsLoading) return;
     if (filter !== '전체' && (counts[filter] ?? 0) === 0) setFilter('전체');
-  }, [filter, counts]);
+  }, [filter, counts, contractsLoading]);
 
   /** 채권화 토글 — 회수 어려운 미수금 분류 (수동) */
   async function toggleDebtFlag(c: Contract) {
@@ -719,7 +726,7 @@ export default function ReceivablesPage() {
               <button
                 className="btn"
                 type="button"
-                onClick={() => downloadOverdueExcel(contracts, companyMaster)}
+                onClick={() => downloadOverdueExcel(filtered, companyMaster)}
                 title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
                 disabled={filtered.length === 0}
               >
@@ -760,7 +767,7 @@ export default function ReceivablesPage() {
         onAddContact={(c) => { setDetailContract(null); setContactOpen(c); }}
         onEngineLock={(c) => { setDetailContract(null); openEngineLockDialog(c); }}
         onSendSms={(c) => { setDetailContract(null); setSelectedIds(new Set([c.id])); setSmsOpen(true); }}
-        onMarkDebt={(c) => { void updateContract({ ...c, status: '채권' }); }}
+        onMarkDebt={(c) => { void toggleDebtFlag(c); }}
         onEdit={detailContract ? () => {
           // 리스크 다이얼로그 → 풀 계약 상세 dialog (수정 가능)
           setEditContract(detailContract);

@@ -25,6 +25,7 @@ import { ref, push, onValue, update as rtdbUpdate, get } from 'firebase/database
 import { useEffect, useState } from 'react';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from './client';
 import { withMeta, type WriteMeta } from '../write-meta';
+import { todayKr } from '../mock-data';
 
 const PATH = dbPath('attendance_requests');
 
@@ -136,7 +137,7 @@ export function useTodayOnLeaveCount(): {
       if (!db) return;
       unsub = onValue(ref(db, PATH), (snap) => {
         const val = (snap.val() ?? {}) as Record<string, AttendanceRequest>;
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayKr();   // KST — UTC toISOString 은 0~9시에 전날로 판정됨
         const filtered = Object.values(val).filter((r) => {
           if (r.status !== 'approved') return false;
           const from = r.fromDate ?? '';

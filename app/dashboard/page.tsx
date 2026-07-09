@@ -80,16 +80,15 @@ export default function DashboardPage() {
 
   const kpi = useMemo(() => {
     const thisMonth = today.slice(0, 7);          // YYYY-MM
-    const lastMonth = (() => {
-      const d = new Date(today);
-      d.setMonth(d.getMonth() - 1);
-      return d.toISOString().slice(0, 7);
-    })();
-    const nextMonth = (() => {
-      const d = new Date(today);
-      d.setMonth(d.getMonth() + 1);
-      return d.toISOString().slice(0, 7);
-    })();
+    // 정수 월 산술 — new Date().setMonth 는 대상 월에 없는 일자(29~31일)를
+    // 다음 달로 롤오버해 월말에 전월/익월이 틀어짐 (예: 7/31 → lastMonth='2026-07').
+    const shiftMonth = (ym: string, delta: number): string => {
+      const [y, m] = ym.split('-').map(Number);
+      const total = y * 12 + (m - 1) + delta;
+      return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
+    };
+    const lastMonth = shiftMonth(thisMonth, -1);
+    const nextMonth = shiftMonth(thisMonth, +1);
 
     // 미수 + 운행
     const totalUnpaid = contracts.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0);
@@ -371,8 +370,10 @@ function ScheduleCalendar({ contracts, today, onSelectContract }: { contracts: i
         c2.set(ymd, cur);
         push(ymd, { contractId: c.id, plate: c.vehiclePlate ?? '', customer: c.customerName ?? '', kind });
       };
+      // 만기(운행)와 반납은 같은 returnScheduledDate 를 쓰므로 상호배타로 —
+      // 운행 계약은 '만기'로만, 그 외 미반납 활성계약(연장대기/종료대기 등)은 '반납'으로 1회만 집계.
       if (c.status === '운행') inc(c.returnScheduledDate, 'expire', '만기');
-      if (!c.returnedDate && c.returnScheduledDate) inc(c.returnScheduledDate, 'return', '반납');
+      else if (!c.returnedDate && c.returnScheduledDate) inc(c.returnScheduledDate, 'return', '반납');
       inc(c.contractDate, 'renew', '신규');
     }
     return { counts: c2, details: d2 };

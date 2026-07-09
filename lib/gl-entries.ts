@@ -107,6 +107,9 @@ export type JournalEntry = {
 export function buildBankJournal(t: BankTransaction): JournalEntry | null {
   const subject = t.subject ?? '';
   if (INTERNAL_SUBJECTS_SET.has(subject)) return null;
+  // CMS 집금: 묶음(deposit)이 대표 현금흐름 — 구성건(item)까지 분개하면 현금·수익 이중계상.
+  //   payments/finance-daily/data-integrity 와 동일 규칙 (settlementRole==='item' 제외).
+  if (t.settlementRole === 'item') return null;
 
   const isDeposit = (t.amount ?? 0) > 0;
   const isWithdraw = (t.withdraw ?? 0) > 0;
@@ -145,7 +148,9 @@ export function buildBankJournal(t: BankTransaction): JournalEntry | null {
 /** CardTx 1건 → 분개 1건. 매출(kind=매출) = 카드매출 수익. 법인카드 = category 비용. */
 export function buildCardJournal(t: CardTransaction): JournalEntry | null {
   const isSales = (t.kind ?? '매출') === '매출';
-  if ((t.amount ?? 0) <= 0) return null;
+  // 취소전표(음수 매출)는 버리지 않고 그대로 통과 — 같은 차·대변 계정에 음수로 집계돼
+  // 원매출과 자동 상계(카드매출·법인카드 지출 과대 방지). 0 만 무의미하므로 제외.
+  if ((t.amount ?? 0) === 0) return null;
   if (isSales) {
     return {
       txId: t.id,

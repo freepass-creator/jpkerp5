@@ -46,8 +46,9 @@ export const cardTxKeys: KeyFn<Pick<CardTransaction,
   const last4 = norm(tx.cardLast4);
   return [
     // 1순위 — 승인번호 (보통 unique). 취소전표(음수)는 원거래와 같은 승인번호를 쓰므로
-    // '|취소' suffix 로 구분 — 없으면 취소가 원거래 중복으로 오인돼 silently drop 됐음.
-    approval ? `approval:${approval}${amount < 0 ? '|취소' : ''}` : '',
+    // '|취소|금액' suffix 로 구분 — 금액까지 넣어야 같은 승인번호의 부분취소 2건이
+    // 서로 다른 키가 돼 둘째가 드롭되지 않고, 동일 취소(진짜 중복)는 여전히 dedup 됨.
+    approval ? `approval:${approval}${amount < 0 ? `|취소|${amount}` : ''}` : '',
     // 2순위 — 일자+금액+카드뒤4 (승인번호 없을 때)
     !approval && date ? `compose:${date}|${amount}|${last4}` : '',
   ];

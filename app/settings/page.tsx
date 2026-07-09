@@ -572,7 +572,7 @@ function PolicySection() {
     <div className="settings-card" style={{ padding: 20 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>정책</h3>
       <div style={{ fontSize: 11, color: 'var(--text-sub)', marginBottom: 16 }}>
-        임박일·연체일·반환기한 — 회사가 직접 변경. 즉시 검증·알림에 반영.
+        임박일·연체일·반환기한 값 — 회사가 직접 변경. 화면별 검증·알림 반영은 단계적 도입 중.
       </div>
       {loading && <div style={{ fontSize: 12, color: 'var(--text-weak)' }}>로딩 중…</div>}
       {Object.entries(grouped).map(([group, keys]) => (

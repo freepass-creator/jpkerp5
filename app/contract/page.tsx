@@ -435,8 +435,9 @@ export default function ContractPage() {
               const r = ctxMenu.row;
               if (!r) return;
               if (!await showConfirm({ title: `${r.contractNo} 반납 처리하시겠습니까? (반납일=오늘)` })) return;
-              // 상태값 SSOT (ERP #4) — markReturned 가 일할 자동 정산 + 부수효과 통합
-              const updated = markReturned(r, new Date().toISOString().slice(0, 10));
+              // 상태값 SSOT (ERP #4) — markReturned 가 일할 자동 정산 + 부수효과 통합.
+              // 반납일은 KST(todayKr) — UTC toISOString 은 KST 0~9시에 전날로 기록됨.
+              const updated = markReturned(r, today);
               void safeUpdate(() => syncContractAndVehicleStatus(updated, vehicles, updateContract, updateVehicleMaster));
             },
             disabled: !!ctxMenu.row.returnedDate,

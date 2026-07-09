@@ -108,7 +108,9 @@ export function useModules(): {
         setLoading(false);
       }, () => { setLoading(false); });
     })();
-    return () => { cancelled = true; if (unsub) unsub(); };
+    // unmount 시 플래그 리셋 — 안 하면 재방문 시 재구독을 건너뛰어 모듈 토글 UI 가 얼어붙음
+    // (useModules 소비자는 settings 페이지 단독). policy.ts usePolicies 와 동일 처리.
+    return () => { cancelled = true; if (unsub) unsub(); moduleSubscribed = false; };
   }, [configured]);
 
   async function toggleModule(key: ModuleKey): Promise<void> {

@@ -155,7 +155,7 @@ function intakeSortTransform(val: unknown): IntakeItem[] {
 
 /** 라이브 구독 — 기본은 처리 진행중 (pending/classifying/matching/matched) 만. */
 export function useIntakeItems(opts?: {
-  status?: IntakeStatus | 'active';
+  status?: IntakeStatus | 'active' | 'all';
   limit?: number;
 }): { items: IntakeItem[]; loading: boolean } {
   const wantStatus = opts?.status ?? 'active';
@@ -163,9 +163,12 @@ export function useIntakeItems(opts?: {
   const { rows, loading } = useCachedSnapshot<IntakeItem>(PATH, intakeSortTransform);
 
   const items = useMemo(() => {
-    let list = wantStatus === 'active'
-      ? rows.filter((i) => i.status !== 'committed' && i.status !== 'rejected')
-      : rows.filter((i) => i.status === wantStatus);
+    // 'all' = 필터 없음(전체). 'active' = 처리 진행중. 그 외 = 해당 status.
+    let list = wantStatus === 'all'
+      ? rows
+      : wantStatus === 'active'
+        ? rows.filter((i) => i.status !== 'committed' && i.status !== 'rejected')
+        : rows.filter((i) => i.status === wantStatus);
     if (limit) list = list.slice(0, limit);
     return list;
   }, [rows, wantStatus, limit]);
