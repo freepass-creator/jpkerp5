@@ -23,6 +23,7 @@ import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
 import { formatCurrency, formatDateFull, daysSince, monthsBetween } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
+import { markReturned } from '@/lib/contract-actions';
 import {
   currentStage, stageLabel, daysToExpiry, getExpiryDate,
   getVehicleState, getContractState, getPaymentState,
@@ -440,6 +441,14 @@ export function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: C
             onChange={async (e) => {
               const next = e.target.value as VehicleStatus;
               if (!next) return;
+              // '반납' 은 상태값만 바꾸면 계약이 운영중으로 남아 청구가 계속됨 → 반납 SSOT(markReturned)
+              // 로 라우팅해 status='반납'+returnedDate+일할 자동정산까지 처리(정상 '반납회수' 흐름과 동일).
+              if (next === '반납') {
+                if (!await showConfirm({ title: `${c.vehiclePlate} 반납 처리합니다 (반납일=오늘, 일할 자동정산). 진행할까요?` })) return;
+                onUpdate(markReturned(c, todayKr()));
+                toast.success(`반납 처리: ${c.vehiclePlate}`);
+                return;
+              }
               if (!await showConfirm({ title: `차량 상태를 '${next}' 로 변경합니다.\n진행할까요?` })) return;
               onUpdate({ ...c, vehicleStatus: next });
               toast.success(`상태 변경: ${c.vehicleStatus} → ${next}`);

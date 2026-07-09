@@ -26,7 +26,7 @@ import type { VehicleStatus } from '@/lib/types';
  */
 const ASSET_STATUS_VALUES: VehicleStatus[] = [
   '구매대기', '등록대기', '상품화대기', '상품화중', '상품대기',
-  '휴차', '운행', '정비', '사고',
+  '휴차대기', '휴차', '운행', '정비', '사고',
   '매각검토', '매각대기', '매각',
 ];
 const ASSET_STATUS_SET = new Set<string>(ASSET_STATUS_VALUES);
@@ -750,6 +750,11 @@ export default function AssetPage() {
               onClick: async () => {
                 const r = ctxMenu.row;
                 if (!r) return;
+                // 합성 contract-derived 행은 vehicles 노드에 없어 삭제해도 무동작 + 허위 감사로그만 남음
+                if (r.id.startsWith('contract-derived-')) {
+                  toast.info('자동 인식 자산 — 해당 계약에서 처리하세요');
+                  return;
+                }
                 if (!await showConfirm({ title: `${r.plate ?? r.id} 차량을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
                 void removeVehicle(r.id);
               },

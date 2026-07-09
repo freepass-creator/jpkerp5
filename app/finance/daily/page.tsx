@@ -26,6 +26,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { buildCompanyOptions } from '@/lib/filter-helpers';
 import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { formatCurrency } from '@/lib/utils';
+import { todayKr } from '@/lib/mock-data';
 import { DailyLedgerView } from '@/components/finance/daily-ledger-view';
 import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
 import { toast } from '@/lib/toast';
@@ -188,7 +189,7 @@ export default function FinanceDailyPage() {
     }
     // ERP #29 Frozen Artifact — 발행 시점 snapshot 영구 보존
     try {
-      const billingMonth = new Date().toISOString().slice(0, 7);
+      const billingMonth = todayKr().slice(0, 7);   // KST 월 (엑셀 기본값과 통일)
       const items = r.snapshots.map(snapshotFromContract);
       await recordIssuedInvoices({
         billingMonth, items,
@@ -213,7 +214,15 @@ export default function FinanceDailyPage() {
       depoSubjects: r.depoSubjects,
       drawSubjects: r.drawSubjects,
     }));
-    const ledger = bankTx.map((t) => {
+    const ledger = bankTx.filter((t) => {
+      // 일자별집계 시트와 동일 필터 — CMS 구성건 제외 + 기간·회사 (안 하면 거래원장 시트만 전기간·전회사)
+      if (t.settlementRole === 'item') return false;
+      const day = (t.txDate ?? '').slice(0, 10);
+      if (!day || !inPeriod(day)) return false;
+      const co = t.companyCode || (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
+      if (companyFilter !== 'all' && co !== companyFilter) return false;
+      return true;
+    }).map((t) => {
       const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
       return {
         txDate: t.txDate ?? '',

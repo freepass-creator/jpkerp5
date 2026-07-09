@@ -277,12 +277,12 @@ export async function syncContractStatusFromVehicle(
   contracts: Contract[],
   updateContract: (c: Contract) => Promise<void>,
 ): Promise<{ updatedCount: number }> {
-  const plate = (vehicle.plate ?? '').trim();
-  if (!plate || !vehicle.status) return { updatedCount: 0 };
+  if (!(vehicle.plate ?? '').trim() || !vehicle.status) return { updatedCount: 0 };
   // 활성 계약만 sync — 종료 계약(반납/해지/채권)의 vehicleStatus 는 종료 시점 기록이므로 보존
   // (기존엔 과거 계약까지 현재 자산 상태로 덮여 종료 기록이 파괴됨)
+  // plate 매칭 SSOT(vehicleMatchesPlate: normPlate+plateHistory) — raw trim 은 표기차·번호변경 차량을 놓침
   const targets = contracts.filter((c) =>
-    (c.vehiclePlate ?? '').trim() === plate &&
+    vehicleMatchesPlate(vehicle, c.vehiclePlate) &&
     (c.status === '운행' || c.status === '대기') &&
     c.vehicleStatus !== vehicle.status,
   );
