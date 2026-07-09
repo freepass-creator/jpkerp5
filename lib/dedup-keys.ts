@@ -17,7 +17,7 @@ function norm(s: string | undefined | null): string {
  * 우선순위: 거래일+금액+상대방+계좌 (가장 강한 키) → 거래일+금액+적요 (계좌 모를 때)
  */
 export const bankTxKeys: KeyFn<Pick<BankTransaction,
-  'txDate' | 'amount' | 'withdraw' | 'counterparty' | 'account' | 'memo'
+  'txDate' | 'amount' | 'withdraw' | 'counterparty' | 'account' | 'memo' | 'balance'
 >> = (tx) => {
   const date = tx.txDate?.slice(0, 10) ?? '';
   const amount = tx.amount || 0;
@@ -25,12 +25,16 @@ export const bankTxKeys: KeyFn<Pick<BankTransaction,
   const cp = norm(tx.counterparty);
   const acc = norm(tx.account);
   const memo = norm(tx.memo).slice(0, 40);
+  // 거래후잔액 — 같은 날 동일금액·동일입금자 '실입금 2건'(법인 다차량 CMS 등)을 구분.
+  //   running balance 는 거래마다 달라 두 실입금이 서로 다른 키가 됨(둘째 drop 방지).
+  //   재업로드 시 같은 tx 는 같은 잔액이라 dedup 도 그대로 유지.
+  const bal = tx.balance != null ? String(tx.balance) : '';
   if (!date) return [];
   return [
-    // 가장 강한 키 — 모든 필드 조합
-    `${date}|${amount}|${withdraw}|${cp}|${acc}`,
-    // 계좌 없을 때 — 메모로 보완
-    cp ? `${date}|${amount}|${withdraw}|${cp}|${memo}` : '',
+    // 가장 강한 키 — 모든 필드 조합 + 잔액
+    `${date}|${amount}|${withdraw}|${cp}|${acc}|${bal}`,
+    // 계좌 없을 때 — 메모로 보완 (+ 잔액)
+    cp ? `${date}|${amount}|${withdraw}|${cp}|${memo}|${bal}` : '',
   ];
 };
 
