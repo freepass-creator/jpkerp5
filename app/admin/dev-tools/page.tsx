@@ -68,6 +68,13 @@ const TOOLS: ToolCard[] = [
     variant: 'op',
   },
   {
+    href: '/admin/deleted-contracts',
+    title: '삭제된 계약 (복원)',
+    desc: '계약 삭제는 soft delete(deletedAt) — 원본 보존. 삭제된 계약 조회·복원. (#6)',
+    icon: <ShieldWarning size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
     href: '/admin/closing',
     title: '회계기간 마감',
     desc: '월별 마감 처리 — 마감된 기간은 수납·인도·반납 등 거래 쓰기 차단. (직접 URL 진입만 되던 것 노출)',

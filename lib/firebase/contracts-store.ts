@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ref, set, update as rtdbUpdate, push } from 'firebase/database';
+import { ref, set, update as rtdbUpdate, push, get } from 'firebase/database';
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined, getFirebaseAuth } from './client';
 import { audit } from './audit-store';
 import { useDataContext } from '@/lib/data-context';
@@ -130,4 +130,34 @@ export function useContracts(): {
       });
     },
   };
+}
+
+/**
+ * soft-deleted(=deletedAt 스탬프된) 계약만 1회 조회 — 복원 화면용.
+ * data-context 구독은 삭제분을 걸러내므로 별도 raw 조회.
+ */
+export async function fetchDeletedContracts(): Promise<Contract[]> {
+  if (!isFirebaseConfigured()) return [];
+  await ensureAuth();
+  const db = getRtdb();
+  if (!db) return [];
+  const snap = await get(ref(db, CONTRACTS_PATH));
+  const val = snap.val();
+  if (!val) return [];
+  return Object.values<Contract>(val)
+    .filter((c) => !!c.deletedAt)
+    .sort((a, b) => (b.deletedAt ?? '').localeCompare(a.deletedAt ?? ''));
+}
+
+/** soft-deleted 계약 복원 — deletedAt/deletedBy 제거. 낙관적 락(#22). */
+export async function restoreContract(id: string, expectedUpdatedAt?: string): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  await ensureAuth();
+  const db = getRtdb();
+  if (!db) return;
+  const now = new Date().toISOString();
+  await lockedUpdate<Contract>(`${CONTRACTS_PATH}/${id}`, expectedUpdatedAt, (cur) => ({
+    ...cur, deletedAt: undefined, deletedBy: undefined, updatedAt: now,
+  }));
+  void audit.update('contract', id, `계약 복원(soft delete 취소)`);
 }
