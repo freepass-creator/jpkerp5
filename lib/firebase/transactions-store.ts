@@ -6,6 +6,13 @@ import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } fro
 import { audit } from './audit-store';
 import type { BankTransaction, CardTransaction, AuditEntityType } from '@/lib/types';
 import { lockedUpdate } from './locked-update';
+import { useClosedPeriods, isDateInClosedPeriod, PeriodClosedError } from './closed-periods-store';
+
+// 회계마감(#18) — 금융 사실(금액·일자) 편집·삭제만 마감월 잠금. 매칭(metadata)은 마감 무관 허용.
+const FINANCIAL_KEYS = ['amount', 'withdraw', 'txDate'];
+function touchesFinancial(patch: Record<string, unknown>): boolean {
+  return FINANCIAL_KEYS.some((k) => k in patch);
+}
 
 const BANK_PATH = dbPath('bank_tx');
 const CARD_PATH = dbPath('card_tx');
@@ -79,6 +86,13 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
   const c = getOrInitCache<T>(path);
   const [, force] = useState(0);
   const [configured] = useState(() => isFirebaseConfigured());
+  // 회계마감(#18) — 맵 캡처. 거래일이 마감월이면 금융편집·삭제 차단(매칭은 허용).
+  const { closedPeriods } = useClosedPeriods();
+  const txDateOf = (id: string): string | undefined => (c.rows.find((r) => r.id === id) as { txDate?: string } | undefined)?.txDate;
+  const closedFor = (id: string): string | null => {
+    const d = txDateOf(id);
+    return d && isDateInClosedPeriod(closedPeriods, d) ? d.slice(0, 7) : null;
+  };
 
   useEffect(() => {
     const rerender = () => force((x) => x + 1);
@@ -98,6 +112,9 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
         notifyAll(c);
         return id;
       }
+      // #18 — 마감월에 신규 금융 거래 추가 차단 (정정은 신규 분개로). 대량 import(addMany)는 사실기록이라 허용.
+      const rowDate = (row as { txDate?: string }).txDate;
+      if (rowDate && isDateInClosedPeriod(closedPeriods, rowDate)) throw new PeriodClosedError(rowDate.slice(0, 7));
       await ensureAuth();
       const db = getRtdb(); if (!db) return '';
       const newRef = push(ref(db, path));
@@ -113,6 +130,12 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
         c.rows = c.rows.map((r: T) => (r.id === id ? { ...r, ...patch } : r));
         notifyAll(c);
         return;
+      }
+      // #18 — 마감월 거래의 금융편집(금액·일자) 차단. 매칭(matchedContractId 등 metadata)은 허용.
+      if (touchesFinancial(patch as Record<string, unknown>)) {
+        const newDate = (patch as { txDate?: string }).txDate;
+        const closedM = closedFor(id) ?? (newDate && isDateInClosedPeriod(closedPeriods, newDate) ? newDate.slice(0, 7) : null);
+        if (closedM) throw new PeriodClosedError(closedM);
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
@@ -134,12 +157,16 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
       const updates: Record<string, unknown> = {};
+      let closedSkip = 0;
       for (const [id, patch] of Object.entries(patches)) {
+        // #18 — 마감월 거래의 금융편집 patch 만 제외(매칭 등 metadata 는 통과)
+        if (patch && touchesFinancial(patch as Record<string, unknown>) && closedFor(id)) { closedSkip++; continue; }
         for (const [k, v] of Object.entries(patch ?? {})) {
           // undefined = 필드 삭제 의도 → RTDB null (키 제거하면 아무것도 안 써짐)
           updates[`${id}/${k}`] = v === undefined ? null : pruneUndefined(v);
         }
       }
+      if (closedSkip > 0) console.warn(`[tx.updateMany] 마감월 금융편집 ${closedSkip}건 제외(#18)`);
       await rtdbUpdate(ref(db, path), updates);
     },
     addMany: async (items: Array<Omit<T, 'id'>>) => {
@@ -182,6 +209,9 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
         notifyAll(c);
         return;
       }
+      // #18 — 마감월 거래 삭제 차단
+      const closedM = closedFor(id);
+      if (closedM) throw new PeriodClosedError(closedM);
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
       await rtdbRemove(ref(db, `${path}/${id}`));
@@ -196,15 +226,24 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return 0;
+      // #18 — 마감월 거래는 삭제 제외(나머지만 삭제)
       const updates: Record<string, null> = {};
-      for (const id of ids) updates[id] = null;
+      const removed: string[] = [];
+      for (const id of ids) {
+        if (closedFor(id)) continue;
+        updates[id] = null;
+        removed.push(id);
+      }
+      if (removed.length === 0) return 0;
       await rtdbUpdate(ref(db, path), updates);
-      void audit.delete(auditType, '', `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 삭제 ${ids.length}건`, {
-        count: ids.length,
-        ids: ids.slice(0, 100),
-        truncated: ids.length > 100,
+      const closedSkip = ids.length - removed.length;
+      void audit.delete(auditType, '', `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 일괄 삭제 ${removed.length}건${closedSkip ? ` (마감월 ${closedSkip} 제외)` : ''}`, {
+        count: removed.length,
+        closedSkipped: closedSkip,
+        ids: removed.slice(0, 100),
+        truncated: removed.length > 100,
       });
-      return ids.length;
+      return removed.length;
     },
   };
 }
