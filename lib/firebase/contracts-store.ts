@@ -100,13 +100,25 @@ export function useContracts(): {
       await ensureAuth();
       const db = getRtdb();
       if (!db) return;
-      const batch: Record<string, Contract> = {};
       const today = todayKr();
-      for (const r of rows) batch[r.id] = pruneUndefined(recalcContract(r, today));
-      await rtdbUpdate(ref(db, CONTRACTS_PATH), batch as unknown as Record<string, unknown>);
-      // batch update — 요약 + 세부 ID 목록 (감사 추적용, after 슬롯에 기록)
-      void audit.update('contract', 'batch', `계약 일괄 수정 ${rows.length}건`, undefined, {
-        count: rows.length,
+      // 낙관적 락 (#22) — 계약별 updatedAt 대조. blind 배치는 동시편집분을 클로버했음.
+      //   충돌 계약은 건너뛰고 집계(무충돌이면 기존과 동일 결과, 충돌 시 클로버 방지).
+      let ok = 0;
+      const conflicts: string[] = [];
+      for (const r of rows) {
+        try {
+          await lockedUpdate<Contract>(`${CONTRACTS_PATH}/${r.id}`, r.updatedAt, () => ({
+            ...recalcContract(r, today), updatedAt: new Date().toISOString(),
+          }));
+          ok++;
+        } catch (e) {
+          conflicts.push(r.id);
+          console.warn('[contracts.updateMany conflict skipped]', r.id, e);
+        }
+      }
+      void audit.update('contract', 'batch', `계약 일괄 수정 ${ok}/${rows.length}건${conflicts.length ? ` (동시편집 충돌 ${conflicts.length} 건너뜀)` : ''}`, undefined, {
+        count: ok,
+        conflicts: conflicts.length,
         ids: rows.map((r) => r.id).slice(0, 100),
         truncated: rows.length > 100,
       });
