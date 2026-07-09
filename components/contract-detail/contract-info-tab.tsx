@@ -19,7 +19,7 @@ import { InlineTextEdit } from '@/components/ui/inline-text-edit';
 import { InlinePhoneEdit } from '@/components/ui/inline-phone-edit';
 import { InlineDateEdit } from '@/components/ui/inline-date-edit';
 import { formatCurrency, formatDateFull, monthsBetween } from '@/lib/utils';
-import { addMonthsKeepDay } from '@/lib/payment-schedule';
+import { addMonthsKeepDay, resizeSchedules } from '@/lib/payment-schedule';
 import { contractIdentMasked } from '@/lib/ident';
 import type { Contract, AdditionalDriver } from '@/lib/types';
 
@@ -134,7 +134,8 @@ export const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUp
 
   const startEdit = () => { setDraft(c); setEditing(true); };
   const cancel = () => { setDraft(c); setEditing(false); };
-  const save = () => { onUpdate(draft); setEditing(false); };
+  // 저장 시 약정기간 변경분을 회차에 반영(확장 append / 축소 미납회차 제거) — 안 하면 허위연체·미청구
+  const save = () => { onUpdate({ ...draft, schedules: resizeSchedules(draft) }); setEditing(false); };
 
   const set = <K extends keyof Contract>(k: K, v: Contract[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
@@ -216,7 +217,11 @@ export const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUp
               <div className="detail-field">
                 <div className="label">반납예정(종료일)</div>
                 <div className="value">
-                  <InlineDateEdit value={c.returnScheduledDate} onSave={(v) => onUpdate({ ...c, returnScheduledDate: v, ...(c.contractDate && v ? { termMonths: monthsBetween(c.contractDate, v) } : {}) })} />
+                  <InlineDateEdit value={c.returnScheduledDate} onSave={(v) => {
+                    const termMonths = c.contractDate && v ? monthsBetween(c.contractDate, v) : c.termMonths;
+                    const next = { ...c, returnScheduledDate: v, termMonths };
+                    onUpdate({ ...next, schedules: resizeSchedules(next) });
+                  }} />
                 </div>
               </div>
             )}

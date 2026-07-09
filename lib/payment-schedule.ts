@@ -227,6 +227,28 @@ export function extendSchedules(
   return out;
 }
 
+/**
+ * 약정기간(termMonths) 변경 시 회차를 기간에 맞게 리사이즈.
+ *   · 확장(term > 회차수): 부족분 '예정' append (extendSchedules)
+ *   · 축소(term < 회차수): seq > term 회차 중 **납부 없는 것만** 제거(납부 회차·이력은 보존).
+ * 기간만 바꾸고 schedules 를 안 고쳐 축소=허위 연체, 확장=미청구 되던 것 방지.
+ */
+export function resizeSchedules(
+  c: { termMonths: number; contractDate: string; monthlyRent: number; paymentDay: number; paymentTiming?: '선불' | '후불'; schedules?: PaymentScheduleInline[] },
+): PaymentScheduleInline[] {
+  const existing = c.schedules ?? [];
+  const term = c.termMonths ?? 0;
+  if (term <= 0) return existing;
+  const maxSeq = existing.reduce((m, s) => Math.max(m, s.seq), 0);
+  if (term > maxSeq) return extendSchedules(c, term);
+  if (term < maxSeq) {
+    return existing.filter((s) =>
+      s.seq <= term || (s.payments?.length ?? 0) > 0 || (s.paidAmount ?? 0) > 0,
+    );
+  }
+  return existing;
+}
+
 /** YYYY-MM-DD + n개월 → 같은 day-of-month 의 다음 달 (월말 보정) */
 function addMonths(iso: string, months: number, day: number): string {
   if (!iso) return '';
