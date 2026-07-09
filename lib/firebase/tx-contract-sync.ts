@@ -61,39 +61,45 @@ export async function updateBankTxWithMatchSync(
   updateContract: ContractUpdater,
 ): Promise<void> {
   const oldMatchId = oldTx.matchedContractId;
+  const wasMulti = (oldTx.matches ?? []).length > 0;
   // 'in' 으로 판정 — 명시적 undefined(매칭 해제 의도)와 키 부재(기존 유지)를 구분.
   //   !== undefined 로는 vendor 재지정 등 해제 흐름({matchedContractId: undefined})이
   //   '변경 없음'으로 오인돼 reverseMatch 를 건너뛰고 계약에 유령 payment 가 남는다.
-  const newMatchId = 'matchedContractId' in patch ? patch.matchedContractId : oldMatchId;
+  const matchProvided = 'matchedContractId' in patch;
+  const newMatchId = matchProvided ? patch.matchedContractId : oldMatchId;
   const newDeposit = patch.amount ?? oldTx.amount ?? 0;
-  const matchChanged = oldMatchId !== newMatchId;
-  const amountChanged = oldMatchId && (oldTx.amount ?? 0) !== newDeposit;
+  // 다중매칭 거래에 단일 match 패치가 오면 항상 collapse(전체 reverse) 대상.
+  const matchChanged = oldMatchId !== newMatchId || (matchProvided && wasMulti);
+  const amountChanged = (!!oldMatchId || wasMulti) && (oldTx.amount ?? 0) !== newDeposit;
 
   if (!matchChanged && !amountChanged) {
     await updateBank(oldTx.id, patch);
     return;
   }
 
-  // 1) 이전 매칭 해제
+  // 1) 이전 매칭 전부 해제 — 단일 matchedContractId + 다중 matches[] 의 모든 계약.
+  //   (기존엔 matchedContractId 만 reverse 해 분할매칭의 2번째 이후 계약에 유령 payment 가 남고
+  //    미수가 영구히 안 돌아왔음.) 계약별 최신상태를 working Map 으로 체이닝 — 같은 계약
+  //    재적용 시 옛 entry 미제거 상태 위에 새 entry 가 쌓이는 이중차감 방지.
+  const working = new Map<string, Contract>();
+  const getW = (id: string): Contract | undefined => working.get(id) ?? contracts.find((c) => c.id === id);
   let resolvedPatch: Partial<BankTransaction> = { ...patch };
-  // 같은 계약에 재적용(금액 변경)하는 경우 — 해제 결과를 2단계 기준으로 사용해야 함.
-  // stale 원본을 쓰면 옛 entry 가 남은 채 새 entry 가 추가돼 이중 차감됨.
-  let reversedContract: Contract | undefined;
-  if (oldMatchId) {
-    const oldContract = contracts.find((c) => c.id === oldMatchId);
-    if (oldContract) {
-      const { txPatch, contractPatch } = reverseMatch(oldTx, oldContract, todayKr());
-      resolvedPatch = { ...txPatch, ...resolvedPatch };
-      reversedContract = { ...oldContract, ...contractPatch };
-      await updateContract(reversedContract);
-    }
+  const oldIds = new Set<string>();
+  if (oldMatchId) oldIds.add(oldMatchId);
+  for (const m of oldTx.matches ?? []) if (m.contractId) oldIds.add(m.contractId);
+  for (const id of oldIds) {
+    const old = getW(id);
+    if (!old) continue;
+    const { txPatch, contractPatch } = reverseMatch(oldTx, old, todayKr());
+    resolvedPatch = { ...txPatch, ...resolvedPatch };
+    working.set(id, { ...old, ...contractPatch });
   }
+  // 다중→단일/해제 collapse — matches 필드 삭제 (store 가 undefined→null 로 RTDB 필드 제거)
+  if (wasMulti) resolvedPatch.matches = undefined;
 
-  // 2) 새 매칭 적용 (있고 입금액 > 0)
+  // 2) 새 단일 매칭 적용 (있고 입금액 > 0)
   if (newMatchId && newDeposit > 0) {
-    const newContract = (newMatchId === oldMatchId && reversedContract)
-      ? reversedContract
-      : contracts.find((c) => c.id === newMatchId);
+    const newContract = getW(newMatchId);
     if (newContract) {
       const txDate = patch.txDate ?? oldTx.txDate ?? todayKr();
       // 중복 감지 — 직접 수납 후 계좌 매칭 시 양쪽 등록 사고 방지
@@ -106,8 +112,9 @@ export async function updateBankTxWithMatchSync(
           `계속 매칭하면 미수금이 두 번 차감됩니다.\n진행할까요?`,
         );
         if (!ok) {
-          // 매칭 취소 — 거래 자체 patch 만 적용 (matchedContractId 제외)
+          // 매칭 취소 — 거래 자체 patch 만 적용 (matchedContractId 제외). 해제분은 커밋.
           delete resolvedPatch.matchedContractId;
+          for (const c of working.values()) await updateContract(c);
           await updateBank(oldTx.id, resolvedPatch);
           return;
         }
@@ -116,10 +123,12 @@ export async function updateBankTxWithMatchSync(
       const mergedTx: BankTransaction = { ...oldTx, ...patch, matchedContractId: newMatchId };
       const { txPatch, contractPatch } = applyFifoPayment(mergedTx, newContract);
       resolvedPatch = { ...resolvedPatch, ...txPatch };
-      await updateContract({ ...newContract, ...contractPatch });
+      working.set(newMatchId, { ...newContract, ...contractPatch });
     }
   }
 
+  // 계약별 1회 커밋
+  for (const c of working.values()) await updateContract(c);
   await updateBank(oldTx.id, resolvedPatch);
 }
 
