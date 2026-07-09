@@ -10,7 +10,8 @@ import { buildBankJournal, summarizeByAccount } from '@/lib/gl-entries';
 import { markReturned, revertToOperating } from '@/lib/contract-actions';
 import { planBulkReconcile } from '@/lib/bulk-reconcile';
 import { applyMultiContractMatch, updateBankTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
-import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry } from '@/lib/types';
+import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
+import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry, Vehicle } from '@/lib/types';
 
 const TODAY = '2026-07-09';
 
@@ -148,6 +149,25 @@ describe('computeContractAsOf — 시점(as-of) 재구성', () => {
     const before = computeContractAsOf(returned, '2025-05-01'); // 반납 전 → 면제 해제, 회차 살아있음
     expect(before.returnedDate).toBeUndefined();
     expect(before.schedules?.some((s) => s.status === '면제')).toBe(false);
+  });
+});
+
+describe('자산대장 처분손익 (C3 — 매각가 입력)', () => {
+  const disposedVehicle = (over: Partial<Vehicle> = {}) => ({
+    id: 'v1', company: 'FP', plate: '12가3456', status: '매각',
+    purchasePrice: 20_000_000, purchasedDate: '2023-01-01', saleDate: '2025-01-01',
+    ...over,
+  } as unknown as Vehicle);
+
+  it('매각가 입력 시 처분손익 = 매각가 - 장부가 (부호 정확)', () => {
+    const e = computeAssetLedgerEntry(disposedVehicle({ salePrice: 10_000_000 }), TODAY);
+    expect(e.disposed).toBe(true);
+    expect(e.incomplete).toBeFalsy();
+    expect(e.disposalGainLoss).toBe(10_000_000 - e.bookValue);
+  });
+  it('매각가 미입력이면 처분손익 미계산(undefined)', () => {
+    const e = computeAssetLedgerEntry(disposedVehicle(), TODAY);
+    expect(e.disposalGainLoss).toBeUndefined();
   });
 });
 

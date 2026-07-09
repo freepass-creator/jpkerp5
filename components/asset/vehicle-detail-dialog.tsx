@@ -279,7 +279,7 @@ function OperationOverviewTab({
         </Grid2>
       </Section>
 
-      <AssetLedgerSection vehicle={vehicle} />
+      <AssetLedgerSection vehicle={vehicle} onUpdate={onUpdate} />
 
       <Section title="GPS 설치">
         <Grid2>
@@ -1019,8 +1019,18 @@ export function VehicleDetailDialog({
 }
 
 /* ─── 자산대장 (ERP 표준) — 취득가/감가/장부가/처분손익 ─── */
-function AssetLedgerSection({ vehicle }: { vehicle: Vehicle }) {
+function AssetLedgerSection({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void }) {
   const entry = useMemo(() => computeAssetLedgerEntry(vehicle, todayKr()), [vehicle]);
+  const [editingSale, setEditingSale] = useState(false);
+  const [saleDraft, setSaleDraft] = useState('');
+  // 매각가 입력 — 처분손익(매각가-장부가) 계산의 유일한 미싱 인풋. 저장 시 saleDate 없으면 오늘로 스탬프.
+  function commitSale() {
+    const n = Number(saleDraft.replace(/[,\s₩]/g, ''));
+    if (!Number.isFinite(n) || n < 0) { toast.error('매각가는 0 이상 숫자로 입력하세요'); return; }
+    onUpdate({ ...vehicle, salePrice: n, saleDate: vehicle.saleDate ?? todayKr() });
+    setEditingSale(false);
+    toast.success(`매각가 ₩${n.toLocaleString()} 저장`);
+  }
   if (entry.incomplete) {
     return (
       <Section title="자산대장 (ERP 표준)">
@@ -1048,7 +1058,28 @@ function AssetLedgerSection({ vehicle }: { vehicle: Vehicle }) {
         {entry.disposed && (
           <>
             <KV k="매각일" v={entry.saleDate} mono />
-            <KV k="매각가" v={entry.salePrice !== undefined ? fmt(entry.salePrice) : '-'} mono />
+            <KV k="매각가" v={
+              editingSale ? (
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                  <input
+                    type="number" className="input" autoFocus value={saleDraft}
+                    style={{ width: 110, fontSize: 12, padding: '2px 6px' }}
+                    onChange={(e) => setSaleDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') commitSale(); if (e.key === 'Escape') setEditingSale(false); }}
+                  />
+                  <button className="btn btn-sm btn-primary" type="button" onClick={commitSale}>저장</button>
+                  <button className="btn btn-sm" type="button" onClick={() => setEditingSale(false)}>취소</button>
+                </span>
+              ) : (
+                <span
+                  style={{ cursor: 'pointer', textDecoration: entry.salePrice === undefined ? 'underline dotted' : undefined }}
+                  title="클릭하여 매각가 입력 (처분손익 계산)"
+                  onClick={() => { setSaleDraft(entry.salePrice !== undefined ? String(entry.salePrice) : ''); setEditingSale(true); }}
+                >
+                  {entry.salePrice !== undefined ? fmt(entry.salePrice) : <span className="dim">입력 →</span>}
+                </span>
+              )
+            } mono />
             <KV
               k="처분손익"
               v={entry.disposalGainLoss === undefined ? '-' : (
