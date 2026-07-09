@@ -15,6 +15,9 @@
 import type { Contract, Vehicle, InsurancePolicy, BankTransaction, CardTransaction } from './types';
 import type { PenaltyWorkItem } from './penalty-pdf';
 import { isContractEnded } from './contract-lifecycle';
+// plate 매칭 SSOT — 공용 findVehicleByPlate 와 같은 정규화(하이픈/OCR O→0·I→1/대문자).
+// 로컬 '공백만 제거' 는 하이픈 차량번호를 거짓 'plate고아'로 잡아 앱 매칭과 어긋났음.
+import { normPlate } from './entity-sync';
 
 export type IntegritySeverity = 'high' | 'mid';
 
@@ -27,10 +30,6 @@ export type IntegrityIssue = {
   plate?: string;
 };
 
-/** 차량번호 정규화 — 공백 제거. (OCR/입력 편차 흡수) */
-function normPlate(p?: string): string {
-  return (p ?? '').replace(/\s+/g, '');
-}
 
 /** 계약이 종료(반납/해지/채권)됐는지 — SSOT 위임. 종료 계약은 고아·역전·완전성 검사 제외.
  *  (로컬 판정은 '반납'·'채권'을 빠뜨려 회수불가 채권 계약에 허위 경고를 냈음) */
