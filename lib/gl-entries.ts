@@ -103,46 +103,38 @@ export type JournalEntry = {
   matchedContractId?: string;
 };
 
-/** BankTx 1건 → 분개 1건 또는 0건 (internal 은 skip) */
-export function buildBankJournal(t: BankTransaction): JournalEntry | null {
+/** BankTx 1건 → 분개 0~2건 (internal·CMS item skip, CMS/카드 집금 deposit 은 수익+수수료 2분개) */
+export function buildBankJournal(t: BankTransaction): JournalEntry[] {
   const subject = t.subject ?? '';
-  if (INTERNAL_SUBJECTS_SET.has(subject)) return null;
+  if (INTERNAL_SUBJECTS_SET.has(subject)) return [];
   // CMS 집금: 묶음(deposit)이 대표 현금흐름 — 구성건(item)까지 분개하면 현금·수익 이중계상.
   //   payments/finance-daily/data-integrity 와 동일 규칙 (settlementRole==='item' 제외).
-  if (t.settlementRole === 'item') return null;
+  if (t.settlementRole === 'item') return [];
 
   const isDeposit = (t.amount ?? 0) > 0;
   const isWithdraw = (t.withdraw ?? 0) > 0;
-  if (!isDeposit && !isWithdraw) return null;
+  if (!isDeposit && !isWithdraw) return [];
+
+  const base = {
+    txId: t.id, source: 'bank' as const, date: t.txDate,
+    counterparty: t.counterparty, memo: t.memo, companyCode: t.companyCode, matchedContractId: t.matchedContractId,
+  };
 
   if (isDeposit) {
+    // CMS·카드 집금 정산 deposit: net 입금 = gross 수익 - 수수료. subject='CMS수수료' 등으로 저장돼
+    //   미지정 처리되던 것을 대여료수입(gross) + 수수료비용(fee) 으로 정확히 분개 (구성건은 위에서 제외).
+    if (t.settlementRole === 'deposit' && (t.settlementGrossAmount ?? 0) > 0) {
+      const net = t.amount ?? 0;
+      const fee = t.settlementFeeAmount ?? 0;
+      const out: JournalEntry[] = [{ ...base, amount: net, debitAccount: 'CASH', creditAccount: 'REVENUE_RENTAL' }];
+      if (fee > 0) out.push({ ...base, amount: fee, debitAccount: 'EXP_FEE', creditAccount: 'REVENUE_RENTAL' });
+      return out;
+    }
     const account = RECEIPT_TO_ACCOUNT[subject] ?? 'UNCLASSIFIED';
-    return {
-      txId: t.id,
-      source: 'bank',
-      date: t.txDate,
-      amount: t.amount ?? 0,
-      debitAccount: 'CASH',
-      creditAccount: account,
-      counterparty: t.counterparty,
-      memo: t.memo,
-      companyCode: t.companyCode,
-      matchedContractId: t.matchedContractId,
-    };
+    return [{ ...base, amount: t.amount ?? 0, debitAccount: 'CASH', creditAccount: account }];
   }
   const account = EXPENSE_TO_ACCOUNT[subject] ?? 'UNCLASSIFIED';
-  return {
-    txId: t.id,
-    source: 'bank',
-    date: t.txDate,
-    amount: t.withdraw ?? 0,
-    debitAccount: account,
-    creditAccount: 'CASH',
-    counterparty: t.counterparty,
-    memo: t.memo,
-    companyCode: t.companyCode,
-    matchedContractId: t.matchedContractId,
-  };
+  return [{ ...base, amount: t.withdraw ?? 0, debitAccount: account, creditAccount: 'CASH' }];
 }
 
 /** CardTx 1건 → 분개 1건. 매출(kind=매출) = 카드매출 수익. 법인카드 = category 비용. */
@@ -151,6 +143,8 @@ export function buildCardJournal(t: CardTransaction): JournalEntry | null {
   // 취소전표(음수 매출)는 버리지 않고 그대로 통과 — 같은 차·대변 계정에 음수로 집계돼
   // 원매출과 자동 상계(카드매출·법인카드 지출 과대 방지). 0 만 무의미하므로 제외.
   if ((t.amount ?? 0) === 0) return null;
+  // 집금 정산된 카드매출(settlementId)은 집금 deposit(BankTx)이 대표 계상 → 여기서 제외(이중계상 방지).
+  if (isSales && t.settlementId) return null;
   if (isSales) {
     return {
       txId: t.id,
@@ -187,10 +181,7 @@ export function buildAllJournals(
   cardTx: CardTransaction[],
 ): JournalEntry[] {
   const out: JournalEntry[] = [];
-  for (const t of bankTx) {
-    const j = buildBankJournal(t);
-    if (j) out.push(j);
-  }
+  for (const t of bankTx) out.push(...buildBankJournal(t));
   for (const t of cardTx) {
     const j = buildCardJournal(t);
     if (j) out.push(j);
