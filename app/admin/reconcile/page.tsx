@@ -29,7 +29,7 @@ export default function ReconcilePage() {
   const router = useRouter();
   const { isMaster, loading: roleLoading } = useRole();
   const { user } = useAuth();
-  const { contracts, updateMany: updateManyContracts } = useContracts();
+  const { contracts, update: updateContract } = useContracts();
   const { rows: bankTx, updateMany: updateManyBankTx } = useBankTx();
   const { closedPeriods } = useClosedPeriods();
   const [applying, setApplying] = useState(false);
@@ -69,11 +69,22 @@ export default function ReconcilePage() {
       // 거래 먼저 마킹 → 계약 갱신. 중간 실패해도 tx.matchedContractId 가 남아
       // /admin/integrity 유령매칭 스캔이 검출 가능(계약 먼저면 실패가 조용히 묻힘). (#11 부분보호)
       await updateManyBankTx(txPatches);
-      await updateManyContracts(contractRows);
-      void audit.match('bank_tx', 'bulk-reconcile', `초기 대사 일괄매칭 ${plan.matchedTxIds.length}건 → ${contractRows.length}계약`, {
-        txCount: plan.matchedTxIds.length, contractCount: contractRows.length, total: totalMatchedAmount,
+      // 계약은 개별 낙관적 락(update) — 배치 updateMany 는 락 없이 전체행 덮어써 동시편집분
+      // 클로버(#22). 충돌 계약은 건너뛰고 집계(다시 실행하면 나머지 처리).
+      let okCount = 0;
+      const conflicts: string[] = [];
+      for (const row of contractRows) {
+        try { await updateContract(row); okCount++; }
+        catch (e) { conflicts.push(row.contractNo || row.id); console.warn('[reconcile] contract conflict', row.id, e); }
+      }
+      void audit.match('bank_tx', 'bulk-reconcile', `초기 대사 일괄매칭 ${plan.matchedTxIds.length}건 → ${okCount}계약`, {
+        txCount: plan.matchedTxIds.length, contractCount: okCount, conflicts: conflicts.length, total: totalMatchedAmount,
       });
-      toast.success(`대사 완료 — 입금 ${plan.matchedTxIds.length}건 매칭`);
+      if (conflicts.length > 0) {
+        toast.info(`대사 ${okCount}계약 적용 — 동시편집 충돌 ${conflicts.length}건은 건너뜀(다시 실행하세요)`);
+      } else {
+        toast.success(`대사 완료 — 입금 ${plan.matchedTxIds.length}건 매칭`);
+      }
       setDone(true);
     } catch (e) {
       toast.error(`적용 실패: ${(e as Error).message}`);
