@@ -16,6 +16,7 @@
 import * as XLSX from 'xlsx';
 import type { Contract } from '@/lib/types';
 import { isContractEnded } from '@/lib/contract-lifecycle';
+import { todayKr } from '@/lib/mock-data';
 
 type SelectionRow = Record<string, string | number>;
 
@@ -58,7 +59,7 @@ export function downloadTaxInvoiceExcel(
   contracts: Contract[],
   opts?: { billingMonth?: string; fileName?: string },
 ): { ok: true; count: number; snapshots: Contract[] } | { ok: false; reason: 'no-contracts' } {
-  const billingMonth = opts?.billingMonth ?? new Date().toISOString().slice(0, 7);
+  const billingMonth = opts?.billingMonth ?? todayKr().slice(0, 7);   // KST 월 (UTC 는 월초 새벽 전월)
 
   // 활성 + B2B 계약만 (개인 계약은 영수증 처리).
   //   종료 판정은 SSOT isContractEnded — 하드코딩 나열은 '채권'(회수불가 채권화)을

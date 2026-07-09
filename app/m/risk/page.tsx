@@ -32,7 +32,6 @@ export default function MobileRisk() {
   const [q, setQ] = useState('');
 
   const groups = useMemo(() => {
-    const todayDate = new Date();
     const dayMs = 24 * 60 * 60 * 1000;
     const todayStr = todayKr();
     const out: Record<RiskKind, typeof contracts> = {
@@ -68,10 +67,11 @@ export default function MobileRisk() {
         const d = (c.customerIdentNo ?? '').replace(/\D/g, '');
         if (c.customerKind !== '법인' && d.length !== 13) out['missing-ident'].push(c);
 
-        // 보험 만료 임박 D-30 (만료일 ≤ 30일 + 미만료)
+        // 보험 만료 임박 D-30 (만료일 ≤ 30일 + 미만료).
+        //   문자열 today(KST) 기준 정수일수 — new Date() 시분초 혼입+floor 는 당일 만료건을
+        //   오전 9시 이후 누락시켰음(overdue-return 과 동일 방식으로 통일).
         if (c.insuranceExpiryDate) {
-          const exp = new Date(c.insuranceExpiryDate);
-          const diff = Math.floor((exp.getTime() - todayDate.getTime()) / dayMs);
+          const diff = Math.round((new Date(c.insuranceExpiryDate).getTime() - new Date(todayStr).getTime()) / dayMs);
           if (diff >= 0 && diff <= 30) out['insurance-expiry'].push(c);
         }
       }

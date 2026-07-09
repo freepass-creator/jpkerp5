@@ -77,6 +77,7 @@ import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
 import { todayKr } from '@/lib/mock-data';
+import { addMonthsKeepDay } from '@/lib/payment-schedule';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { PaymentTab as ContractPaymentTab } from '@/components/contract-detail-dialog';
@@ -502,13 +503,11 @@ function LoanScheduleTab({ vehicle }: { vehicle: Vehicle }) {
   }
 
   const monthly = purchasePrice && months ? Math.round(purchasePrice / months) : 0;
-  const startD = new Date(start);
-  const today = new Date();
+  const today = todayKr();
   const rows = Array.from({ length: months }, (_, i) => {
-    const due = new Date(startD);
-    due.setMonth(due.getMonth() + i);
-    const dueIso = due.toISOString().slice(0, 10);
-    const paid = due < today;
+    // addMonthsKeepDay — 월말(1/31 등) clamp + TZ 안전. setMonth 는 clamp 없어 다음달로 롤오버했음
+    const dueIso = addMonthsKeepDay(start, i);
+    const paid = dueIso <= today;
     return { seq: i + 1, dueDate: dueIso, amount: monthly, paid };
   });
   const paidCount = rows.filter((r) => r.paid).length;

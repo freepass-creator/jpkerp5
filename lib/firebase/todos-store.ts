@@ -108,9 +108,10 @@ export function useTodos() {
         // done 토글 시 ack 도 자동 채움
         return { ...a, done: on ? ts : undefined, ack: on ? (a.ack ?? ts) : a.ack };
       });
-      // 전체 done 자동 채움/해제
+      // 전체 done 자동 채움/해제. 해제 시 null — undefined 는 pruneUndefined(JSON) 가
+      // 걷어내 RTDB doneAt 필드가 안 지워지고 계속 '완료'로 남음.
       const allDone = nextAssignees.length > 0 && nextAssignees.every((a) => !!a.done);
-      const doneAt = allDone ? ts : undefined;
+      const doneAt = allDone ? ts : null;
       await persistUpdate(
         id,
         { assignees: nextAssignees, doneAt },
@@ -130,7 +131,7 @@ export function useTodos() {
       }));
       await persistUpdate(
         id,
-        { assignees: nextAssignees, doneAt: on ? ts : undefined },
+        { assignees: nextAssignees, doneAt: on ? ts : null },
         `할 일 ${on ? '일괄완료' : '재오픈'}`,
       );
     },

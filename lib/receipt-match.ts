@@ -85,7 +85,9 @@ export function buildMatchIndex(contracts: Contract[]): MatchIndex {
       else byPlateSuffix.set(suffix, [c]);
     }
     for (const s of c.schedules ?? []) {
-      if (s.status === '완료') continue;
+      // 완료·면제 회차는 매칭 대상 제외 — 면제(반납후 미도래 등)에 입금이 흡수되면
+      // 미수 차감 없이 증발함.
+      if (s.status === '완료' || s.status === '면제') continue;
       const remaining = s.status === '부분납' ? (s.amount - s.paidAmount) : s.amount;
       const amounts = new Set<number>([s.amount]);
       if (remaining !== s.amount && remaining > 0) amounts.add(remaining);
@@ -159,7 +161,7 @@ function findCandidatesIndexed(
   const strongCandidates = new Set<Contract>([...nameMatched, ...plateMatched]);
   for (const c of strongCandidates) {
     for (const s of c.schedules ?? []) {
-      if (s.status === '완료') continue;
+      if (s.status === '완료' || s.status === '면제') continue;
       const key = `${c.id}:${s.seq}`;
       if (seen.has(key)) continue;
       seen.add(key);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { LinkSimple, X as XIcon, CheckCircle, MagnifyingGlass } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import type { BankTransaction, CardTransaction, Contract } from '@/lib/types';
@@ -43,6 +43,9 @@ export function ReceiptMatchDialog({
 }) {
   const [search, setSearch] = useState('');
   const [pickedId, setPickedId] = useState<string | null>(null);
+
+  // 거래가 바뀌면 검색어·선택 초기화 — 안 하면 이전 거래의 검색·선택이 다음 거래로 이월됨
+  useEffect(() => { setSearch(''); setPickedId(null); }, [tx?.id]);
 
   const candidates = useMemo(() => (tx ? findCandidates(tx, contracts) : []), [tx, contracts]);
 
@@ -304,6 +307,9 @@ export function CardMatchDialog({
 }) {
   const [search, setSearch] = useState('');
   const [pickedId, setPickedId] = useState<string | null>(null);
+
+  // 거래가 바뀌면 검색어·선택 초기화 (은행 다이얼로그와 동일)
+  useEffect(() => { setSearch(''); setPickedId(null); }, [tx?.id]);
 
   const candidates = useMemo(() => (tx ? findCardCandidates(tx, contracts) : []), [tx, contracts]);
   const filteredContracts = useMemo(() => {

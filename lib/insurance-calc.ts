@@ -11,6 +11,7 @@
  */
 
 import type { InsurancePolicy, InsuranceInstallment } from './types';
+import { todayKr } from './mock-data';
 
 /**
  * OCR raw → InsurancePolicy 변환 + 1회차 자동 prepend.
@@ -127,12 +128,14 @@ export function buildInsurancePolicyFromOcr(
   };
 }
 
-/** end_date 까지 남은 일수 (today 기준). 음수면 만료된 일수. */
-export function daysToExpiry(policy: InsurancePolicy, today = new Date()): number | null {
+/** end_date 까지 남은 일수 (KST today 기준). 음수면 만료된 일수. 0 = 오늘 만기.
+ *  today 는 'YYYY-MM-DD' 문자열 — new Date() 시분초+Math.floor 는 만기 당일을 '1일 경과'로
+ *  오표시했음(양쪽 UTC 자정 앵커 + Math.round 로 정수 일수). */
+export function daysToExpiry(policy: InsurancePolicy, today: string = todayKr()): number | null {
   if (!policy.endDate) return null;
   const end = new Date(policy.endDate);
   if (Number.isNaN(end.getTime())) return null;
-  return Math.floor((end.getTime() - today.getTime()) / 86400000);
+  return Math.round((end.getTime() - new Date(today).getTime()) / 86400000);
 }
 
 /** 분납 합계 — 검산용 (paid 무관 전체 합) */

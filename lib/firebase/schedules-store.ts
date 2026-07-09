@@ -51,7 +51,9 @@ export function useSchedules() {
     },
 
     toggleDone: async (id: string, done: boolean): Promise<void> => {
-      const patch = { done, doneAt: done ? new Date().toISOString() : undefined };
+      // 재오픈 시 doneAt 은 null 로 — undefined 는 pruneUndefined 가 걷어내 RTDB 필드가
+      // 안 지워지고 stale 완료시각이 남음 (RTDB 는 null 이라야 필드 삭제).
+      const patch = { done, doneAt: done ? new Date().toISOString() : null };
       if (!configured) {
         setCacheRows<ManualSchedule>(PATH, (prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
         return;

@@ -46,12 +46,16 @@ export function InlinePhoneEdit({
   }
 
   if (editing && !disabled) {
+    // blur 시 commit — PhoneInput 자체엔 onBlur 가 없어 편집 div 로 감싸야 저장·종료됨
+    // (기존엔 onBlur 가 표시용 div 에만 있어 편집모드에서 저장도 탈출도 안 됐음. InlineDateEdit 동일 패턴)
     return (
-      <PhoneInput
-        value={draft}
-        onChange={setDraft}
-        className="input input-compact mono"
-      />
+      <div onBlur={commit}>
+        <PhoneInput
+          value={draft}
+          onChange={setDraft}
+          className="input input-compact mono"
+        />
+      </div>
     );
   }
 
@@ -59,7 +63,6 @@ export function InlinePhoneEdit({
   return (
     <div
       onClick={() => !disabled && setEditing(true)}
-      onBlur={commit}
       title={disabled ? undefined : '클릭하여 수정'}
       style={{
         cursor: disabled ? 'default' : 'text',

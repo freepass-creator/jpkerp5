@@ -755,7 +755,7 @@ export type ManualSchedule = {
   title: string;
   time?: string;         // HH:MM (선택)
   done?: boolean;        // 처리 완료 여부
-  doneAt?: string;       // 완료 ISO
+  doneAt?: string | null; // 완료 ISO. 재오픈 시 null 로 삭제
   notes?: string;
   createdAt: string;
   createdBy?: string;
@@ -777,7 +777,7 @@ export type ManualTodo = {
   assignees: ManualTodoAssignee[];   // 복수 담당자 (빈 배열 가능)
   followups?: ManualTodoFollowup[];   // 후속 진행 기록
   dueDate?: string;        // YYYY-MM-DD
-  doneAt?: string;         // 전체 완료 시각 (모든 담당자 완료 시 자동 또는 수동 일괄 처리)
+  doneAt?: string | null;  // 전체 완료 시각 (모든 담당자 완료 시). 재오픈 시 null 로 삭제
   createdAt: string;
   createdBy?: string;
   notes?: string;
