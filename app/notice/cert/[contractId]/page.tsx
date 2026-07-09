@@ -12,14 +12,9 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { todayKr } from '@/lib/mock-data';
+import { addDays } from '@/lib/utils';
 import type { Company } from '@/lib/types';
 import { CertDocument, CERT_PRINT_CSS } from '@/components/notice/cert-document';
-
-function addDays(yyyymmdd: string, days: number): string {
-  const d = new Date(yyyymmdd);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 export default function NoticeCertPage() {
   const params = useParams<{ contractId: string }>();

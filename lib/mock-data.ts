@@ -1,4 +1,5 @@
 import type { Contract } from './types';
+import { addDays } from './utils';
 
 /** 기준일 — 오늘 (한국 시간). 호출 시점에 계산되므로 자정 넘기면 자동으로 새 날짜 반환. */
 export function todayKr(): string {
@@ -71,11 +72,5 @@ export function buildReturns(contracts: Contract[], today: string, withinDays = 
   }
   out.sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
   return out;
-}
-
-function addDays(yyyymmdd: string, days: number): string {
-  const d = new Date(yyyymmdd);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 

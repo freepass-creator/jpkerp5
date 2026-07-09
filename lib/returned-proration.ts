@@ -13,18 +13,13 @@
  */
 
 import type { Contract, DiscountEntry } from './types';
+import { addDays } from './utils';
 
 function daysBetween(from: string, to: string): number {
   const a = new Date(from).getTime();
   const b = new Date(to).getTime();
   if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
   return Math.round((b - a) / 86400_000);
-}
-
-function addDaysIso(date: string, days: number): string {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 
 export function applyReturnedProration(contract: Contract, returnedDate: string): Contract {
@@ -36,7 +31,7 @@ export function applyReturnedProration(contract: Contract, returnedDate: string)
   const last = sorted.find((s, i) => {
     if (s.dueDate > returnedDate) return false;
     const next = sorted[i + 1];
-    const nextDue = next?.dueDate ?? addDaysIso(s.dueDate, 30);
+    const nextDue = next?.dueDate ?? addDays(s.dueDate, 30);
     return returnedDate < nextDue;
   });
   if (!last) return contract;
@@ -46,7 +41,7 @@ export function applyReturnedProration(contract: Contract, returnedDate: string)
 
   const nextIdx = sorted.findIndex((s) => s.seq === last.seq) + 1;
   const next = sorted[nextIdx];
-  const endDate = next?.dueDate ?? addDaysIso(last.dueDate, 30);
+  const endDate = next?.dueDate ?? addDays(last.dueDate, 30);
   const totalDays = daysBetween(last.dueDate, endDate);
   const usedDays = Math.max(0, daysBetween(last.dueDate, returnedDate));
   if (totalDays <= 0 || usedDays >= totalDays) return contract;

@@ -15,15 +15,9 @@ import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useAuth } from '@/lib/use-auth';
 import { todayKr } from '@/lib/mock-data';
-import { monthsBetween } from '@/lib/utils';
+import { monthsBetween, addDays } from '@/lib/utils';
 import { CertDocument, CERT_PRINT_CSS } from '@/components/notice/cert-document';
 import type { Contract } from '@/lib/types';
-
-function addDays(ymd: string, days: number): string {
-  const d = new Date(ymd);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 function calcPenaltyRate(contractDate: string, terminationDate: string): number {
   if (!contractDate || !terminationDate) return 0.3;

@@ -52,6 +52,13 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
 }
 
+/** YYYY-MM-DD 에 days 를 더한 YYYY-MM-DD. (여러 곳 중복 정의되던 것 통합) */
+export function addDays(yyyymmdd: string, days: number): string {
+  const d = new Date(yyyymmdd);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export function daysSince(date: string, today: string): number {
   return daysBetween(date, today);
 }
