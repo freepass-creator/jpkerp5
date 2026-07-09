@@ -12,6 +12,7 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
+import { useContracts } from '@/lib/firebase/contracts-store';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -39,6 +40,13 @@ export default function AssetGpsPage() {
 
   const { vehicles, loading: vehiclesLoading } = useMergedVehicles();
   const { remove: removeVehicle } = useVehicles();
+  const { contracts } = useContracts();
+  // 시동제어 상태는 계약(engineDisabled)에 있음 — plate 로 join 해 자산 GPS 화면에 노출(5영역 반영).
+  const lockedPlates = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of contracts) if (c.engineDisabled && c.vehiclePlate) s.add(c.vehiclePlate.trim());
+    return s;
+  }, [contracts]);
   const { openVehicle } = useVehicleDialog();
   const { companies: companyMaster } = useCompanies();
   const [search, setSearch] = useState('');
@@ -123,7 +131,11 @@ export default function AssetGpsPage() {
                             ? <StatusBadge tone="green">설치</StatusBadge>
                             : <StatusBadge tone="gray">미설치</StatusBadge>}
                         </td>
-                        <td className="center dim">-</td>
+                        <td className="center">
+                          {v.plate && lockedPlates.has(v.plate.trim())
+                            ? <StatusBadge tone="red">제어중</StatusBadge>
+                            : <span className="dim">-</span>}
+                        </td>
                         <td className="center"><StatusBadge tone={vehicleStatusTone(v.status)}>{v.status}</StatusBadge></td>
                       </tr>
                     );

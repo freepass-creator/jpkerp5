@@ -48,6 +48,8 @@ const ENTITY_LABEL: Record<AuditEntityType, string> = {
   penalty: '과태료',
   license: '면허',
   document: '서류',
+  dispatch: '디스패치',
+  attendance: '근태',
   system: '시스템',
 };
 

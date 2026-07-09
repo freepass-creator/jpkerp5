@@ -714,6 +714,7 @@ export type AuditEntityType =
   | 'contract' | 'company' | 'vehicle'
   | 'bank_tx' | 'card_tx' | 'schedule'
   | 'penalty' | 'license' | 'document'
+  | 'dispatch' | 'attendance'
   | 'system';
 
 export type AuditLog = {

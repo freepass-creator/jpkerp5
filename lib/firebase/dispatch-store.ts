@@ -23,6 +23,7 @@
 import { ref, push, onValue, update as rtdbUpdate, get, remove as rtdbRemove } from 'firebase/database';
 import { useEffect, useState } from 'react';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined, getFirebaseAuth } from './client';
+import { audit } from './audit-store';
 import { withMeta, type WriteMeta } from '../write-meta';
 
 const PATH = dbPath('dispatch_orders');
@@ -134,6 +135,7 @@ export async function removeDispatchOrder(orderId: string): Promise<void> {
   // soft delete(#6) — 지시 원본 보존(복원·추적). 구독 필터가 deletedAt 항목을 숨김.
   const by = getFirebaseAuth()?.currentUser?.email ?? undefined;
   await rtdbUpdate(ref(db, `${PATH}/${orderId}`), pruneUndefined({ deletedAt: new Date().toISOString(), deletedBy: by }));
+  void audit.delete('dispatch', orderId, '디스패치 지시 삭제(soft)');
 }
 
 export async function addDispatchComment(
