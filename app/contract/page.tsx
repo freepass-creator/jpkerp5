@@ -449,8 +449,9 @@ export default function ContractPage() {
             onClick: async () => {
               const r = ctxMenu.row;
               if (!r) return;
-              if (!await showConfirm({ title: `${r.contractNo} 계약을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
-              void removeContract(r.id);
+              if (!await showConfirm({ title: `${r.contractNo} 계약을 삭제하시겠습니까? (감사로그 남음 · 복원 가능)`, danger: true })) return;
+              const ok = await safeUpdate(() => removeContract(r.id), { errorPrefix: '계약 삭제 실패' });
+              if (ok !== null) toast.success(`${r.contractNo} 계약 삭제됨`);
             },
             danger: true,
           },

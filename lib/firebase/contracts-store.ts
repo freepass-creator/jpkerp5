@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
+import { ref, set, update as rtdbUpdate, push } from 'firebase/database';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined, getFirebaseAuth } from './client';
 import { audit } from './audit-store';
 import { useDataContext } from '@/lib/data-context';
 import { recalcContract } from '@/lib/payment-schedule';
@@ -53,8 +53,14 @@ export function useContracts(): {
       await ensureAuth();
       const db = getRtdb();
       if (!db) return;
-      await rtdbRemove(ref(db, `${CONTRACTS_PATH}/${id}`));
-      void audit.delete('contract', id, `계약 삭제 ${target?.contractNo ?? id} ${target?.vehiclePlate ?? ''} ${target?.customerName ?? ''}`);
+      // Soft delete (#6·#15) — 계약·입금 이력은 물리삭제 X. deletedAt 스탬프로 목록·집계에서만
+      // 제외(원본 RTDB 보존 → 감사·복원·소명). 낙관적 락(#22)으로 동시편집 충돌 시 중단.
+      const now = new Date().toISOString();
+      const by = getFirebaseAuth()?.currentUser?.email ?? undefined;
+      await lockedUpdate<Contract>(`${CONTRACTS_PATH}/${id}`, target?.updatedAt, (cur) => ({
+        ...cur, deletedAt: now, deletedBy: by, updatedAt: now,
+      }));
+      void audit.delete('contract', id, `계약 삭제(soft) ${target?.contractNo ?? id} ${target?.vehiclePlate ?? ''} ${target?.customerName ?? ''}`);
     },
     add: async (c: Omit<Contract, 'id'>) => {
       if (!configured) return `local-${Date.now()}`;

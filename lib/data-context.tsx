@@ -86,7 +86,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const val = snap.val();
         const raw = val ? Object.values<Contract>(val) : [];
         const today = todayKr();
-        setContracts(raw.map((c) => recalcContract(c, today)));
+        // soft delete (#6) — deletedAt 스탬프된 계약은 목록·집계에서 제외 (원본은 RTDB 보존)
+        setContracts(raw.filter((c) => !c.deletedAt).map((c) => recalcContract(c, today)));
         setContractsLoading(false);
       }));
 
