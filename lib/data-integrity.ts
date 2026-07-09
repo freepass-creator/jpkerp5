@@ -32,9 +32,10 @@ function normPlate(p?: string): string {
   return (p ?? '').replace(/\s+/g, '');
 }
 
-/** 계약이 종료(반납/해지)됐는지 — 종료 계약은 고아·역전 검사 제외. */
+/** 계약이 종료(반납/해지/채권)됐는지 — SSOT 위임. 종료 계약은 고아·역전·완전성 검사 제외.
+ *  (로컬 판정은 '반납'·'채권'을 빠뜨려 회수불가 채권 계약에 허위 경고를 냈음) */
 function isEnded(c: Contract): boolean {
-  return c.status === '해지' || !!c.returnedDate;
+  return isContractEnded(c);
 }
 
 export type IntegrityInput = {

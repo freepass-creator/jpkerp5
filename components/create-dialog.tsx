@@ -47,7 +47,7 @@ import { toast } from '@/lib/toast';
 import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { upsertVehicleFromContract, normPlate } from '@/lib/entity-sync';
+import { upsertVehicleFromContract, normPlate, findVehicleByPlate } from '@/lib/entity-sync';
 import { useAuth } from '@/lib/use-auth';
 // Phase 2.2 — intake 평행 기록 (배치 단위)
 import { addIntakeItem, markIntakeCommitted, setIntakeMatch } from '@/lib/firebase/intake-store';
@@ -2845,12 +2845,11 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
     return raw;
   }, [companies]);
 
-  // 차량 마스터 plate 매칭
+  // 차량 마스터 plate 매칭 — SSOT findVehicleByPlate (하이픈·OCR O→0/I→1·번호변경 이력 포함).
+  //   공백만 제거하던 로컬 비교는 하이픈/OCR 편차·plateHistory 차량을 못 잡아 기존 차량을
+  //   '신규 생성(+)'으로 오표시했음.
   const matchVehicle = useCallback((plate: string): string | undefined => {
-    const p = plate.replace(/\s+/g, '').toLowerCase();
-    if (!p) return undefined;
-    const hit = vehicles.find((v) => v.plate.replace(/\s+/g, '').toLowerCase() === p);
-    return hit?.id;
+    return findVehicleByPlate(vehicles, plate)?.id;
   }, [vehicles]);
 
   async function handleFiles(fileList: File[]) {

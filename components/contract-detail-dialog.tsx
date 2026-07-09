@@ -54,7 +54,7 @@ export function ContractDetailDialog({
 
 /** 가장 임박한 (가장 작은, 또는 가장 음수인) D-day. 모두 비어있거나 30 초과 면 null. */
 function earliestDday(c: Contract, fields: Array<'insuranceExpiryDate' | 'inspectionDueDate' | 'returnScheduledDate'>): number | null {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayKr();   // KST — UTC toISOString 은 0~9시에 전날이라 D-day 하루 밀림
   const tT = new Date(today).getTime();
   let best: number | null = null;
   for (const f of fields) {

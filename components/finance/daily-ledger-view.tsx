@@ -271,7 +271,7 @@ export function DailyLedgerView({
 
         counterparty: t.customerName ?? t.merchant ?? '',
 
-        memo: isSales ? (t.approvalNo ? `승인 ${t.approvalNo}` : '카드留ㅼ텧') : (t.category ?? '법인카드'),
+        memo: isSales ? (t.approvalNo ? `승인 ${t.approvalNo}` : '카드매출') : (t.category ?? '법인카드'),
 
         subject: isSales ? '카드매출' : (t.category ?? ''),
 
@@ -554,7 +554,7 @@ export function DailyLedgerView({
 
             bankRecord?.settlementRole === 'deposit'
 
-            || /CMS|吏묎툑/i.test(`${r.counterparty} ${r.memo}`)
+            || /CMS|집금/i.test(`${r.counterparty} ${r.memo}`)
 
           );
 
@@ -888,11 +888,11 @@ export function DailyLedgerView({
 
                           <th style={{ width: 96 }}>거래일자</th>
 
-                          <th style={{ width: 130 }}>입금일</th>
+                          <th style={{ width: 130 }}>거래처</th>
 
                           <th>적요</th>
 
-                          <th style={{ width: 84 }}>李⑤웾번호</th>
+                          <th style={{ width: 84 }}>차량번호</th>
 
                           <th className="num" style={{ width: 100 }}>금액</th>
 

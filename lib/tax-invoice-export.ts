@@ -15,6 +15,7 @@
 
 import * as XLSX from 'xlsx';
 import type { Contract } from '@/lib/types';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 
 type SelectionRow = Record<string, string | number>;
 
@@ -59,11 +60,11 @@ export function downloadTaxInvoiceExcel(
 ): { ok: true; count: number; snapshots: Contract[] } | { ok: false; reason: 'no-contracts' } {
   const billingMonth = opts?.billingMonth ?? new Date().toISOString().slice(0, 7);
 
-  // 활성 + B2B 계약만 (개인 계약은 영수증 처리)
+  // 활성 + B2B 계약만 (개인 계약은 영수증 처리).
+  //   종료 판정은 SSOT isContractEnded — 하드코딩 나열은 '채권'(회수불가 채권화)을
+  //   빠뜨려 악성채권 건에 세금계산서가 발행됐음.
   const candidates = contracts.filter((c) =>
-    !c.returnedDate
-    && c.status !== '반납'
-    && c.status !== '해지'
+    !isContractEnded(c)
     && (c.customerKind === '사업자' || c.customerKind === '법인')
     && (c.monthlyRent ?? 0) > 0
   );
