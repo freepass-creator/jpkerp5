@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ref, onValue, set, update as rtdbUpdate, push, remove as rtdbRemove } from 'firebase/database';
-import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
+import { ref, onValue, set, update as rtdbUpdate, push } from 'firebase/database';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined, getFirebaseAuth } from './client';
 import { audit } from './audit-store';
 import type { BankTransaction, CardTransaction, AuditEntityType } from '@/lib/types';
 import { lockedUpdate } from './locked-update';
@@ -68,7 +68,8 @@ async function ensureSubscribed<T>(path: string): Promise<void> {
   if (!db) { c.loading = false; notifyAll(c); return; }
   onValue(ref(db, path), (snap) => {
     const val = snap.val();
-    c.rows = val ? Object.values<T>(val) as T[] : [];
+    // soft delete(#6) — deletedAt 스탬프된 거래는 화면에서 제외. 원본은 RTDB 에 보존(복원·감사).
+    c.rows = val ? (Object.values<T>(val) as T[]).filter((r) => !(r as { deletedAt?: string }).deletedAt) : [];
     c.loading = false;
     notifyAll(c);
   });
@@ -214,8 +215,11 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       if (closedM) throw new PeriodClosedError(closedM);
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbRemove(ref(db, `${path}/${id}`));
-      void audit.delete(auditType, id, `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 삭제`);
+      // soft delete(#6) — 물리삭제 대신 deletedAt/deletedBy 스탬프. 재무 사실기록 원본 보존.
+      const by = getFirebaseAuth()?.currentUser?.email ?? undefined;
+      const now = new Date().toISOString();
+      await rtdbUpdate(ref(db, `${path}/${id}`), patchToRtdb({ deletedAt: now, deletedBy: by, updatedAt: now }));
+      void audit.delete(auditType, id, `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 삭제(soft)`);
     },
     removeMany: async (ids: string[]) => {
       if (ids.length === 0) return 0;
@@ -226,12 +230,16 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       }
       await ensureAuth();
       const db = getRtdb(); if (!db) return 0;
-      // #18 — 마감월 거래는 삭제 제외(나머지만 삭제)
-      const updates: Record<string, null> = {};
+      // #18 — 마감월 거래는 삭제 제외(나머지만 삭제). soft delete(#6) — deletedAt 스탬프.
+      const updates: Record<string, unknown> = {};
       const removed: string[] = [];
+      const by = getFirebaseAuth()?.currentUser?.email ?? null;
+      const now = new Date().toISOString();
       for (const id of ids) {
         if (closedFor(id)) continue;
-        updates[id] = null;
+        updates[`${id}/deletedAt`] = now;
+        updates[`${id}/deletedBy`] = by;
+        updates[`${id}/updatedAt`] = now;
         removed.push(id);
       }
       if (removed.length === 0) return 0;

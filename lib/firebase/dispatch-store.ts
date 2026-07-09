@@ -88,6 +88,9 @@ export type DispatchOrder = {
   statusChangedAt?: string;
   /** 댓글 dictionary (commentId → DispatchComment) */
   comments?: Record<string, DispatchComment>;
+  /** soft delete(#6) — 삭제해도 지시 원본 보존, 구독 필터가 숨김 */
+  deletedAt?: string;
+  deletedBy?: string;
   _meta?: WriteMeta;
 };
 
@@ -128,7 +131,9 @@ export async function removeDispatchOrder(orderId: string): Promise<void> {
   await ensureAuth();
   const db = getRtdb();
   if (!db) return;
-  await rtdbRemove(ref(db, `${PATH}/${orderId}`));
+  // soft delete(#6) — 지시 원본 보존(복원·추적). 구독 필터가 deletedAt 항목을 숨김.
+  const by = getFirebaseAuth()?.currentUser?.email ?? undefined;
+  await rtdbUpdate(ref(db, `${PATH}/${orderId}`), pruneUndefined({ deletedAt: new Date().toISOString(), deletedBy: by }));
 }
 
 export async function addDispatchComment(
@@ -195,6 +200,7 @@ export function useMyDispatchOrders(
       unsub = onValue(ref(db, PATH), (snap) => {
         const val = (snap.val() ?? {}) as Record<string, DispatchOrder>;
         const list = Object.values(val).filter((o) => {
+          if (o.deletedAt) return false; // soft delete(#6)
           const uids = o.assignedToUids ?? (o.assignedToUid ? [o.assignedToUid] : []);
           const teams = o.assignedToTeams ?? (o.assignedToTeam ? [o.assignedToTeam] : []);
           const divs = o.assignedToDivisions ?? (o.assignedToDivision ? [o.assignedToDivision] : []);
@@ -233,7 +239,7 @@ export function useSentDispatchOrders(email: string | null | undefined): Dispatc
       if (!db) return;
       unsub = onValue(ref(db, PATH), (snap) => {
         const val = (snap.val() ?? {}) as Record<string, DispatchOrder>;
-        const list = Object.values(val).filter((o) => o.createdBy === email);
+        const list = Object.values(val).filter((o) => !o.deletedAt && o.createdBy === email);
         list.sort((a, b) => (b._meta?.at ?? '').localeCompare(a._meta?.at ?? ''));
         setData(list);
       });
