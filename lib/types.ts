@@ -652,6 +652,14 @@ export type Vehicle = {
   /** 매각일 — status='매각' 전환일 */
   saleDate?: string;
 
+  // ─── 차량 마스터 관리 정보 (계약 무관 — 재고·휴차·상품화중 차량도 추적) ───
+  /** 현재 주행거리(km) — 반납 초과주행·감가·매각시세 산정 기준 */
+  currentMileage?: number;
+  /** 정기검사 만기일 (YYYY-MM-DD) — 계약측 Contract.inspectionDueDate 와 별개, 무계약 차량용 */
+  inspectionDueDate?: string;
+  /** 자동차세 납부일 (YYYY-MM-DD) */
+  vehicleTaxDueDate?: string;
+
   // ─── 자산 관리 정보 (보험/할부/GPS) — 자산관리 표 컬럼 ───
   insuranceCompany?: string;       // 보험사 (예: 삼성화재)
   insurancePolicyNo?: string;      // 증권번호

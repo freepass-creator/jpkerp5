@@ -496,6 +496,9 @@ function SummaryTab({
         onClose={() => setCertOpen(false)}
       />
 
+      {/* 차량 마스터 관리 정보 (주행·검사·세금) — 계약 무관 추적 */}
+      <VehicleTrackingSection vehicle={vehicle} onUpdate={onUpdate} />
+
       {/* 비고 — 인라인 즉시 편집 (직원이 차량별 메모·발주처·특이사항 입력) */}
       <Section title="비고">
         <InlineTextEdit
@@ -1094,6 +1097,52 @@ function AssetLedgerSection({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate:
             />
           </>
         )}
+      </Grid2>
+    </Section>
+  );
+}
+
+/* ─── 차량 마스터 관리 정보 (주행·검사·세금) — 계약 무관, 무계약 차량도 추적 ─── */
+function VehicleTrackingSection({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void }) {
+  const today = todayKr();
+  function dueBadge(due?: string) {
+    if (!due) return null;
+    const days = Math.round((new Date(due).getTime() - new Date(today).getTime()) / 86400000);
+    if (!Number.isFinite(days)) return null;
+    if (days < 0) return <StatusBadge tone="red">경과 {-days}일</StatusBadge>;
+    if (days <= 30) return <StatusBadge tone="orange">D-{days}</StatusBadge>;
+    return null;
+  }
+  function dateField(label: string, key: 'inspectionDueDate' | 'vehicleTaxDueDate') {
+    return (
+      <Field label={label} value={
+        <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+          <InlineTextEdit value={vehicle[key]} onSave={(v) => onUpdate({ ...vehicle, [key]: v.trim() || undefined })} placeholder="YYYY-MM-DD" />
+          {dueBadge(vehicle[key])}
+        </span>
+      } />
+    );
+  }
+  return (
+    <Section title="차량 관리 (주행·검사·세금)">
+      <div className="dim" style={{ fontSize: 11, marginBottom: 6 }}>
+        계약과 무관하게 차량 마스터에 기록 — 재고·휴차·상품화중(무계약) 차량도 검사·세금·주행 추적.
+      </div>
+      <Grid2>
+        <Field label="현재 주행거리(km)" value={
+          <InlineTextEdit
+            value={vehicle.currentMileage !== undefined ? vehicle.currentMileage.toLocaleString() : ''}
+            onSave={(v) => {
+              const n = v.replace(/[,\s]/g, '');
+              if (n === '') { onUpdate({ ...vehicle, currentMileage: undefined }); return; }
+              const num = Number(n);
+              if (Number.isFinite(num) && num >= 0) onUpdate({ ...vehicle, currentMileage: num });
+            }}
+            placeholder="-"
+          />
+        } />
+        {dateField('정기검사 만기', 'inspectionDueDate')}
+        {dateField('자동차세 납부일', 'vehicleTaxDueDate')}
       </Grid2>
     </Section>
   );
