@@ -14,17 +14,16 @@
 import type { Contract, BankTransaction, PaymentEntry, PaymentScheduleInline } from './types';
 import { distributeEntry, totalUnpaid, totalUnpaidCount } from './payment-schedule';
 import { isContractEnded } from './contract-lifecycle';
+// 정규화 SSOT — 자동매칭(receipt-match)과 동일 로직 재사용 (#1 SSOT)
+import { normName, plateSuffix4, counterpartySuffix4 } from './receipt-match';
 
-function normName(s?: string): string {
-  return (s ?? '').replace(/\s+/g, '').toLowerCase();
+/** 문자열 끝쪽 4자리 숫자 — 입금자명 우선, 없으면 적요. */
+function depositSuffix4(t: { counterparty?: string; memo?: string }): string {
+  return counterpartySuffix4(t.counterparty ?? '') || counterpartySuffix4(t.memo ?? '');
 }
-function plateSuffix4(plate?: string): string {
-  return (plate ?? '').replace(/[^0-9]/g, '').slice(-4);
-}
-/** 문자열 끝쪽 4자리 숫자 (입금자명·적요에 붙인 차량 끝번호 관행). */
-function tailSuffix4(text?: string): string {
-  const m = (text ?? '').match(/(\d{4})(?!.*\d)/);
-  return m ? m[1] : '';
+/** 회사|신원 복합 그룹키 — 회사 격리(#19): 입금은 자기 회사 계약에만 귀속. */
+function idOf(c: Contract): string {
+  return (c.customerIdentNo ?? '').replace(/\D/g, '') || normName(c.customerName ?? '');
 }
 
 export type ReconcileTx = Pick<BankTransaction, 'id' | 'txDate' | 'amount' | 'counterparty' | 'memo'>;
@@ -45,36 +44,46 @@ export type BulkReconcilePlan = {
   perContract: ContractReconcile[];
   assignments: ReconcileAssignment[];
   matchedTxIds: string[];
-  floating: ReconcileTx[];                       // 계약자 귀속 실패 입금 (검토용)
+  floating: ReconcileTx[];                       // 귀속 실패/회사 모호 입금 (검토용)
   overflow: Array<{ txId: string; amount: number }>; // 계약 미납 다 채우고 남은 초과분
+  closedSkipped: ReconcileTx[];                  // 회계마감된 월이라 건너뛴 입금 (#18)
 };
 
-/** 활성 계약 + 미매칭 입금 → 대사 계획(미리보기). 저장 없음(순수). */
+/**
+ * 활성 계약 + 미매칭 입금 → 대사 계획(미리보기). 저장 없음(순수).
+ * #19 회사 격리: 입금은 자기 회사(companyCode) 계약에만 귀속. 회사 불명이면서 신원이
+ *   여러 회사에 걸치면 안전하게 floating(오귀속 방지).
+ * #18 회계마감: isClosed 제공 시 마감월 입금은 건너뜀(closedSkipped).
+ * #5 감사: actorEmail 을 payment entry.by 로 기록.
+ */
 export function planBulkReconcile(
   contracts: Contract[],
   bankTx: BankTransaction[],
-  opts?: { today?: string },
+  opts?: { today?: string; actorEmail?: string; isClosed?: (date: string, company?: string) => boolean },
 ): BulkReconcilePlan {
   const today = opts?.today ?? '';
+  const isClosed = opts?.isClosed;
 
   // 1) 현재 계약자·계약만 (종료 제외)
   const active = contracts.filter((c) => !isContractEnded(c));
 
-  // 2) 계약자 그룹핑 — 신원키 = 식별번호 숫자 || 정규화 이름
-  const groupKey = (c: Contract): string =>
-    (c.customerIdentNo ?? '').replace(/\D/g, '') || normName(c.customerName);
+  // 2) 회사|신원 그룹핑 (#19) — 같은 이름이어도 회사가 다르면 다른 그룹
+  const gkey = (company: string, id: string) => JSON.stringify([company, id]);
+  const companyOf = (k: string) => (JSON.parse(k)[0] as string) ?? '';
   const groups = new Map<string, Contract[]>();
-  const nameIndex = new Map<string, string>();     // normName(이름) → 그룹키
-  const suffixIndex = new Map<string, string>();   // 차량 끝4자리 → 그룹키
+  const nameIndex = new Map<string, Set<string>>();     // normName → {그룹키...}
+  const suffixIndex = new Map<string, Set<string>>();   // 차량끝4 → {그룹키...}
+  const addIdx = (m: Map<string, Set<string>>, key: string, gk: string) => {
+    let s = m.get(key); if (!s) { s = new Set(); m.set(key, s); } s.add(gk);
+  };
   for (const c of active) {
-    const k = groupKey(c);
-    if (!k) continue;
-    let arr = groups.get(k);
-    if (!arr) { arr = []; groups.set(k, arr); }
-    arr.push(c);
-    if (c.customerName) nameIndex.set(normName(c.customerName), k);
-    const suf = plateSuffix4(c.vehiclePlate);
-    if (suf.length === 4) suffixIndex.set(suf, k);
+    const id = idOf(c);
+    if (!id) continue;
+    const gk = gkey(c.company ?? '', id);
+    let arr = groups.get(gk); if (!arr) { arr = []; groups.set(gk, arr); } arr.push(c);
+    if (c.customerName) addIdx(nameIndex, normName(c.customerName), gk);
+    const suf = plateSuffix4(c.vehiclePlate ?? '');
+    if (suf.length === 4) addIdx(suffixIndex, suf, gk);
   }
   // 그룹 내 계약을 계약일 오름차순(먼저 계약한 것 먼저)
   for (const arr of groups.values()) {
@@ -86,19 +95,24 @@ export function planBulkReconcile(
     .filter((t) => (t.amount ?? 0) > 0 && !(t.withdraw && t.withdraw > 0) && !t.matchedContractId)
     .sort((a, b) => (a.txDate ?? '').localeCompare(b.txDate ?? ''));
 
-  // 4) 계약자 귀속 — 차량 끝4자리 우선, 그다음 이름
+  // 4) 회사 스코프 귀속 — 차량끝4 우선, 그다음 이름. 입금 회사가 있으면 그 회사 그룹만,
+  //    회사 불명이면서 신원이 여러 회사에 걸치면 floating(오귀속 방지). 마감월은 건너뜀.
   const depByGroup = new Map<string, BankTransaction[]>();
   const floating: ReconcileTx[] = [];
+  const closedSkipped: ReconcileTx[] = [];
+  const asTx = (t: BankTransaction): ReconcileTx => ({ id: t.id, txDate: t.txDate, amount: t.amount, counterparty: t.counterparty, memo: t.memo });
   for (const t of deposits) {
-    const suf = tailSuffix4(t.counterparty) || tailSuffix4(t.memo);
-    let k = suf ? suffixIndex.get(suf) : undefined;
-    if (!k) {
-      const nm = normName(t.counterparty);
-      if (nm) k = nameIndex.get(nm);
-    }
-    if (!k) { floating.push({ id: t.id, txDate: t.txDate, amount: t.amount, counterparty: t.counterparty, memo: t.memo }); continue; }
-    let arr = depByGroup.get(k);
-    if (!arr) { arr = []; depByGroup.set(k, arr); }
+    const suf = depositSuffix4(t);
+    let cand = (suf && suffixIndex.get(suf)) || undefined;
+    if (!cand) { const nm = normName(t.counterparty ?? ''); cand = nm ? nameIndex.get(nm) : undefined; }
+    if (!cand || cand.size === 0) { floating.push(asTx(t)); continue; }
+    let picks = [...cand];
+    if (t.companyCode) picks = picks.filter((gk) => companyOf(gk) === t.companyCode);
+    if (picks.length !== 1) { floating.push(asTx(t)); continue; }   // 0=미귀속, 2+=회사 모호
+    const gk = picks[0];
+    if (isClosed && isClosed((t.txDate ?? '').slice(0, 10), companyOf(gk) || undefined)) { closedSkipped.push(asTx(t)); continue; }
+    let arr = depByGroup.get(gk);
+    if (!arr) { arr = []; depByGroup.set(gk, arr); }
     arr.push(t);
   }
 
@@ -115,7 +129,7 @@ export function planBulkReconcile(
       for (const c of cs) {
         if (remaining <= 0) break;
         const sched = work.get(c.id)!;
-        const entry: PaymentEntry = { date: t.txDate, amount: remaining, source: '계좌', txId: t.id };
+        const entry: PaymentEntry = { date: t.txDate, amount: remaining, source: '계좌', txId: t.id, by: opts?.actorEmail, at: new Date().toISOString() };
         const { schedules, consumed } = distributeEntry(sched, entry, today || t.txDate);
         const used = consumed.reduce((s, x) => s + x.amount, 0);
         if (used > 0) {
@@ -153,7 +167,7 @@ export function planBulkReconcile(
     }
   }
 
-  return { perContract, assignments, matchedTxIds: [...matchedTxIds], floating, overflow };
+  return { perContract, assignments, matchedTxIds: [...matchedTxIds], floating, overflow, closedSkipped };
 }
 
 /**

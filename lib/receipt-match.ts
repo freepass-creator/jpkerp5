@@ -18,20 +18,20 @@
 import type { BankTransaction, CardTransaction, Contract, PaymentEntry, PaymentScheduleInline } from './types';
 import { applyPayment, totalUnpaid, totalUnpaidCount, computeCurrentSeq, addPaymentEntry, distributeEntry } from './payment-schedule';
 
-/** 이름 정규화 — 공백 제거, 소문자 */
-function normName(s: string): string {
+/** 이름 정규화 — 공백 제거, 소문자. (입금자명·계약자명 매칭 SSOT) */
+export function normName(s: string): string {
   return (s ?? '').replace(/\s+/g, '').toLowerCase();
 }
 
 /** 차량번호 끝 4자리 추출 — '12가1234'/'서울12가1234'/'1234' 모두 '1234' 반환. */
-function plateSuffix4(plate: string): string {
+export function plateSuffix4(plate: string): string {
   const digits = (plate ?? '').replace(/[^0-9]/g, '');
   return digits.slice(-4);
 }
 
 /** 입금자명에서 끝 4자리 숫자 추출 — '박영협8309' → '8309'.
  *  렌터카 손님이 차량번호 끝자리를 입금자명에 붙이는 관행 매칭용. */
-function counterpartySuffix4(name: string): string {
+export function counterpartySuffix4(name: string): string {
   const m = (name ?? '').match(/(\d{4})\s*$/);
   return m ? m[1] : '';
 }

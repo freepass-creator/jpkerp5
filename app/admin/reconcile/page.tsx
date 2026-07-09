@@ -14,7 +14,9 @@ import { ArrowsLeftRight, CheckCircle, Warning } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useBankTx } from '@/lib/firebase/transactions-store';
+import { useClosedPeriods, isDateInClosedPeriod } from '@/lib/firebase/closed-periods-store';
 import { useRole } from '@/lib/use-role';
+import { useAuth } from '@/lib/use-auth';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatCurrency } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
@@ -26,14 +28,20 @@ import { planBulkReconcile, buildReconcilePatches } from '@/lib/bulk-reconcile';
 export default function ReconcilePage() {
   const router = useRouter();
   const { isMaster, loading: roleLoading } = useRole();
+  const { user } = useAuth();
   const { contracts, updateMany: updateManyContracts } = useContracts();
   const { rows: bankTx, updateMany: updateManyBankTx } = useBankTx();
+  const { closedPeriods } = useClosedPeriods();
   const [applying, setApplying] = useState(false);
   const [done, setDone] = useState(false);
 
   const plan = useMemo(
-    () => planBulkReconcile(contracts, bankTx, { today: todayKr() }),
-    [contracts, bankTx],
+    () => planBulkReconcile(contracts, bankTx, {
+      today: todayKr(),
+      actorEmail: user?.email ?? user?.uid,
+      isClosed: (d) => isDateInClosedPeriod(closedPeriods, d),
+    }),
+    [contracts, bankTx, closedPeriods, user],
   );
 
   const matchedContracts = useMemo(
@@ -58,8 +66,10 @@ export default function ReconcilePage() {
     setApplying(true);
     try {
       const { contractRows, txPatches } = buildReconcilePatches(plan);
-      await updateManyContracts(contractRows);
+      // 거래 먼저 마킹 → 계약 갱신. 중간 실패해도 tx.matchedContractId 가 남아
+      // /admin/integrity 유령매칭 스캔이 검출 가능(계약 먼저면 실패가 조용히 묻힘). (#11 부분보호)
       await updateManyBankTx(txPatches);
+      await updateManyContracts(contractRows);
       void audit.match('bank_tx', 'bulk-reconcile', `초기 대사 일괄매칭 ${plan.matchedTxIds.length}건 → ${contractRows.length}계약`, {
         txCount: plan.matchedTxIds.length, contractCount: contractRows.length, total: totalMatchedAmount,
       });
@@ -99,6 +109,7 @@ export default function ReconcilePage() {
             </button>
             <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>
               미리보기는 저장되지 않습니다. [적용]을 눌러야 반영됩니다.
+              {plan.closedSkipped.length > 0 && ` · 회계마감월 입금 ${plan.closedSkipped.length}건은 제외됨(#18).`}
             </span>
           </div>
         </div>
