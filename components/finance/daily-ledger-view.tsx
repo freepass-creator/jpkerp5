@@ -566,9 +566,13 @@ export function DailyLedgerView({
 
           <Fragment key={rowKey}>
 
-          <tr>
+          <tr
+            onDoubleClick={() => { if (isCmsDeposit) toggleExpand(rowKey); }}
+            style={isCmsDeposit ? { cursor: 'pointer' } : undefined}
+            title={isCmsDeposit ? '더블클릭 — CMS 세부내역(구성 자동이체·수수료) 펼치기' : undefined}
+          >
 
-            {/* 1. 거래일자 + CMS ?쇱묠 ??*/}
+            {/* 1. 거래일자 + CMS 펼침 ▶ */}
 
             <td className="mono" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
 
@@ -873,6 +877,9 @@ export function DailyLedgerView({
                             </span>
 
                           )}
+                          <span style={{ marginLeft: 8, color: 'var(--green-text)' }}>
+                            · 실입금(계좌) <strong className="mono">₩{fmtNum(r.deposit)}</strong>
+                          </span>
 
                         </span>
 
