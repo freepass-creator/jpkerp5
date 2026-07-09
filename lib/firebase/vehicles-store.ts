@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'firebase/database';
-import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined } from './client';
+import { ref, set, update as rtdbUpdate, push } from 'firebase/database';
+import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, pruneUndefined, getFirebaseAuth } from './client';
 import { audit } from './audit-store';
 import { mergePlateAttachmentsToVehicle } from './vehicle-attachments-store';
 import { useDataContext } from '@/lib/data-context';
@@ -96,8 +96,13 @@ export function useVehicles(): {
       if (!configured) return;
       await ensureAuth();
       const db = getRtdb(); if (!db) return;
-      await rtdbRemove(ref(db, `${VEHICLES_PATH}/${id}`));
-      void audit.delete('vehicle', id, `차량 삭제 ${target?.plate ?? id} ${target?.model ?? ''}`);
+      // Soft delete (#6) — 차량 마스터도 물리삭제 X. deletedAt 스탬프(원본 보존)+낙관적 락(#22).
+      const now = new Date().toISOString();
+      const by = getFirebaseAuth()?.currentUser?.email ?? undefined;
+      await lockedUpdate<Vehicle>(`${VEHICLES_PATH}/${id}`, target?.updatedAt, (cur) => ({
+        ...cur, deletedAt: now, deletedBy: by, updatedAt: now,
+      }));
+      void audit.delete('vehicle', id, `차량 삭제(soft) ${target?.plate ?? id} ${target?.model ?? ''}`);
     },
   };
 }

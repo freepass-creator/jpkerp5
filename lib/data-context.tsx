@@ -78,7 +78,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       unsubs.push(onValue(ref(db, dbPath('vehicles')), (snap) => {
         const val = snap.val();
-        setVehicles(val ? Object.values<Vehicle>(val) : []);
+        // soft delete (#6) — deletedAt 스탬프된 차량은 목록·집계에서 제외 (원본 RTDB 보존)
+        setVehicles(val ? Object.values<Vehicle>(val).filter((v) => !v.deletedAt) : []);
         setVehiclesLoading(false);
       }));
 
