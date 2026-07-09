@@ -6,6 +6,8 @@ import { DialogRoot, DialogContent, DialogBody, DialogFooter, DialogClose } from
 import type { Contract } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
+import { useHistoryEntries } from '@/lib/firebase/history-store';
+import { todayKr } from '@/lib/mock-data';
 
 type Recipient = {
   contractId: string;
@@ -111,6 +113,7 @@ export function SmsDialog({
     return arr;
   }, [contracts, selectedIds]);
 
+  const { add: addHistory } = useHistoryEntries();
   const [templateIdx, setTemplateIdx] = useState(0);
   const [body, setBody] = useState(TEMPLATES[0].body);
 
@@ -136,6 +139,7 @@ export function SmsDialog({
     // 같은 키로 재호출 시 서버가 기존 응답 반환 (네트워크 실패 retry 안전).
     const batchKey = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     let sent = 0, failed = 0, mocked = 0;
+    const delivered: Recipient[] = []; // 발송 성공(mock 포함) — 연락기록 남길 대상
     for (const r of recipients) {
       try {
         const res = await fetch('/api/sms/send', {
@@ -152,12 +156,29 @@ export function SmsDialog({
           }),
         });
         const json = await res.json();
-        if (json.mock) mocked++;
-        else if (json.ok) sent++;
+        if (json.mock) { mocked++; delivered.push(r); }
+        else if (json.ok) { sent++; delivered.push(r); }
         else failed++;
       } catch {
         failed++;
       }
+    }
+    // 연락기록(#5) — 발송 성공분을 계약 이력에 남김. 계약해지 통보는 법적조치, 나머지는 연락기록.
+    //   → risk 대시 lastContactDate·needsRecovery·needsNotice(법적조치) 자동화. 이력 실패가 발송을 막지 않음.
+    const isLegal = /해지|통보|내용증명|법적/.test(TEMPLATES[templateIdx].label);
+    const day = todayKr();
+    for (const r of delivered) {
+      try {
+        await addHistory({
+          scope: 'contract',
+          contractId: r.contractId,
+          date: day,
+          category: isLegal ? '법적조치' : '연락기록',
+          title: `${TEMPLATES[templateIdx].label} 문자 발송`,
+          description: preview(body, r),
+          status: '완료',
+        });
+      } catch { /* 이력 실패 무시 — 발송은 이미 완료 */ }
     }
     if (mocked > 0 && sent === 0 && failed === 0) {
       toast.warning(`Aligo 환경변수 미설정 — mock ${mocked}건 처리. .env.local 등록 필요.`);

@@ -5,11 +5,12 @@
  * 우측 상단 floating 인쇄 버튼 (인쇄 시 자동 숨김).
  */
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Printer } from '@phosphor-icons/react';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { todayKr } from '@/lib/mock-data';
 import type { Company } from '@/lib/types';
 import { CertDocument, CERT_PRINT_CSS } from '@/components/notice/cert-document';
@@ -25,6 +26,8 @@ export default function NoticeCertPage() {
   const contractId = params?.contractId;
   const { contracts } = useContracts();
   const { companies } = useCompanies();
+  const { add: addHistory } = useHistoryEntries();
+  const loggedRef = useRef(false);
 
   const contract = useMemo(() => contracts.find((c) => c.id === contractId), [contracts, contractId]);
   const senderCompany = useMemo<Company | undefined>(() => {
@@ -42,6 +45,20 @@ export default function NoticeCertPage() {
   const terminationDate = contract.returnedDate || today;
   const returnedDate = contract.returnedDate || '';
   const paymentDueDate = addDays(today, 14);
+
+  // 인쇄(발송) 시 법적조치 이력 1회 기록 — needsNoticeAction 배지 해소. 이력 실패가 인쇄를 막지 않음.
+  async function handlePrint() {
+    if (!loggedRef.current && contract) {
+      loggedRef.current = true;
+      try {
+        await addHistory({
+          scope: 'contract', contractId: contract.id, date: today,
+          category: '법적조치', title: '내용증명 발송(출력)', status: '완료',
+        });
+      } catch { /* ignore */ }
+    }
+    window.print();
+  }
 
   return (
     <div className="cert-shell">
@@ -71,7 +88,7 @@ export default function NoticeCertPage() {
       `}</style>
       <style dangerouslySetInnerHTML={{ __html: CERT_PRINT_CSS }} />
 
-      <button className="cert-print-fab" type="button" onClick={() => window.print()}>
+      <button className="cert-print-fab" type="button" onClick={handlePrint}>
         <Printer size={14} weight="bold" /> 인쇄
       </button>
 
