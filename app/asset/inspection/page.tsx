@@ -25,6 +25,7 @@ import { CompanyCell } from '@/components/ui/company-cell';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { toast } from '@/lib/toast';
+import type { Vehicle } from '@/lib/types';
 
 export default function AssetInspectionPage() {
   const { contracts, loading: contractsLoading } = useContracts();
@@ -49,6 +50,21 @@ export default function AssetInspectionPage() {
   const inspectionEvents = useMemo(() => {
     return history.filter((h) => h.scope === 'vehicle' && h.category === '검사').sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
   }, [history]);
+
+  // 차량 마스터에 직접 입력된 검사·세금 만기 (계약 무관 — 무계약 차량도 추적). Contract 기반 upcoming 과 별개 소스.
+  const masterDue = useMemo(() => {
+    const rows: { v: Vehicle; kind: string; due: string; daysLeft: number }[] = [];
+    for (const v of vehicles) {
+      const add = (kind: string, due?: string) => {
+        if (!due) return;
+        const daysLeft = Math.round((new Date(due).getTime() - new Date(today).getTime()) / 86400000);
+        if (Number.isFinite(daysLeft)) rows.push({ v, kind, due, daysLeft });
+      };
+      add('정기검사', v.inspectionDueDate);
+      add('자동차세', v.vehicleTaxDueDate);
+    }
+    return rows.sort((a, b) => a.daysLeft - b.daysLeft);
+  }, [vehicles, today]);
 
   const overdue = upcoming.filter((u) => u.daysLeft < 0);
   const within30 = upcoming.filter((u) => u.daysLeft >= 0 && u.daysLeft <= 30);
@@ -204,6 +220,37 @@ export default function AssetInspectionPage() {
                 <td className="dim">{h.vendor || '-'}</td>
                 <td className="num mono">{h.cost ? `₩${h.cost.toLocaleString()}` : '-'}</td>
                 <td className="dim">{h.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h3 style={{ fontSize: 13, fontWeight: 700, margin: '0 0 8px' }}>차량 마스터 만기 (검사·세금)</h3>
+        <div className="dim" style={{ fontSize: 11, marginBottom: 6 }}>차량 상세에 입력한 정기검사·자동차세 만기 — 계약 유무와 무관하게 추적 (무계약 재고·휴차 차량 포함).</div>
+        <table className="table">
+          <thead>
+            <tr>
+              <th style={{ width: 96 }}>차량번호</th>
+              <th style={{ width: 90 }}>만기 유형</th>
+              <th style={{ width: 110 }}>만기일</th>
+              <th style={{ width: 100 }}>D-day</th>
+              <th>차종</th>
+            </tr>
+          </thead>
+          <tbody>
+            {masterDue.length === 0 ? (
+              <EmptyRow colSpan={5}>차량 마스터에 입력된 검사·세금 만기 없음 (차량 상세에서 입력)</EmptyRow>
+            ) : masterDue.map((r) => (
+              <tr key={`${r.v.id}-${r.kind}`} onDoubleClick={() => r.v.plate && openVehicle(r.v.plate, 'asset')} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, plate: r.v.plate }); }} style={{ cursor: 'pointer' }}>
+                <td className="mono">{r.v.plate || '-'}</td>
+                <td>{r.kind}</td>
+                <td className="mono">{r.due}</td>
+                <td className="mono" style={{ color: r.daysLeft < 0 ? 'var(--red-text)' : r.daysLeft <= 30 ? 'var(--orange-text)' : undefined }}>
+                  {r.daysLeft < 0 ? `경과 ${-r.daysLeft}일` : `D-${r.daysLeft}`}
+                </td>
+                <td className="dim">{r.v.vehicleModelLine || r.v.model || '-'}</td>
               </tr>
             ))}
           </tbody>
