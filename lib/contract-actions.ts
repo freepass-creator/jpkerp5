@@ -70,13 +70,25 @@ export function cancelDebt(c: Contract): Contract {
   };
 }
 
-/** 운행 복귀 — 종료(반납/해지) 후 잘못 종료 처리한 경우 되돌리기. */
+/** 운행 복귀 — 종료(반납/해지) 후 잘못 종료 처리한 경우 되돌리기.
+ *  반납 시 부여된 면제회차(returnedDate 이후)·반납 일할 할인·종료정보까지 정리해야
+ *  재개된 계약이 그 달들을 미청구하거나 종료정보가 유령으로 남지 않음. */
 export function revertToOperating(c: Contract): Contract {
+  const rd = c.returnedDate;
+  const schedules = (c.schedules ?? []).map((s) => {
+    const discounts = (s.discounts ?? []).filter((d) => d.reason !== '반납 일할');
+    // 반납으로 면제된 회차(반납일 이후)만 해제 → recalcContract 이 연체/예정 재판정. 수동 면제는 보존.
+    const status = (s.status === '면제' && rd && s.dueDate > rd) ? ('예정' as const) : s.status;
+    return { ...s, discounts, status };
+  });
   return {
     ...c,
+    schedules,
     status: '운행' as const,
     vehicleStatus: '운행' as const,
     returnedDate: undefined,
     endReason: undefined,
+    endedAt: undefined,
+    unpaidAtEnd: undefined,
   };
 }

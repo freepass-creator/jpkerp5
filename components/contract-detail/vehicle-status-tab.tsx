@@ -23,7 +23,7 @@ import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
 import { formatCurrency, formatDateFull, daysSince, monthsBetween } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
-import { markReturned } from '@/lib/contract-actions';
+import { markReturned, revertToOperating } from '@/lib/contract-actions';
 import {
   currentStage, stageLabel, daysToExpiry, getExpiryDate,
   getVehicleState, getContractState, getPaymentState,
@@ -349,8 +349,8 @@ export function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: C
         onUpdate({ ...c, vehicleStatus: '휴차대기' });
         break;
       case '휴차대기':
-        // 반납회수 취소 → 운행 복귀
-        onUpdate({ ...c, vehicleStatus: '운행', status: '운행', returnedDate: undefined });
+        // 반납회수 취소 → 운행 복귀 (SSOT — 면제회차·반납일할·종료정보 정리 포함)
+        onUpdate(revertToOperating(c));
         break;
       case '운행':
         // 인도 취소 → 상품대기
