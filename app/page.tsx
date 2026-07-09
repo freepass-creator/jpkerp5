@@ -447,7 +447,12 @@ export default function Page() {
       return;
     }
     if (!await showConfirm({ title: `정말 ${c.contractNo} ${c.vehiclePlate} ${c.customerName} 계약을 삭제하시겠습니까?\n(돌이킬 수 없음)`, danger: true })) return;
-    void rtdbRemove(c.id);
+    try {
+      await rtdbRemove(c.id);
+      toast.success('계약 삭제됨');
+    } catch (e) {
+      toast.error(`삭제 실패: ${(e as Error).message ?? String(e)}`);
+    }
   }
 
   // 선택된 계약 일괄 삭제 — SUPER_ADMIN 만

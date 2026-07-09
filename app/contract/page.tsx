@@ -280,10 +280,13 @@ export default function ContractPage() {
             onClick={async () => {
               if (selectedIds.size === 0) return;
               if (!await showConfirm({ title: `선택한 ${selectedIds.size}건의 계약을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
+              let ok = 0, fail = 0;
               for (const id of selectedIds) {
-                try { await removeContract(id); } catch (e) { console.error('contract delete failed', id, e); }
+                try { await removeContract(id); ok++; } catch (e) { console.error('contract delete failed', id, e); fail++; }
               }
               setSelectedIds(new Set());
+              if (fail > 0) toast.error(`${ok}건 삭제, ${fail}건 실패`);
+              else toast.success(`${ok}건 삭제`);
             }}
           >
             <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제

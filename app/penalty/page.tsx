@@ -135,10 +135,13 @@ export default function PenaltyPage() {
 
   // soft delete (ERP 원칙) — 하드삭제하면 감사추적·통지번호 dedup 이력이 소실됨.
   // items memo 의 !deletedAt 필터가 화면에서 숨김. audit 로그 병행.
-  function removeItem(id: string) {
+  async function removeItem(id: string) {
     const target = allItems.find((i) => i.id === id);
+    const label = `${target?.car_number ?? ''} ${target?.notice_no ?? ''}`.trim();
+    if (!await showConfirm({ title: '이 과태료를 삭제할까요?', description: label || undefined, danger: true })) return;
     setItems((p) => p.map((i) => i.id === id ? { ...i, deletedAt: new Date().toISOString() } : i));
     void audit.delete('penalty', id, `과태료 삭제 ${target?.car_number ?? id} ${target?.notice_no ?? ''}`.trim());
+    toast.success('과태료 1건 삭제됨');
   }
 
   async function clearInProgress() {

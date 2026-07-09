@@ -65,6 +65,9 @@ export function FleetApplyView({ companies, pendingByCompany }: Props) {
           </tr>
         </thead>
         <tbody>
+          {companies.length === 0 && (
+            <tr><td colSpan={8} className="muted center" style={{ padding: 32 }}>등록된 법인이 없습니다 — 법인 관리에서 법인을 먼저 등록하세요</td></tr>
+          )}
           {companies.map((c) => {
             const avail = Math.max(0, c.fleetLimit - c.vehicleCount);
             const pending = pendingByCompany[c.id] ?? [];

@@ -159,10 +159,13 @@ export default function AssetGpsPage() {
                   }
                   const note = sel.size - realIds.length > 0 ? `\n(자동 인식 ${sel.size - realIds.length}건은 제외됨)` : '';
                   if (!await showConfirm({ title: `선택한 ${realIds.length}건의 자산을 삭제하시겠습니까?${note}`, danger: true })) return;
+                  let ok = 0, fail = 0;
                   for (const id of realIds) {
-                    try { await removeVehicle(id); } catch (err) { console.error('vehicle delete failed', id, err); }
+                    try { await removeVehicle(id); ok++; } catch (err) { console.error('vehicle delete failed', id, err); fail++; }
                   }
                   sel.clear();
+                  if (fail > 0) toast.error(`${ok}건 삭제, ${fail}건 실패`);
+                  else toast.success(`${ok}건 삭제`);
                 }}
               >
                 <Trash size={14} weight="bold" /> 선택 {sel.size}건 삭제

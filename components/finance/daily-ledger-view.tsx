@@ -632,7 +632,7 @@ export function DailyLedgerView({
 
             <td className="num mono" style={{ color: r.deposit > 0 ? 'var(--blue-text)' : 'var(--text-weak)' }}>
 
-              {fmtNum(r.deposit) || '-'}
+              {r.deposit > 0 ? `₩${fmtNum(r.deposit)}` : '-'}
 
             </td>
 
@@ -640,7 +640,7 @@ export function DailyLedgerView({
 
             <td className="num mono" style={{ color: r.withdraw > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>
 
-              {fmtNum(r.withdraw) || '-'}
+              {r.withdraw > 0 ? `₩${fmtNum(r.withdraw)}` : '-'}
 
             </td>
 

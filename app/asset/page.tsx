@@ -556,10 +556,13 @@ export default function AssetPage() {
                   }
                   const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
                   if (!await showConfirm({ title: `선택한 ${realIds.length}건의 자산을 삭제하시겠습니까? (감사로그 남음)${note}`, danger: true })) return;
+                  let ok = 0, fail = 0;
                   for (const id of realIds) {
-                    try { await removeVehicle(id); } catch (e) { console.error('vehicle delete failed', id, e); }
+                    try { await removeVehicle(id); ok++; } catch (e) { console.error('vehicle delete failed', id, e); fail++; }
                   }
                   setSelectedIds(new Set());
+                  if (fail > 0) toast.error(`${ok}건 삭제, ${fail}건 실패`);
+                  else toast.success(`${ok}건 삭제`);
                 }}
               >
                 <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
@@ -756,7 +759,8 @@ export default function AssetPage() {
                   return;
                 }
                 if (!await showConfirm({ title: `${r.plate ?? r.id} 차량을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
-                void removeVehicle(r.id);
+                try { await removeVehicle(r.id); toast.success('차량 삭제됨'); }
+                catch (e) { toast.error(`삭제 실패: ${(e as Error).message ?? String(e)}`); }
               },
               danger: true,
             },

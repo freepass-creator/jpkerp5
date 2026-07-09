@@ -15,6 +15,7 @@ import {
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { showConfirm } from '@/lib/confirm';
+import { toast } from '@/lib/toast';
 import { EmptyRow } from "@/components/ui/empty-row";
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-apply';
@@ -66,11 +67,17 @@ export default function GeneralPage() {
     const target = companies.filter((c) => companySelectedIds.has(c.id));
     if (target.length === 0) return;
     if (!await showConfirm({ title: `선택한 ${target.length}건 삭제하시겠습니까?`, danger: true })) return;
+    let ok = 0, fail = 0;
     for (const c of target) {
-      await removeCompany(c.id);
-      void audit.delete('company', c.id, `법인 삭제 — ${c.name}`);
+      try {
+        await removeCompany(c.id);
+        void audit.delete('company', c.id, `법인 삭제 — ${c.name}`);
+        ok++;
+      } catch (e) { console.error('company delete failed', c.id, e); fail++; }
     }
     setCompanySelectedIds(new Set());
+    if (fail > 0) toast.error(`${ok}건 삭제, ${fail}건 실패`);
+    else toast.success(`${ok}건 삭제`);
   }
 
   return (
