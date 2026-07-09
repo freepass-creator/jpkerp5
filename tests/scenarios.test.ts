@@ -11,6 +11,7 @@ import { markReturned, revertToOperating } from '@/lib/contract-actions';
 import { planBulkReconcile } from '@/lib/bulk-reconcile';
 import { applyMultiContractMatch, updateBankTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
+import { splitVat, computeVatReport, vatPeriodRange } from '@/lib/vat-report';
 import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry, Vehicle } from '@/lib/types';
 
 const TODAY = '2026-07-09';
@@ -168,6 +169,33 @@ describe('자산대장 처분손익 (C3 — 매각가 입력)', () => {
   it('매각가 미입력이면 처분손익 미계산(undefined)', () => {
     const e = computeAssetLedgerEntry(disposedVehicle(), TODAY);
     expect(e.disposalGainLoss).toBeUndefined();
+  });
+});
+
+describe('부가세 신고자료 (H16)', () => {
+  it('splitVat — VAT 포함가 ÷1.1 분리 (공급가액+세액=총액)', () => {
+    const { supply, vat } = splitVat(1_100_000);
+    expect(supply).toBe(1_000_000);
+    expect(vat).toBe(100_000);
+    expect(supply + vat).toBe(1_100_000);
+  });
+  it('과세매출(대여료) 매출세액 + 과세매입(정비) 매입세액 → 납부예상 = 차액', () => {
+    const sale = bankTx({ id: 's', txDate: '2026-08-01', amount: 1_100_000, subject: '대여료수입' });
+    const buy = bankTx({ id: 'b', txDate: '2026-08-05', amount: 0, withdraw: 220_000, subject: '정비비' });
+    const insur = bankTx({ id: 'i', txDate: '2026-08-06', amount: 550_000, subject: '보험금수령' }); // 면세성 — 제외
+    const r = computeVatReport([sale, buy, insur], [], '2026-07-01', '2026-12-31');
+    expect(r.salesVat).toBe(100_000);      // 대여료만
+    expect(r.purchaseVat).toBe(20_000);    // 정비비만 (보험금수령은 매출에도 안 잡힘)
+    expect(r.netVatPayable).toBe(80_000);
+    expect(r.salesLines.some((l) => l.account === 'REVENUE_INSURANCE')).toBe(false);
+  });
+  it('기간 밖 거래는 제외', () => {
+    const outOfRange = bankTx({ id: 'o', txDate: '2026-01-01', amount: 1_100_000, subject: '대여료수입' });
+    const r = computeVatReport([outOfRange], [], '2026-07-01', '2026-12-31');
+    expect(r.salesVat).toBe(0);
+  });
+  it('vatPeriodRange — 2기 = 7~12월', () => {
+    expect(vatPeriodRange(2026, '2기')).toEqual({ from: '2026-07-01', to: '2026-12-31' });
   });
 });
 

@@ -53,6 +53,7 @@ export const FINANCE_SUB: SubNavItem[] = [
   { href: '/finance/vendor', label: '거래처' },
   { href: '/finance/customer', label: '임차인' },
   { href: '/finance/gl', label: '총계정원장' },
+  { href: '/finance/vat', label: '부가세 신고자료' },
 ];
 
 export function SubNav({ items }: { items: SubNavItem[] }) {
