@@ -15,6 +15,7 @@ import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
 import { applicableSubjects } from '@/lib/ledger-subjects';
 import { autoMatchAll, applyMatch, reverseMatch, applyFifoPayment, autoMatchCardAll, applyCardMatch, reverseCardMatch, applyFifoCardPayment } from '@/lib/receipt-match';
+import { updateBankTxWithMatchSync, detectDuplicateManualPayment } from '@/lib/firebase/tx-contract-sync';
 import { findAllSettlements, buildSettlementPatch } from '@/lib/settlement-match';
 import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
 import { ReceiptMatchDialog, CardMatchDialog } from '@/components/receipt-match-dialog';
@@ -159,7 +160,19 @@ export default function PaymentsPage() {
     await updateBankTx(tx.id, { note: note || undefined } as Partial<BankTransaction>);
   }
 
+  /** 직접수납 후 계좌매칭 시 이중차감 방지 — 같은 금액 수동/현금 수납이 ±3일 내 있으면 확인. */
+  async function confirmIfDuplicate(tx: BankTransaction, contract: Contract): Promise<boolean> {
+    const dup = detectDuplicateManualPayment(contract, tx.txDate ?? todayKr(), tx.amount);
+    if (!dup.found) return true;
+    return showConfirm({
+      title: '중복 입금 의심 — 계속 매칭할까요?',
+      description: `${contract.vehiclePlate ?? ''} ${contract.customerName ?? ''}의 ${dup.matchSeq}회차에 같은 금액 ₩${formatCurrency(tx.amount)} 직접 수납(${dup.matchDate})이 이미 있습니다.\n계속 매칭하면 미수금이 두 번 차감됩니다.`,
+      danger: true,
+    });
+  }
+
   async function handleManualMatch(tx: BankTransaction, contract: Contract, scheduleSeq: number) {
+    if (!await confirmIfDuplicate(tx, contract)) return;
     const { txPatch, contractPatch } = applyMatch(tx, contract, scheduleSeq);
     await updateBankTx(tx.id, txPatch);
     await updateContract({ ...contract, ...contractPatch });
@@ -169,21 +182,18 @@ export default function PaymentsPage() {
   }
 
   async function handleReverse(tx: BankTransaction) {
+    // 분할매칭(matches[]) 포함 모든 매칭을 원복 — 기존엔 matchedContractId 한 계약만 reverse 해
+    // 분할의 2번째 이후 계약에 유령 payment 가 남고 미수가 영구히 안 돌아왔음. sync 가 전부 해제 + collapse.
+    const splitCount = tx.matches?.length ?? 0;
+    await updateBankTxWithMatchSync(tx, { matchedContractId: undefined }, contracts, updateBankTx, updateContract);
     const c = tx.matchedContractId ? contractById.get(tx.matchedContractId) : undefined;
-    if (!c) {
-      await updateBankTx(tx.id, { matchedContractId: undefined, matchedScheduleSeq: undefined, matchedAt: undefined });
-      void audit.unmatch('bank_tx', tx.id, `매칭 해제 (계약 없음) ₩${formatCurrency(tx.amount)}`);
-      return;
-    }
-    const { txPatch, contractPatch } = reverseMatch(tx, c, todayKr());
-    await updateBankTx(tx.id, txPatch);
-    await updateContract({ ...c, ...contractPatch });
-    void audit.unmatch('bank_tx', tx.id, `${c.contractNo} ${tx.matchedScheduleSeq ?? '?'}회차 매칭 해제 ₩${formatCurrency(tx.amount)}`, {
-      contractId: c.id, scheduleSeq: tx.matchedScheduleSeq,
+    void audit.unmatch('bank_tx', tx.id, `${c?.contractNo ?? ''} 매칭 해제 ₩${formatCurrency(tx.amount)}${splitCount > 0 ? ` (분할 ${splitCount}건 전체 해제)` : ''}`.trim(), {
+      contractId: tx.matchedContractId, scheduleSeq: tx.matchedScheduleSeq, splitCount,
     });
   }
 
   async function handleFifo(tx: BankTransaction, contract: Contract) {
+    if (!await confirmIfDuplicate(tx, contract)) return;
     const { txPatch, contractPatch, leftover } = applyFifoPayment(tx, contract);
     await updateBankTx(tx.id, txPatch);
     await updateContract({ ...contract, ...contractPatch });

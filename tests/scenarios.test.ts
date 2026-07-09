@@ -9,6 +9,7 @@ import { dedupAgainst } from '@/lib/dedup';
 import { buildBankJournal, summarizeByAccount } from '@/lib/gl-entries';
 import { markReturned, revertToOperating } from '@/lib/contract-actions';
 import { planBulkReconcile } from '@/lib/bulk-reconcile';
+import { applyMultiContractMatch, updateBankTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry } from '@/lib/types';
 
 const TODAY = '2026-07-09';
@@ -97,6 +98,33 @@ describe('반납 → 되돌리기 (면제·일할·종료정보)', () => {
     expect(reopened.returnedDate).toBeUndefined();
     expect(reopened.endReason).toBeUndefined();
     expect(reopened.schedules?.filter((s) => s.status === '면제' && s.dueDate > '2025-06-15')).toHaveLength(0);
+  });
+});
+
+describe('은행 분할매칭 → 전체 해제 (H11 유령 payment 방지)', () => {
+  it('1입금을 2계약에 분할 후 해제하면 두 계약 모두 미수 완전 원복', async () => {
+    const mk = (id: string, plate: string) =>
+      recalcContract({ ...contract({ id, vehiclePlate: plate }), schedules: schedulesFor(contract({ id })) }, TODAY);
+    const store = new Map<string, Contract>([['cA', mk('cA', '11가1111')], ['cB', mk('cB', '22가2222')]]);
+    const unpaid0 = store.get('cA')!.unpaidAmount ?? 0;
+    expect(unpaid0).toBeGreaterThan(0);
+
+    let tx: BankTransaction = bankTx({ id: 'dep', amount: 1_000_000, txDate: '2025-02-01' });
+    const updateBank = (_id: string, patch: Partial<BankTransaction>) => { tx = { ...tx, ...patch }; };
+    const updateC = (c: Contract) => { store.set(c.id, recalcContract(c, TODAY)); };
+    const arr = () => Array.from(store.values());
+
+    // 분할 매칭 500k + 500k
+    await applyMultiContractMatch(tx, [{ contractId: 'cA', amount: 500_000 }, { contractId: 'cB', amount: 500_000 }], arr(), updateBank, updateC);
+    expect((store.get('cA')!.unpaidAmount ?? 0)).toBe(unpaid0 - 500_000);
+    expect((store.get('cB')!.unpaidAmount ?? 0)).toBe(unpaid0 - 500_000);
+    expect(tx.matches?.length).toBe(2);
+
+    // 전체 해제 — 두 계약 모두 원복 + matches 비움 (구버전은 cA 만 원복하고 cB 에 유령 payment 잔존)
+    await updateBankTxWithMatchSync(tx, { matchedContractId: undefined }, arr(), updateBank, updateC);
+    expect((store.get('cA')!.unpaidAmount ?? 0)).toBe(unpaid0);
+    expect((store.get('cB')!.unpaidAmount ?? 0)).toBe(unpaid0);
+    expect(tx.matches ?? []).toHaveLength(0);
   });
 });
 
