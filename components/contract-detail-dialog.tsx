@@ -28,6 +28,7 @@ import { PaymentTab } from '@/components/contract-detail/payment-tab';
 import { VehicleStatusTab } from '@/components/contract-detail/vehicle-status-tab';
 import { VehicleSpecTab } from '@/components/contract-detail/vehicle-spec-tab';
 import { ContractInfoTab } from '@/components/contract-detail/contract-info-tab';
+import { ContractHealthStrip } from '@/components/contract-detail/contract-health-strip';
 export { PaymentTab };
 
 export function ContractDetailDialog({
@@ -190,7 +191,12 @@ function ContractDetailShell({
       onSave={handleSave}
       onCancel={handleCancel}
       tabs={[
-        { value: 'status', label: '상태', content: <VehicleStatusTab c={contract} onUpdate={onUpdate} /> },
+        { value: 'status', label: '상태', content: (
+          <>
+            {contract.customerName?.trim() && <ContractHealthStrip c={contract} />}
+            <VehicleStatusTab c={contract} onUpdate={onUpdate} />
+          </>
+        ) },
         {
           value: 'asset',
           label: tabLabelWithDday('자산', earliestDday(contract, ['insuranceExpiryDate', 'inspectionDueDate'])),

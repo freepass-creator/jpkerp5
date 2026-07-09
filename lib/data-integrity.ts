@@ -1,23 +1,26 @@
 /**
- * 교차 엔티티 정합성 점검 — v6(jpkerp6-app/app/integrity)의 dataChecks 를 v5로 백포트.
+ * 교차 엔티티 정합성·연동 점검 — "입력한 데이터가 뭐가 빠졌나 + 서로 물려 도나".
  *
  * v5 는 이미 risk-issues.ts 로 "계약 1건 내부" 리스크(미납·검사지연·보험만기)를 본다.
- * 여기서는 v5 에 없던 **마스터 간 참조무결성**만 추가 (중복 금지):
+ * 여기서는 v5 에 없던 **마스터 간 참조무결성 + 연동 끊김**을 본다 (중복 금지):
  *   1) plate 고아 — 계약/보험/과태료의 차량번호가 차량 마스터에 없음
  *   2) 날짜 역전 — 계약 시작일 > 반납예정일
- *   3) 핵심 필수 누락 — 마스터/계약의 필수 식별 필드 결손
+ *   3) 필수/완전성 누락 — 마스터·계약의 식별·과금 필드 결손 (회차 미생성 포함)
+ *   4) 유령 매칭 — 거래는 계약을 가리키는데 계약엔 그 입금 기록 없음
+ *   5) 연동 끊김 — 운행 차량인데 계약 없음 / 수입 거래가 계약에 안 물림(미수·자금일보 미반영)
  *
  * 순수 함수 (읽기 전용). 저장·기존 리스크 로직 무변경.
  */
 
 import type { Contract, Vehicle, InsurancePolicy, BankTransaction, CardTransaction } from './types';
 import type { PenaltyWorkItem } from './penalty-pdf';
+import { isContractEnded } from './contract-lifecycle';
 
 export type IntegritySeverity = 'high' | 'mid';
 
 export type IntegrityIssue = {
   sev: IntegritySeverity;
-  kind: '필수누락' | '날짜역전' | 'plate고아' | '유령매칭';
+  kind: '필수누락' | '날짜역전' | 'plate고아' | '유령매칭' | '회차미생성' | '차량-계약' | '미매칭수입';
   entity: '차량' | '계약' | '보험' | '과태료' | '거래';
   target: string;   // 사람이 식별할 라벨 (plate/이름)
   detail: string;
@@ -84,6 +87,17 @@ export function computeDataIntegrity(input: IntegrityInput): IntegrityIssue[] {
     if (p && !plateSet.has(p)) {
       out.push({ sev: 'mid', kind: 'plate고아', entity: '계약', target: label, detail: `차량 ${c.vehiclePlate} 가 차량 마스터에 없음`, plate: c.vehiclePlate });
     }
+
+    // 완전성 — 인도된 계약인데 수납 회차 미생성 → 미수 계산·수납 매칭이 아예 불가.
+    //   (recalcContract 는 회차 없으면 미수를 손대지 않으므로 조용히 누락됨)
+    if (c.deliveredDate && (c.monthlyRent ?? 0) > 0 && (!c.schedules || c.schedules.length === 0)) {
+      out.push({ sev: 'high', kind: '회차미생성', entity: '계약', target: label, detail: '인도된 계약인데 수납 회차가 없음 — 미수·수납 매칭 불가 (계약 상세에서 저장 시 회차 재생성)', plate: c.vehiclePlate });
+    }
+    // 완전성 — 인도된 활성 계약인데 월대여료 0 → 과금·미수 계산 불가 (구조적 이상).
+    //   (연락처 등 필드 단위 완전성은 계약 상세의 레코드별 점검에서. 전역 목록엔 구조 이상만.)
+    if (c.deliveredDate && (c.monthlyRent ?? 0) <= 0) {
+      out.push({ sev: 'mid', kind: '필수누락', entity: '계약', target: label, detail: '인도된 계약인데 월대여료 0 — 과금·미수 계산 불가', plate: c.vehiclePlate });
+    }
   }
 
   // 3) plate 고아 — 보험 (보험은 deletedAt 미사용 — 갱신 시 새 증권 추가)
@@ -134,6 +148,47 @@ export function computeDataIntegrity(input: IntegrityInput): IntegrityIssue[] {
         out.push({ sev: 'mid', kind: '유령매칭', entity: '거래', target: label, detail: `계약(${c.vehiclePlate ?? '?'} ${c.customerName ?? ''})에 이 카드수납 기록이 없음 — 매칭 해제 후 재매칭 권장`, plate: c.vehiclePlate });
       }
     }
+  }
+
+  // 5) 연동 끊김 — 운행 차량인데 연결된 활성 계약 없음.
+  //    "이 차가 어디 나가있나"를 계약이 못 받쳐줌 → 실물·상태 불일치.
+  const activeContractPlates = new Set<string>();
+  for (const c of contracts) {
+    if (isContractEnded(c)) continue;
+    const p = normPlate(c.vehiclePlate);
+    if (p) activeContractPlates.add(p);
+  }
+  for (const v of vehicles) {
+    if (v.status !== '운행') continue;
+    const p = normPlate(v.plate);
+    const linked =
+      (p && activeContractPlates.has(p)) ||
+      (v.plateHistory ?? []).some((h) => { const hp = normPlate(h); return hp && activeContractPlates.has(hp); });
+    if (!linked) {
+      out.push({ sev: 'mid', kind: '차량-계약', entity: '차량', target: v.plate || v.id, detail: '운행 상태인데 연결된 활성 계약이 없음 — 실제 임차 여부·차량 상태 확인', plate: v.plate });
+    }
+  }
+
+  // 5) 연동 끊김 — 수입 거래가 계약에 안 물림 → 미수 차감·자금일보 반영이 안 됨.
+  //    (돈은 들어왔는데 어느 계약 건지 시스템이 모르는 상태 — 자금일보에서 매칭 필요)
+  let unmatchedCard = 0, unmatchedCardAmt = 0;
+  for (const t of cardTx) {
+    if ((t.amount ?? 0) <= 0) continue;
+    if (t.kind === '법인카드') continue;              // 지출은 계약 매칭 대상 아님
+    if (t.matchedContractId) continue;
+    unmatchedCard += 1; unmatchedCardAmt += (t.amount ?? 0);
+  }
+  if (unmatchedCard > 0) {
+    out.push({ sev: 'mid', kind: '미매칭수입', entity: '거래', target: `카드매출 ${unmatchedCard}건`, detail: `계약 미매칭 카드매출 ${unmatchedCard}건 · ₩${unmatchedCardAmt.toLocaleString()} — 미수·자금일보에 반영 안 됨. 자금일보에서 매칭 필요` });
+  }
+  let unmatchedCms = 0, unmatchedCmsAmt = 0;
+  for (const t of bankTx) {
+    if (t.settlementRole !== 'item') continue;        // CMS 자동이체 구성건
+    if (t.matchedContractId) continue;
+    unmatchedCms += 1; unmatchedCmsAmt += (t.amount ?? 0);
+  }
+  if (unmatchedCms > 0) {
+    out.push({ sev: 'mid', kind: '미매칭수입', entity: '거래', target: `자동이체 ${unmatchedCms}건`, detail: `계약 미매칭 CMS 자동이체 ${unmatchedCms}건 · ₩${unmatchedCmsAmt.toLocaleString()} — 미수 차감 안 됨. 자금일보에서 매칭 필요` });
   }
 
   // high 먼저

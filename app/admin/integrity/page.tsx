@@ -21,7 +21,17 @@ import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { usePenaltyStore } from '@/lib/use-penalty-store';
 import { useRole } from '@/lib/use-role';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { computeDataIntegrity } from '@/lib/data-integrity';
+import { computeDataIntegrity, type IntegrityIssue } from '@/lib/data-integrity';
+
+const KIND_LABEL: Record<IntegrityIssue['kind'], string> = {
+  '회차미생성': '회차 미생성',
+  '미매칭수입': '미매칭 수입',
+  '차량-계약': '운행차량 계약없음',
+  '유령매칭': '유령 매칭',
+  'plate고아': '차량 고아',
+  '날짜역전': '날짜 역전',
+  '필수누락': '필수·완전성 누락',
+};
 
 export default function IntegrityPage() {
   const router = useRouter();
@@ -40,6 +50,13 @@ export default function IntegrityPage() {
 
   const high = issues.filter((i) => i.sev === 'high').length;
 
+  // 유형별 집계 (건수 많은 순) — 한눈에 "뭐가 얼마나 빠졌나"
+  const byKind = useMemo(() => {
+    const m = new Map<IntegrityIssue['kind'], number>();
+    for (const it of issues) m.set(it.kind, (m.get(it.kind) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [issues]);
+
   if (!roleLoading && !isMaster) {
     router.replace('/');
     return null;
@@ -51,18 +68,32 @@ export default function IntegrityPage() {
       <main style={{ flex: 1, padding: 24, maxWidth: 1100, margin: '0 auto', width: '100%' }}>
         <header className="page-header" style={{ marginBottom: 16 }}>
           <h1 className="page-header-title">
-            <ShieldWarning size={18} weight="duotone" /> 정합성 점검
+            <ShieldWarning size={18} weight="duotone" /> 연동·완전성 점검
           </h1>
           <div className="page-header-title-sub">
-            차량 마스터 ↔ 계약·보험·과태료의 참조무결성 진단. 미납·검사·보험 만기는 리스크 현황에서 봅니다.
+            입력한 데이터가 뭐가 빠졌고(회차·필드), 서로 물려 도는지(차량↔계약↔수입거래) 진단.
+            미납·검사·보험 만기는 리스크 현황에서 봅니다.
           </div>
         </header>
 
-        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 13 }}>총 <strong>{issues.length}</strong>건</span>
           <span style={{ fontSize: 13, color: 'var(--red-text)' }}>위험 <strong>{high}</strong></span>
           <span style={{ fontSize: 13, color: 'var(--orange-text)' }}>주의 <strong>{issues.length - high}</strong></span>
         </div>
+
+        {issues.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+            {byKind.map(([kind, n]) => (
+              <span key={kind} style={{
+                fontSize: 12, padding: '4px 10px', borderRadius: 'var(--radius-sm)',
+                background: 'var(--bg-sunken)', border: '1px solid var(--border)',
+              }}>
+                {KIND_LABEL[kind] ?? kind} <strong>{n}</strong>
+              </span>
+            ))}
+          </div>
+        )}
 
         <section className="detail-section">
           <div className="detail-section-body" style={{ padding: 0 }}>
@@ -81,7 +112,7 @@ export default function IntegrityPage() {
                   <tr>
                     <td colSpan={5} className="muted center" style={{ padding: 40 }}>
                       <CheckCircle size={22} weight="duotone" style={{ color: 'var(--green-text)', display: 'block', margin: '0 auto 8px' }} />
-                      정합성 문제 없음 — 모든 차량번호 참조·날짜·필수 필드 정상
+                      연동·완전성 문제 없음 — 차량↔계약↔수입거래 연결·필수 필드·회차 모두 정상
                     </td>
                   </tr>
                 ) : issues.map((it, i) => (
