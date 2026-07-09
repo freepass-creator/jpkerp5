@@ -2,7 +2,7 @@
  * 업로드 처리 상태 — 모든 엑셀/OCR 업로드에 공용 type.
  *
  * 계좌·자동이체·카드매출·법인카드·계약·자산·과태료 등 모든 업로드에서
- * 같은 type 으로 결과 표시 → UploadResultPanel 이 같이 렌더.
+ * 같은 type 으로 각 업로드 화면이 결과를 표시.
  */
 
 export type UploadRowStatus =

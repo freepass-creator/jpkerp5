@@ -7,7 +7,7 @@
  *  · 등록차량 view: 요약 탭 단일 (제조사 스펙 + 자등증 + 첨부)
  *
  *  탭 컴포넌트는 향후 별도 파일로 분할 예정 (vehicle-detail/tabs/*).
- *  공용 부품: DetailTabContent (탭 wrapper), COL/COL_FLEX (표 컬럼 width 토큰).
+ *  공용 부품: COL/COL_FLEX (표 컬럼 width 토큰).
  */
 
 import React, { useMemo, useState } from 'react';
