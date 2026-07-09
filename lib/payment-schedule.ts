@@ -249,6 +249,24 @@ export function resizeSchedules(
   return existing;
 }
 
+/**
+ * 시점(as-of) 재구성 — "그 날 기준 미수·회차상태".
+ *   · 입금·할인을 asOf 이하 날짜만 반영 (그 이후 낸 돈은 아직 안 들어온 것)
+ *   · 반납이 asOf 이후면 그 시점엔 미반납으로 취급(면제 미적용)
+ *   · 회차 상태는 asOf 기준으로 재판정 (dueDate < asOf → 연체)
+ * 원천(날짜 박힌 입금·회차·반납일)이 다 있으니 과거 어느 시점이든 재생 가능.
+ */
+export function computeContractAsOf<T extends Contract>(c: T, asOf: string): T {
+  const schedules = (c.schedules ?? []).map((s) => ({
+    ...s,
+    payments: (s.payments ?? []).filter((p) => (p.date ?? '') <= asOf),
+    discounts: (s.discounts ?? []).filter((d) => (d.date ?? '') <= asOf),
+    status: s.status === '면제' ? ('예정' as const) : s.status,   // 면제는 recalc 이 반납일로 재판정
+  }));
+  const returnedDate = c.returnedDate && c.returnedDate <= asOf ? c.returnedDate : undefined;
+  return recalcContract({ ...c, schedules, returnedDate }, asOf);
+}
+
 /** YYYY-MM-DD + n개월 → 같은 day-of-month 의 다음 달 (월말 보정) */
 function addMonths(iso: string, months: number, day: number): string {
   if (!iso) return '';

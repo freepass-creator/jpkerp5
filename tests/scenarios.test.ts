@@ -3,7 +3,7 @@
  * Firebase·React 없이 검증. 이번 세션에 고친 로직의 회귀 안전망.
  */
 import { describe, it, expect } from 'vitest';
-import { generateSchedules, distributeEntry, recalcContract, resizeSchedules } from '@/lib/payment-schedule';
+import { generateSchedules, distributeEntry, recalcContract, resizeSchedules, computeContractAsOf } from '@/lib/payment-schedule';
 import { bankTxKeys } from '@/lib/dedup-keys';
 import { dedupAgainst } from '@/lib/dedup';
 import { buildBankJournal, summarizeByAccount } from '@/lib/gl-entries';
@@ -97,6 +97,29 @@ describe('반납 → 되돌리기 (면제·일할·종료정보)', () => {
     expect(reopened.returnedDate).toBeUndefined();
     expect(reopened.endReason).toBeUndefined();
     expect(reopened.schedules?.filter((s) => s.status === '면제' && s.dueDate > '2025-06-15')).toHaveLength(0);
+  });
+});
+
+describe('computeContractAsOf — 시점(as-of) 재구성', () => {
+  it('입금일 이후 기준일에는 납부 반영, 이전 기준일에는 미납으로 재구성', () => {
+    const c = contract();
+    const sched = schedulesFor(c);
+    // seq1 을 2026-03-01 에 납부. 두 기준일 모두 12회차 전부 연체된 시점이라 연체집합은 동일 → 입금만 격리.
+    sched[0] = { ...sched[0], payments: [{ date: '2026-03-01', amount: 500_000, source: '계좌' }] };
+    const base = { ...c, schedules: sched };
+    const before = computeContractAsOf(base, '2026-02-28'); // 입금 전 시점
+    const after = computeContractAsOf(base, '2026-04-01');  // 입금 후 시점
+    // 같은 계약·같은 연체집합이라도 입금 반영 여부로 미수가 다르다 (입금 전이 딱 1회차만큼 큼)
+    expect((before.unpaidAmount ?? 0) - (after.unpaidAmount ?? 0)).toBe(500_000);
+    // 원본은 불변
+    expect(base.schedules?.[0].payments?.[0].date).toBe('2026-03-01');
+  });
+  it('반납일 이후 기준일에만 반납 반영 (그 이전엔 아직 운행 중 미수 발생)', () => {
+    const c = contract();
+    const returned = markReturned({ ...c, schedules: schedulesFor(c) }, '2025-06-15');
+    const before = computeContractAsOf(returned, '2025-05-01'); // 반납 전 → 면제 해제, 회차 살아있음
+    expect(before.returnedDate).toBeUndefined();
+    expect(before.schedules?.some((s) => s.status === '면제')).toBe(false);
   });
 });
 

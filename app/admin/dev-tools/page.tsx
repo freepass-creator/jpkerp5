@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -65,6 +65,13 @@ const TOOLS: ToolCard[] = [
     title: '일괄 대사 매칭 (초기 세팅)',
     desc: '3년치 은행입금을 활성 계약자 계약에 계약일순·오래된 미납부터 FIFO 로 채워 미리보기 → 확인 후 일괄 적용. 미귀속(붕 떠있는) 입금 검토 포함.',
     icon: <ShieldWarning size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/admin/as-of',
+    title: '시점 미수 조회 (as-of)',
+    desc: '과거 어느 날짜든 "그 시점에 어떤 계약이 어떤 상태였고 미수가 얼마였나" 재구성. 날짜 박힌 입금·회차·반납일 원천을 그대로 재생 — 그 날 이후 입금은 제외. 읽기 전용.',
+    icon: <ClockCounterClockwise size={18} weight="duotone" />,
     variant: 'op',
   },
   {
