@@ -61,6 +61,13 @@ const TOOLS: ToolCard[] = [
     variant: 'op',
   },
   {
+    href: '/admin/reconcile',
+    title: '일괄 대사 매칭 (초기 세팅)',
+    desc: '3년치 은행입금을 활성 계약자 계약에 계약일순·오래된 미납부터 FIFO 로 채워 미리보기 → 확인 후 일괄 적용. 미귀속(붕 떠있는) 입금 검토 포함.',
+    icon: <ShieldWarning size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
     href: '/admin/closing',
     title: '회계기간 마감',
     desc: '월별 마감 처리 — 마감된 기간은 수납·인도·반납 등 거래 쓰기 차단. (직접 URL 진입만 되던 것 노출)',
