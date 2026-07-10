@@ -15,7 +15,7 @@ import { useMemo, useState } from 'react';
 import { ChartBar, FileXls, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { FilterSelect } from '@/components/ui/filter-select';
-import { CompanyFilter } from '@/components/ui/filter-bar';
+import { CompanyFilter, PeriodFilter } from '@/components/ui/filter-bar';
 import { FINANCE_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { EmptyRow } from '@/components/ui/empty-row';
@@ -301,14 +301,7 @@ export default function FinanceDailyPage() {
           master={companyMaster}
         />
         <span className="filter-divider" />
-        <button type="button" className={`chip ${periodMode === 'month' ? 'active' : ''}`} onClick={() => setPeriodMode('month')}>월</button>
-        <button type="button" className={`chip ${periodMode === 'quarter' ? 'active' : ''}`} onClick={() => setPeriodMode('quarter')}>분기</button>
-        <button type="button" className={`chip ${periodMode === 'year' ? 'active' : ''}`} onClick={() => setPeriodMode('year')}>연</button>
-        <span className="filter-divider" />
-        <button type="button" className="chip" onClick={() => shiftPeriod(-1)} aria-label="이전 기간"><CaretLeft size={11} weight="bold" /></button>
-        <strong className="mono" style={{ minWidth: 80, textAlign: 'center', fontSize: 12 }}>{periodLabel}</strong>
-        <button type="button" className="chip" onClick={() => shiftPeriod(1)} aria-label="다음 기간"><CaretRight size={11} weight="bold" /></button>
-        <button type="button" className="chip" onClick={gotoCurrent}>당월</button>
+        <PeriodFilter mode={periodMode} onModeChange={setPeriodMode} onShift={shiftPeriod} onCurrent={gotoCurrent} label={periodLabel} />
         <span className="filter-divider" />
         <input
           className="input-compact" data-w="md"

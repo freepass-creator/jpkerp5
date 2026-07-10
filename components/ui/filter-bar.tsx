@@ -58,14 +58,16 @@ export function PeriodFilter({
   mode, anchor, onModeChange, onShift, onCurrent, label,
 }: {
   mode: PeriodMode;
-  anchor: PeriodAnchor;
+  /** 자동 라벨 계산용. label 을 직접 넘기면 생략 가능. */
+  anchor?: PeriodAnchor;
   onModeChange: (m: PeriodMode) => void;
   onShift: (delta: number) => void;
   onCurrent: () => void;
-  /** 라벨 override — 없으면 자동 (YYYY-MM 또는 YYYY Q?) */
+  /** 라벨 override — 없으면 anchor 로 자동 (YYYY-MM 또는 YYYY Q?) */
   label?: string;
 }) {
   const auto = (() => {
+    if (!anchor) return '';
     if (mode === 'year') return `${anchor.y}`;
     if (mode === 'quarter') {
       const q = Math.floor((anchor.m - 1) / 3) + 1;

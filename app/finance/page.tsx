@@ -33,7 +33,7 @@ import { recordIssuedInvoices, snapshotFromContract } from '@/lib/firebase/issue
 import { useAuth } from '@/lib/use-auth';
 import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
 import { PageShell } from '@/components/ui/page-shell';
-import { CompanyFilter } from '@/components/ui/filter-bar';
+import { CompanyFilter, PeriodFilter } from '@/components/ui/filter-bar';
 import { FilterSelect } from '@/components/ui/filter-select';
 import { usePersistentState } from '@/lib/use-persistent-state';
 
@@ -278,14 +278,7 @@ export default function FinancePage() {
       topbarChips={
         <>
           {/* 기간 chip 그룹 */}
-          <button type="button" className={`chip ${periodMode === 'month' ? 'active' : ''}`} onClick={() => setPeriodMode('month')}>월</button>
-          <button type="button" className={`chip ${periodMode === 'quarter' ? 'active' : ''}`} onClick={() => setPeriodMode('quarter')}>분기</button>
-          <button type="button" className={`chip ${periodMode === 'year' ? 'active' : ''}`} onClick={() => setPeriodMode('year')}>연</button>
-          <span className="filter-divider" />
-          <button type="button" className="chip" onClick={() => shiftPeriod(-1)} title="이전 기간"><CaretLeft size={11} weight="bold" /></button>
-          <strong className="mono" style={{ minWidth: 80, textAlign: 'center', fontSize: 12 }}>{periodLabel}</strong>
-          <button type="button" className="chip" onClick={() => shiftPeriod(1)} title="다음 기간"><CaretRight size={11} weight="bold" /></button>
-          <button type="button" className="chip" onClick={gotoCurrent} title="현재 기간으로">당월</button>
+          <PeriodFilter mode={periodMode} onModeChange={setPeriodMode} onShift={shiftPeriod} onCurrent={gotoCurrent} label={periodLabel} />
           {/* 보조 dropdown — 맨 뒤 */}
           <span className="filter-divider" />
           <FilterSelect
