@@ -417,6 +417,7 @@ export type HistoryEntry = {
   scope: HistoryScope;
   contractId?: string;      // scope='contract'일 때 필수 / scope='vehicle'일 때 발생 시점 컨텍스트로 기록
   vehiclePlate?: string;    // scope='vehicle'일 때 필수
+  companyCode?: CompanyCode; // 회사 소속 — 저장 시 계약/차량 경유 자동 해석(#R3 회사별 분리·v6 테넌트 격리)
   date: string;             // YYYY-MM-DD
   category: HistoryCategory;
   title: string;

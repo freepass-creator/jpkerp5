@@ -5,6 +5,7 @@ import { ref, set, update as rtdbUpdate, remove as rtdbRemove, push } from 'fire
 import { getRtdb, dbPath, isFirebaseConfigured, ensureAuth, getFirebaseAuth, pruneUndefined } from './client';
 import { audit } from './audit-store';
 import { useDataContext } from '@/lib/data-context';
+import { findVehicleByPlate } from '@/lib/entity-sync';
 import type { HistoryEntry } from '@/lib/types';
 
 const PATH = dbPath('history_entries');
@@ -23,7 +24,7 @@ export function useHistoryEntries(): {
   update: (e: HistoryEntry) => Promise<void>;
   remove: (id: string) => Promise<void>;
 } {
-  const { history, historyLoading } = useDataContext();
+  const { history, historyLoading, vehicles, contracts } = useDataContext();
   const [configured] = useState(() => isFirebaseConfigured());
 
   return {
@@ -39,7 +40,11 @@ export function useHistoryEntries(): {
       const newRef = push(ref(db, PATH));
       const id = newRef.key;
       if (!id) throw new Error('Firebase push failed: no key');
-      const full = { ...e, id, createdAt, createdBy } as HistoryEntry;
+      // 회사코드 자동 해석(#R3) — 계약(contractId)/차량(vehiclePlate) 경유로 확정. 이력 노드가 스스로 소속을 알게 → v6 테넌트 격리.
+      let companyCode = e.companyCode;
+      if (!companyCode && e.contractId) companyCode = contracts.find((c) => c.id === e.contractId)?.company;
+      if (!companyCode && e.vehiclePlate) companyCode = findVehicleByPlate(vehicles, e.vehiclePlate)?.company;
+      const full = { ...e, companyCode, id, createdAt, createdBy } as HistoryEntry;
       await set(newRef, pruneUndefined(full));
       void audit.create('document', id, `${e.scope === 'vehicle' ? '차량이력' : '계약이력'} ${e.category} — ${e.title}`);
       return id;
