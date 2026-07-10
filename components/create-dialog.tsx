@@ -2836,7 +2836,7 @@ type ExtractedRow = {
 };
 
 function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
-  const { addMany: addContracts } = useContracts();
+  const { addMany: addContracts, contracts } = useContracts();
   const { vehicles, add: addVehicle, addMany: addVehicles, update: updateVehicle } = useVehicles();
   const { companies } = useCompanies();
   const [busy, setBusy] = useState(false);
@@ -2938,7 +2938,6 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
     if (valid.length === 0) return;
     setSaving(true);
     try {
-      const { genCode } = await import('@/lib/code');
       // 신규 차량 사전 생성 제거 — 아래 upsertVehicleFromContract 가 미등록 plate 를 자동 생성한다.
       // (기존엔 addVehicles 로 먼저 만든 뒤 stale vehicles 목록으로 upsert 를 또 돌려 같은 차가 2대 생겼음)
 
@@ -2950,7 +2949,7 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
         const yy = start.slice(2, 4);
         const mm = start.slice(5, 7);
         return {
-          contractNo: `ICR-${yy}${mm}-${genCode(4)}`,
+          contractNo: '', // assignContractNos 로 회사·월 순번 재할당(아래)
           company: (r.company || '기타') as import('@/lib/types').CompanyCode,
           customerName: r.customerName.trim() || '미상',
           customerPhone1: r.customerPhone1.trim(),
@@ -2979,12 +2978,13 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
             : undefined,
         };
       });
-      await addContracts(newContracts);
+      const withNos = assignContractNos(newContracts, contracts, companies); // 회사·월 순번 계약번호
+      await addContracts(withNos);
       // 차량 자동 동기화 — upsert 가 미등록 plate 를 자동 생성 + currentContractId 갱신.
       // ctx.vehicles 가 stale 상태라 같은 plate 를 두 번 upsert 하면 중복 생성 → plate 당 1회만.
       const syncCtx2 = { vehicles, companies, addVehicle, updateVehicle };
       const upsertedPlates = new Set<string>();
-      for (const c of newContracts) {
+      for (const c of withNos) {
         const p = (c.vehiclePlate ?? '').trim();
         if (p && upsertedPlates.has(p)) continue;
         if (p) upsertedPlates.add(p);
