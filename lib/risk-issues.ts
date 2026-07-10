@@ -184,7 +184,7 @@ export function computeLatePayStage(daysOverdue: number): LatePayStage {
 }
 
 /** 이슈 종류별 배지 색상 (UI 헬퍼) */
-export const ISSUE_COLOR: Record<RiskIssueKind, 'red' | 'orange' | 'yellow' | 'gray'> = {
+export const ISSUE_COLOR: Record<RiskIssueKind, 'red' | 'orange' | 'amber' | 'gray'> = {
   '미납': 'red',
   '내용증명': 'red',
   '시동제어': 'red',
@@ -192,9 +192,9 @@ export const ISSUE_COLOR: Record<RiskIssueKind, 'red' | 'orange' | 'yellow' | 'g
   '면허': 'orange',
   '보험만료': 'orange',
   '사고': 'orange',
-  '과태료': 'yellow',
-  '검사지연': 'yellow',
-  '등록증만료': 'yellow',
+  '과태료': 'amber',
+  '검사지연': 'amber',
+  '등록증만료': 'amber',
 };
 
 /** 이슈 종류별 아이콘용 짧은 라벨 */

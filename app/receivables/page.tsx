@@ -23,6 +23,7 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { CompanyCell } from '@/components/ui/company-cell';
+import { displayCompanyName } from '@/lib/company-display';
 import { useRowSelection, useCtrlASelectAll } from '@/lib/use-row-selection';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
@@ -324,7 +325,7 @@ export default function ReceivablesPage() {
                 title="회사별 필터"
                 options={[
                   { value: 'all', label: '회사: 전체' },
-                  ...companyOptions.map((co) => ({ value: co, label: co })),
+                  ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) || co })),
                 ]}
               />
               <span className="filter-divider" />
@@ -972,7 +973,7 @@ function IssueBadge({ issue }: { issue: RiskIssue }) {
   const palette = {
     red:    { bg: 'var(--red-bg)',    fg: 'var(--red-text)',    bd: 'var(--red-border)' },
     orange: { bg: 'var(--orange-bg, #fff7ed)', fg: 'var(--orange-text, #c2410c)', bd: 'rgba(194,65,12,0.25)' },
-    yellow: { bg: 'var(--warn-bg, #fefce8)', fg: 'var(--warn-text, #854d0e)', bd: 'rgba(133,77,14,0.2)' },
+    amber:  { bg: 'var(--amber-bg, #fefce8)', fg: 'var(--amber-text, #854d0e)', bd: 'var(--amber-border, rgba(133,77,14,0.2))' },
     gray:   { bg: 'var(--bg-sunken)', fg: 'var(--text-main)',   bd: 'var(--border)' },
   }[color];
   return (

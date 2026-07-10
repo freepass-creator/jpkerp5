@@ -102,7 +102,7 @@ export default function AssetLedgerPage() {
               title="회사별 필터"
               options={[
                 { value: 'all', label: '회사: 전체' },
-                ...companyOptions.map((co) => ({ value: co, label: co })),
+                ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) || co })),
               ]}
             />
             <span className="filter-divider" />
