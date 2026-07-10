@@ -59,7 +59,7 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
     // CMS 개별건 — 전통적인 자동이체 채널 + 계좌 채널로 들어왔지만 계약에 매칭된 입금건도 포함
     // (은행 계좌명세에 CMS 개별건이 계좌 채널로 함께 들어오는 경우 대응)
     const isCmsItem =
-      t.source === '자동이체' ||
+      t.source === '자동이체' || t.source === 'CMS' ||   // 'CMS' = 자동이체 업로드 SSOT 태그(create-dialog); '자동이체'는 레거시
       (t.source === '계좌' && !!t.matchedContractId && (t.amount ?? 0) > 0);
     if (isCmsItem) {
       const co = t.companyCode ?? '';
