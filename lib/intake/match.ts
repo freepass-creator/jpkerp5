@@ -26,6 +26,8 @@ function normalizePhone(s: string): string {
 /* ────────────────────────── 입력 시그널 ────────────────────────── */
 
 export type MatchSignals = {
+  /** 계약번호 — 정확키, 가장 강한 신호(동명이인·오타 방어) */
+  contractNo?: string;
   /** 차량번호 (정규화 전) */
   plate?: string;
   /** 전화번호 (정규화 전) */
@@ -71,7 +73,16 @@ function scoreContract(
   let score = 0;
   const reasons: string[] = [];
 
-  // 차량번호 — 가장 강한 신호
+  // 계약번호 — 정확키, 최강 신호(동명이인·오타 방어). 공백·구분자 무시 대문자 비교.
+  if (signals.contractNo && c.contractNo) {
+    const nn = (s: string) => s.replace(/[\s\-_/\\.]/g, '').toUpperCase();
+    if (nn(signals.contractNo) === nn(c.contractNo)) {
+      score += 100;
+      reasons.push(`계약번호 정합 ${signals.contractNo}`);
+    }
+  }
+
+  // 차량번호 — 강한 신호
   if (signals.plate) {
     const target = normPlate(signals.plate);
     if (c.vehiclePlate && normPlate(c.vehiclePlate) === target) {
@@ -163,6 +174,7 @@ function scoreContract(
 }
 
 function bucketConfidence(score: number, candidateCount: number): MatchResult['confidence'] {
+  if (score >= 100) return 'high';   // 계약번호 정확키 — 단독 후보 아니어도 authoritative
   if (score >= 50 && candidateCount === 1) return 'high';
   if (score >= 50) return 'medium';   // 동점/동명이인 위험
   if (score >= 25) return 'medium';

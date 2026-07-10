@@ -23,6 +23,11 @@ export function normName(s: string): string {
   return (s ?? '').replace(/\s+/g, '').toLowerCase();
 }
 
+/** 계약번호 정규화 — 공백·구분자 제거, 대문자. 정확키 매칭용(CP01-2607-0001 ≈ cp0126070001) */
+export function normContractNo(s: string): string {
+  return (s ?? '').replace(/[\s\-_/\\.]/g, '').toUpperCase();
+}
+
 /** 차량번호 끝 4자리 추출 — '12가1234'/'서울12가1234'/'1234' 모두 '1234' 반환. */
 export function plateSuffix4(plate: string): string {
   const digits = (plate ?? '').replace(/[^0-9]/g, '');
@@ -52,14 +57,20 @@ export type MatchIndex = {
   byAmount: Map<number, ScheduleRef[]>;
   /** 차량번호 끝 4자리 → 계약 N개. '박영협8309' 같은 입금자명 매칭. */
   byPlateSuffix: Map<string, Contract[]>;
+  /** 계약번호(정규화) → 계약. 정확키 — 있으면 이름보다 우선(동명이인·오타 방어). */
+  byContractNo: Map<string, Contract>;
 };
 
 export function buildMatchIndex(contracts: Contract[]): MatchIndex {
   const byName = new Map<string, Contract[]>();
   const byAmount = new Map<number, ScheduleRef[]>();
   const byPlateSuffix = new Map<string, Contract[]>();
+  const byContractNo = new Map<string, Contract>();
   for (const c of contracts) {
     if (c.status === '해지') continue;
+    // 계약번호 정확키 색인
+    const cno = normContractNo(c.contractNo ?? '');
+    if (cno) byContractNo.set(cno, c);
     const names = new Set<string>();
     const cName = normName(c.customerName);
     if (cName) names.add(cName);
@@ -98,7 +109,7 @@ export function buildMatchIndex(contracts: Contract[]): MatchIndex {
       }
     }
   }
-  return { byName, byAmount, byPlateSuffix };
+  return { byName, byAmount, byPlateSuffix, byContractNo };
 }
 
 /**
@@ -109,7 +120,34 @@ function findCandidatesIndexed(
   txAmount: number,
   txCounterparty: string,
   index: MatchIndex,
+  txContractNo?: string,
 ): MatchCandidate[] {
+  // ── 계약번호 정확키 최우선 — 있으면 그 계약으로만(동명이인·오타·차명불일치 방어) ──
+  if (txContractNo) {
+    const c = index.byContractNo.get(normContractNo(txContractNo));
+    if (c) {
+      const exact: MatchCandidate[] = [];
+      for (const s of c.schedules ?? []) {
+        if (s.status === '완료' || s.status === '면제') continue;
+        const remaining = s.status === '부분납' ? (s.amount - s.paidAmount) : s.amount;
+        const amtMatch = s.amount === txAmount || remaining === txAmount;
+        exact.push({
+          contract: c, scheduleSeq: s.seq, scheduleAmount: s.amount, scheduleDueDate: s.dueDate,
+          confidence: amtMatch ? 'high' : 'medium', // 계약은 확정, 회차는 금액 일치 시 high
+        });
+      }
+      if (exact.length > 0) {
+        const rank = { high: 0, medium: 1, low: 2 } as const;
+        return exact.sort((a, b) =>
+          rank[a.confidence] !== rank[b.confidence]
+            ? rank[a.confidence] - rank[b.confidence]
+            : a.scheduleDueDate.localeCompare(b.scheduleDueDate));
+      }
+      return []; // 계약번호는 맞으나 미납 회차 없음(완납)
+    }
+    // 계약번호가 어느 계약과도 불일치(오타/미등록) → 아래 이름·금액 fallback 계속
+  }
+
   const out: MatchCandidate[] = [];
   const cpName = normName(txCounterparty);
   const cpSuffix = counterpartySuffix4(txCounterparty);
@@ -194,7 +232,7 @@ export function findCandidates(tx: BankTransaction, contracts: Contract[]): Matc
   if (tx.amount <= 0) return [];
   if (tx.matchedContractId) return [];
   const index = buildMatchIndex(contracts);
-  return findCandidatesIndexed(tx.amount, tx.counterparty, index);
+  return findCandidatesIndexed(tx.amount, tx.counterparty, index, tx.contractNo);
 }
 
 /** 매칭 한 건 적용 — BankTransaction patch + Contract patch 반환 */
@@ -324,7 +362,7 @@ export function autoMatchAll(
     if (t.withdraw && t.withdraw > 0) continue;
     if (t.amount <= 0) continue;
     if (t.matchedContractId) continue;
-    const candidates = findCandidatesIndexed(t.amount, t.counterparty, index);
+    const candidates = findCandidatesIndexed(t.amount, t.counterparty, index, t.contractNo);
     const high = candidates.filter((c) => c.confidence === 'high' && !used.has(`${c.contract.id}:${c.scheduleSeq}`));
     if (high.length === 0) continue;
     // 동명이인·금액 충돌 안전장치 — high 후보가 여러 계약을 가리키면 자동매칭 격하 (수동 검토 유도).
@@ -368,7 +406,7 @@ export function findCardCandidates(tx: CardTransaction, contracts: Contract[]): 
   if (tx.amount <= 0) return [];
   if (tx.matchedContractId) return [];
   const index = buildMatchIndex(contracts);
-  return findCandidatesIndexed(tx.amount, tx.customerName ?? '', index);
+  return findCandidatesIndexed(tx.amount, tx.customerName ?? '', index, tx.contractNo);
 }
 
 /** 카드 매칭 적용 — Bank와 동일 패턴 */
@@ -508,7 +546,7 @@ export function autoMatchCardAll(
   for (const t of txs) {
     if (t.amount <= 0) continue;
     if (t.matchedContractId) continue;
-    const candidates = findCandidatesIndexed(t.amount, t.customerName ?? '', index);
+    const candidates = findCandidatesIndexed(t.amount, t.customerName ?? '', index, t.contractNo);
     const high = candidates.filter((c) => c.confidence === 'high' && !used.has(`${c.contract.id}:${c.scheduleSeq}`));
     if (high.length === 0) continue;
     // 동명이인·금액 충돌 안전장치

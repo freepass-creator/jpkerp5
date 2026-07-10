@@ -910,6 +910,8 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
     source: toStr(get(row, '결제수단', '은행', '거래은행', '은행명', 'source')) || bankHint || fileName,
     // CMS 명세는 계좌 대신 회원번호로 식별 (계약 매칭 보조)
     account: toStr(get(row, '계좌번호', '계좌', '나의계좌', '본인계좌', '회원번호', 'account')) || undefined,
+    // 계약번호 정확키 — CMS 명세에 있으면 이름 매칭보다 우선(동명이인·오타 방어)
+    contractNo: toStr(get(row, '계약번호', '약정번호', 'contractNo', 'contract_no')) || undefined,
     companyCode: toStr(get(row, '회사', '회사코드', 'companyCode')) || undefined,
     subject: subjectRaw || defaultSubject,
     method,

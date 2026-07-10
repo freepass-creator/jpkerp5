@@ -332,6 +332,7 @@ export type BankTransaction = {
   matchedContractId?: string;
   matchedScheduleId?: string;
   matchedScheduleSeq?: number; // schedule 의 회차 번호 (인라인 schedules 매칭용)
+  contractNo?: string;         // 명세(CMS 등)에 적힌 계약번호 — 매칭 정확키(이름보다 우선)
   matchedAt?: string;          // 매칭 처리 시각 (ISO)
   matchedBy?: string;          // 매칭 처리자 (이메일/uid)
   /**
@@ -393,6 +394,7 @@ export type CardTransaction = {
   /** @deprecated 회차참조는 matchedScheduleSeq(number) 로 통일(#쓰기경로 v6정합). BankTx 와 동일 필드. */
   matchedScheduleId?: string;
   matchedScheduleSeq?: number; // 회차 번호 — BankTx 와 통일(인라인 schedules 매칭용)
+  contractNo?: string;         // 명세에 적힌 계약번호 — 매칭 정확키(이름보다 우선)
   /** 카드사 집금 정산 ID — 1 BankTransaction deposit ↔ N CardTransaction 묶음. role='item' 만 카드 측에 표시 */
   settlementId?: string;
   raw?: Record<string, unknown>;
