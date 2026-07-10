@@ -12,7 +12,8 @@
 
 import React, { useMemo, useState } from 'react';
 import type { Vehicle, Contract, HistoryEntry, VehicleStatus, LoanRepaymentMethod } from '@/lib/types';
-import { generateLoanSchedule, summarizeLoanSchedule, shouldReplaceLoanSchedule } from '@/lib/loan-schedule-calc';
+import { generateLoanSchedule, summarizeLoanSchedule, shouldReplaceLoanSchedule, buildLoanScheduleFromOcr, matchLoanPaymentsToWithdrawals } from '@/lib/loan-schedule-calc';
+import { getFirebaseAuth } from '@/lib/firebase/client';
 
 /** VehicleStatus 별 다음 액션 안내 — 운영 현황 탭 라이프사이클 가이드 */
 const NEXT_ACTION: Record<VehicleStatus, string> = {
@@ -527,6 +528,8 @@ function LoanScheduleTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v
   const [start, setStart] = useState(vehicle.loanStartDate ?? '');
   const [method, setMethod] = useState<LoanRepaymentMethod>(vehicle.loanMethod ?? '원리금균등');
   const [note, setNote] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const { rows: bankTx } = useBankTx();
 
   const genValid = Number(principal) > 0 && Number(ratePct) >= 0 && Number(months) > 0 && !!start;
   const fieldStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10, color: 'var(--text-weak)' };
@@ -549,6 +552,48 @@ function LoanScheduleTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v
       loanRemainingPrincipal: vehicle.loanRemainingPrincipal ?? g.principal,
     });
     setNote(`생성 완료 — ${g.months}회차, 월불입 ₩${g.monthlyPayment.toLocaleString()}, 총이자 ₩${g.totalInterest.toLocaleString()}`);
+  }
+
+  // 상환스케줄표 PDF/이미지 업로드 → OCR(loan_schedule) → 저장(업로드 우선)
+  async function handleUploadSchedule(file: File) {
+    setNote(null); setUploading(true);
+    try {
+      const user = getFirebaseAuth()?.currentUser;
+      if (!user) { setNote('로그인이 필요합니다.'); return; }
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('type', 'loan_schedule');
+      const res = await fetch('/api/ocr/extract', { method: 'POST', headers: { Authorization: `Bearer ${await user.getIdToken()}` }, body: fd });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'OCR 실패');
+      const raw = json.extracted as Record<string, unknown>;
+      const rows = buildLoanScheduleFromOcr(raw);
+      if (!rows.length) { setNote('상환표 회차를 못 읽었습니다 — 파일을 확인하세요.'); return; }
+      const n = (k: string) => { const v = raw[k]; const x = typeof v === 'number' ? v : Number(String(v ?? '').replace(/[,\s]/g, '')); return Number.isFinite(x) && x > 0 ? x : undefined; };
+      onUpdate({
+        ...vehicle,
+        loanSchedule: rows, loanScheduleSource: 'uploaded', // 업로드본 우선
+        loanCompany: (raw.loan_company as string) || vehicle.loanCompany,
+        loanContractNo: (raw.contract_no as string) || vehicle.loanContractNo,
+        loanMonths: n('months') ?? rows.length,
+        loanPrincipal: n('principal') ?? n('acquisition_cost') ?? vehicle.loanPrincipal,
+        loanTotalRepayment: n('total_repayment') ?? vehicle.loanTotalRepayment,
+        loanMonthlyPayment: n('monthly_payment') ?? rows[0]?.payment ?? vehicle.loanMonthlyPayment,
+      });
+      setNote(`업로드 완료 — ${rows.length}회차 (업로드 상환표 우선 적용)`);
+    } catch (e) {
+      setNote('업로드 실패: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // 각 회차 월불입금 ↔ 은행 출금 매칭(자금 연결) — matchedTxId/paidDate 저장
+  function handleMatchPayments() {
+    if (!hasSchedule) return;
+    const m = matchLoanPaymentsToWithdrawals(schedule, bankTx);
+    onUpdate({ ...vehicle, loanSchedule: m.rows });
+    setNote(`출금 매칭 — ${m.matchedCount}/${schedule.length}회차 납입확인(은행 출금과 대사)`);
   }
 
   const sum = hasSchedule ? summarizeLoanSchedule(schedule) : null;
@@ -594,6 +639,21 @@ function LoanScheduleTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v
         </div>
         {note && <div style={{ fontSize: 11, color: 'var(--text-weak)', paddingTop: 6 }}>{note}</div>}
       </Section>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label className="btn btn-sm" style={{ cursor: uploading ? 'wait' : 'pointer' }}>
+          {uploading ? '읽는 중…' : '상환스케줄표 업로드(OCR)'}
+          <input
+            type="file"
+            accept="application/pdf,image/*"
+            hidden
+            disabled={uploading}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUploadSchedule(f); e.currentTarget.value = ''; }}
+          />
+        </label>
+        {hasSchedule && <button type="button" className="btn btn-sm" onClick={handleMatchPayments}>출금 매칭</button>}
+        <span className="dim" style={{ fontSize: 11 }}>업로드 상환표는 생성값보다 우선 · 출금 매칭 = 각 회차↔은행 출금 대사</span>
+      </div>
 
       <Section title="회차별 상환표" bodyPadding={0}>
         <table className="table">
