@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple, ArrowsClockwise, UsersThree, Images, Tray } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple, ArrowsClockwise, UsersThree, Tray } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -72,13 +72,6 @@ const TOOLS: ToolCard[] = [
     title: '입력함 (intake audit)',
     desc: '모든 데이터 입력(모바일 업로드·엑셀·OCR)의 감사 로그·상태 추적. 일상 업무용 아님 → 개발도구로 이동.',
     icon: <Tray size={18} weight="duotone" />,
-    variant: 'op',
-  },
-  {
-    href: '/admin/uploads',
-    title: '업로드 관리',
-    desc: '모바일 선업로드된 사진·서류를 열람 + 자동매칭 안 된 파일을 차량에 수동 분배(매칭). 반영분 관리·삭제. 선업로드 후매칭의 후매칭 화면.',
-    icon: <Images size={18} weight="duotone" />,
     variant: 'op',
   },
   {
