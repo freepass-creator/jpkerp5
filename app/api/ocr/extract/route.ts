@@ -390,7 +390,14 @@ const TYPE_SPECS: Record<string, TypeSpec> = {
     prompt: `이 문서는 한국 할부/리스(시설대여) 금융사의 상환스케줄표(원리금 상환표)입니다. 오릭스캐피탈·도이치파이낸셜·메리츠캐피탈 등 금융사마다 양식이 다릅니다.
 - 상단/헤더: 금융사명(loan_company), 계약(약정)번호(contract_no), 차량번호(car_number), 취득원가/차량가(acquisition_cost), 대출원금(principal), 총상환액(total_repayment), 기간 개월수(months), 연이율(interest_rate), 월불입금(monthly_payment).
 - 표: 회차별로 [회차(seq), 납입(예정)일(due_date), 원금(principal), 이자(interest), 월불입금(payment), 미회수(잔여)원금(remaining_principal), (있으면)중도상환금액(prepayment)]. **모든 회차 행을 빠짐없이** rows 로 추출.
-- 금액은 원 단위 숫자만(콤마 제거). 규칙: 월불입금 = 원금 + 이자. 미회수원금은 회차가 지날수록 감소.
+- **금융사마다 컬럼명이 다르니 아래로 매핑**(중요):
+  · payment ← "월불입금"(오릭스) / "원리금" 또는 "실납입액"(도이치) / "월납입금"(메리츠) / "월상환금"
+  · remaining_principal ← "미회수원금" / "잔원금" / "잔여원금"
+  · due_date ← "납입일자" / "청구일자" / "납입일"
+  · principal(헤더 대출원금) ← "취득원가" / "여신금액" / "대출원금"
+  · loan_company ← 상단 로고/명판(오릭스캐피탈코리아 / 도이치파이낸셜(DEUTSCH FINANCIAL) / 메리츠캐피탈 등)
+  · 도이치의 기타금액·상계금액·선납금 컬럼은 보통 0 — 무시하고 원리금을 payment 로.
+- 금액은 원 단위 숫자만(콤마 제거). 규칙: payment = 원금 + 이자. 미회수원금은 회차가 지날수록 감소. 실행일(회차 0, 원금0) 행은 있으면 포함하되 payment 0.
 - 표가 여러 페이지로 이어지면 전부 포함. 인식 못 한 값은 null.`,
     schema: LOAN_SCHEDULE_SCHEMA,
   },
