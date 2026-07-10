@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple, ArrowsClockwise } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple, ArrowsClockwise, UsersThree } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -72,6 +72,13 @@ const TOOLS: ToolCard[] = [
     title: '계약↔차량 안정 링크 (vehicleId 백필)',
     desc: 'plate 문자열 링크를 Vehicle.id 안정 FK로 확정 — OCR 오보정·번호변경에도 링크 불변, v6 이식성. plate 는 폴백 유지. 재실행 가능(멱등).',
     icon: <LinkSimple size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/admin/derive-customers',
+    title: '고객 마스터 파생·연결 (customers)',
+    desc: '계약마다 복제된 고객정보를 등록번호 기준 dedup → 동일인 여러 계약 연결 + Contract.customerId 스탬프. 원천 유지. 재실행 멱등. v6 customer 이관 정합.',
+    icon: <UsersThree size={18} weight="duotone" />,
     variant: 'op',
   },
   {

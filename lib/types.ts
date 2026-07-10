@@ -42,7 +42,9 @@ export type Contract = {
   contractNo: string;          // ICR-YYMM-XXXX
   company: CompanyCode;
   manager?: string;            // 담당자
-  // 고객 (임베드)
+  // 고객 (임베드) — 원천은 계약에 그대로 유지. customerId 는 고객 마스터 안정 참조(#R5, 동일인 여러 계약 연결)
+  /** 고객 마스터 FK (customers/{id}) — 등록번호 기준 dedup. 임베드 고객필드는 폴백·표시로 유지 */
+  customerId?: string;
   customerName: string;
   /**
    * 입금자명 별칭 — 가족·법인 계좌 등 customerName 과 다른 이름으로 입금되는 케이스.
@@ -524,6 +526,28 @@ export type CompanyDocument = {
   fileName?: string;
   uploadedAt: string;
   notes?: string;
+};
+
+/**
+ * 고객 마스터 (#R5) — 동일인이 여러 계약을 가질 때 연결. 등록번호(주민/사업자) 기준 dedup.
+ * 원천(고객정보)은 계약에 임베드로 유지, 이 마스터는 계약에서 파생·통합. v6 customer(keyField=licenseNo) 이관 정합.
+ */
+export type Customer = {
+  id: string;                  // dedup 키 기반 결정적 id (재실행 멱등)
+  identNo?: string;            // 등록번호(주민/사업자) raw — v5 주요 식별키
+  kind?: '개인' | '사업자' | '법인';
+  name: string;
+  phone1?: string;
+  phone2?: string;
+  address?: string;
+  licenseNo?: string;          // 운전면허번호 — v6 customer keyField 정합
+  payerAliases?: string[];     // 입금자명 별칭(고객 단위 승격)
+  contractIds?: string[];      // 이 고객의 계약들(역참조)
+  companyCode?: CompanyCode;   // 소속 회사(첫 계약 기준)
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 };
 
 export type Company = {

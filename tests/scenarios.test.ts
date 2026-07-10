@@ -13,6 +13,7 @@ import { applyMultiContractMatch, updateBankTxWithMatchSync } from '@/lib/fireba
 import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
 import { splitVat, computeVatReport, vatPeriodRange } from '@/lib/vat-report';
 import { findVehicleForContract } from '@/lib/entity-sync';
+import { deriveCustomers } from '@/lib/customer-derive';
 import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry, Vehicle } from '@/lib/types';
 
 const TODAY = '2026-07-09';
@@ -166,6 +167,28 @@ describe('computeContractAsOf — 시점(as-of) 재구성', () => {
     const before = computeContractAsOf(returned, '2025-05-01'); // 반납 전 → 면제 해제, 회차 살아있음
     expect(before.returnedDate).toBeUndefined();
     expect(before.schedules?.some((s) => s.status === '면제')).toBe(false);
+  });
+});
+
+describe('고객 마스터 파생 (R5)', () => {
+  it('동일 등록번호 여러 계약 → 1 고객 dedup + 계약 역참조 + 별칭 통합', () => {
+    const c1 = contract({ id: 'c1', customerName: '홍길동', customerIdentNo: '900101-1234567' });
+    const c2 = contract({ id: 'c2', customerName: '홍길동', customerIdentNo: '9001011234567', payerAliases: ['홍부인'] });
+    const { customers, contractToCustomer } = deriveCustomers([c1, c2]);
+    expect(customers).toHaveLength(1);
+    expect(customers[0].contractIds).toEqual(['c1', 'c2']);
+    expect(contractToCustomer['c1']).toBe(contractToCustomer['c2']);
+    expect(customers[0].payerAliases).toContain('홍부인');
+  });
+  it('등록번호 없으면 이름+전화로 dedup (하이픈 무관)', () => {
+    const a = contract({ id: 'a', customerName: '김철수', customerIdentNo: undefined, customerPhone1: '010-1111-2222' });
+    const b = contract({ id: 'b', customerName: '김철수', customerIdentNo: undefined, customerPhone1: '01011112222' });
+    expect(deriveCustomers([a, b]).customers).toHaveLength(1);
+  });
+  it('다른 사람은 분리', () => {
+    const a = contract({ id: 'a', customerName: '홍길동', customerIdentNo: '900101-1111111' });
+    const b = contract({ id: 'b', customerName: '김철수', customerIdentNo: '910202-2222222' });
+    expect(deriveCustomers([a, b]).customers).toHaveLength(2);
   });
 });
 
