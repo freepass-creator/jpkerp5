@@ -7,6 +7,7 @@ import {
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton, ExcelButton, ActionSep, PageStats } from '@/components/ui/page-actions';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { audit } from '@/lib/firebase/audit-store';
@@ -292,18 +293,15 @@ export default function CompaniesPage() {
 
         <BottomBar
           left={
-            isEditing ? null : (
-              <button className="btn btn-primary" type="button" onClick={startCreate}>
-                <Plus weight="bold" /> 신규 법인
-              </button>
-            )
-          }
-          right={
             <>
-              <button
-                className="btn"
-                type="button"
-                disabled={sortedCompanies.length === 0}
+              {!isEditing && (
+                <>
+                  <NewButton label="법인 등록" onClick={startCreate} />
+                  <ActionSep />
+                </>
+              )}
+              <ExcelButton
+                count={sortedCompanies.length}
                 title={`현재 페이지 목록 (${sortedCompanies.length}건) 엑셀 다운로드`}
                 onClick={() => exportToExcel({
                   title: '법인 마스터',
@@ -336,10 +334,11 @@ export default function CompaniesPage() {
                     { key: '종목', header: '종목', width: 14 },
                   ],
                 })}
-              >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{sortedCompanies.length}</span>
-              </button>
+              />
             </>
+          }
+          right={
+            <PageStats total={sortedCompanies.length} totalLabel="법인" />
           }
         />
 

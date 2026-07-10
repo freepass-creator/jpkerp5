@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bank, Plus, Trash, FileXls, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton, ExcelButton, DeleteButton, ActionButton, ActionSep } from '@/components/ui/page-actions';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -562,65 +563,24 @@ export default function FinancePage() {
           left={
             viewMode === 'gl' ? (
               <>
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={handleGlExcelExport}
-                  title="총계정원장 전체 분개 엑셀 다운로드 (회사·기간 필터 반영)"
-                >
-                  <FileXls size={14} weight="bold" /> 엑셀
-                </button>
-                <span className="btn-sep" />
+                <ExcelButton label="엑셀" onClick={handleGlExcelExport} title="총계정원장 전체 분개 엑셀 다운로드 (회사·기간 필터 반영)" />
+                <ActionSep />
                 <span className="dim" style={{ fontSize: 11 }}>
                   총계정원장은 자동 분개 (계좌·자동이체·카드매출·법인카드에서 생성) — 수기 등록 불가
                 </span>
               </>
             ) : (
               <>
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={() => setCreateOpen(true)}
-                  title="계좌/자동이체/카드매출/법인카드 1건 등록 (다이얼로그에서 종류 선택)"
-                >
-                  <Plus size={14} weight="bold" /> 신규 등록
-                </button>
-                <span className="btn-sep" />
-                <button className="btn" type="button" disabled title="자금일보 view 에서 엑셀 다운로드 가능 — 우측 [자금일보] 탭 클릭">
-                  <FileXls size={14} weight="bold" /> 엑셀
-                </button>
+                <NewButton label="거래 등록" onClick={() => setCreateOpen(true)} title="계좌/자동이체/카드매출/법인카드 1건 등록 (다이얼로그에서 종류 선택)" />
                 {viewMode === 'daily' && (
                   <>
-                    <span className="btn-sep" />
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={handleTaxInvoiceExport}
-                      title="세금계산서 발행 엑셀 — 전자세금계산서 시스템 일괄 업로드용"
-                    >
-                      세금계산서 엑셀
-                    </button>
-                    <button
-                      className="btn"
-                      type="button"
-                      onClick={() => void handleCmsAutoMatch()}
-                      title="미매칭 CMS 집금건 ↔ 자동이체 자동 묶음 매칭 (일자 ±3일 + 수수료 0.05~0.3%)"
-                    >
-                      CMS 자동 매칭
-                    </button>
+                    <ActionSep />
+                    <ActionButton icon={<FileXls size={14} />} label="세금계산서 엑셀" onClick={handleTaxInvoiceExport} title="세금계산서 발행 엑셀 — 전자세금계산서 시스템 일괄 업로드용" />
+                    <ActionButton label="CMS 자동 매칭" onClick={() => void handleCmsAutoMatch()} title="미매칭 CMS 집금건 ↔ 자동이체 자동 묶음 매칭 (일자 ±3일 + 수수료 0.05~0.3%)" />
                   </>
                 )}
-                <span className="btn-sep" />
-                <button
-                  className="btn"
-                  type="button"
-                  disabled={selectedIds.size === 0}
-                  onClick={() => void handleBulkDelete()}
-                  style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
-                  title={selectedIds.size === 0 ? '체크박스로 거래내역 선택' : `선택 ${selectedIds.size}건 삭제`}
-                >
-                  <Trash size={14} weight="bold" /> 선택 삭제{selectedIds.size > 0 && ` (${selectedIds.size})`}
-                </button>
+                <ActionSep />
+                <DeleteButton count={selectedIds.size} onClick={() => void handleBulkDelete()} title={selectedIds.size === 0 ? '체크박스로 거래내역 선택' : `선택 ${selectedIds.size}건 삭제`} />
               </>
             )
           }

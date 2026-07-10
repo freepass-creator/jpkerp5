@@ -9,6 +9,8 @@ import { AppTopbar } from '@/components/layout/app-topbar';
 import { FilterSelect } from '@/components/ui/filter-select';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton, ExcelButton, SmsButton, ActionButton, ActionSep, ClearButton } from '@/components/ui/page-actions';
+import { RiskRegisterDialog } from '@/components/risk-register-dialog';
 import { SmsDialog } from '@/components/sms-dialog';
 import { EngineLockDialog } from '@/components/engine-lock-dialog';
 import dynamic from 'next/dynamic';
@@ -132,6 +134,7 @@ export default function ReceivablesPage() {
   const [contactOpen, setContactOpen] = useState<Contract | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; row: Contract | null }>({ open: false, x: 0, y: 0, row: null });
   const [createOpen, setCreateOpen] = useState(false);
+  const [riskRegOpen, setRiskRegOpen] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [engineLockTarget, setEngineLockTarget] = useState<Contract | null>(null);
   const [detailContract, setDetailContract] = useState<Contract | null>(null);
@@ -255,6 +258,17 @@ export default function ReceivablesPage() {
       }
       await updateContract(updated);
       toast.success(isDebt ? `${c.vehiclePlate} 채권 해제` : `${c.vehiclePlate} 채권화`);
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
+
+  /** 리스크 수기 등록 — 계약을 채권(리스크)으로 직접 마킹 (자동 미수/연체 외). */
+  async function registerRisk(c: Contract) {
+    try {
+      await updateContract(markAsDebt(c));
+      toast.success(`${c.vehiclePlate} 리스크(채권) 등록`);
+      setRiskRegOpen(false);
     } catch (e) {
       toast.error(friendlyError(e));
     }
@@ -695,43 +709,31 @@ export default function ReceivablesPage() {
         <BottomBar
           left={
             <>
-              <button className="btn btn-primary" type="button" onClick={() => setCreateOpen(true)}>
-                <Plus size={14} weight="bold" /> 신규 등록
-              </button>
-              <button
-                className="btn"
-                type="button"
-                onClick={() => setSmsOpen(true)}
-                disabled={filtered.length === 0}
-                title={selectedIds.size === 0 ? `필터 표시된 ${filtered.length}건 전체 발송 (확인창에서 취소 가능)` : `선택 ${selectedIds.size}건 발송`}
-              >
-                <PaperPlaneTilt size={14} /> 문자 발송 ({selectedIds.size > 0 ? selectedIds.size : `전체 ${filtered.length}`})
-              </button>
-              <button
-                className="btn"
-                type="button"
+              <NewButton label="리스크 등록" onClick={() => setRiskRegOpen(true)} title="리스크 수기 등록 — 계약을 골라 채권(리스크)으로 직접 등록 (자동 미수/연체 외 분쟁·회수불가 등)" />
+              <ActionSep />
+              <SmsButton count={selectedIds.size} onClick={() => setSmsOpen(true)} disabled={filtered.length === 0} />
+              <ActionButton
+                icon={<FileText size={14} />}
+                label={`내용증명 일괄 출력${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
+                disabled={selectedIds.size === 0}
+                title={selectedIds.size === 0 ? '체크박스로 선택 후 일괄 출력 (한 PDF에 N장)' : '선택 계약 N건 내용증명 일괄 출력'}
                 onClick={() => {
                   if (selectedIds.size === 0) return;
                   const ids = Array.from(selectedIds).join(',');
                   window.open(`/notice/cert/bulk?ids=${ids}`, '_blank');
                 }}
-                disabled={selectedIds.size === 0}
-                title={selectedIds.size === 0 ? '체크박스로 선택 후 일괄 출력 (한 PDF에 N장)' : '선택 계약 N건 내용증명 일괄 출력'}
-              >
-                <FileText size={14} /> 내용증명 일괄 출력{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
-              </button>
-              <button className="btn" type="button" onClick={() => setContactOpen(filtered[0] ?? null)} disabled={filtered.length === 0} title="첫 행 연락기록 — 행 선택 후 우측 연락 버튼 권장">
-                <ChatCircleDots size={14} /> 연락기록
-              </button>
-              <button
-                className="btn"
-                type="button"
-                onClick={() => downloadOverdueExcel(filtered, companyMaster)}
-                title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
+              />
+              <ActionButton
+                icon={<ChatCircleDots size={14} />}
+                label="연락기록"
+                onClick={() => setContactOpen(filtered[0] ?? null)}
                 disabled={filtered.length === 0}
-              >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
-              </button>
+                title="첫 행 연락기록 — 행 선택 후 우측 연락 버튼 권장"
+              />
+              <ExcelButton count={filtered.length} onClick={() => downloadOverdueExcel(filtered, companyMaster)} />
+              <ActionSep />
+              <ActionButton label="이력 업로드" onClick={() => setCreateOpen(true)} title="수납 이력 엑셀 업로드 (미수 자동 산출용)" />
+              {selectedIds.size > 0 && <ClearButton count={selectedIds.size} onClick={() => setSelectedIds(new Set())} />}
             </>
           }
           right={
@@ -739,18 +741,15 @@ export default function ReceivablesPage() {
               <span>표시 <strong>{filtered.length}</strong>건</span>
               {selectedIds.size > 0 && (
                 <>
-                  <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                  <ActionSep />
                   <span>선택 <strong>{selectedIds.size}</strong>건</span>
-                  <button className="btn btn-sm btn-ghost" type="button" onClick={() => setSelectedIds(new Set())} title="선택 모두 해제">
-                    <X size={11} /> 해제
-                  </button>
                 </>
               )}
-              <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+              <ActionSep />
               <span>미수 <strong className="mono" style={{ color: 'var(--red-text)' }}>₩{filtered.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0).toLocaleString()}</strong></span>
               {counts['시동제어'] > 0 && (
                 <>
-                  <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                  <ActionSep />
                   <span><Power size={11} weight="fill" style={{ color: 'var(--red-text)', verticalAlign: 'middle' }} /> {counts['시동제어']}</span>
                 </>
               )}
@@ -760,6 +759,7 @@ export default function ReceivablesPage() {
       </div>
 
       <CreateDialog open={createOpen} onOpenChange={setCreateOpen} visibleModes={['이력']} initialMode="이력" />
+      <RiskRegisterDialog open={riskRegOpen} onOpenChange={setRiskRegOpen} contracts={contracts} onRegister={registerRisk} />
       <RiskDetailDialog
         contract={detailContract}
         open={!!detailContract}
