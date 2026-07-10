@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { Megaphone, Plus, Trash, PaperPlaneTilt, ChatCircleDots } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton } from '@/components/ui/page-actions';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
 import {
@@ -287,15 +288,7 @@ export default function NoticePage() {
         </div>
 
         <BottomBar
-          left={
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={() => { setComposeOpen(true); setSelectedId(null); }}
-            >
-              <Plus size={14} weight="bold" /> 새 공지
-            </button>
-          }
+          left={<NewButton label="공지 등록" onClick={() => { setComposeOpen(true); setSelectedId(null); }} />}
           right={null}
         />
       </div>

@@ -18,6 +18,7 @@ import { showConfirm } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
 import { EmptyRow } from "@/components/ui/empty-row";
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton, DeleteButton, ClearButton, ActionSep } from '@/components/ui/page-actions';
 import { FleetApplyView, type PendingVehicle } from '@/components/general/fleet-apply';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { BusinessRegRegisterDialog } from '@/components/companies/business-reg-register-dialog';
@@ -141,22 +142,12 @@ export default function GeneralPage() {
           left={
             view === 'company' ? (
               <>
-                <button className="btn btn-primary" type="button" onClick={() => setCompanyRegisterOpen(true)}>
-                  <Plus size={14} weight="bold" /> 법인 등록
-                </button>
+                <NewButton label="법인 등록" onClick={() => setCompanyRegisterOpen(true)} />
                 {companySelectedIds.size > 0 && (
                   <>
-                    <span className="btn-sep" />
-                    <span style={{ fontSize: 12 }}>선택 <strong>{companySelectedIds.size}</strong>건</span>
-                    <button className="btn btn-sm" type="button" onClick={() => setCompanySelectedIds(new Set())}>선택 해제</button>
-                    <button
-                      className="btn btn-sm"
-                      type="button"
-                      onClick={() => void deleteSelectedCompanies()}
-                      style={{ color: 'var(--red-text)' }}
-                    >
-                      <Trash size={11} weight="bold" /> 선택 삭제 ({companySelectedIds.size})
-                    </button>
+                    <ActionSep />
+                    <DeleteButton count={companySelectedIds.size} onClick={() => void deleteSelectedCompanies()} />
+                    <ClearButton count={companySelectedIds.size} onClick={() => setCompanySelectedIds(new Set())} />
                   </>
                 )}
               </>
