@@ -15,8 +15,9 @@ import { useRole } from '@/lib/use-role';
 import { useAuth } from '@/lib/use-auth';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { findVehicleByPlate } from '@/lib/entity-sync';
-import { usePendingUploads, matchUpload, removePendingUpload, SUB_CATEGORY_LABEL, type PendingUpload } from '@/lib/firebase/pending-uploads-store';
+import { usePendingUploads, matchUpload, removePendingUpload, SUB_CATEGORY_LABEL, SUB_CATEGORIES_BY_KIND, type PendingUpload } from '@/lib/firebase/pending-uploads-store';
 import { addVehiclePhoto, type VehiclePhotoKind } from '@/lib/firebase/vehicle-attachments-store';
+import type { Vehicle } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { FileLightbox } from '@/components/ui/attached-file-preview';
@@ -29,9 +30,10 @@ export default function UploadsPage() {
   const router = useRouter();
   const { isMaster, loading: roleLoading } = useRole();
   const { user } = useAuth();
-  const { vehicles } = useVehicles();
+  const { vehicles, update: updateVehicle } = useVehicles();
   const uploads = usePendingUploads({ onlyPending: false });
   const [plateBy, setPlateBy] = useState<Record<string, string>>({});
+  const [subBy, setSubBy] = useState<Record<string, string>>({}); // 편집한 분류
   const [lightbox, setLightbox] = useState<{ url: string; name?: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -39,26 +41,40 @@ export default function UploadsPage() {
   const matched = useMemo(() => uploads.filter((u) => u.status === 'matched'), [uploads]);
   const plateOf = (id?: string) => vehicles.find((v) => v.id === id)?.plate ?? id ?? '-';
 
-  async function matchToVehicle(u: PendingUpload) {
-    const plate = (plateBy[u.id] ?? '').trim();
+  // 서류 분류 → 차량 첨부 URL 필드
+  const DOC_FIELD: Record<string, string> = {
+    registration: 'registrationCertUrl', insurance: 'insuranceCertUrl',
+    loan: 'loanContractUrl', estimate: 'manufacturerQuoteUrl',
+  };
+
+  /** 반영하기 — 분류에 따라 차량에 데이터화(사진→차량사진 / 서류→첨부URL) + 매칭 기록. */
+  async function applyToVehicle(u: PendingUpload) {
+    const plate = (plateBy[u.id] ?? u.detectedPlate ?? '').trim();
     if (!plate) { toast.error('차량번호를 입력하세요'); return; }
     const v = findVehicleByPlate(vehicles, plate);
     if (!v) { toast.error(`'${plate}' 차량이 없습니다 — 자산에 먼저 등록`); return; }
+    const sub = subBy[u.id] ?? u.subCategory ?? 'general';
     setBusy(u.id);
     try {
       const by = user?.email ?? undefined;
-      // 상품화/출고/반납 사진이면 차량 사진으로 첨부(상세에 노출). 그 외(서류)는 매칭 기록만(파일은 이 화면에서 열람).
-      if (u.kind === 'image' && PHOTO_KINDS.includes(u.subCategory ?? '')) {
+      const now = new Date().toISOString();
+      let dest = '매칭 기록';
+      if (PHOTO_KINDS.includes(sub)) {
         await addVehiclePhoto(v.id, {
-          id: `vp-${u.uploadedAt}-${u.id.slice(-4)}`,
-          kind: u.subCategory as VehiclePhotoKind,
-          url: u.dataUrl, fileName: u.fileName, uploadedAt: new Date().toISOString(), uploadedBy: by,
+          id: `vp-${u.uploadedAt}-${u.id.slice(-4)}`, kind: sub as VehiclePhotoKind,
+          url: u.dataUrl, fileName: u.fileName, uploadedAt: now, uploadedBy: by,
         });
+        dest = `${SUB_CATEGORY_LABEL[sub] ?? sub} 사진`;
+      } else if (DOC_FIELD[sub]) {
+        const f = DOC_FIELD[sub];
+        const patch: Record<string, string> = { [f]: u.dataUrl, [f.replace('Url', 'FileName')]: u.fileName, [f.replace('Url', 'UploadedAt')]: now };
+        await updateVehicle({ ...v, ...patch } as Vehicle);
+        dest = SUB_CATEGORY_LABEL[sub] ?? sub;
       }
-      await matchUpload(u.id, { matchedVehicleId: v.id, matchedBy: by, subCategory: u.subCategory });
-      toast.success(`${v.plate} 에 매칭${u.kind === 'image' && PHOTO_KINDS.includes(u.subCategory ?? '') ? ' + 차량 사진 첨부' : ''}`);
+      await matchUpload(u.id, { matchedVehicleId: v.id, matchedBy: by, subCategory: sub });
+      toast.success(`${v.plate} 에 반영 — ${dest}`);
     } catch (e) {
-      toast.error(`매칭 실패: ${(e as Error).message ?? String(e)}`);
+      toast.error(`반영 실패: ${(e as Error).message ?? String(e)}`);
     } finally { setBusy(null); }
   }
 
@@ -94,7 +110,7 @@ export default function UploadsPage() {
           <th style={{ width: 60 }}>파일</th>
           <th>파일명 / 분류</th>
           <th style={{ width: 130 }}>업로드</th>
-          {kind === 'pending' ? <th style={{ width: 260 }}>차량 매칭(분배)</th> : <th style={{ width: 200 }}>매칭 대상</th>}
+          {kind === 'pending' ? <th style={{ width: 320 }}>분류 · 차량번호 · 반영</th> : <th style={{ width: 200 }}>반영 대상</th>}
           <th style={{ width: 60 }}></th>
         </tr>
       </thead>
@@ -114,9 +130,12 @@ export default function UploadsPage() {
             <td className="mono dim">{(u.uploadedAt ?? '').slice(0, 10)}<br /><span style={{ fontSize: 10 }}>{u.uploadedBy ?? ''}</span></td>
             {kind === 'pending' ? (
               <td>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <input className="input" placeholder={u.detectedPlate || '차량번호'} value={plateBy[u.id] ?? u.detectedPlate ?? ''} onChange={(e) => setPlateBy((p) => ({ ...p, [u.id]: e.target.value }))} style={{ width: 130, fontSize: 12 }} />
-                  <button className="btn btn-sm btn-primary" type="button" disabled={busy === u.id} onClick={() => matchToVehicle(u)}>{busy === u.id ? '…' : '매칭'}</button>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <select className="input" value={subBy[u.id] ?? u.subCategory ?? ''} onChange={(e) => setSubBy((p) => ({ ...p, [u.id]: e.target.value }))} style={{ width: 92, fontSize: 11 }} title="분류 — 사진: 상품/출고/반납, 서류: 등록증/보험/할부 등">
+                    {(SUB_CATEGORIES_BY_KIND[u.kind] ?? ['general']).map((s) => <option key={s} value={s}>{SUB_CATEGORY_LABEL[s] ?? s}</option>)}
+                  </select>
+                  <input className="input" placeholder={u.detectedPlate || '차량번호'} value={plateBy[u.id] ?? u.detectedPlate ?? ''} onChange={(e) => setPlateBy((p) => ({ ...p, [u.id]: e.target.value }))} style={{ width: 108, fontSize: 12 }} />
+                  <button className="btn btn-sm btn-primary" type="button" disabled={busy === u.id} onClick={() => applyToVehicle(u)} title="분류·차량으로 데이터화 반영">{busy === u.id ? '…' : '반영하기'}</button>
                 </div>
               </td>
             ) : (

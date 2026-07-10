@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Megaphone, Tray, Gauge,
+  Car, Warning, Gear, CaretLeft, CaretRight, ChartBar, CurrencyKrw, Wrench, Receipt, FileText, Folder, Megaphone, Images, Gauge,
 } from '@phosphor-icons/react';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -197,10 +197,10 @@ export function Sidebar(_props: SidebarProps = {} as SidebarProps) {
 
       {/* 관리 영역 — 도구·설정 (과태료 업무는 위 디테일 묶음으로 이동) */}
       <div className="sb-foot">
-        {master && show('inbox') && (
-          <Link href="/inbox" className={`sb-item ${isActive('/inbox') ? 'active' : ''}`} title="입력함 — 모든 데이터 입력 audit (intake)">
-            <Tray size={14} weight={isActive('/inbox') ? 'fill' : 'regular'} />
-            <span>입력함</span>
+        {master && (
+          <Link href="/admin/uploads" className={`sb-item ${isActive('/admin/uploads') ? 'active' : ''}`} title="업로드 관리 — 모바일 선업로드 파일 분류·차량 반영">
+            <Images size={14} weight={isActive('/admin/uploads') ? 'fill' : 'regular'} />
+            <span>업로드 관리</span>
           </Link>
         )}
         {master && show('devtools') && (

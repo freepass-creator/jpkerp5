@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple, ArrowsClockwise, UsersThree, Images } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple, ArrowsClockwise, UsersThree, Images, Tray } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -65,6 +65,13 @@ const TOOLS: ToolCard[] = [
     title: '일괄 대사 매칭 (초기 세팅)',
     desc: '3년치 은행입금을 활성 계약자 계약에 계약일순·오래된 미납부터 FIFO 로 채워 미리보기 → 확인 후 일괄 적용. 미귀속(붕 떠있는) 입금 검토 포함.',
     icon: <ShieldWarning size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/inbox',
+    title: '입력함 (intake audit)',
+    desc: '모든 데이터 입력(모바일 업로드·엑셀·OCR)의 감사 로그·상태 추적. 일상 업무용 아님 → 개발도구로 이동.',
+    icon: <Tray size={18} weight="duotone" />,
     variant: 'op',
   },
   {
