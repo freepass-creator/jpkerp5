@@ -2839,6 +2839,11 @@ kbd {
   opacity: 0.55;
   cursor: not-allowed;
 }
+/* 폭 고정 — min-width(내용 가변)로 인한 로드/선택 시 좌우 출렁임 제거. 긴 라벨은 ellipsis 처리(라벨에 이미 적용).
+   모든 페이지 필터 드롭다운이 동일 폭으로 정렬됨. */
+.filter-select-btn[data-w="sm"] { width: 104px; }
+.filter-select-btn[data-w="md"] { width: 128px; }
+.filter-select-btn[data-w="lg"] { width: 152px; }
 .filter-select-label {
   flex: 1;
   overflow: hidden;
