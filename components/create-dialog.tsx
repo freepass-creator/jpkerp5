@@ -1854,7 +1854,101 @@ function VehicleExcelPane({
 
 /* ─────────────── 현황 스냅샷 Pane — 차량번호 upsert ─────────────── */
 
-function SnapshotPane({
+type SnapshotPaneProps = {
+  onCommit: (rows: Record<string, unknown>[]) => Promise<void>;
+  onCommitHorizontal?: (sheet: ParsedSheet) => Promise<void>;
+  onCommitReceivables?: (sheet: ParsedSheet) => Promise<void>;
+  busy: boolean;
+  result: string | null;
+};
+
+/** 운영현황 등록 = [수기 입력 | 엑셀 업로드]. 수기 1건도 엑셀과 같은 파이프라인(onCommit→parseSnapshotRow). */
+function SnapshotPane(props: SnapshotPaneProps) {
+  const [mode, setMode] = useState<'manual' | 'excel'>('manual');
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="filter-bar" style={{ gap: 6 }}>
+        <button type="button" className={`chip ${mode === 'manual' ? 'active' : ''}`} onClick={() => setMode('manual')}>수기 입력</button>
+        <button type="button" className={`chip ${mode === 'excel' ? 'active' : ''}`} onClick={() => setMode('excel')}>엑셀 업로드</button>
+      </div>
+      {mode === 'manual'
+        ? <SnapshotManualForm onCommit={props.onCommit} busy={props.busy} result={props.result} />
+        : <SnapshotExcelPane {...props} />}
+    </div>
+  );
+}
+
+/** 운영현황 1건 수기 입력 — SNAPSHOT_COLUMNS 스키마에서 폼 생성. 저장 시 onCommit([row]) 로 엑셀과 동일 처리. */
+function SnapshotManualForm({ onCommit, busy, result }: {
+  onCommit: (rows: Record<string, unknown>[]) => Promise<void>;
+  busy: boolean;
+  result: string | null;
+}) {
+  const { companies } = useCompanies();
+  const companyOptions = useMemo(
+    () => Array.from(new Set(companies.map((c) => c.name).filter((n): n is string => !!n))),
+    [companies],
+  );
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [company, setCompany] = useState('');
+  const set = (label: string, v: string) => setVals((p) => ({ ...p, [label]: v }));
+
+  const NUM_FIELDS = new Set(['monthlyRent', 'deposit', 'unpaidAmount', 'paymentDay', 'insuranceAge']);
+  const DATE_FIELDS = new Set(['contractDate', 'returnScheduledDate']);
+
+  const missing = SNAPSHOT_COLUMNS.filter((c) => c.required)
+    .filter((c) => c.field === 'company' ? !company.trim() : !(vals[c.label] ?? '').trim());
+
+  async function submit() {
+    if (missing.length > 0) { toast.error(`필수 미입력: ${missing.map((m) => m.label).join(', ')}`); return; }
+    const row: Record<string, unknown> = { 회사: company.trim() };
+    for (const c of SNAPSHOT_COLUMNS) {
+      if (c.field === 'company') continue;
+      const v = (vals[c.label] ?? '').trim();
+      if (v) row[c.label] = v;
+    }
+    await onCommit([row]);
+    setVals({});
+    setCompany('');
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="dim" style={{ fontSize: 12, lineHeight: 1.5 }}>
+        운영현황 1건을 엑셀 없이 직접 입력. <strong>차량번호 기준 upsert</strong>(있으면 갱신). 저장하면 엑셀 업로드와 <strong>같은 파이프라인</strong>으로 반영돼요. 마지막 입금일은 계좌 연동으로 자동 산출.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+        {SNAPSHOT_COLUMNS.map((c) => (
+          <label key={c.field} style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
+            <span style={{ fontWeight: 600 }}>
+              {c.label}{c.required && <span style={{ color: 'var(--red-text)' }}> *</span>}
+            </span>
+            {c.field === 'company' ? (
+              <CompanyPicker value={company} onChange={setCompany} options={companyOptions} />
+            ) : (
+              <input
+                className="input"
+                type={NUM_FIELDS.has(c.field) ? 'number' : DATE_FIELDS.has(c.field) ? 'date' : 'text'}
+                placeholder={c.example}
+                value={vals[c.label] ?? ''}
+                onChange={(e) => set(c.label, e.target.value)}
+              />
+            )}
+            {c.hint && <span className="dim" style={{ fontSize: 10, lineHeight: 1.4 }}>{c.hint}</span>}
+          </label>
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, alignItems: 'center' }}>
+        {result && <span className="dim" style={{ fontSize: 12 }}>{result}</span>}
+        <button className="btn btn-primary" type="button" disabled={busy || missing.length > 0} onClick={submit}>
+          {busy ? '저장 중…' : '운영현황 등록'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SnapshotExcelPane({
   onCommit, onCommitHorizontal, onCommitReceivables, busy, result,
 }: {
   onCommit: (rows: Record<string, unknown>[]) => Promise<void>;
