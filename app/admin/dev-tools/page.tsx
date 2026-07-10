@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple, ArrowsClockwise } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -72,6 +72,13 @@ const TOOLS: ToolCard[] = [
     title: '계약↔차량 안정 링크 (vehicleId 백필)',
     desc: 'plate 문자열 링크를 Vehicle.id 안정 FK로 확정 — OCR 오보정·번호변경에도 링크 불변, v6 이식성. plate 는 폴백 유지. 재실행 가능(멱등).',
     icon: <LinkSimple size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/admin/recalc-derived',
+    title: '파생값 재계산·확정 (export 전)',
+    desc: '미수·회차상태·dueDate stale 캐시를 앱 재계산값으로 RTDB에 확정 저장(+_recalcAt). 덤프/v6 이관 직전 실행 — 덤프 신선화. 재실행 가능.',
+    icon: <ArrowsClockwise size={18} weight="duotone" />,
     variant: 'op',
   },
   {

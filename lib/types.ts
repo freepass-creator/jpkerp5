@@ -184,6 +184,8 @@ export type Contract = {
   lastPaidAmount?: number;
   unpaidAmount: number;        // 미수 합
   unpaidSeqCount: number;      // 미납 회차 수
+  /** 파생값(미수·회차상태·dueDate) 마지막 recalc 확정 시각 — export/이관 전 stale 판별용(#R6). */
+  _recalcAt?: string;
   // 회차 스케줄 — 운영현황 업로드 시 자동 생성 + 미수 분배 (lib/payment-schedule.ts)
   schedules?: PaymentScheduleInline[];
   // 활성 리스크 이슈 (lib/risk-issues.ts 가 동적 계산 — 저장 X)
