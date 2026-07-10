@@ -75,7 +75,8 @@ export const VEHICLE_TRANSITIONS: Partial<Record<VehicleStatus, Transition[]>> =
       // 회수(미납·채권보전) — 정상 반납과 다른 절차. 합의 없이 강제 회수.
       to: '반납', actionLabel: '회수(미납·채권보전) → 반납 입고',
       checklist: [
-        { key: 'arrearsChecked', label: '미납 확인(연체 회차·금액)' },
+        // 계약이 실제 연체(미수)면 자동 ✓ — 미납 여부는 데이터로 아는 것
+        { key: 'arrearsChecked', label: '미납 확인(연체 회차·금액)', auto: (_v, c) => !!c && ((c.unpaidSeqCount ?? 0) > 0 || (c.unpaidAmount ?? 0) > 0), autoHint: '연체 미수 있음(미납중)' },
         { key: 'recoveryNotice', label: '회수 통보 발송(내용증명 등)' },
         { key: 'locateVehicle', label: '차량 위치 확인(GPS)' },
         { key: 'recovered', label: '회수·입고 완료' },

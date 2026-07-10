@@ -55,6 +55,9 @@ describe('차량 상태 전이 체크리스트 시뮬', () => {
     line(`④ 운행 전이 갈래 ${t4.length}개: ${t4.map((x) => `${x.to}(${x.checklist.length})`).join(' / ')}`);
     line(`   회수 절차 ${recovery.checklist.length}단계: ${recovery.checklist.map((c) => c.label).join(' → ')}`);
     line(`   미완 ready=${recNot} → 4항목 체크 후 ready=${recReady}`);
+    const arrearsC = { status: '운행', unpaidSeqCount: 2, unpaidAmount: 1_600_000 } as Contract;
+    const recAutoDone = transitionProgress(recovery, vRun, arrearsC, {}).done;
+    line(`   미납 계약이면 '미납 확인' 자동✓ → ${recAutoDone}/4 (수동 체크 전)`);
 
     line('');
     line('【판정】 준비 항목 다 체크돼야 다음 단계 열림. 같은 상태도 갈래별(정상반납/회수) 절차가 다름. 데이터로 아는 항목(등록증·보험·계약)은 자동✓.');
@@ -73,5 +76,6 @@ describe('차량 상태 전이 체크리스트 시뮬', () => {
     expect(recovery.checklist.length).toBe(4);
     expect(recNot).toBe(false);
     expect(recReady).toBe(true);
+    expect(recAutoDone).toBeGreaterThanOrEqual(1); // 미납 계약이면 '미납 확인' 자동✓
   });
 });
