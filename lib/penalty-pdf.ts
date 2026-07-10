@@ -12,6 +12,7 @@ import { toast } from '@/lib/toast';
 import type { Company } from './sample-companies';
 import type { IssueContext, ConfirmationArgs } from './penalty-templates';
 import type { AuditFields } from './audit-fields';
+import type { OcrOriginal } from './types';
 
 export interface PenaltyWorkItem extends PenaltyParsed, AuditFields {
   id: string;
@@ -19,6 +20,7 @@ export interface PenaltyWorkItem extends PenaltyParsed, AuditFields {
   fileDataUrl: string;
   fileSize?: number;
   pageNumber?: number;
+  _ocrOriginal?: OcrOriginal;  // OCR 파싱 원본 스냅샷 (과태료 고지서) — 원본 영구보존
   /** 소프트 삭제. 통지번호는 영구 보존 (재발급 금지). */
   deletedAt?: string;
   _company?: Company | null;

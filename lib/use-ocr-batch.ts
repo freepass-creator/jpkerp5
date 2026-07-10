@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { runWithConcurrency } from './parallel';
 import { getFirebaseAuth } from './firebase/client';
+import type { OcrOriginal } from './types';
 
 /**
  * 도메인 무관 OCR 배치 훅 — 자산·과태료·회사 등 공통 사용.
@@ -26,6 +27,8 @@ export interface OcrBatchItem {
   fileName: string;
   _status: OcrBatchStatus;
   _error?: string;
+  /** OCR 파싱 원본 스냅샷 — applyResult 공통 경로에서 자동 부착(원본 영구보존). 저장 시 도메인 레코드로 실려감. */
+  _ocrOriginal?: OcrOriginal;
 }
 
 type Options<W extends OcrBatchItem> = {
@@ -119,7 +122,13 @@ export function useOcrBatch<W extends OcrBatchItem>(opts: Options<W>) {
           setItems((prev) => prev.map((it) => {
             if (it.id !== id) return it;
             const applied = optsRef.current.applyResult(it, raw, prev);
-            return { ...applied, _status: 'done' as const };
+            // OCR 원본 영구보존(#feedback_ocr_preserve_original + v6 _ocrOriginal 정합) — 파싱 JSON 그대로 스냅샷.
+            // applyResult 가 이미 세팅했으면 존중, 아니면 공통 부착.
+            return {
+              ...applied,
+              _status: 'done' as const,
+              _ocrOriginal: applied._ocrOriginal ?? { raw, at: new Date().toISOString(), source: O.docType },
+            };
           }));
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);

@@ -525,6 +525,7 @@ export type Company = {
   code: string;                  // CP01 / CP02 — 자동 부여 (영구·재발급 X)
   name: string;                  // 회사명 (계약의 company 코드와 매칭)
   bizRegNo?: string;             // 사업자등록번호 (123-45-67890)
+  _ocrOriginal?: OcrOriginal;    // OCR 파싱 원본 스냅샷 (사업자등록증) — 원본 영구보존
   corpRegNo?: string;            // 법인등록번호 (110111-1234567)
   ceo?: string;                  // 대표자
   address?: string;
@@ -661,6 +662,8 @@ export type Vehicle = {
   inspectionDueDate?: string;
   /** 자동차세 납부일 (YYYY-MM-DD) */
   vehicleTaxDueDate?: string;
+  /** OCR 파싱 원본 스냅샷 (등록증 등) — 원본 영구보존 */
+  _ocrOriginal?: OcrOriginal;
 
   // ─── 자산 관리 정보 (보험/할부/GPS) — 자산관리 표 컬럼 ───
   insuranceCompany?: string;       // 보험사 (예: 삼성화재)
@@ -719,6 +722,13 @@ export type Vendor = {
 
 /** 감사 로그 — 모든 변경 추적 (누가 / 언제 / 무엇을) */
 export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'match' | 'unmatch' | 'login' | 'logout' | 'import' | 'export';
+
+/** OCR 파싱 원본 스냅샷 — 도메인 레코드에 부착해 원본 영구보존(감사·수기교정 전 재구성). v6 _ocrOriginal 정합. */
+export type OcrOriginal = {
+  raw: Record<string, unknown>;  // /api/ocr/extract 파싱 JSON 그대로 (수기 정규화 전)
+  at: string;                    // 부착 시각 ISO
+  source?: string;               // docType — vehicle_reg / penalty / business_reg / insurance / rental_contract / license
+};
 
 export type AuditEntityType =
   | 'contract' | 'company' | 'vehicle'
@@ -813,6 +823,7 @@ export type InsurancePolicy = {
   id: string;
   companyCode?: string;
   vehicleId?: string;          // 매칭된 차량 (carNumber → Vehicle.plate 매칭)
+  _ocrOriginal?: OcrOriginal;  // OCR 파싱 원본 스냅샷 (보험증권) — 원본 영구보존
   fileUrl?: string;
   fileName?: string;
   uploadedAt?: string;
