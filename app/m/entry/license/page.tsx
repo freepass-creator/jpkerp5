@@ -12,6 +12,7 @@
  */
 
 import { useState, useMemo, useRef } from 'react';
+import { fileToDataUrl } from '@/lib/image-compress';
 import { useRouter } from 'next/navigation';
 import {
   MagnifyingGlass, IdentificationCard, Camera,
@@ -67,8 +68,9 @@ export default function MobileLicenseVerify() {
     setBusy('ocr');
     setOcr(null); setVerify(null);
     try {
-      const buf = await file.arrayBuffer();
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      // FileReader 기반(스택오버플로 없음). 기존 btoa(String.fromCharCode(...spread))는
+      // 수 MB 실기기 사진에서 바이트를 함수인자로 펼쳐 'Maximum call stack size exceeded'로 터졌음.
+      const b64 = (await fileToDataUrl(file)).split(',')[1] ?? '';
       const res = await fetch('/api/ocr/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
