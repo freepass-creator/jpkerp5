@@ -55,16 +55,27 @@ export function scanOpsAlerts(input: OpsAlertInput): OpsAlert[] {
 
   const operating = input.vehicles.filter((v) => !DISPOSED.has(v.status));
 
-  // 1) 보험 만기
+  // 1) 보험 만기 / 무보험·보험미상 운행
   for (const v of operating) {
     const due = v.insuranceExpiryDate;
-    if (!due) continue;
+    const onRoad = v.status === '운행'; // 도로 위 = 최악 케이스
+    if (!due) {
+      // 만기일 데이터 자체가 없음 — 운행 중이면 무보험/보험미상(가장 위험).
+      // 기존엔 `if(!due) continue`로 이 최악 케이스가 경보에서 통째로 빠졌음.
+      if (onRoad) alerts.push({
+        kind: '보험만기', severity: 'critical',
+        title: `무보험·보험미상 운행 · ${v.plate ?? v.id}`,
+        detail: '운행 중인데 보험 만기일 데이터 없음 — 즉시 확인(무보험 사고=회사 직접배상)',
+        entityId: v.id, entityLabel: v.plate, href: '/asset',
+      });
+      continue;
+    }
     const d = daysBetween(today, due);
     if (d == null || d > soonIns) continue;
     alerts.push({
       kind: '보험만기',
       severity: d < 0 ? 'critical' : d <= 7 ? 'critical' : 'warn',
-      title: `보험 만기 ${d < 0 ? `${-d}일 경과` : `D-${d}`} · ${v.plate ?? v.id}`,
+      title: `보험 ${d < 0 ? `만료 ${-d}일 경과${onRoad ? '·운행중' : ''}` : `만기 D-${d}`} · ${v.plate ?? v.id}`,
       detail: `${v.insuranceCompany ?? '보험사 미상'} · 만기 ${due}`,
       entityId: v.id, entityLabel: v.plate, dueDate: due, daysLeft: d, href: '/asset',
     });

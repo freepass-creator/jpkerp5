@@ -56,5 +56,7 @@ describe('능동 운영 알림 시뮬', () => {
     expect(kinds.has('정합성')).toBe(true);
     expect(alerts.some((a) => a.entityId === 'v3')).toBe(false); // 매각 제외
     expect(alerts[0].severity).toBe('critical');                 // 심각도 정렬
+    // 무보험·보험미상 운행(v4=운행·보험만기없음) critical 경보 — 기존엔 스캔서 빠지던 최악 케이스
+    expect(alerts.some((a) => a.title.includes('무보험') && a.severity === 'critical')).toBe(true);
   });
 });
