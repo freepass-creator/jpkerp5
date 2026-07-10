@@ -11,7 +11,8 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import type { Vehicle, Contract, HistoryEntry, VehicleStatus } from '@/lib/types';
+import type { Vehicle, Contract, HistoryEntry, VehicleStatus, LoanRepaymentMethod } from '@/lib/types';
+import { generateLoanSchedule, summarizeLoanSchedule, shouldReplaceLoanSchedule } from '@/lib/loan-schedule-calc';
 
 /** VehicleStatus 별 다음 액션 안내 — 운영 현황 탭 라이프사이클 가이드 */
 const NEXT_ACTION: Record<VehicleStatus, string> = {
@@ -513,91 +514,128 @@ function SummaryTab({
 }
 
 /* ─── 탭2: 할부스케줄 ─── */
-function LoanScheduleTab({ vehicle }: { vehicle: Vehicle }) {
-  const months = vehicle.loanMonths ?? 0;
-  const start = vehicle.loanStartDate;
-  const remaining = vehicle.loanRemainingPrincipal ?? 0;
-  const purchasePrice = vehicle.purchasePrice ?? 0;
+function LoanScheduleTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v: Vehicle) => void }) {
+  const schedule = vehicle.loanSchedule ?? [];
+  const hasSchedule = schedule.length > 0;
+  const source = vehicle.loanScheduleSource;
+  const today = todayKr();
 
-  if (!vehicle.loanCompany || !months || !start) {
-    return (
-      <Stack>
-        <Section
-          title="할부 스케줄"
-          action={<span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-weak)' }}>할부 정보 미입력</span>}
-          bodyPadding={0}
-        >
-          <table className="table">
-            <thead>
-              <tr>
-                <th className="num" style={{ width: COL.cycle }}>회차</th>
-                <th style={{ width: 100 }}>예정일</th>
-                <th className="num" style={{ width: COL.money }}>금액</th>
-                <th className="center" style={{ width: COL.status }}>상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              <EmptyRow colSpan={4}>자산 등록 시 할부사·개월·개시일 입력하면 회차별 스케줄 자동 생성</EmptyRow>
-            </tbody>
-          </table>
-        </Section>
-      </Stack>
-    );
+  // 생성 폼 — 차량에 값 있으면 프리필. 표 없어도 원금·금리·기간으로 생성 가능.
+  const [principal, setPrincipal] = useState(String(vehicle.loanPrincipal ?? vehicle.purchasePrice ?? ''));
+  const [ratePct, setRatePct] = useState(String(vehicle.loanInterestRate ?? ''));
+  const [months, setMonths] = useState(String(vehicle.loanMonths ?? ''));
+  const [start, setStart] = useState(vehicle.loanStartDate ?? '');
+  const [method, setMethod] = useState<LoanRepaymentMethod>(vehicle.loanMethod ?? '원리금균등');
+  const [note, setNote] = useState<string | null>(null);
+
+  const genValid = Number(principal) > 0 && Number(ratePct) >= 0 && Number(months) > 0 && !!start;
+  const fieldStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10, color: 'var(--text-weak)' };
+
+  function handleGenerate() {
+    setNote(null);
+    if (!genValid) { setNote('원금·연이율·기간·개시일을 입력하세요.'); return; }
+    // 업로드(OCR) 상환표가 우선 — 생성값이 덮지 않음
+    if (!shouldReplaceLoanSchedule(source, 'generated')) {
+      setNote('업로드된 상환표가 우선 적용 중입니다 — 생성값으로 대체하지 않았습니다. (대체하려면 업로드본을 먼저 제거)');
+      return;
+    }
+    const g = generateLoanSchedule({ principal: Number(principal), annualRatePct: Number(ratePct), months: Number(months), startDate: start, method });
+    onUpdate({
+      ...vehicle,
+      loanSchedule: g.rows, loanScheduleSource: 'generated',
+      loanPrincipal: g.principal, loanInterestRate: Number(ratePct), loanMonths: g.months,
+      loanStartDate: start, loanMethod: method,
+      loanMonthlyPayment: g.monthlyPayment, loanTotalRepayment: g.totalRepayment,
+      loanRemainingPrincipal: vehicle.loanRemainingPrincipal ?? g.principal,
+    });
+    setNote(`생성 완료 — ${g.months}회차, 월불입 ₩${g.monthlyPayment.toLocaleString()}, 총이자 ₩${g.totalInterest.toLocaleString()}`);
   }
 
-  const monthly = purchasePrice && months ? Math.round(purchasePrice / months) : 0;
-  const today = todayKr();
-  const rows = Array.from({ length: months }, (_, i) => {
-    // addMonthsKeepDay — 월말(1/31 등) clamp + TZ 안전. setMonth 는 clamp 없어 다음달로 롤오버했음
-    const dueIso = addMonthsKeepDay(start, i);
-    const paid = dueIso <= today;
-    return { seq: i + 1, dueDate: dueIso, amount: monthly, paid };
-  });
-  const paidCount = rows.filter((r) => r.paid).length;
-  const paidSum = paidCount * monthly;
+  const sum = hasSchedule ? summarizeLoanSchedule(schedule) : null;
 
   return (
     <Stack>
-      <Section title="할부 개요">
+      <Section
+        title="할부/리스 개요"
+        action={source && (
+          <span style={{ marginLeft: 'auto', fontSize: 10, padding: '1px 7px', borderRadius: 'var(--radius-sm)',
+            background: source === 'uploaded' ? 'var(--green-bg)' : 'var(--brand-bg)',
+            color: source === 'uploaded' ? 'var(--green-text)' : 'var(--brand)' }}>
+            {source === 'uploaded' ? '업로드 상환표(우선)' : '생성 상환표'}
+          </span>
+        )}
+      >
         <Grid2>
-          <KV k="할부사" v={vehicle.loanCompany} />
-          <KV k="할부개월" v={`${months}개월`} />
-          <KV k="개시일" v={start} mono />
-          <KV k="잔여원금" v={`₩${remaining.toLocaleString()}`} mono />
-          <KV k="납입회차" v={`${paidCount} / ${months}`} />
-          <KV k="누적납입" v={`₩${paidSum.toLocaleString()}`} mono />
+          <KV k="금융사" v={vehicle.loanCompany || '-'} />
+          <KV k="상환방식" v={vehicle.loanMethod || '-'} />
+          <KV k="기간" v={vehicle.loanMonths ? `${vehicle.loanMonths}개월` : '-'} />
+          <KV k="개시일" v={vehicle.loanStartDate || '-'} mono />
+          <KV k="대출원금" v={vehicle.loanPrincipal != null ? `₩${vehicle.loanPrincipal.toLocaleString()}` : '-'} mono />
+          <KV k="월불입금" v={vehicle.loanMonthlyPayment != null ? `₩${vehicle.loanMonthlyPayment.toLocaleString()}` : '-'} mono />
+          {sum && <KV k="총상환(원금+이자)" v={`₩${sum.paymentSum.toLocaleString()}`} mono />}
+          {sum && <KV k="총이자(금융비용)" v={`₩${sum.interestSum.toLocaleString()}`} mono />}
         </Grid2>
       </Section>
 
-      <Section title="회차별 스케줄" bodyPadding={0}>
+      <Section title="상환표 생성 — 표 없이 원금·금리·기간으로">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', padding: '2px 0' }}>
+          <label style={fieldStyle}>원금(원)<input className="input input-compact mono" type="number" value={principal} onChange={(e) => setPrincipal(e.target.value)} style={{ width: 130 }} /></label>
+          <label style={fieldStyle}>연이율(%)<input className="input input-compact mono" type="number" step="0.1" value={ratePct} onChange={(e) => setRatePct(e.target.value)} style={{ width: 74 }} /></label>
+          <label style={fieldStyle}>기간(개월)<input className="input input-compact mono" type="number" value={months} onChange={(e) => setMonths(e.target.value)} style={{ width: 74 }} /></label>
+          <label style={fieldStyle}>개시일<input className="input input-compact mono" type="date" value={start} onChange={(e) => setStart(e.target.value)} style={{ width: 140 }} /></label>
+          <label style={fieldStyle}>방식
+            <select className="input input-compact" value={method} onChange={(e) => setMethod(e.target.value as LoanRepaymentMethod)}>
+              <option value="원리금균등">원리금균등</option>
+              <option value="원금균등">원금균등</option>
+              <option value="만기일시">만기일시</option>
+            </select>
+          </label>
+          <button type="button" className="btn btn-primary" onClick={handleGenerate} disabled={!genValid}>스케줄 생성</button>
+        </div>
+        {note && <div style={{ fontSize: 11, color: 'var(--text-weak)', paddingTop: 6 }}>{note}</div>}
+      </Section>
+
+      <Section title="회차별 상환표" bodyPadding={0}>
         <table className="table">
           <thead>
             <tr>
               <th className="num" style={{ width: COL.cycle }}>회차</th>
-              <th style={{ width: 100 }}>예정일</th>
-              <th className="num" style={{ width: COL.money }}>금액</th>
+              <th style={{ width: 96 }}>예정일</th>
+              <th className="num" style={{ width: COL.money }}>원금</th>
+              <th className="num" style={{ width: COL.money }}>이자</th>
+              <th className="num" style={{ width: COL.money }}>월불입금</th>
+              <th className="num" style={{ width: COL.money }}>미회수원금</th>
               <th className="center" style={{ width: COL.status }}>상태</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.seq}>
-                <td className="num mono">{r.seq}</td>
-                <td className="mono">{r.dueDate}</td>
-                <td className="num mono">₩{r.amount.toLocaleString()}</td>
-                <td className="center">
-                  {r.paid ? <StatusBadge tone="green">납입</StatusBadge> : <StatusBadge tone="gray">예정</StatusBadge>}
-                </td>
-              </tr>
-            ))}
+            {!hasSchedule && <EmptyRow colSpan={7}>상환표 없음 — 위에서 생성하거나 상환스케줄표를 업로드하세요</EmptyRow>}
+            {schedule.map((r) => {
+              const passed = !!r.dueDate && r.dueDate <= today;
+              return (
+                <tr key={r.seq}>
+                  <td className="num mono">{r.seq}</td>
+                  <td className="mono">{r.dueDate || '-'}</td>
+                  <td className="num mono">₩{(r.principal ?? 0).toLocaleString()}</td>
+                  <td className="num mono dim">₩{(r.interest ?? 0).toLocaleString()}</td>
+                  <td className="num mono">₩{(r.payment ?? 0).toLocaleString()}</td>
+                  <td className="num mono dim">₩{(r.remainingPrincipal ?? 0).toLocaleString()}</td>
+                  <td className="center">
+                    {r.matchedTxId
+                      ? <StatusBadge tone="green">납입확인</StatusBadge>
+                      : passed ? <StatusBadge tone="gray">예정경과</StatusBadge> : <StatusBadge tone="gray">예정</StatusBadge>}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-weak)', borderTop: '1px solid var(--border-soft)' }}>
-          ※ 실 납입 여부는 카드내역/계좌내역 매칭으로 자동 확정 — 위는 균등분할 추정치
+          ※ 원금=부채상환, 이자=금융비용(회계 분리). 실 납입은 은행 출금 매칭으로 자동 확정(납입확인).
         </div>
       </Section>
       <AttachedFilePreview
-        title="원본 할부계약서"
+        title="원본 할부계약서/상환표"
         url={vehicle.loanContractUrl}
         fileName={vehicle.loanContractFileName}
         uploadedAt={vehicle.loanContractUploadedAt}
@@ -1286,7 +1324,7 @@ function AssetTab({
       <ComplianceTab vehicle={vehicle} contracts={contracts} />
       <RepairHistoryTab history={repairHistory} />
       <OperatingCostSection vehicle={vehicle} contracts={contracts} repairHistory={repairHistory} />
-      <LoanScheduleTab vehicle={vehicle} />
+      <LoanScheduleTab vehicle={vehicle} onUpdate={onUpdate} />
       {hasOrphanAttachment && (
         <>
           <AttachedFilePreview
