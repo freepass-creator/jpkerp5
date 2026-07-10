@@ -14,6 +14,8 @@ import React, { useMemo, useState } from 'react';
 import type { Vehicle, Contract, HistoryEntry, VehicleStatus, LoanRepaymentMethod } from '@/lib/types';
 import { generateLoanSchedule, summarizeLoanSchedule, shouldReplaceLoanSchedule, buildLoanScheduleFromOcr, matchLoanPaymentsToWithdrawals } from '@/lib/loan-schedule-calc';
 import { getFirebaseAuth } from '@/lib/firebase/client';
+import { simpleVehicleState } from '@/lib/vehicle-state';
+import { nextTransitions, isItemSatisfied, isTransitionReady, transitionProgress } from '@/lib/vehicle-transitions';
 
 /** VehicleStatus 별 다음 액션 안내 — 운영 현황 탭 라이프사이클 가이드 */
 const NEXT_ACTION: Record<VehicleStatus, string> = {
@@ -145,6 +147,17 @@ function OperationOverviewTab({
     onUpdate({ ...vehicle, status: next, saleDate });
   }
 
+  // 간편 상태(2축) + 체크리스트 게이팅 전이
+  const simpleState = simpleVehicleState(vehicle.status as VehicleStatus, activeContract ?? null);
+  const transitions = nextTransitions(vehicle.status as VehicleStatus);
+  function toggleCheck(key: string) {
+    const cur = vehicle.prepChecks ?? {};
+    const nextChecks = { ...cur };
+    if (nextChecks[key]) delete nextChecks[key];
+    else nextChecks[key] = new Date().toISOString();
+    onUpdate({ ...vehicle, prepChecks: nextChecks });
+  }
+
   // 등록 체크리스트 — 각 단계별 prerequisites
   const checklist: { label: string; ok: boolean; hint?: string }[] = [
     { label: '자동차등록증 정보', ok: !!(vehicle.vin && vehicle.manufacturedDate), hint: 'VIN + 제작연월' },
@@ -191,30 +204,70 @@ function OperationOverviewTab({
       {/* 차량 상태 + 다음 단계 chip — 클릭으로 진행 */}
       <Section title="차량 상태">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
-          <StatusBadge tone={vehicleStatusTone(vehicle.status)}>
-            <span style={{ fontSize: 12, fontWeight: 700 }}>{vehicle.status}</span>
+          <StatusBadge tone={simpleState.tone}>
+            <span style={{ fontSize: 12, fontWeight: 700 }}>{simpleState.label}</span>
           </StatusBadge>
+          <span style={{ fontSize: 10, color: 'var(--text-weak)' }} title="세부 상태(전이·이력용)">세부: {vehicle.status}</span>
           <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>
             {NEXT_ACTION[vehicle.status as VehicleStatus] ?? '-'}
           </span>
         </div>
-        {nextStates.length > 0 && (
+        {transitions.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-weak)' }}>다음 단계로 — 준비 항목을 체크하면 활성화</span>
+            {transitions.map((t) => {
+              const prog = transitionProgress(t, vehicle, activeContract ?? null, vehicle.prepChecks);
+              const ready = isTransitionReady(t, vehicle, activeContract ?? null, vehicle.prepChecks);
+              return (
+                <div key={t.to} style={{ border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', padding: '8px 10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600 }}>{t.actionLabel}</span>
+                    <span className="dim" style={{ fontSize: 10 }}>{prog.done}/{prog.total}</span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      disabled={!ready}
+                      onClick={() => void changeStatus(t.to)}
+                      style={{ marginLeft: 'auto', fontSize: 11 }}
+                      title={ready ? `[${t.to}] 로 변경` : '준비 항목을 모두 체크하세요'}
+                    >
+                      → {t.to}
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {t.checklist.map((item) => {
+                      const auto = !!item.auto && item.auto(vehicle, activeContract ?? null);
+                      const done = isItemSatisfied(item, vehicle, activeContract ?? null, vehicle.prepChecks);
+                      return (
+                        <label
+                          key={item.key}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11,
+                            padding: '2px 6px', borderRadius: 'var(--radius-sm)',
+                            background: done ? 'var(--green-bg)' : 'transparent',
+                            color: done ? 'var(--green-text)' : 'var(--text)',
+                            cursor: auto ? 'default' : 'pointer', opacity: auto && !done ? 0.6 : 1,
+                          }}
+                          title={auto ? (item.autoHint ?? '데이터로 자동 판정') : '클릭하여 체크'}
+                        >
+                          <input type="checkbox" checked={done} disabled={auto} onChange={() => toggleCheck(item.key)} />
+                          {item.label}{auto && <span style={{ fontSize: 9 }}> (자동)</span>}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : nextStates.length > 0 ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
             <span style={{ fontSize: 10, color: 'var(--text-weak)', marginRight: 2 }}>→ 다음:</span>
             {nextStates.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className="btn btn-sm"
-                onClick={() => changeStatus(s)}
-                style={{ fontSize: 11 }}
-                title={`상태 [${s}] 로 변경`}
-              >
-                {s}
-              </button>
+              <button key={s} type="button" className="btn btn-sm" onClick={() => changeStatus(s)} style={{ fontSize: 11 }} title={`상태 [${s}] 로 변경`}>{s}</button>
             ))}
           </div>
-        )}
+        ) : null}
         <Grid2>
           <KV k="회사" v={vehicle.company ? displayCompanyName(vehicle.company, companies) : undefined} />
           <KV k="활성 계약" v={activeContract ? (

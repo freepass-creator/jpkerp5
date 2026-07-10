@@ -741,6 +741,8 @@ export type Vehicle = {
   loanSchedule?: LoanScheduleRow[];
   /** 상환표 출처 — 'uploaded'(OCR)가 'generated'(계산)보다 우선. 업로드 시 생성값을 덮음 */
   loanScheduleSource?: LoanScheduleSource;
+  /** 상태 전이 준비 체크 — key(전이 체크항목) → 완료 ISO 일시. 다음 단계 게이팅([[lib/vehicle-transitions]]) */
+  prepChecks?: Record<string, string>;
   gpsProvider?: string;            // GPS 공급사 (예: 마카롱)
   gpsDeviceId?: string;            // GPS 단말번호
 
