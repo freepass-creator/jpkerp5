@@ -269,7 +269,8 @@ export async function upsertVehicleFromContract(
     vehicleSubModel: contract.vehicleSubModel,
     vehicleVariant: contract.vehicleVariant,
     vehicleTrim: contract.vehicleTrim,
-    company: (company?.code || company?.name || contract.company || '') as Vehicle['company'],
+    // 계약과 동일한 company 값으로 통일(섞임 방지) — 전면 code화는 v6 ETL 시점. assetCode 는 code prefix.
+    company: (contract.company || company?.code || company?.name || '') as Vehicle['company'],
     assetCode: nextAssetCode(cc, ctx.vehicles), // 자산코드 발급(#쓰기경로 v6정합)
     // 신규 차량 — plate 정규성 기반 자동 status
     status: autoStatus,
