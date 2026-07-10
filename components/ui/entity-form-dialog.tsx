@@ -3,6 +3,11 @@
 /**
  * EntityFormDialog — 도메인 무관 schema-driven 등록·조회·수정·복사 다이얼로그.
  *
+ * ⭐ 신규 등록·수정 폼의 **표준**. 필드만 있는 폼은 손롤(DialogContent+수동 input) 금지 —
+ *   FieldDef[] / FieldSection[] 스키마만 정의하면 검증·dirty·Ctrl+S·천단위·이중제출가드가 공짜.
+ *   커스텀 DialogContent 는 OCR/엑셀 탭·실시간 배너·특수 위젯이 꼭 필요한 경우만 예외.
+ *   (탭 안 인라인 폼은 같은 스키마 접근 — 예: create-dialog SnapshotManualForm 이 SNAPSHOT_COLUMNS 로 폼 생성.)
+ *
  * 4-mode (자산 다이얼로그 패턴):
  *  - view      : readonly + 회색 dot. [닫기] [수정→edit]
  *  - edit      : editable + 황색 dot.  [취소→view] [저장]
