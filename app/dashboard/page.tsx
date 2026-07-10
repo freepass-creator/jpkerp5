@@ -40,6 +40,7 @@ import { formatCurrency, dateWithDow } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
 import { useLiveTodayKr } from '@/lib/use-live-today';
 import { dDayLabel } from '@/lib/alerts';
+import { scanOpsAlerts, summarizeAlerts } from '@/lib/ops-alerts';
 
 export default function DashboardPage() {
   const { contracts } = useContracts();
@@ -160,6 +161,13 @@ export default function DashboardPage() {
     };
   }, [contracts, vehicles, bankTx, cardTx, penalties, today]);
 
+  // 능동 운영 알림 — 기한 임박·미수·적체·정합성을 시스템이 먼저 통보
+  const opsAlerts = useMemo(
+    () => scanOpsAlerts({ today, vehicles, contracts, penalties }),
+    [today, vehicles, contracts, penalties],
+  );
+  const alertSummary = summarizeAlerts(opsAlerts);
+
   return (
     <div className="layout">
       <Sidebar />
@@ -175,6 +183,36 @@ export default function DashboardPage() {
           display: 'flex', flexDirection: 'column', gap: 10,
           flex: 1, minHeight: 0, overflow: 'hidden',
         }}>
+          {/* 능동 알림 스트립 — 기한·미수·적체·정합성 (알림 있을 때만) */}
+          {opsAlerts.length > 0 && (
+            <div className="panel" style={{ padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: '0 0 auto' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                능동 알림
+                {alertSummary.critical > 0 && <span style={{ color: 'var(--red-text)', marginLeft: 6 }}>긴급 {alertSummary.critical}</span>}
+                {alertSummary.warn > 0 && <span style={{ color: 'var(--orange-text)', marginLeft: 6 }}>주의 {alertSummary.warn}</span>}
+                {alertSummary.info > 0 && <span className="dim" style={{ marginLeft: 6 }}>정보 {alertSummary.info}</span>}
+              </span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+                {opsAlerts.slice(0, 6).map((a, i) => (
+                  <a
+                    key={i}
+                    href={a.href ?? '#'}
+                    title={a.detail}
+                    style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap',
+                      border: '1px solid var(--border-soft)',
+                      borderLeft: `3px solid ${a.severity === 'critical' ? 'var(--red-text)' : a.severity === 'warn' ? 'var(--orange-text)' : 'var(--border)'}`,
+                      color: 'var(--text)', textDecoration: 'none',
+                    }}
+                  >
+                    {a.title}
+                  </a>
+                ))}
+                {opsAlerts.length > 6 && <span className="dim" style={{ fontSize: 11, alignSelf: 'center' }}>+{opsAlerts.length - 6}건</span>}
+              </div>
+            </div>
+          )}
+
           {/* 업무 카드 — 본인 스케줄(좌, 1fr) + 디스패치(우, 280px) — 아래 row 와 column align */}
           <Section title="업무 카드" right={<span className="dim" style={{ fontSize: 11 }}>본인 기준 · 항목 클릭 → 상세</span>}>
             <TaskCardsGrid
