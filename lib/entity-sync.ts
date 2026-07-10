@@ -16,6 +16,7 @@
 
 import type { InsurancePolicy, Vehicle, Contract, Company } from '@/lib/types';
 import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
+import { nextAssetCode } from '@/lib/code-scheme';
 
 /** plate 정규화 — 공백/제로폭/하이픈 제거. O→0, I→1 OCR 보정 */
 export function normPlate(s?: string): string {
@@ -191,6 +192,7 @@ export async function upsertVehicleFromPolicy(
     model: policy.carName ?? '',
     vehicleModelLine: policy.carName,
     company: (company?.code || company?.name || '') as Vehicle['company'],
+    assetCode: nextAssetCode(company?.code || policy.companyCode || 'CP00', ctx.vehicles), // 자산코드 발급(#쓰기경로 v6정합)
     status: '상품대기',
     insuranceCompany: policy.insurer,
     insurancePolicyNo: policy.policyNo,
@@ -258,6 +260,7 @@ export async function upsertVehicleFromContract(
 
   // 신규 Vehicle 자동 생성 — 계약 임베드 정보
   const company = findCompanyForContract(contract, ctx.companies);
+  const cc = company?.code || contract.company || 'CP00';
   const draft: Omit<Vehicle, 'id'> = {
     plate: plate.trim(),
     model: contract.vehicleModel ?? '',
@@ -267,6 +270,7 @@ export async function upsertVehicleFromContract(
     vehicleVariant: contract.vehicleVariant,
     vehicleTrim: contract.vehicleTrim,
     company: (company?.code || company?.name || contract.company || '') as Vehicle['company'],
+    assetCode: nextAssetCode(cc, ctx.vehicles), // 자산코드 발급(#쓰기경로 v6정합)
     // 신규 차량 — plate 정규성 기반 자동 status
     status: autoStatus,
     currentContractId: contract.id,

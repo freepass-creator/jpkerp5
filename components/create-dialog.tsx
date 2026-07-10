@@ -48,7 +48,8 @@ import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { upsertVehicleFromContract, normPlate, findVehicleByPlate } from '@/lib/entity-sync';
-import { nextContractNo, yymmOf } from '@/lib/code-scheme';
+import { nextContractNo, nextAssetCode, yymmOf } from '@/lib/code-scheme';
+import { customerKey } from '@/lib/customer-derive';
 import { useAuth } from '@/lib/use-auth';
 // Phase 2.2 — intake 평행 기록 (배치 단위)
 import { addIntakeItem, markIntakeCommitted, setIntakeMatch } from '@/lib/firebase/intake-store';
@@ -1225,7 +1226,8 @@ function useCompanyNames(): string[] {
 
 function VehicleManualForm({ onSubmit }: { onSubmit: (newVehicleId?: string) => void }) {
   const companyNames = useCompanyNames();
-  const { add: addVehicle } = useVehicles();
+  const { add: addVehicle, vehicles } = useVehicles();
+  const { companies } = useCompanies();
   const [company, setCompany] = useState(companyNames[0] ?? '');
   // 5단 분류
   const [vehicleMaker, setVehicleMaker] = useState('');
@@ -1268,6 +1270,7 @@ function VehicleManualForm({ onSubmit }: { onSubmit: (newVehicleId?: string) => 
         plate: normPlate(plate.trim()) || '미정',
         model: fullName,
         company: (company || '기타') as import('@/lib/types').CompanyCode,
+        assetCode: nextAssetCode(companies.find((co) => co.name === company || co.code === company)?.code ?? company, vehicles), // 자산코드 발급
         status: vehicleStatus as import('@/lib/types').VehicleStatus,
         purchasedDate: purchasedDate || undefined,
         // 제조사 스펙
@@ -1470,6 +1473,7 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
         plate: extracted.plate.trim() || '미정',
         model: extracted.model.trim() || '미정',
         company: (extracted.company || '기타') as import('@/lib/types').CompanyCode,
+        assetCode: nextAssetCode(extracted.company || 'CP00', vehicles), // 자산코드 발급
         status: '등록대기',
         notes: [
           extracted.vin && `차대번호 ${extracted.vin}`,
@@ -2418,6 +2422,9 @@ function ContractManualForm({ onSubmit }: { onSubmit: (newContractId?: string) =
       const newContractId = await addContract({
         contractNo,
         company: (company || '기타') as import('@/lib/types').CompanyCode,
+        // FK write-stamp(#쓰기경로 v6정합) — customerId 결정적(등록번호 키), vehicleId 는 기존 plate면 확정(신규는 백필)
+        customerId: customerKey({ customerIdentNo: identDigits || undefined, customerName: customerName.trim(), customerPhone1: customerPhone1.trim() }),
+        vehicleId: findVehicleByPlate(vehicles, normPlate(plate.trim()))?.id,
         customerName: customerName.trim(),
         customerKind,
         customerIdentNo: identDigits || undefined,
