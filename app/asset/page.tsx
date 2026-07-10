@@ -43,6 +43,7 @@ import { useTableSelection } from '@/lib/use-table-selection';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import type { Vehicle, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { VehicleStateBadge } from '@/components/asset/vehicle-state-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
@@ -449,7 +450,7 @@ export default function AssetPage() {
                           ? <span style={{ color: 'var(--green-text)' }}>✓ 모두 입력 완료</span>
                           : <MissingText label={missing.join(' · ')} tone="red" />}
                       </td>
-                      <td className="center"><StatusBadge tone={vehicleStatusTone(v.status)}>{v.status}</StatusBadge></td>
+                      <td className="center"><VehicleStateBadge vehicle={v} contracts={contracts} /></td>
                     </tr>
                   );
                   })}
