@@ -3,7 +3,7 @@
  * Firebase·React 없이 검증. 이번 세션에 고친 로직의 회귀 안전망.
  */
 import { describe, it, expect } from 'vitest';
-import { generateSchedules, distributeEntry, recalcContract, resizeSchedules, computeContractAsOf, distributeUnpaid, isSyntheticPayment } from '@/lib/payment-schedule';
+import { generateSchedules, distributeEntry, recalcContract, resizeSchedules, computeContractAsOf, distributeUnpaid, isSyntheticPayment, realizeOpeningBalance } from '@/lib/payment-schedule';
 import { bankTxKeys } from '@/lib/dedup-keys';
 import { dedupAgainst } from '@/lib/dedup';
 import { buildBankJournal, summarizeByAccount } from '@/lib/gl-entries';
@@ -103,6 +103,29 @@ describe('반납 → 되돌리기 (면제·일할·종료정보)', () => {
     expect(reopened.returnedDate).toBeUndefined();
     expect(reopened.endReason).toBeUndefined();
     expect(reopened.schedules?.filter((s) => s.status === '면제' && s.dueDate > '2025-06-15')).toHaveLength(0);
+  });
+});
+
+describe('期초 realization — 계좌가 期초 허수 실전환 (꼬리 미수 보존)', () => {
+  it('실입금이 期초 슬롯을 오래된순 실전환, 현재미수 꼬리는 불변', () => {
+    const c = contract(); // 12회차 500k
+    const seeded = distributeUnpaid(schedulesFor(c), 1_000_000, TODAY); // 현재미수 100만 期초
+    expect((recalcContract({ ...c, schedules: seeded }, TODAY).unpaidAmount)).toBe(1_000_000);
+    const seededSynthetic = seeded.flatMap((s) => (s.payments ?? []).filter(isSyntheticPayment)).reduce((a, p) => a + p.amount, 0);
+
+    // 과거 실입금 50만 (期초 자리 1개 실전환)
+    const entry = { date: '2025-03-01', amount: 500_000, source: '계좌' as const, txId: 't1' };
+    const { schedules: after } = realizeOpeningBalance(seeded, entry, TODAY);
+
+    // 꼬리(진짜 현재미수)는 불변 — 과거입금이 현재미수를 자동으로 지우지 않음
+    expect((recalcContract({ ...c, schedules: after }, TODAY).unpaidAmount)).toBe(1_000_000);
+    // 실 entry(실날짜·txId) 생성
+    const realized = after.flatMap((s) => s.payments ?? []).filter((p) => p.txId === 't1');
+    expect(realized).toHaveLength(1);
+    expect(realized[0].date).toBe('2025-03-01');
+    // synthetic 총액이 50만 줄어듦 (허수→실 전환)
+    const afterSynthetic = after.flatMap((s) => (s.payments ?? []).filter(isSyntheticPayment)).reduce((a, p) => a + p.amount, 0);
+    expect(afterSynthetic).toBe(seededSynthetic - 500_000);
   });
 });
 

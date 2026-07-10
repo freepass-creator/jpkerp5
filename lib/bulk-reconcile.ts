@@ -12,7 +12,7 @@
  */
 
 import type { Contract, BankTransaction, PaymentEntry, PaymentScheduleInline } from './types';
-import { distributeEntry, totalUnpaid, totalUnpaidCount } from './payment-schedule';
+import { realizeOpeningBalance, totalUnpaid, totalUnpaidCount } from './payment-schedule';
 import { isContractEnded } from './contract-lifecycle';
 // 정규화 SSOT — 자동매칭(receipt-match)과 동일 로직 재사용 (#1 SSOT)
 import { normName, plateSuffix4, counterpartySuffix4 } from './receipt-match';
@@ -130,7 +130,8 @@ export function planBulkReconcile(
         if (remaining <= 0) break;
         const sched = work.get(c.id)!;
         const entry: PaymentEntry = { date: t.txDate, amount: remaining, source: '계좌', txId: t.id, by: opts?.actorEmail, at: new Date().toISOString() };
-        const { schedules, consumed } = distributeEntry(sched, entry, today || t.txDate);
+        // 期초 realization — 실입금이 期초(synthetic) 자리를 오래된순 실전환, 꼬리 미수는 보존
+        const { schedules, consumed } = realizeOpeningBalance(sched, entry, today || t.txDate);
         const used = consumed.reduce((s, x) => s + x.amount, 0);
         if (used > 0) {
           work.set(c.id, schedules);

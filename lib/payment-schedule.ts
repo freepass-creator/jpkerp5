@@ -186,6 +186,65 @@ export function distributeEntry<T extends PaymentScheduleInline>(
   return { schedules: list, consumed };
 }
 
+/**
+ * 期초(현재미수) realization — 초기 3년치 계좌 업로드 시 실입금이 期초 허수(synthetic) 슬롯을 실전환.
+ *   - 우선순위: synthetic 있는 슬롯(과거 期초 자리) 오래된순 → 그 다음 미납 꼬리
+ *   - 실 entry 추가하며 synthetic 을 같은 금액만큼 축소(총 paid 불변 = 날조→실 전환, 분할 자연 처리)
+ *   - 꼬리(진짜 현재미수)는 synthetic 소진 후에만 채움 → 과거입금이 현재미수를 자동으로 지우지 않음
+ * 일반 distributeEntry(미납 우선)와 달리 synthetic 슬롯을 대상으로 삼음 → 期초 대사 전용.
+ */
+export function realizeOpeningBalance<T extends PaymentScheduleInline>(
+  schedules: T[],
+  entry: PaymentEntry,
+  today: string,
+): { schedules: T[]; consumed: Array<{ seq: number; amount: number }> } {
+  const list = schedules.map((s) => ({ ...s }));
+  const idxBySeq = new Map<number, number>();
+  list.forEach((s, i) => idxBySeq.set(s.seq, i));
+  const hasSynthetic = (s: T) => (s.payments ?? []).some(isSyntheticPayment);
+  // synthetic(期초) 슬롯 먼저, 각 그룹 안에서 오래된(seq) 순
+  const ordered = [...list].sort((a, b) => {
+    const ga = hasSynthetic(a) ? 0 : 1;
+    const gb = hasSynthetic(b) ? 0 : 1;
+    if (ga !== gb) return ga - gb;
+    return a.seq - b.seq;
+  });
+  let remaining = Math.max(0, Math.round(entry.amount));
+  const consumed: Array<{ seq: number; amount: number }> = [];
+  for (const s of ordered) {
+    if (remaining <= 0) break;
+    if (s.status === '면제') continue;
+    const idx = idxBySeq.get(s.seq);
+    if (idx === undefined) continue;
+    const cur = list[idx];
+    // 실입금이 채울 여지 = 회차금액 − 이미 있는 실입금(synthetic 제외)
+    const owedByReal = Math.max(0, effectiveAmount(cur) - sumRealPayments(cur));
+    if (owedByReal <= 0) continue;
+    const apply = Math.min(owedByReal, remaining);
+    list[idx] = realizeSlot(cur, { ...entry, amount: apply }, today);
+    consumed.push({ seq: s.seq, amount: apply });
+    remaining -= apply;
+  }
+  return { schedules: list, consumed };
+}
+
+/** 회차에 실 entry 추가하며 synthetic 을 apply 만큼 오래된순 축소(총 paid 불변 = 期초→실 전환). */
+function realizeSlot<T extends PaymentScheduleInline>(s: T, realEntry: PaymentEntry, today: string): T {
+  let toShrink = realEntry.amount;
+  const kept: PaymentEntry[] = [];
+  for (const p of s.payments ?? []) {
+    if (toShrink > 0 && isSyntheticPayment(p)) {
+      if (p.amount <= toShrink) { toShrink -= p.amount; continue; } // synthetic 제거
+      kept.push({ ...p, amount: p.amount - toShrink }); // 부분 축소
+      toShrink = 0;
+    } else {
+      kept.push(p);
+    }
+  }
+  kept.push({ ...realEntry }); // 실입금 entry(실날짜·txId)로 전환
+  return recalcSchedule({ ...s, payments: kept }, today);
+}
+
 /** legacy 모델 (payments 없고 paidAmount만 있는 회차) → payments 배열 마이그레이션 */
 export function migrateLegacySchedules<T extends PaymentScheduleInline>(schedules: T[]): T[] {
   return schedules.map((s) => {
