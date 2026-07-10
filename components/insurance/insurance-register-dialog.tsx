@@ -294,6 +294,10 @@ export function InsuranceRegisterDialog({
                   {items.map((it) => {
                     const plateOk = it.carNumber && PLATE_RE.test(it.carNumber.replace(/\s/g, ''));
                     const dup = it.policyNo && existingPolicyNos.has(it.policyNo);
+                    // OCR 교차검증 — 낮은 신뢰도 건에 ⚠ 배지(능동 검증). 저장은 막지 않음.
+                    const cc = it._crosscheck;
+                    const ccWarn = it._status === 'done' && !!cc && cc.level !== 'ok';
+                    const ccTitle = cc?.issues.map((i) => `• ${i.message}`).join('\n');
                     const cycInst = (n: number) => it.installments?.find((x) => x.cycle === n);
                     const cyc = (n: number): number | undefined => cycInst(n)?.amount;
                     /** 일자만 짧게 MM-DD */
@@ -315,8 +319,12 @@ export function InsuranceRegisterDialog({
                         </td>
                         <td className="center">
                           {it._status === 'pending' && <CircleNotch size={14} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-weak)' }} />}
-                          {it._status === 'done' && plateOk && !dup && <CheckCircle size={14} weight="duotone" style={{ color: 'var(--green-text)' }} />}
-                          {it._status === 'done' && (!plateOk || dup) && <Warning size={14} weight="duotone" style={{ color: 'var(--orange-text)' }} />}
+                          {it._status === 'done' && plateOk && !dup && !ccWarn && <CheckCircle size={14} weight="duotone" style={{ color: 'var(--green-text)' }} />}
+                          {it._status === 'done' && (!plateOk || dup || ccWarn) && (
+                            <span title={ccTitle || undefined} style={{ display: 'inline-flex' }}>
+                              <Warning size={14} weight="duotone" style={{ color: cc?.level === 'error' ? 'var(--red-text)' : 'var(--orange-text)' }} />
+                            </span>
+                          )}
                           {it._status === 'failed' && <X size={14} weight="bold" style={{ color: 'var(--red-text)' }} />}
                         </td>
                         {/* 회사 매칭 */}
@@ -356,7 +364,8 @@ export function InsuranceRegisterDialog({
                           {it._status === 'pending' && <span className="dim">대기</span>}
                           {it._status === 'done' && dup && <span style={{ color: 'var(--orange-text)' }}>중복</span>}
                           {it._status === 'done' && !plateOk && <span style={{ color: 'var(--orange-text)' }}>번호누락</span>}
-                          {it._status === 'done' && plateOk && !dup && <span style={{ color: 'var(--green-text)' }}>OK</span>}
+                          {it._status === 'done' && plateOk && !dup && !ccWarn && <span style={{ color: 'var(--green-text)' }}>OK</span>}
+                          {it._status === 'done' && plateOk && !dup && ccWarn && <span style={{ color: cc?.level === 'error' ? 'var(--red-text)' : 'var(--orange-text)' }} title={ccTitle}>검산 {cc?.confidence}</span>}
                           {it._status === 'failed' && <span style={{ color: 'var(--red-text)' }} title={it._error}>실패</span>}
                         </td>
                         <td className="center">
