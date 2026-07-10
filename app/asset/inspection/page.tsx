@@ -15,6 +15,7 @@ import { exportToExcel } from '@/lib/excel-export';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { ASSET_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton, ExcelButton, ActionSep } from '@/components/ui/page-actions';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
@@ -88,21 +89,22 @@ export default function AssetInspectionPage() {
       }
       bottomBar={
         <BottomBar
-          left={<button className="btn btn-primary" type="button" onClick={() => {
-            const ids = Array.from(sel.selectedIds);
-            if (ids.length !== 1) { toast.info('검사를 등록할 차량 1대를 목록에서 선택하세요 (행 더블클릭으로도 상세가 열립니다).'); return; }
-            const row = upcoming.find(({ c }) => c.id === ids[0]);
-            if (row?.c.vehiclePlate) openVehicle(row.c.vehiclePlate, 'asset'); else toast.error('차량번호가 없어 상세를 열 수 없습니다.');
-          }}>+ 검사 등록</button>}
-          right={
-            <button
-              className="btn"
-              type="button"
-              disabled={upcoming.length === 0 && inspectionEvents.length === 0}
-              title={sel.size > 0
-                ? `선택한 ${sel.size}건 (만기 추적만) 엑셀 다운로드 — 선택 해제 시 전체`
-                : `현재 페이지 목록 (${upcoming.length + inspectionEvents.length}건) 엑셀 다운로드`}
-              onClick={() => {
+          left={
+            <>
+              <NewButton label="검사 등록" onClick={() => {
+                const ids = Array.from(sel.selectedIds);
+                if (ids.length !== 1) { toast.info('검사를 등록할 차량 1대를 목록에서 선택하세요 (행 더블클릭으로도 상세가 열립니다).'); return; }
+                const row = upcoming.find(({ c }) => c.id === ids[0]);
+                if (row?.c.vehiclePlate) openVehicle(row.c.vehiclePlate, 'asset'); else toast.error('차량번호가 없어 상세를 열 수 없습니다.');
+              }} />
+              <ActionSep />
+              <ExcelButton
+                count={sel.size > 0 ? sel.size : upcoming.length + inspectionEvents.length}
+                disabled={upcoming.length === 0 && inspectionEvents.length === 0}
+                title={sel.size > 0
+                  ? `선택한 ${sel.size}건 (만기 추적만) 엑셀 다운로드 — 선택 해제 시 전체`
+                  : `현재 페이지 목록 (${upcoming.length + inspectionEvents.length}건) 엑셀 다운로드`}
+                onClick={() => {
                 const upcomingFiltered = sel.size > 0
                   ? upcoming.filter(({ c }) => sel.selectedIds.has(c.id))
                   : upcoming;
@@ -153,10 +155,10 @@ export default function AssetInspectionPage() {
                   ],
                 });
               }}
-            >
-              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{sel.size > 0 ? sel.size : upcoming.length + inspectionEvents.length}</span>
-            </button>
+              />
+            </>
           }
+          right={null}
         />
       }
     >
