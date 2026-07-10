@@ -144,12 +144,49 @@ export function crosscheckVehicleReg(raw: Record<string, unknown>): CrosscheckRe
   return summarize(issues);
 }
 
+// ── 상환스케줄표(할부/리스) ─────────────────────────────────────────
+/** raw: LOAN_SCHEDULE_SCHEMA 출력 (principal/acquisition_cost, total_repayment, months, rows[{principal,interest,payment,remaining_principal}]). */
+export function crosscheckLoanSchedule(raw: Record<string, unknown>): CrosscheckResult {
+  const issues: CrosscheckIssue[] = [];
+  const rows = Array.isArray(raw.rows) ? raw.rows : [];
+  if (rows.length === 0) {
+    issues.push({ field: 'rows', message: '회차 행을 못 읽음 — 상환표 인식 실패', severity: 'error' });
+    return summarize(issues);
+  }
+  const months = num(raw.months);
+  const principal = num(raw.principal) ?? num(raw.acquisition_cost);
+  const totalRep = num(raw.total_repayment);
+
+  let pSum = 0, iSum = 0, paySum = 0, rowMismatch = 0, remainViolation = 0;
+  let prev = Infinity;
+  for (const it of rows) {
+    if (typeof it !== 'object' || it === null) continue;
+    const o = it as Record<string, unknown>;
+    const p = num(o.principal) ?? 0;
+    const ic = num(o.interest) ?? 0;
+    let pay = num(o.payment) ?? 0;
+    if (pay === 0) pay = p + ic;
+    pSum += p; iSum += ic; paySum += pay;
+    if (pay > 0 && Math.abs(p + ic - pay) > 1) rowMismatch++;
+    const rem = num(o.remaining_principal ?? o.remainingPrincipal);
+    if (rem != null) { if (rem > prev + 1) remainViolation++; prev = rem; }
+  }
+  void iSum;
+  if (rowMismatch > 0) issues.push({ field: 'rows', message: `${rowMismatch}개 회차에서 원금+이자 ≠ 월불입금 — 금액 오독 의심`, severity: 'warn' });
+  if (remainViolation > 0) issues.push({ field: 'rows', message: `미회수원금이 증가하는 회차 ${remainViolation}개 — 잔액 오독 의심`, severity: 'warn' });
+  if (months != null && rows.length !== months) issues.push({ field: 'months', message: `회차 수(${rows.length})와 기간(${months}) 불일치 — 일부 행 누락 의심`, severity: 'warn' });
+  if (principal != null && pSum > 0 && Math.abs(pSum - principal) > Math.max(1000, principal * 0.01)) issues.push({ field: 'principal', message: `원금 합(${WON(pSum)})과 대출원금(${WON(principal)}) 불일치`, severity: 'warn' });
+  if (totalRep != null && paySum > 0 && Math.abs(paySum - totalRep) > Math.max(1000, totalRep * 0.01)) issues.push({ field: 'total_repayment', message: `월불입 합(${WON(paySum)})과 총상환액(${WON(totalRep)}) 불일치`, severity: 'warn' });
+  return summarize(issues);
+}
+
 // ── 디스패처 ────────────────────────────────────────────────────────
 export function crosscheckOcr(docType: string, raw: Record<string, unknown>): CrosscheckResult {
   switch (docType) {
     case 'insurance_policy': return crosscheckInsurance(raw);
     case 'penalty':          return crosscheckPenalty(raw);
     case 'vehicle_reg':      return crosscheckVehicleReg(raw);
+    case 'loan_schedule':    return crosscheckLoanSchedule(raw);
     default:                 return { level: 'ok', confidence: 100, issues: [] };
   }
 }

@@ -166,6 +166,44 @@ const INSURANCE_POLICY_SCHEMA = {
   ],
 };
 
+const LOAN_SCHEDULE_ROW_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    seq: { type: Type.INTEGER, description: '회차 (1,2,3,...)' },
+    due_date: { type: Type.STRING, nullable: true, description: '납입(예정)일 YYYY-MM-DD' },
+    principal: { type: Type.INTEGER, nullable: true, description: '원금(원)' },
+    interest: { type: Type.INTEGER, nullable: true, description: '이자(원)' },
+    payment: { type: Type.INTEGER, nullable: true, description: '월불입금/상환금(원) = 원금+이자' },
+    remaining_principal: { type: Type.INTEGER, nullable: true, description: '미회수(잔여)원금(원)' },
+    prepayment: { type: Type.INTEGER, nullable: true, description: '중도상환금액(원)' },
+  },
+  required: ['seq', 'due_date', 'principal', 'interest', 'payment', 'remaining_principal'],
+};
+
+const LOAN_SCHEDULE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    loan_company: { type: Type.STRING, nullable: true, description: '할부/리스 금융사 (예: 오릭스캐피탈, 도이치파이낸셜, 메리츠캐피탈)' },
+    contract_no: { type: Type.STRING, nullable: true, description: '계약번호/약정번호' },
+    car_number: { type: Type.STRING, nullable: true, description: '차량번호 (있으면)' },
+    acquisition_cost: { type: Type.INTEGER, nullable: true, description: '취득원가/차량가(원)' },
+    principal: { type: Type.INTEGER, nullable: true, description: '대출(할부)원금(원) — 취득원가−선수금' },
+    total_repayment: { type: Type.INTEGER, nullable: true, description: '총상환액(원)' },
+    months: { type: Type.INTEGER, nullable: true, description: '기간(개월/회차 수)' },
+    interest_rate: { type: Type.NUMBER, nullable: true, description: '연이율(%)' },
+    monthly_payment: { type: Type.INTEGER, nullable: true, description: '월불입금(원, 원리금균등이면 정액)' },
+    rows: {
+      type: Type.ARRAY,
+      description: '회차별 상환 행. 표의 각 행(회차·납입일·원금·이자·월불입금·미회수원금)을 빠짐없이.',
+      items: LOAN_SCHEDULE_ROW_SCHEMA,
+    },
+  },
+  required: [
+    'loan_company', 'contract_no', 'car_number', 'acquisition_cost', 'principal',
+    'total_repayment', 'months', 'interest_rate', 'monthly_payment', 'rows',
+  ],
+};
+
 const DEPOSIT_INSTALLMENT_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -339,6 +377,15 @@ interface TypeSpec {
 }
 
 const TYPE_SPECS: Record<string, TypeSpec> = {
+  loan_schedule: {
+    label: '상환스케줄표',
+    prompt: `이 문서는 한국 할부/리스(시설대여) 금융사의 상환스케줄표(원리금 상환표)입니다. 오릭스캐피탈·도이치파이낸셜·메리츠캐피탈 등 금융사마다 양식이 다릅니다.
+- 상단/헤더: 금융사명(loan_company), 계약(약정)번호(contract_no), 차량번호(car_number), 취득원가/차량가(acquisition_cost), 대출원금(principal), 총상환액(total_repayment), 기간 개월수(months), 연이율(interest_rate), 월불입금(monthly_payment).
+- 표: 회차별로 [회차(seq), 납입(예정)일(due_date), 원금(principal), 이자(interest), 월불입금(payment), 미회수(잔여)원금(remaining_principal), (있으면)중도상환금액(prepayment)]. **모든 회차 행을 빠짐없이** rows 로 추출.
+- 금액은 원 단위 숫자만(콤마 제거). 규칙: 월불입금 = 원금 + 이자. 미회수원금은 회차가 지날수록 감소.
+- 표가 여러 페이지로 이어지면 전부 포함. 인식 못 한 값은 null.`,
+    schema: LOAN_SCHEDULE_SCHEMA,
+  },
   vehicle_reg: {
     label: '자동차등록증',
     prompt: `이 문서는 한국 자동차등록증입니다.

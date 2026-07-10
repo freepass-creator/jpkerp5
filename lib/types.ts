@@ -598,6 +598,27 @@ export type Company = {
 };
 
 /** 차량 마스터 — 등록증 기준 (plate + model + company만). 디테일은 나중. */
+/** 할부/리스 상환방식 — 금융사 스케줄 생성 공식 결정 */
+export type LoanRepaymentMethod = '원리금균등' | '원금균등' | '만기일시';
+
+/** 상환표 출처 — 'uploaded'(OCR 상환스케줄표)가 'generated'(금리·기간 계산)보다 우선 */
+export type LoanScheduleSource = 'generated' | 'uploaded';
+
+/** 상환스케줄표(리스/할부) 회차별 원리금 한 행.
+ *  홀로 존재 X — 차량(자산)·할부사(거래처)·월 은행출금(자금)·회계(원금/이자)에 연결됨. */
+export interface LoanScheduleRow {
+  seq: number;                 // 회차
+  dueDate: string;             // 납입예정일 YYYY-MM-DD
+  principal: number;           // 원금 (부채상환)
+  interest: number;            // 이자 (금융비용)
+  payment: number;             // 월불입금 = principal + interest
+  remainingPrincipal: number;  // 회차 후 미회수(잔여)원금
+  prepayment?: number;         // 중도상환금액
+  /** 이 회차에 매칭된 은행 출금 tx id — matchLoanPaymentsToWithdrawals 가 채움(자금 연결) */
+  matchedTxId?: string;
+  paidDate?: string;           // 실제 납입확인일(매칭된 출금 일자)
+}
+
 export type Vehicle = {
   id: string;
   plate: string;            // 차량번호 (unique) — 자동차등록번호
@@ -708,6 +729,16 @@ export type Vehicle = {
   loanRemainingPrincipal?: number; // 잔여원금 (원)
   loanStartDate?: string;          // 할부 개시일
   loanCashOnly?: boolean;          // 할부 없음 (현금 일시불) — 명시적 표시. 미입력과 구분
+  loanContractNo?: string;         // 할부/리스 계약번호 (거래처 매칭 정확키)
+  loanPrincipal?: number;          // 대출(할부)원금 = 취득원가 − 선수금 (스케줄 생성 입력)
+  loanInterestRate?: number;       // 연이율 % (스케줄 생성 입력)
+  loanMethod?: LoanRepaymentMethod; // 상환방식 (기본 원리금균등)
+  loanMonthlyPayment?: number;     // 월 불입금 (원리금균등 시 정액)
+  loanTotalRepayment?: number;     // 총상환액 (원금+이자 합)
+  /** 회차별 원리금 상환표 — OCR(상환스케줄표) 또는 금리·기간·원금으로 생성. 원본은 loanContractUrl. */
+  loanSchedule?: LoanScheduleRow[];
+  /** 상환표 출처 — 'uploaded'(OCR)가 'generated'(계산)보다 우선. 업로드 시 생성값을 덮음 */
+  loanScheduleSource?: LoanScheduleSource;
   gpsProvider?: string;            // GPS 공급사 (예: 마카롱)
   gpsDeviceId?: string;            // GPS 단말번호
 
