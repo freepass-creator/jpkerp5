@@ -78,7 +78,9 @@ export const SNAPSHOT_COLUMNS: ColumnSpec[] = [
   { label: '보증금',     field: 'deposit',         required: true, example: '2000000', hint: '원 단위 (무보증 상품이면 0 — 0도 명시)' },
   { label: '현재미수',   field: 'unpaidAmount',    required: true, example: '1500000', hint: '오늘 기준 미수 합계 (완납이면 0 — 0도 명시). 마지막입금일 이후 회차에 역순 분배(期初)' },
 
-  // ─── 선택 = 있으면 期初·독촉에 활용, 없으면 나중에 각 화면에서 보완 ───
+  // ─── 선택 = 있으면 운영현황이 더 완전해짐(importer가 이미 소비). 없으면 각 화면에서 보완 ───
+  { label: '차종',       field: 'vehicleModel',   required: false, example: 'K5', hint: '운영현황 차종칸 + 자산마스터 모델. 비우면 자산관리에서 채움(그전까지 「미정」)' },
+  { label: '보험연령',   field: 'insuranceAge',    required: false, example: '26', hint: '보험 가입가능 최저연령(증권 기준, 운전연령과 별개). 운영중 미입력 시 운영현황 경고. 보험 파트에서 나중에 보완 가능' },
   { label: '마지막입금일', field: 'lastPaidDate', required: false, example: '2026-04-25', hint: '이 날짜 이전 회차는 자동 완료(期初). 비우면 오늘 기준 역순 분배' },
   { label: '연락처',     field: 'customerPhone1',  required: false, example: '010-1234-5678', hint: '미수 독촉 문자용' },
   { label: '결제방법',   field: 'paymentMethod',   required: false, example: 'CMS', hint: 'CMS/카드/이체/후불/현금' },

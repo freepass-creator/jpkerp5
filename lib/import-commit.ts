@@ -195,6 +195,8 @@ export type SnapshotPatch = {
   company: string;
   vehicleModel: string;
   customerName: string;
+  /** 등록번호(주민/사업자/법인) — 진짜 식별키. 운전연령·동일인 연결·수납 매칭 원천. */
+  customerIdentNo?: string;
   customerPhone1: string;
   customerKind?: CustomerKind;
   contractDate: string;
@@ -397,7 +399,9 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
     ? Math.floor(paymentDayRaw)
     : (period.start ? parseInt(period.start.slice(8, 10), 10) || 1 : 1);
   const paymentMethod = toStr(get(row, '결제방법', '결제수단', 'paymentMethod')) || '이체';
-  const customerKind = pickCustomerKind(get(row, '구분', 'customerKind'));
+  // 등록번호 = 진짜 식별키. 자릿수로 개인/사업자 자동판별(구분 힌트 있으면 우선).
+  const identDigits = normalizeIdent(toStr(get(row, '등록번호', '주민번호', '사업자번호', '법인번호', 'customerIdentNo', 'customerRegNo')));
+  const customerKind = inferKind(identDigits, pickCustomerKind(get(row, '구분', '계약자구분', 'customerKind')));
   // 손님 있는 계약 행은 차량상태 컬럼 무시 — 항상 '운행'
   const vehicleStatus: VehicleStatus = '운행';
 
@@ -415,6 +419,7 @@ export function parseSnapshotRow(row: Row, companies?: Company[]): SnapshotPatch
     company,
     vehicleModel,
     customerName,
+    customerIdentNo: identDigits || undefined,
     customerPhone1: phone,
     customerKind,
     contractDate: period.start,
@@ -478,6 +483,7 @@ export function applySnapshotToContract(
       vehicleModel: patch.vehicleModel || existing.vehicleModel,
       vehicleStatus: patch.vehicleStatus || existing.vehicleStatus,
       customerName: patch.customerName || existing.customerName,
+      customerIdentNo: patch.customerIdentNo || existing.customerIdentNo,
       customerPhone1: patch.customerPhone1 || existing.customerPhone1,
       customerKind: patch.customerKind ?? existing.customerKind,
       contractDate: patch.contractDate || existing.contractDate,
@@ -505,6 +511,7 @@ export function applySnapshotToContract(
     contractNo: `ICR-${yy}${mm}-${seqHash}`,
     company: (patch.company || '기타') as Contract['company'],
     customerName: patch.customerName,
+    customerIdentNo: patch.customerIdentNo,
     customerPhone1: patch.customerPhone1,
     customerKind: patch.customerKind,
     vehiclePlate: patch.vehiclePlate,
