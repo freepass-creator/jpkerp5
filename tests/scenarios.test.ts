@@ -14,6 +14,7 @@ import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
 import { splitVat, computeVatReport, vatPeriodRange } from '@/lib/vat-report';
 import { findVehicleForContract } from '@/lib/entity-sync';
 import { deriveCustomers } from '@/lib/customer-derive';
+import { depositLedger, unrefundedDeposit, hasUnrefundedDeposit } from '@/lib/deposit';
 import { nextCompanyCode, nextAssetCode, nextContractNo, yymmOf } from '@/lib/code-scheme';
 import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry, Vehicle } from '@/lib/types';
 
@@ -209,6 +210,22 @@ describe('코드체계 SSOT (쓰기경로 v6정합)', () => {
     expect(nextContractNo('CP01', [{ contractNo: 'CP01-2607-0003' }, { contractNo: 'CP01-2606-0009' }], '2607')).toBe('CP01-2607-0004');
   });
   it('yymmOf', () => { expect(yymmOf('2026-07-15')).toBe('2607'); });
+});
+
+describe('보증금 원장 (반납 미반환 처리)', () => {
+  it('미반환 = 받음 − 차감 − 환불, 반납이면 처리대상', () => {
+    const c = contract({ deposit: 1_000_000, depositReceived: 1_000_000, depositDeductions: [{ id: 'd1', date: '2025-06-01', amount: 300_000, reason: '미납 충당' }], status: '해지', returnedDate: '2025-06-15' });
+    expect(depositLedger(c).unrefunded).toBe(700_000);
+    expect(hasUnrefundedDeposit(c)).toBe(true);
+  });
+  it('환불 완료면 미반환 0·처리대상 아님', () => {
+    const c = contract({ depositReceived: 500_000, depositRefunded: 500_000, status: '해지', returnedDate: '2025-06-15' });
+    expect(unrefundedDeposit(c)).toBe(0);
+    expect(hasUnrefundedDeposit(c)).toBe(false);
+  });
+  it('운행중이면 미반환 있어도 처리대상 아님', () => {
+    expect(hasUnrefundedDeposit(contract({ depositReceived: 500_000, status: '운행' }))).toBe(false);
+  });
 });
 
 describe('고객 마스터 파생 (R5)', () => {

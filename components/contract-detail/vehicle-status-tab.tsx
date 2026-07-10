@@ -14,6 +14,7 @@ import {
   PauseCircle, PlayCircle, Warning as WarningIcon,
 } from '@phosphor-icons/react';
 import { Section } from '@/components/ui/detail-primitives';
+import { DepositSection } from '@/components/contract-detail/deposit-section';
 import { isContractEnded } from '@/lib/contract-lifecycle';
 import { Field as SharedField } from '@/components/ui/editable-field';
 import { MissingBadge, MissingText } from '@/components/ui/missing-badge';
@@ -962,6 +963,9 @@ export function VehicleStatusTab({ c, onUpdate }: { c: Contract; onUpdate: (u: C
       {(isContractEnded(c) || c.endReason) && (
         <EndInfoSection c={c} onUpdate={onUpdate} />
       )}
+
+      {/* 보증금 처리 — 반납/해지/회수 시 미반환 보증금 차감·환불 */}
+      <DepositSection c={c} onUpdate={onUpdate} />
 
       {/* 첨부 파일 — 첨부 상태 + 다운로드 (미리보기 없음) */}
       <AttachmentList c={c} />
