@@ -405,7 +405,7 @@ export function applyCardMatch(
   return {
     txPatch: {
       matchedContractId: contract.id,
-      matchedScheduleId: String(scheduleSeq),
+      matchedScheduleSeq: scheduleSeq, // BankTx 와 통일(number)
     },
     contractPatch: {
       schedules: finalSchedules,
@@ -446,7 +446,7 @@ export function reverseCardMatch(
   return {
     txPatch: {
       matchedContractId: undefined,
-      matchedScheduleId: undefined,
+      matchedScheduleSeq: undefined,
     },
     contractPatch: {
       schedules,

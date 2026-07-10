@@ -388,7 +388,9 @@ export type CardTransaction = {
   linkedVehiclePlate?: string;
   // ─── 매칭 ───
   matchedContractId?: string;
+  /** @deprecated 회차참조는 matchedScheduleSeq(number) 로 통일(#쓰기경로 v6정합). BankTx 와 동일 필드. */
   matchedScheduleId?: string;
+  matchedScheduleSeq?: number; // 회차 번호 — BankTx 와 통일(인라인 schedules 매칭용)
   /** 카드사 집금 정산 ID — 1 BankTransaction deposit ↔ N CardTransaction 묶음. role='item' 만 카드 측에 표시 */
   settlementId?: string;
   raw?: Record<string, unknown>;

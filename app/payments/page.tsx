@@ -217,7 +217,7 @@ export default function PaymentsPage() {
   async function handleCardReverse(tx: import('@/lib/types').CardTransaction) {
     const c = tx.matchedContractId ? contractById.get(tx.matchedContractId) : undefined;
     if (!c) {
-      await updateCard(tx.id, { matchedContractId: undefined, matchedScheduleId: undefined });
+      await updateCard(tx.id, { matchedContractId: undefined, matchedScheduleSeq: undefined });
       void audit.unmatch('card_tx', tx.id, `카드 매칭 해제 (계약 없음) ₩${formatCurrency(tx.amount)}`);
       return;
     }
