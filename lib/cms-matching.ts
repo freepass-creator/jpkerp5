@@ -31,9 +31,12 @@ export type CmsMatchCandidate = {
   confidence: 'high' | 'medium' | 'low';  // feeRate 가 0.1%±0.05% 면 high
 };
 
-const DATE_TOLERANCE_DAYS = 7;  // 영업일+4일 기준 — 주말 낀 경우 최대 7일 달력일
-const MIN_FEE_RATE = 0.0005;   // 0.05%
-const MAX_FEE_RATE = 0.003;    // 0.3%
+const DATE_TOLERANCE_DAYS = 7;  // 정산일→집금 영업일+며칠. 주말 낀 경우 최대 7일 달력일
+// 실 CMS/PG 수수료대(스위치플랜 실측: 집금 2~3%). 은행CMS는 0.1%대. 정액/면제(0%)도 허용.
+const MIN_FEE_RATE = 0;        // 수수료 0(정액·면제)도 허용 — 숫자만 맞으면
+const MAX_FEE_RATE = 0.035;    // 3.5% (실 CMS 2~3% + 여유)
+const TYPICAL_FEE_LO = 0.005;  // 전형 CMS 수수료대(신뢰도 판정용)
+const TYPICAL_FEE_HI = 0.035;
 
 function ymd(date: string): string { return (date ?? '').slice(0, 10); }
 
@@ -53,7 +56,10 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
   const itemsByCompany = new Map<string, BankTransaction[]>();
   for (const t of bankTx) {
     if (t.settlementId) continue;
-    if ((t.amount ?? 0) > 0 && /CMS|집금|cms/i.test(`${t.counterparty ?? ''} ${t.memo ?? ''}`)) {
+    // 집금 입금 후보 — 실계좌엔 "CMS" 라벨이 없고 입금자명이 가상계좌식(예 616에서868)이라
+    // 라벨에 의존하지 않고 금액으로 매칭. 라벨 있거나, 계약 미매칭 계좌입금(집금은 개별계약에 안 붙는 묶음).
+    const labeled = /CMS|집금|cms/i.test(`${t.counterparty ?? ''} ${t.memo ?? ''}`);
+    if ((t.amount ?? 0) > 0 && !t.matchedContractId && (labeled || t.source === '계좌' || t.source === 'CMS집금')) {
       depositCandidates.push(t);
     }
     // CMS 개별건 — 전통적인 자동이체 채널 + 계좌 채널로 들어왔지만 계약에 매칭된 입금건도 포함
@@ -82,14 +88,17 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
     // 1차 후보: 그 window 의 전체 자동이체
     const itemsSum = sameWindow.reduce((s, x) => s + (x.amount ?? 0), 0);
     const fee = itemsSum - (dep.amount ?? 0);
-    if (fee <= 0) continue;   // 수수료 음수 = 합계가 입금보다 작음, 매칭 X
-    const feeRate = fee / itemsSum;
-    if (feeRate < MIN_FEE_RATE / 4 || feeRate > MAX_FEE_RATE * 2) continue;   // 너무 동떨어진 비율 제외
+    if (fee < 0) continue;    // 입금이 합계보다 큼 = 집금 아님(수수료는 차감분이라 입금 ≤ 합계)
+    const feeRate = itemsSum > 0 ? fee / itemsSum : 1;
+    if (feeRate > MAX_FEE_RATE) continue;   // 수수료율 상한(3.5%) 초과 = 집금 아님
+    void MIN_FEE_RATE;
 
+    // 신뢰도 — 전형 CMS 수수료대(0.5~3.5%) + 2건 이상 묶음이면 high(실 집금 패턴).
+    // 수수료 매우 낮음(≤0.5%)은 우연 일치(법인이체 등) 가능 → medium 이하로.
     const confidence: CmsMatchCandidate['confidence'] =
-      feeRate >= MIN_FEE_RATE && feeRate <= MAX_FEE_RATE
-        ? (Math.abs(feeRate - 0.001) < 0.0005 ? 'high' : 'medium')
-        : 'low';
+      (feeRate >= TYPICAL_FEE_LO && feeRate <= TYPICAL_FEE_HI && sameWindow.length >= 2) ? 'high'
+      : (sameWindow.length >= 2 || feeRate >= TYPICAL_FEE_LO) ? 'medium'
+      : 'low';
 
     out.push({
       depositId: dep.id,
