@@ -8,7 +8,7 @@
 
 import type { Contract, Vehicle, BankTransaction, CardTransaction, InsurancePolicy } from './types';
 import type { PenaltyWorkItem } from './penalty-pdf';
-import { findVehicleByPlate, normPlate } from './entity-sync';
+import { findVehicleForContract, normPlate } from './entity-sync';
 import { isContractEnded } from './contract-lifecycle';
 
 export type ContractLinkage = {
@@ -38,7 +38,7 @@ export function computeContractLinkage(
     insurances: InsurancePolicy[];
   },
 ): ContractLinkage {
-  const vehicle = findVehicleByPlate(data.vehicles, c.vehiclePlate) ?? null;
+  const vehicle = findVehicleForContract(data.vehicles, c) ?? null;
 
   let incomeCount = 0;
   let incomeAmount = 0;

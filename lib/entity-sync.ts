@@ -110,6 +110,21 @@ export function findVehicleByPlate(vehicles: Vehicle[], plate?: string): Vehicle
     ?? vehicles.find((v) => (v.plateHistory ?? []).some((h) => normPlate(h) === key));
 }
 
+/**
+ * 안정 FK 우선 차량 조회 — vehicleId(push-id) 있으면 그것으로 확정 조회, 없으면 plate 폴백.
+ * plate 문자열 링크(OCR 오보정·번호변경에 취약)를 대체하는 정본 참조. Contract·Penalty·Insurance 공용.
+ */
+export function findVehicleForContract(
+  vehicles: Vehicle[],
+  ref: { vehicleId?: string; vehiclePlate?: string },
+): Vehicle | undefined {
+  if (ref.vehicleId) {
+    const byId = vehicles.find((v) => v.id === ref.vehicleId);
+    if (byId) return byId;
+  }
+  return findVehicleByPlate(vehicles, ref.vehiclePlate);
+}
+
 /** 보험증권의 회사 식별자 (companyCode 또는 bizNo) → 회사 마스터 매칭 */
 export function findCompanyForPolicy(
   policy: InsurancePolicy,

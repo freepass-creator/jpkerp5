@@ -78,6 +78,8 @@ export type Contract = {
    */
   additionalDrivers?: AdditionalDriver[];
   // 차량 (임베드)
+  /** 안정 FK — Vehicle.id (push-id). plate 문자열 링크의 정본 대체. 저장 시 findVehicleByPlate 로 확정. 없으면 vehiclePlate 폴백 */
+  vehicleId?: string;
   vehiclePlate: string;
   vehicleModel: string;            // 자동 결합 풀네임 (예: '현대 아반떼 더 뉴 그랜저 GN7 가솔린 3.5 AWD 캘리그래피')
   vehicleStatus: VehicleStatus;

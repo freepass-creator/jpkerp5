@@ -12,6 +12,7 @@ import { planBulkReconcile } from '@/lib/bulk-reconcile';
 import { applyMultiContractMatch, updateBankTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
 import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
 import { splitVat, computeVatReport, vatPeriodRange } from '@/lib/vat-report';
+import { findVehicleForContract } from '@/lib/entity-sync';
 import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry, Vehicle } from '@/lib/types';
 
 const TODAY = '2026-07-09';
@@ -150,6 +151,19 @@ describe('computeContractAsOf — 시점(as-of) 재구성', () => {
     const before = computeContractAsOf(returned, '2025-05-01'); // 반납 전 → 면제 해제, 회차 살아있음
     expect(before.returnedDate).toBeUndefined();
     expect(before.schedules?.some((s) => s.status === '면제')).toBe(false);
+  });
+});
+
+describe('findVehicleForContract — 안정 FK 우선 (R1)', () => {
+  const vehicles = [{ id: 'vA', plate: '11가1111' }, { id: 'vB', plate: '22가2222' }] as unknown as Vehicle[];
+  it('vehicleId 있으면 그것으로 조회 (plate 가 달라도 FK 우선)', () => {
+    expect(findVehicleForContract(vehicles, { vehicleId: 'vB', vehiclePlate: '11가1111' })?.id).toBe('vB');
+  });
+  it('vehicleId 없으면 plate 폴백', () => {
+    expect(findVehicleForContract(vehicles, { vehiclePlate: '11가1111' })?.id).toBe('vA');
+  });
+  it('vehicleId 가 무효(차량 없음)면 plate 폴백', () => {
+    expect(findVehicleForContract(vehicles, { vehicleId: 'gone', vehiclePlate: '22가2222' })?.id).toBe('vB');
   });
 });
 

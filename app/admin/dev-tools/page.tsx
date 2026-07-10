@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -65,6 +65,13 @@ const TOOLS: ToolCard[] = [
     title: '일괄 대사 매칭 (초기 세팅)',
     desc: '3년치 은행입금을 활성 계약자 계약에 계약일순·오래된 미납부터 FIFO 로 채워 미리보기 → 확인 후 일괄 적용. 미귀속(붕 떠있는) 입금 검토 포함.',
     icon: <ShieldWarning size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/admin/link-vehicles',
+    title: '계약↔차량 안정 링크 (vehicleId 백필)',
+    desc: 'plate 문자열 링크를 Vehicle.id 안정 FK로 확정 — OCR 오보정·번호변경에도 링크 불변, v6 이식성. plate 는 폴백 유지. 재실행 가능(멱등).',
+    icon: <LinkSimple size={18} weight="duotone" />,
     variant: 'op',
   },
   {
