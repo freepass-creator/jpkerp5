@@ -96,12 +96,13 @@ function KV({ k, v, mono = false }: { k: string; v?: React.ReactNode; mono?: boo
 
 /* ─── 자산현황 탭1: 운영 요약 — 한 화면 운영 상태 한눈에 ─── */
 function OperationOverviewTab({
-  vehicle, contracts, history, onUpdate,
+  vehicle, contracts, history, onUpdate, onUpdateContract,
 }: {
   vehicle: Vehicle;
   contracts: Contract[];
   history: HistoryEntry[];
   onUpdate: (v: Vehicle) => void;
+  onUpdateContract?: (c: Contract) => void;
 }) {
   const { companies } = useCompanies();
   // 등록 상태 — 자등증 입력 여부
@@ -141,10 +142,19 @@ function OperationOverviewTab({
   const nextStates = NEXT_STATES[vehicle.status as VehicleStatus] ?? [];
 
   async function changeStatus(next: VehicleStatus) {
-    if (!await showConfirm({ title: `차량 상태를 [${vehicle.status}] → [${next}] 로 변경하시겠습니까?` })) return;
+    // 운행 → 반납 = 회수(정상반납은 종료대기 경유). 회수 시 계약도 채권보전으로 동반 전환.
+    const isRecovery = vehicle.status === '운행' && next === '반납';
+    const msg = isRecovery
+      ? '회수 처리 — 차량 [운행]→[반납] + 활성 계약을 [채권보전]으로 전환합니다. 진행할까요?'
+      : `차량 상태를 [${vehicle.status}] → [${next}] 로 변경하시겠습니까?`;
+    if (!await showConfirm({ title: msg })) return;
     // 매각 전환 시 saleDate stamp — 자산대장 감가 컷오프 (처분 페이지와 동일 규칙)
     const saleDate = next === '매각' && !vehicle.saleDate ? todayKr() : vehicle.saleDate;
     onUpdate({ ...vehicle, status: next, saleDate });
+    // 회수 → 계약 채권보전(미수 보존). 데이터는 홀로 안 산다 — 차량↔계약 동반 갱신.
+    if (isRecovery && activeContract && onUpdateContract) {
+      onUpdateContract({ ...activeContract, status: '채권', endReason: '채권보전' });
+    }
   }
 
   // 간편 상태(2축) + 체크리스트 게이팅 전이
@@ -1153,7 +1163,7 @@ export function VehicleDetailDialog({
         : [
             // 페이지 메뉴와 동일 6분류
             { value: 'operation', label: '운영 현황',
-              content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} onUpdate={onUpdate} />
+              content: <OperationOverviewTab vehicle={vehicle} contracts={sortedContracts} history={sortedHistory} onUpdate={onUpdate} onUpdateContract={onUpdateContract} />
             },
             { value: 'risk', label: `리스크 현황${incidentHistory.length > 0 ? ` (${incidentHistory.length})` : ''}`,
               content: <RiskTab vehicle={vehicle} contracts={sortedContracts} incidentHistory={incidentHistory} allHistory={sortedHistory} />
