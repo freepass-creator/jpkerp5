@@ -3,7 +3,7 @@
  * Firebase·React 없이 검증. 이번 세션에 고친 로직의 회귀 안전망.
  */
 import { describe, it, expect } from 'vitest';
-import { generateSchedules, distributeEntry, recalcContract, resizeSchedules, computeContractAsOf } from '@/lib/payment-schedule';
+import { generateSchedules, distributeEntry, recalcContract, resizeSchedules, computeContractAsOf, distributeUnpaid, isSyntheticPayment } from '@/lib/payment-schedule';
 import { bankTxKeys } from '@/lib/dedup-keys';
 import { dedupAgainst } from '@/lib/dedup';
 import { buildBankJournal, summarizeByAccount } from '@/lib/gl-entries';
@@ -101,6 +101,21 @@ describe('반납 → 되돌리기 (면제·일할·종료정보)', () => {
     expect(reopened.returnedDate).toBeUndefined();
     expect(reopened.endReason).toBeUndefined();
     expect(reopened.schedules?.filter((s) => s.status === '면제' && s.dueDate > '2025-06-15')).toHaveLength(0);
+  });
+});
+
+describe('합성 입금 provenance (R4)', () => {
+  it('isSyntheticPayment — synthetic 플래그 또는 source=정산(구데이터 폴백)', () => {
+    expect(isSyntheticPayment({ synthetic: true, source: '계좌' })).toBe(true);
+    expect(isSyntheticPayment({ source: '정산' })).toBe(true);
+    expect(isSyntheticPayment({ source: '계좌' })).toBe(false);
+  });
+  it('distributeUnpaid 가 미수 맞추려 만든 합성 정산 entry 는 synthetic:true', () => {
+    const c = contract();
+    const distributed = distributeUnpaid(schedulesFor(c), 1_000_000, TODAY);
+    const settled = distributed.flatMap((s) => s.payments ?? []).filter((p) => p.source === '정산');
+    expect(settled.length).toBeGreaterThan(0);
+    expect(settled.every((p) => p.synthetic === true)).toBe(true);
   });
 });
 

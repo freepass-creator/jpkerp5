@@ -23,6 +23,16 @@ export function sumPayments(s: { payments?: PaymentEntry[] }): number {
   return (s.payments ?? []).reduce((sum, p) => sum + (p.amount || 0), 0);
 }
 
+/** 합성(재구성) entry 판별 — 신규는 synthetic 플래그, 구데이터는 source='정산' 폴백. 실입금만 골라낼 때 사용(#R4·회계·v6 ETL). */
+export function isSyntheticPayment(p: { synthetic?: boolean; source?: string }): boolean {
+  return p.synthetic === true || p.source === '정산';
+}
+
+/** 실입금 합계 — 합성 entry 제외(실현금만). */
+export function sumRealPayments(s: { payments?: PaymentEntry[] }): number {
+  return (s.payments ?? []).filter((p) => !isSyntheticPayment(p)).reduce((sum, p) => sum + (p.amount || 0), 0);
+}
+
 /** discounts 합계 — undefined 안전 */
 export function sumDiscounts(s: { discounts?: DiscountEntry[] }): number {
   return (s.discounts ?? []).reduce((sum, d) => sum + (d.amount || 0), 0);
@@ -183,7 +193,7 @@ export function migrateLegacySchedules<T extends PaymentScheduleInline>(schedule
     if (s.paidAmount > 0) {
       // 정산 entry 1건으로 변환 — paidAt 있으면 그 날짜, 없으면 dueDate
       const date = s.paidAt || s.dueDate;
-      const payments: PaymentEntry[] = [{ date, amount: s.paidAmount, source: '정산', memo: '스냅샷 자동 정리' }];
+      const payments: PaymentEntry[] = [{ date, amount: s.paidAmount, source: '정산', synthetic: true, memo: '스냅샷 자동 정리' }];
       return { ...s, payments };
     }
     return { ...s, payments: [] };
@@ -343,7 +353,7 @@ export function distributeUnpaid<T extends PaymentScheduleInline>(
     }
     // lastPaidDate 이전(또는 같음) 회차는 자동 완료 처리 — 그 시점까지는 정산됨
     if (lastPaidDate && s.dueDate <= lastPaidDate) {
-      s.payments = [{ date: lastPaidDate, amount: s.amount, source: '정산', memo: `마지막입금일(${lastPaidDate}) 이전 자동 정산` }];
+      s.payments = [{ date: lastPaidDate, amount: s.amount, source: '정산', synthetic: true, memo: `마지막입금일(${lastPaidDate}) 이전 자동 정산` }];
       s.status = '완료';
       s.paidAmount = s.amount;
       s.paidAt = lastPaidDate;
@@ -351,7 +361,7 @@ export function distributeUnpaid<T extends PaymentScheduleInline>(
     }
     if (remaining <= 0) {
       // 과거 회차 + 미수 다 차감됨 → 정산 entry 추가
-      s.payments = [{ date: s.dueDate, amount: s.amount, source: '정산', memo: '스냅샷 자동 정리' }];
+      s.payments = [{ date: s.dueDate, amount: s.amount, source: '정산', synthetic: true, memo: '스냅샷 자동 정리' }];
       s.status = '완료';
       s.paidAmount = s.amount;
       s.paidAt = s.dueDate;
@@ -363,7 +373,7 @@ export function distributeUnpaid<T extends PaymentScheduleInline>(
     } else {
       // 부분납 — 채워진 부분만 정산 entry로
       const paid = s.amount - remaining;
-      s.payments = [{ date: s.dueDate, amount: paid, source: '정산', memo: '스냅샷 자동 정리 (부분)' }];
+      s.payments = [{ date: s.dueDate, amount: paid, source: '정산', synthetic: true, memo: '스냅샷 자동 정리 (부분)' }];
       s.status = '부분납';
       s.paidAmount = paid;
       s.paidAt = s.dueDate;

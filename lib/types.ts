@@ -240,6 +240,9 @@ export type PaymentEntry = {
   memo?: string;
   by?: string;           // 등록자 email (수동·현금 entry)
   at?: string;           // 등록 시각 ISO
+  /** 합성(재구성) entry 표식 — distributeUnpaid/스냅샷 자동정리가 미수 맞추려 날조한 잔액채움(txId 없음).
+   *  실입금(계좌/카드/현금)과 구분해 회계 재구성·v6 이관 시 실현금만 골라낼 수 있게(#R4). 계좌매칭 시 실입금으로 덮임. */
+  synthetic?: boolean;
 };
 
 /** 청구할인 entry — 회차 청구금액을 차감 (자가조치/보상/사은품 등) */
