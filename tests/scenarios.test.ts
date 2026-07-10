@@ -17,6 +17,7 @@ import { deriveCustomers } from '@/lib/customer-derive';
 import { depositLedger, unrefundedDeposit, hasUnrefundedDeposit } from '@/lib/deposit';
 import { computeEarlyTerminationFee } from '@/lib/early-termination';
 import { nextCompanyCode, nextAssetCode, nextContractNo, yymmOf } from '@/lib/code-scheme';
+import { parseSnapshotRow, applySnapshotToContract } from '@/lib/import-commit';
 import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry, Vehicle } from '@/lib/types';
 
 const TODAY = '2026-07-09';
@@ -338,5 +339,50 @@ describe('planBulkReconcile — 회사 격리 (#19)', () => {
     const plan = planBulkReconcile([cAf, cBf], [dep], { today: TODAY });
     expect(plan.assignments.filter((a) => a.contractId === 'cA')).toHaveLength(0);
     expect(plan.assignments.filter((a) => a.contractId === 'cB').length).toBeGreaterThan(0);
+  });
+});
+
+describe('운영현황 업로드 ↔ 원천(SSOT) 매칭', () => {
+  const snapRow = (over: Record<string, unknown> = {}) => ({
+    회사: '110111-1234567', 등록번호: '900101-1234567', 계약자: '홍길동',
+    차량번호: '12가3456', 차종: 'K5', 보험연령: '26',
+    계약시작일: '2025-01-01', 계약종료일: '2025-12-31', 결제일: '15',
+    월대여료: '500000', 보증금: '2000000', 현재미수: '0',
+    ...over,
+  });
+
+  it('등록번호가 patch 원천까지 꽂힌다 (digits) — 흘리던 치명갭', () => {
+    const p = parseSnapshotRow(snapRow());
+    expect(p).not.toBeNull();
+    expect(p!.customerIdentNo).toBe('9001011234567'); // 하이픈 제거된 digits
+  });
+
+  it('차종·보험연령이 patch에 매핑된다 (importer가 이미 소비하던 필드)', () => {
+    const p = parseSnapshotRow(snapRow())!;
+    expect(p.vehicleModel).toBe('K5');
+    expect(p.insuranceAge).toBe(26);
+  });
+
+  it('등록번호 자릿수로 개인/사업자 자동판별', () => {
+    expect(parseSnapshotRow(snapRow())!.customerKind).toBe('개인');            // 13자리
+    expect(parseSnapshotRow(snapRow({ 등록번호: '123-45-67890' }))!.customerKind).toBe('사업자'); // 10자리
+  });
+
+  it('신규 계약 생성 시 등록번호·차종·보험연령이 Contract 원천에 남는다', () => {
+    const p = parseSnapshotRow(snapRow())!;
+    const c = applySnapshotToContract(undefined, p) as Omit<Contract, 'id'>;
+    expect(c.customerIdentNo).toBe('9001011234567');
+    expect(c.vehicleModel).toBe('K5');
+    expect(c.insuranceAge).toBe(26);
+  });
+
+  it('기존 계약 upsert: 새 등록번호는 갱신, 빈 값이면 기존 보존', () => {
+    const existing = contract({ id: 'x', customerIdentNo: '8001019999999', vehiclePlate: '12가3456' });
+    // 등록번호 있는 재업로드 → 갱신
+    const upd = applySnapshotToContract(existing, parseSnapshotRow(snapRow())!) as Contract;
+    expect(upd.customerIdentNo).toBe('9001011234567');
+    // 등록번호 빈 재업로드 → 기존 보존 (덮어쓰지 않음)
+    const kept = applySnapshotToContract(existing, parseSnapshotRow(snapRow({ 등록번호: '' }))!) as Contract;
+    expect(kept.customerIdentNo).toBe('8001019999999');
   });
 });
