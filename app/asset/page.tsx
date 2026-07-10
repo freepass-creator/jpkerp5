@@ -18,6 +18,7 @@ import { todayKr } from '@/lib/mock-data';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton, ExcelButton, DeleteButton, ActionButton, ActionSep, ClearButton, PageStats } from '@/components/ui/page-actions';
 import type { VehicleStatus } from '@/lib/types';
 
 /**
@@ -527,46 +528,14 @@ export default function AssetPage() {
         <BottomBar
           left={
             <>
-              <button
-                className="btn btn-primary"
-                type="button"
-                title={
-                  assetView === 'registered'
-                    ? '차량 등록 — 자동차등록증 OCR / 개별 입력 / 엑셀 일괄'
-                    : '자산현황 등록 — 운영중인 자산의 현황 (보험·할부·GPS) 함께 등록'
-                }
+              <NewButton
+                label={assetView === 'registered' ? '차량 등록' : '자산현황 등록'}
                 onClick={() => setVehicleRegOpen(true)}
-              >
-                <Plus size={14} weight="bold" /> {assetView === 'registered' ? '차량 등록' : '자산현황 등록'}
-              </button>
-              <button
-                className="btn"
-                type="button"
-                disabled={selectedIds.size === 0}
-                title="체크박스로 선택한 자산 일괄 삭제"
-                style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
-                onClick={async () => {
-                  if (selectedIds.size === 0) return;
-                  // 합성 contract-derived 자산 제외 — 실 vehicles 노드에 있는 것만 삭제 가능
-                  const realIds = Array.from(selectedIds).filter((id) => !id.startsWith('contract-derived-'));
-                  const synthetic = selectedIds.size - realIds.length;
-                  if (realIds.length === 0) {
-                    toast.info(`선택 ${selectedIds.size}건이 모두 자동 인식 자산 — 해당 계약에서 처리하세요`);
-                    return;
-                  }
-                  const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
-                  if (!await showConfirm({ title: `선택한 ${realIds.length}건의 자산을 삭제하시겠습니까? (감사로그 남음)${note}`, danger: true })) return;
-                  let ok = 0, fail = 0;
-                  for (const id of realIds) {
-                    try { await removeVehicle(id); ok++; } catch (e) { console.error('vehicle delete failed', id, e); fail++; }
-                  }
-                  setSelectedIds(new Set());
-                  if (fail > 0) toast.error(`${ok}건 삭제, ${fail}건 실패`);
-                  else toast.success(`${ok}건 삭제`);
-                }}
-              >
-                <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
-              </button>
+                title={assetView === 'registered'
+                  ? '차량 등록 — 자동차등록증 OCR / 개별 입력 / 엑셀 일괄'
+                  : '자산현황 등록 — 운영중인 자산의 현황 (보험·할부·GPS) 함께 등록'}
+              />
+              <ActionSep />
               {/* 일괄 상태 변경 — 선택된 자산의 status 를 한 번에 변경 + 같은 plate 계약 sync */}
               <select
                 className="input input-compact"
@@ -617,9 +586,8 @@ export default function AssetPage() {
                 <option value="매각대기">매각대기</option>
                 <option value="매각">매각</option>
               </select>
-              <button
-                className="btn"
-                type="button"
+              <ExcelButton
+                count={selectedIds.size > 0 ? selectedIds.size : filtered.length}
                 disabled={filtered.length === 0}
                 title={selectedIds.size > 0
                   ? `선택한 ${selectedIds.size}건만 엑셀 다운로드 (체크 해제 시 전체 ${filtered.length}건)`
@@ -653,53 +621,63 @@ export default function AssetPage() {
                     ],
                   });
                 }}
-              >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{selectedIds.size > 0 ? selectedIds.size : filtered.length}</span>
-              </button>
+              />
+              <ActionButton
+                label="상태 자동 결정"
+                title="차량번호 기반 자동 결정 — 정상 plate → 휴차 / 임판 → 등록대기 / 빈값 → 구매대기 (사용자가 명시 설정한 운행·정비·사고·매각 등은 보존)"
+                onClick={async () => {
+                  const targets = rawVehicles.filter((v) => AUTO_CALCULABLE_STATUS.has(v.status));
+                  if (targets.length === 0) {
+                    toast.info('자동 결정 대상 없음 — 모든 차량이 사용자 명시 상태');
+                    return;
+                  }
+                  if (!await showConfirm({ title: `자동 결정 대상 ${targets.length}대 — 차량번호로 휴차/등록대기/구매대기 재계산.\n사용자 명시 상태(운행/정비/사고/매각 등)는 보존.\n계속?` })) return;
+                  let changed = 0;
+                  let syncedContracts = 0;
+                  for (const v of targets) {
+                    const next = deriveVehicleStatusFromContract(v.plate);
+                    if (next !== v.status) {
+                      const merged = { ...v, status: next };
+                      try {
+                        await updateVehicle(merged);
+                        changed++;
+                        const r = await syncContractStatusFromVehicle(merged, contracts, updateContract);
+                        syncedContracts += r.updatedCount;
+                      } catch (e) { console.error('status auto failed', v.id, e); }
+                    }
+                  }
+                  toast.success(`${changed}대 상태 자동 결정 완료 (대상 ${targets.length}대 중)${syncedContracts > 0 ? ` · 계약 ${syncedContracts}건 sync` : ''}`);
+                }}
+              />
+              <ActionSep />
+              <DeleteButton
+                count={selectedIds.size}
+                title="체크박스로 선택한 자산 일괄 삭제"
+                onClick={async () => {
+                  if (selectedIds.size === 0) return;
+                  // 합성 contract-derived 자산 제외 — 실 vehicles 노드에 있는 것만 삭제 가능
+                  const realIds = Array.from(selectedIds).filter((id) => !id.startsWith('contract-derived-'));
+                  const synthetic = selectedIds.size - realIds.length;
+                  if (realIds.length === 0) {
+                    toast.info(`선택 ${selectedIds.size}건이 모두 자동 인식 자산 — 해당 계약에서 처리하세요`);
+                    return;
+                  }
+                  const note = synthetic > 0 ? `\n(자동 인식 ${synthetic}건은 제외됨)` : '';
+                  if (!await showConfirm({ title: `선택한 ${realIds.length}건의 자산을 삭제하시겠습니까? (감사로그 남음)${note}`, danger: true })) return;
+                  let ok = 0, fail = 0;
+                  for (const id of realIds) {
+                    try { await removeVehicle(id); ok++; } catch (e) { console.error('vehicle delete failed', id, e); fail++; }
+                  }
+                  setSelectedIds(new Set());
+                  if (fail > 0) toast.error(`${ok}건 삭제, ${fail}건 실패`);
+                  else toast.success(`${ok}건 삭제`);
+                }}
+              />
+              {selectedIds.size > 0 && <ClearButton count={selectedIds.size} onClick={() => setSelectedIds(new Set())} />}
             </>
           }
           right={
-            <>
-            {selectedIds.size > 0 && (
-              <>
-                <span className="dim" style={{ fontSize: 11 }}>선택 <strong>{selectedIds.size}</strong></span>
-                <button className="btn btn-sm btn-ghost" type="button" onClick={() => setSelectedIds(new Set())} title="선택 모두 해제">
-                  <Trash size={11} weight="bold" style={{ display: 'none' }} /><span style={{ fontSize: 11 }}>× 해제</span>
-                </button>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-              </>
-            )}
-            <button
-              className="btn"
-              type="button"
-              title="차량번호 기반 자동 결정 — 정상 plate → 휴차 / 임판 → 등록대기 / 빈값 → 구매대기 (사용자가 명시 설정한 운행·정비·사고·매각 등은 보존)"
-              onClick={async () => {
-                const targets = rawVehicles.filter((v) => AUTO_CALCULABLE_STATUS.has(v.status));
-                if (targets.length === 0) {
-                  toast.info('자동 결정 대상 없음 — 모든 차량이 사용자 명시 상태');
-                  return;
-                }
-                if (!await showConfirm({ title: `자동 결정 대상 ${targets.length}대 — 차량번호로 휴차/등록대기/구매대기 재계산.\n사용자 명시 상태(운행/정비/사고/매각 등)는 보존.\n계속?` })) return;
-                let changed = 0;
-                let syncedContracts = 0;
-                for (const v of targets) {
-                  const next = deriveVehicleStatusFromContract(v.plate);
-                  if (next !== v.status) {
-                    const merged = { ...v, status: next };
-                    try {
-                      await updateVehicle(merged);
-                      changed++;
-                      const r = await syncContractStatusFromVehicle(merged, contracts, updateContract);
-                      syncedContracts += r.updatedCount;
-                    } catch (e) { console.error('status auto failed', v.id, e); }
-                  }
-                }
-                toast.success(`${changed}대 상태 자동 결정 완료 (대상 ${targets.length}대 중)${syncedContracts > 0 ? ` · 계약 ${syncedContracts}건 sync` : ''}`);
-              }}
-            >
-              상태 자동 결정
-            </button>
-            </>
+            <PageStats total={filtered.length} totalLabel="표시" selectedCount={selectedIds.size} />
           }
         />
 

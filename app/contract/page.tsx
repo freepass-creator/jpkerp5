@@ -20,6 +20,7 @@ import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { CreateDialog } from '@/components/create-dialog';
 import { SmsDialog } from '@/components/sms-dialog';
 import { PageShell } from '@/components/ui/page-shell';
+import { NewButton, ExcelButton, SmsButton, DeleteButton, ActionButton, ActionSep, ClearButton, PageStats } from '@/components/ui/page-actions';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { CompanyFilter } from '@/components/ui/filter-bar';
 import { useRole } from '@/lib/use-role';
@@ -219,64 +220,26 @@ export default function ContractPage() {
       }
       bottomBarLeft={
         <>
-          <button className="btn btn-primary" type="button" onClick={() => setCreateOpen(true)}>+ 신규 계약</button>
-          <span className="btn-sep" />
-          <button
-            className="btn"
-            type="button"
-            onClick={handleExcelAll}
-            disabled={filtered.length === 0}
-            title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드`}
-          >
-            <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
-          </button>
-          <span className="btn-sep" />
-          <span className="dim" style={{ fontSize: 11 }}>
-            {selectedIds.size > 0 ? `선택 ${selectedIds.size}건` : '체크박스로 선택'}
-          </span>
-          {selectedIds.size > 0 && (
-            <button
-              className="btn btn-sm btn-ghost"
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              title="선택 모두 해제"
-            >
-              <X size={11} /> 해제
-            </button>
-          )}
-          <button
-            className="btn"
-            type="button"
-            disabled={selectedIds.size === 0}
-            title="선택한 계약자에게 일괄 SMS 발송"
-            onClick={() => setSmsOpen(true)}
-          >
-            문자 발송 {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
-          </button>
-          <button
-            className="btn"
-            type="button"
+          <NewButton label="계약 등록" onClick={() => setCreateOpen(true)} />
+          <ActionSep />
+          <ExcelButton count={filtered.length} onClick={handleExcelAll} />
+          <SmsButton count={selectedIds.size} onClick={() => setSmsOpen(true)} disabled={selectedIds.size === 0} />
+          <ActionButton
+            label={`만기 안내${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
+            onClick={handleExpireGuide}
             disabled={selectedIds.size === 0}
             title="선택한 계약 만기 안내 (클립보드 복사)"
-            onClick={handleExpireGuide}
-          >
-            만기 안내 {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
-          </button>
-          <button
-            className="btn"
-            type="button"
+          />
+          <ActionButton
+            icon={<FileXls size={14} />}
+            label={`선택 엑셀${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
+            onClick={handleExcelSelected}
             disabled={selectedIds.size === 0}
             title="선택한 계약만 엑셀 다운로드"
-            onClick={handleExcelSelected}
-          >
-            선택 엑셀 {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
-          </button>
-          <button
-            className="btn"
-            type="button"
-            disabled={selectedIds.size === 0}
-            title="체크박스로 선택한 계약 일괄 삭제 (감사로그 남음)"
-            style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
+          />
+          <ActionSep />
+          <DeleteButton
+            count={selectedIds.size}
             onClick={async () => {
               if (selectedIds.size === 0) return;
               if (!await showConfirm({ title: `선택한 ${selectedIds.size}건의 계약을 삭제하시겠습니까? (감사로그 남음)`, danger: true })) return;
@@ -288,10 +251,13 @@ export default function ContractPage() {
               if (fail > 0) toast.error(`${ok}건 삭제, ${fail}건 실패`);
               else toast.success(`${ok}건 삭제`);
             }}
-          >
-            <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
-          </button>
+            title="체크박스로 선택한 계약 일괄 삭제 (감사로그 남음)"
+          />
+          {selectedIds.size > 0 && <ClearButton count={selectedIds.size} onClick={() => setSelectedIds(new Set())} />}
         </>
+      }
+      bottomBarRight={
+        <PageStats total={filtered.length} totalLabel="표시" selectedCount={selectedIds.size} />
       }
     >
               {(

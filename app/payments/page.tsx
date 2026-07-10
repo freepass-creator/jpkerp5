@@ -6,6 +6,7 @@ import {
 } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton, ExcelButton, ActionButton, ActionSep } from '@/components/ui/page-actions';
 import { CreateDialog } from '@/components/create-dialog';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -604,64 +605,62 @@ export default function PaymentsPage() {
 
         <BottomBar
           left={
-            <button className="btn btn-primary" type="button" onClick={() => setUploadOpen(true)}>
-              <Plus weight="bold" /> 신규 등록
-            </button>
+            <>
+              <NewButton label="수납 등록" onClick={() => setUploadOpen(true)} />
+              {tab === 'all' && (
+                <>
+                  <ActionSep />
+                  <ActionButton label="자동매칭" onClick={handleAutoMatchAll} title="입금 ↔ 계약 자동 매칭" />
+                  <ActionButton label="집금 정산" onClick={handleSettlementMatchAll} title="CMS·카드 집금 ↔ 묶음 매칭 + 수수료 자동 계산" />
+                </>
+              )}
+              {tab === 'summary' && (
+                <>
+                  <ActionSep />
+                  <ExcelButton count={daily.length} onClick={handleExportExcel} title={`현재 페이지 목록 (${daily.length}건) 엑셀 다운로드 — 자금일보`} />
+                </>
+              )}
+              {tab === 'card' && (
+                <>
+                  <ActionSep />
+                  <ActionButton label="자동매칭" onClick={handleAutoMatchCardAll} title="카드 매출 ↔ 계약 자동 매칭" />
+                </>
+              )}
+            </>
           }
           right={
             tab === 'all' ? (
               <>
                 <span>표시 <strong>{ledgerRows.length}</strong></span>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <ActionSep />
                 {direction !== 'withdraw' && (
                   <span style={{ color: 'var(--green-text)' }}>입금 <strong className="mono">₩{formatCurrency(ledgerRows.reduce((s, r) => s + (r.amount ?? 0), 0))}</strong></span>
                 )}
                 {direction !== 'deposit' && (
                   <span style={{ color: 'var(--red-text)' }}>출금 <strong className="mono">₩{formatCurrency(ledgerRows.reduce((s, r) => s + (r.withdraw ?? 0), 0))}</strong></span>
                 )}
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <button className="btn btn-sm btn-primary" type="button" onClick={handleAutoMatchAll}>
-                  자동매칭
-                </button>
-                <button className="btn btn-sm" type="button" onClick={handleSettlementMatchAll} title="CMS·카드 집금 ↔ 묶음 매칭 + 수수료 자동 계산">
-                  집금 정산
-                </button>
               </>
             ) : tab === 'summary' ? (
               <>
                 <span>일자 <strong>{daily.length}</strong></span>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <ActionSep />
                 <span>입금 <strong className="mono">₩{formatCurrency(dailyTotals.inSum)}</strong></span>
                 <span>출금 <strong className="mono">₩{formatCurrency(dailyTotals.outSum)}</strong></span>
                 <span>순증감 <strong className="mono" style={{ color: dailyTotals.inSum - dailyTotals.outSum < 0 ? 'var(--red-text)' : 'var(--text-main)' }}>₩{formatCurrency(dailyTotals.inSum - dailyTotals.outSum)}</strong></span>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={handleExportExcel}
-                  disabled={daily.length === 0}
-                  title={`현재 페이지 목록 (${daily.length}건) 엑셀 다운로드 — 자금일보`}
-                >
-                  <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{daily.length}</span>
-                </button>
               </>
             ) : tab === 'card' ? (
               <>
                 <span>카드 매출 <strong>{cardRows.length}</strong></span>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <ActionSep />
                 <span style={{ color: 'var(--green-text)' }}>매칭 <strong>{cardRows.filter((t) => t.matchedContractId).length}</strong></span>
                 <span style={{ color: 'var(--orange-text)' }}>미매칭 <strong>{cardRows.filter((t) => !t.matchedContractId).length}</strong></span>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <button className="btn btn-sm btn-primary" type="button" onClick={handleAutoMatchCardAll}>
-                  자동매칭
-                </button>
               </>
             ) : (
               <>
                 <span>법인카드 사용 <strong>{corpCardRows.length}</strong></span>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <ActionSep />
                 <span>총액 <strong className="mono">₩{formatCurrency(corpCardRows.reduce((s, t) => s + (t.amount ?? 0), 0))}</strong></span>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
+                <ActionSep />
                 <span style={{ color: 'var(--green-text)' }}>결재 완료 <strong>{corpCardRows.filter((t) => t.approved).length}</strong></span>
                 <span style={{ color: 'var(--orange-text)' }}>미결재 <strong>{corpCardRows.filter((t) => !t.approved).length}</strong></span>
               </>

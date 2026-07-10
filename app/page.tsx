@@ -1031,7 +1031,7 @@ export default function Page() {
       <BottomBar
         left={
           <>
-            <NewButton label="신규 등록" onClick={() => setCreateOpen(true)} title="단건 수기 등록 · 엑셀 일괄 업로드 — 다이얼로그 탭에서 선택" />
+            <NewButton label="운영 현황 등록" onClick={() => setCreateOpen(true)} title="운영현황 단건 수기 등록 · 엑셀 일괄 업로드 · 수납 입력 — 다이얼로그 탭에서 선택" />
             <ActionSep />
             <ExcelButton
               count={filteredContracts.length}
