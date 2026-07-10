@@ -150,6 +150,8 @@ function OperationOverviewTab({
   // 간편 상태(2축) + 체크리스트 게이팅 전이
   const simpleState = simpleVehicleState(vehicle.status as VehicleStatus, activeContract ?? null);
   const transitions = nextTransitions(vehicle.status as VehicleStatus);
+  const definedTos = new Set(transitions.map((t) => t.to));
+  const plainNext = nextStates.filter((s) => !definedTos.has(s)); // 절차 미정의 전이 → 즉시 버튼
   function toggleCheck(key: string) {
     const cur = vehicle.prepChecks ?? {};
     const nextChecks = { ...cur };
@@ -212,9 +214,9 @@ function OperationOverviewTab({
             {NEXT_ACTION[vehicle.status as VehicleStatus] ?? '-'}
           </span>
         </div>
-        {transitions.length > 0 ? (
+        {(transitions.length > 0 || nextStates.length > 0) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-weak)' }}>다음 단계로 — 준비 항목을 체크하면 활성화</span>
+            <span style={{ fontSize: 10, color: 'var(--text-weak)' }}>넘어갈 수 있는 상태 — 절차 있는 전이는 준비 체크 완료 시 활성화</span>
             {transitions.map((t) => {
               const prog = transitionProgress(t, vehicle, activeContract ?? null, vehicle.prepChecks);
               const ready = isTransitionReady(t, vehicle, activeContract ?? null, vehicle.prepChecks);
@@ -259,15 +261,16 @@ function OperationOverviewTab({
                 </div>
               );
             })}
+            {plainNext.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 10, color: 'var(--text-weak)', marginRight: 2 }}>기타 전이:</span>
+                {plainNext.map((s) => (
+                  <button key={s} type="button" className="btn btn-sm" onClick={() => changeStatus(s)} style={{ fontSize: 11 }} title={`상태 [${s}] 로 변경`}>{s}</button>
+                ))}
+              </div>
+            )}
           </div>
-        ) : nextStates.length > 0 ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: 'var(--text-weak)', marginRight: 2 }}>→ 다음:</span>
-            {nextStates.map((s) => (
-              <button key={s} type="button" className="btn btn-sm" onClick={() => changeStatus(s)} style={{ fontSize: 11 }} title={`상태 [${s}] 로 변경`}>{s}</button>
-            ))}
-          </div>
-        ) : null}
+        )}
         <Grid2>
           <KV k="회사" v={vehicle.company ? displayCompanyName(vehicle.company, companies) : undefined} />
           <KV k="활성 계약" v={activeContract ? (

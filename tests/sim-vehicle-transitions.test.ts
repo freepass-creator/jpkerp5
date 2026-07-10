@@ -45,8 +45,19 @@ describe('차량 상태 전이 체크리스트 시뮬', () => {
     line('');
     line(`③ 상품대기 → ${t3.to}: 계약없음 ${rNoContract.done}/${rNoContract.total} · 계약대기 연결 시 ${rWithContract.done}/${rWithContract.total}(자동✓) · 인도준비 체크 후 ready=${rReady}`);
 
+    // 4) 운행 → 두 갈래(정상 반납 / 회수). 회수는 4단계 절차.
+    const t4 = nextTransitions('운행');
+    const recovery = t4.find((x) => x.to === '반납')!;
+    const vRun = V({ status: '운행' });
+    const recNot = isTransitionReady(recovery, vRun, waitContract, {});
+    const recReady = isTransitionReady(recovery, vRun, waitContract, { arrearsChecked: 'x', recoveryNotice: 'x', locateVehicle: 'x', recovered: 'x' });
     line('');
-    line('【판정】 준비 항목 다 체크돼야 다음 단계 열림. 데이터로 아는 항목(등록증·보험·계약)은 자동✓ → 중복 체크 불필요.');
+    line(`④ 운행 전이 갈래 ${t4.length}개: ${t4.map((x) => `${x.to}(${x.checklist.length})`).join(' / ')}`);
+    line(`   회수 절차 ${recovery.checklist.length}단계: ${recovery.checklist.map((c) => c.label).join(' → ')}`);
+    line(`   미완 ready=${recNot} → 4항목 체크 후 ready=${recReady}`);
+
+    line('');
+    line('【판정】 준비 항목 다 체크돼야 다음 단계 열림. 같은 상태도 갈래별(정상반납/회수) 절차가 다름. 데이터로 아는 항목(등록증·보험·계약)은 자동✓.');
     line('══════════════════════════════════════════════════════════');
     writeFileSync('sim-vehicle-transitions-report.txt', L.join('\n'), 'utf-8');
 
@@ -57,5 +68,10 @@ describe('차량 상태 전이 체크리스트 시뮬', () => {
     expect(rNoContract.done).toBe(0); // 계약없으면 자동✓ 안 됨
     expect(rWithContract.done).toBe(1); // 계약연결 시 자동✓
     expect(rReady).toBe(true);
+    // 운행: 정상반납 + 회수 두 갈래, 회수는 4단계
+    expect(t4.length).toBe(2);
+    expect(recovery.checklist.length).toBe(4);
+    expect(recNot).toBe(false);
+    expect(recReady).toBe(true);
   });
 });

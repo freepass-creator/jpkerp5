@@ -66,10 +66,22 @@ export const VEHICLE_TRANSITIONS: Partial<Record<VehicleStatus, Transition[]>> =
     to: '운행', actionLabel: '인도 완료 → 운행',
     checklist: [{ key: 'delivered', label: '차량 인도 완료' }],
   }],
-  '운행': [{
-    to: '종료대기', actionLabel: '반납 확정 → 종료대기',
-    checklist: [{ key: 'returnAgreed', label: '반납 의사·반납일 확정' }],
-  }],
+  '운행': [
+    {
+      to: '종료대기', actionLabel: '정상 반납 예약 → 종료대기',
+      checklist: [{ key: 'returnAgreed', label: '반납 의사·반납일 확정' }],
+    },
+    {
+      // 회수(미납·채권보전) — 정상 반납과 다른 절차. 합의 없이 강제 회수.
+      to: '반납', actionLabel: '회수(미납·채권보전) → 반납 입고',
+      checklist: [
+        { key: 'arrearsChecked', label: '미납 확인(연체 회차·금액)' },
+        { key: 'recoveryNotice', label: '회수 통보 발송(내용증명 등)' },
+        { key: 'locateVehicle', label: '차량 위치 확인(GPS)' },
+        { key: 'recovered', label: '회수·입고 완료' },
+      ],
+    },
+  ],
   '종료대기': [{
     to: '반납', actionLabel: '반납 입고 → 반납',
     checklist: [{ key: 'returnedIn', label: '차량 반납 입고' }],
