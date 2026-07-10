@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple, ArrowsClockwise, UsersThree } from '@phosphor-icons/react';
+import { Upload, Database, ClipboardText, Wrench, Warning, Users, Truck, ShieldWarning, LockKey, CalendarX, ClockCounterClockwise, LinkSimple, ArrowsClockwise, UsersThree, Images } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { useRole } from '@/lib/use-role';
@@ -65,6 +65,13 @@ const TOOLS: ToolCard[] = [
     title: '일괄 대사 매칭 (초기 세팅)',
     desc: '3년치 은행입금을 활성 계약자 계약에 계약일순·오래된 미납부터 FIFO 로 채워 미리보기 → 확인 후 일괄 적용. 미귀속(붕 떠있는) 입금 검토 포함.',
     icon: <ShieldWarning size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
+    href: '/admin/uploads',
+    title: '업로드 관리',
+    desc: '모바일 선업로드된 사진·서류를 열람 + 자동매칭 안 된 파일을 차량에 수동 분배(매칭). 반영분 관리·삭제. 선업로드 후매칭의 후매칭 화면.',
+    icon: <Images size={18} weight="duotone" />,
     variant: 'op',
   },
   {

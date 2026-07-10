@@ -66,23 +66,22 @@ export const CONTRACT_COLUMNS: ColumnSpec[] = [
  * 업로드 후 수납 엑셀 매칭은 정상 동작 — 미수금이 차감됨.
  */
 export const SNAPSHOT_COLUMNS: ColumnSpec[] = [
-  { label: '법인등록번호', field: 'corpRegNo',     required: true,  example: '110111-1234567', hint: '회사 마스터의 법인등록번호로 자동 매칭 → 회사명 결정 ((주)/주식회사 자동 제거). 미등록은 입력값 그대로.' },
-  { label: '차량번호',   field: 'vehiclePlate',    required: false, example: '109호1234',  hint: 'UPSERT 키 — 동일 번호 있으면 갱신. 비어있고 계약자만 있으면 구매대기 계약으로 신규 등록' },
-  { label: '차명',       field: 'vehicleModel',    required: false, example: 'K5' },
-  { label: '계약자',     field: 'customerName',    required: false, example: '홍길동', hint: '비어있고 차량번호만 있으면 휴차 차량으로 등록' },
-  { label: '구분',       field: 'customerKind',    required: false, example: '개인',    hint: '개인/사업자/법인' },
-  { label: '등록번호',   field: 'customerIdentNo', required: false, example: '900101-1234567', hint: '주민/사업자/법인 번호' },
-  { label: '연락처',     field: 'customerPhone1',  required: false, example: '010-1234-5678' },
-  { label: '계약시작일', field: 'contractDate',    required: true,  example: '2026-01-01',  hint: '2026-01-01 / 260101 / 26.1.1 / 엑셀 날짜 모두 OK' },
-  { label: '계약종료일', field: 'returnScheduledDate', required: true, example: '2026-12-31', hint: '2026-12-31 / 261231 / 26.12.31' },
-  { label: '차량상태',   field: 'vehicleStatus',   required: false, example: '계약중',       hint: '계약중 / 휴차중 — 비우면 자동 (계약자 있으면 계약중, 없으면 휴차중)' },
-  { label: '결제일',     field: 'paymentDay',      required: false, example: '15',          hint: '매월 1~31일 결제일. 미입력 시 계약시작일의 일자 적용 — 미납일수 계산 기준' },
-  { label: '결제방법',   field: 'paymentMethod',   required: false, example: 'CMS',         hint: 'CMS/카드/세금계산서/이체/후불/현금' },
-  { label: '보증금',     field: 'deposit',         required: false, example: '2000000',     hint: '원 단위' },
-  { label: '월대여료',   field: 'monthlyRent',     required: false, example: '1500000',     hint: '원 단위 (월 청구금액). 계약자 있을 땐 사실상 필수' },
-  { label: '보험연령',   field: 'insuranceAge',    required: false, example: '26',          hint: '만 N세 — 자동차보험 운전자 연령제한' },
-  { label: '마지막입금일', field: 'lastPaidDate',  required: false, example: '2026-04-25',  hint: '선택 항목 — 마지막으로 입금된 회차의 결제일. 이 날짜 이전 회차는 자동 완료 처리. 비우면 오늘 기준으로 역순 분배' },
-  { label: '현재미수',   field: 'unpaidAmount',    required: false, example: '1500000',     hint: '오늘 기준 미수 합계 (원). 0이면 정상. 마지막입금일 이후 ~ 오늘까지 회차에 역순으로 분배' },
+  // ─── 필수 = 씨앗 최소셋 (목록에 뜨고·미수 계산되고·회사 격리되는 데 꼭 필요. 나머지는 각 파트에서 누적) ───
+  { label: '회사',       field: 'company',         required: true, example: '110111-1234567', hint: '법인등록번호 / 사업자번호 / 회사코드 중 하나 — 회사 마스터 자동 매칭' },
+  { label: '등록번호',   field: 'customerIdentNo', required: true, example: '900101-1234567', hint: '주민/사업자 — 진짜 식별키(동명이인·재계약 연결). 자릿수로 개인/사업자 자동 구분, 표시는 마스킹' },
+  { label: '계약자',     field: 'customerName',    required: true, example: '홍길동', hint: '표시용 이름' },
+  { label: '차량번호',   field: 'vehiclePlate',    required: true, example: '109호1234', hint: '자산 연결 키 — 차량 상세(차종·스펙 등)는 자산관리에서 채움' },
+  { label: '계약시작일', field: 'contractDate',    required: true, example: '2026-01-01', hint: '2026-01-01 / 260101 / 26.1.1 / 엑셀 날짜 모두 OK' },
+  { label: '계약종료일', field: 'returnScheduledDate', required: true, example: '2026-12-31', hint: '약정 만기일' },
+  { label: '결제일',     field: 'paymentDay',      required: true, example: '15', hint: '매월 1~31일 — 미납일수·회차 계산 기준' },
+  { label: '월대여료',   field: 'monthlyRent',     required: true, example: '1500000', hint: '원 단위 월 청구액' },
+  { label: '보증금',     field: 'deposit',         required: true, example: '2000000', hint: '원 단위 (무보증 상품이면 0 — 0도 명시)' },
+  { label: '현재미수',   field: 'unpaidAmount',    required: true, example: '1500000', hint: '오늘 기준 미수 합계 (완납이면 0 — 0도 명시). 마지막입금일 이후 회차에 역순 분배(期初)' },
+
+  // ─── 선택 = 있으면 期初·독촉에 활용, 없으면 나중에 각 화면에서 보완 ───
+  { label: '마지막입금일', field: 'lastPaidDate', required: false, example: '2026-04-25', hint: '이 날짜 이전 회차는 자동 완료(期初). 비우면 오늘 기준 역순 분배' },
+  { label: '연락처',     field: 'customerPhone1',  required: false, example: '010-1234-5678', hint: '미수 독촉 문자용' },
+  { label: '결제방법',   field: 'paymentMethod',   required: false, example: 'CMS', hint: 'CMS/카드/이체/후불/현금' },
 ];
 
 /* ─────────────── 계좌 거래내역 (입금 + 출금) ─────────────── */
