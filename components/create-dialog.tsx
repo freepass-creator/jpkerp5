@@ -48,6 +48,7 @@ import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { upsertVehicleFromContract, normPlate, findVehicleByPlate } from '@/lib/entity-sync';
+import { nextContractNo, yymmOf } from '@/lib/code-scheme';
 import { useAuth } from '@/lib/use-auth';
 // Phase 2.2 — intake 평행 기록 (배치 단위)
 import { addIntakeItem, markIntakeCommitted, setIntakeMatch } from '@/lib/firebase/intake-store';
@@ -2300,7 +2301,7 @@ function ContractRegisterPane({
 
 function ContractManualForm({ onSubmit }: { onSubmit: (newContractId?: string) => void }) {
   const companyNames = useCompanyNames();
-  const { add: addContract } = useContracts();
+  const { add: addContract, contracts } = useContracts();
   const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
   const { companies } = useCompanies();
   const [company, setCompany] = useState(companyNames[0] ?? '');
@@ -2399,10 +2400,9 @@ function ContractManualForm({ onSubmit }: { onSubmit: (newContractId?: string) =
       }
 
       const identDigits = (regNo || '').replace(/\D/g, '');
-      const { genCode } = await import('@/lib/code');
-      const yy = contractDate.slice(2, 4);
-      const mm = contractDate.slice(5, 7);
-      const contractNo = `ICR-${yy}${mm}-${genCode(4)}`;
+      // 계약번호 — 회사·월 scope 순번(#쓰기경로 v6정합). company 는 이름일 수 있어 코드로 resolve.
+      const companyCode = companies.find((co) => co.name === company || co.code === company)?.code ?? company;
+      const contractNo = nextContractNo(companyCode, contracts, yymmOf(contractDate));
 
       // 회차 자동 생성 — termMonths 만큼 monthlyRent 청구 (paymentDay 기준).
       // 누락 시 수납 탭 빈 화면 + autoMatch 동작 불가 → 등록 시점에 즉시 생성.

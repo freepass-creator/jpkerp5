@@ -8,14 +8,13 @@ import type { Company } from '@/lib/types';
 import { lockedUpdate } from './locked-update';
 import { audit } from './audit-store';
 
-import { genCode } from '@/lib/code';
+import { nextCompanyCode as nextCompanyCodeSeq } from '@/lib/code-scheme';
 
 const COMPANIES_PATH = dbPath('companies');
 
-/** 새 회사 코드 — 6자 영문·숫자 난수 (prefix 없음). 기존과 충돌 시 재시도. */
+/** 새 회사 코드 — CP01, CP02 … 순번(불변). 랜덤 genCode 대체(#쓰기경로 v6정합). */
 export function nextCompanyCode(existing: Company[]): string {
-  const used = new Set(existing.map((c) => c.code).filter(Boolean));
-  return genCode(6, used);
+  return nextCompanyCodeSeq(existing);
 }
 
 export function useCompanies(): {

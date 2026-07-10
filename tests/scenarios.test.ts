@@ -14,6 +14,7 @@ import { computeAssetLedgerEntry } from '@/lib/asset-ledger';
 import { splitVat, computeVatReport, vatPeriodRange } from '@/lib/vat-report';
 import { findVehicleForContract } from '@/lib/entity-sync';
 import { deriveCustomers } from '@/lib/customer-derive';
+import { nextCompanyCode, nextAssetCode, nextContractNo, yymmOf } from '@/lib/code-scheme';
 import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry, Vehicle } from '@/lib/types';
 
 const TODAY = '2026-07-09';
@@ -168,6 +169,23 @@ describe('computeContractAsOf — 시점(as-of) 재구성', () => {
     expect(before.returnedDate).toBeUndefined();
     expect(before.schedules?.some((s) => s.status === '면제')).toBe(false);
   });
+});
+
+describe('코드체계 SSOT (쓰기경로 v6정합)', () => {
+  it('회사코드 CP01 순번', () => {
+    expect(nextCompanyCode([])).toBe('CP01');
+    expect(nextCompanyCode([{ code: 'CP01' }, { code: 'CP03' }])).toBe('CP04');
+  });
+  it('자산코드 회사 scope 순번 + offset 배치', () => {
+    expect(nextAssetCode('CP02', [])).toBe('CP02VH0001');
+    expect(nextAssetCode('CP02', [{ assetCode: 'CP02VH0005' }, { assetCode: 'CP01VH0009' }])).toBe('CP02VH0006');
+    expect(nextAssetCode('CP02', [], 2)).toBe('CP02VH0003');
+  });
+  it('계약번호 회사·월 scope 순번', () => {
+    expect(nextContractNo('CP01', [], '2607')).toBe('CP01-2607-0001');
+    expect(nextContractNo('CP01', [{ contractNo: 'CP01-2607-0003' }, { contractNo: 'CP01-2606-0009' }], '2607')).toBe('CP01-2607-0004');
+  });
+  it('yymmOf', () => { expect(yymmOf('2026-07-15')).toBe('2607'); });
 });
 
 describe('고객 마스터 파생 (R5)', () => {
