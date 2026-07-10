@@ -13,6 +13,8 @@ import { Receipt } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { FINANCE_SUB } from '@/components/layout/sub-nav';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
+import { useContracts } from '@/lib/firebase/contracts-store';
+import { resolveCompanyKey, matchesCompanyFilter, buildCompanyOptions } from '@/lib/filter-helpers';
 import { computeVatReport, vatPeriodRange, type VatLine } from '@/lib/vat-report';
 import { formatCurrency } from '@/lib/utils';
 import { EmptyRow } from '@/components/ui/empty-row';
@@ -24,6 +26,14 @@ const PERIODS: Period[] = ['1기', '2기', '1분기', '2분기', '3분기', '4�
 export default function FinanceVatPage() {
   const { rows: bankTx } = useBankTx();
   const { rows: cardTx } = useCardTx();
+  const { contracts } = useContracts();
+
+  // 부가세는 사업자(법인) 단위 신고 — 회사별로 tx를 좁힌 뒤 산출(전 회사 합산=가산세 리스크·회사격리 위반).
+  const contractById = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
+  const [companyFilter, setCompanyFilter] = useState('all');
+  const companyOptions = useMemo(() => buildCompanyOptions(bankTx, (t) => resolveCompanyKey(t, contractById)), [bankTx, contractById]);
+  const scopedBank = useMemo(() => bankTx.filter((t) => matchesCompanyFilter(resolveCompanyKey(t, contractById), companyFilter)), [bankTx, contractById, companyFilter]);
+  const scopedCard = useMemo(() => cardTx.filter((t) => matchesCompanyFilter(resolveCompanyKey(t, contractById), companyFilter)), [cardTx, contractById, companyFilter]);
 
   const today = todayKr();
   const curYear = Number(today.slice(0, 4));
@@ -32,7 +42,7 @@ export default function FinanceVatPage() {
   const [period, setPeriod] = useState<Period>(curMonth <= 6 ? '1기' : '2기');
 
   const { from, to } = useMemo(() => vatPeriodRange(year, period), [year, period]);
-  const report = useMemo(() => computeVatReport(bankTx, cardTx, from, to), [bankTx, cardTx, from, to]);
+  const report = useMemo(() => computeVatReport(scopedBank, scopedCard, from, to), [scopedBank, scopedCard, from, to]);
 
   const years = Array.from({ length: 6 }, (_, i) => curYear - i);
   const won = (n: number) => `₩${formatCurrency(n)}`;
@@ -80,7 +90,14 @@ export default function FinanceVatPage() {
             <select className="input" value={period} onChange={(e) => setPeriod(e.target.value as Period)} style={{ width: 110 }}>
               {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
+            <select className="input" value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)} style={{ width: 160 }} title="부가세는 사업자(법인) 단위로 신고">
+              <option value="all">전체(참고용)</option>
+              {companyOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
             <span className="dim mono" style={{ fontSize: 12 }}>{from} ~ {to}</span>
+            {companyFilter === 'all' && (
+              <span style={{ fontSize: 11, color: 'var(--orange-text)' }}>⚠ 전체 합산은 참고용 — 신고는 법인 단위로 선택</span>
+            )}
           </div>
         </div>
 
