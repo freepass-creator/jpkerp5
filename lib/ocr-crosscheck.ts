@@ -82,6 +82,18 @@ export function crosscheckInsurance(raw: Record<string, unknown>): CrosscheckRes
     }
   }
 
+  // 분납 회차 금액은 보통 균등(예: 50,320 안팎) — 한 회차만 크게 튀면 OCR 오독 의심.
+  // (실측: DB손보 bulk 2~6회차 모두 근사. "납입한 보험료" 필드는 불신뢰라 검산에 안 씀.)
+  if (later.length >= 2) {
+    const amts = later.map((x) => x.amount ?? 0).filter((a) => a > 0);
+    if (amts.length >= 2) {
+      const mn = Math.min(...amts), mx = Math.max(...amts);
+      if (mn > 0 && mx > mn * 3) {
+        issues.push({ field: 'installments', message: `분납 회차 금액 편차 큼(${WON(mn)}~${WON(mx)}) — 특정 회차 오독 의심`, severity: 'warn' });
+      }
+    }
+  }
+
   const s = ymd(raw.start_date), e = ymd(raw.end_date);
   if (s && e) {
     const d = daysBetween(s, e);

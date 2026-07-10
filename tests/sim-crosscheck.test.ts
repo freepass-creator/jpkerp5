@@ -70,8 +70,21 @@ describe('OCR 교차검증 시뮬', () => {
     line(`⑤ 등록증(VIN 16자): level=${reg.level} conf=${reg.confidence}`);
     reg.issues.forEach((i) => line(`    ⚠ [${i.severity}] ${i.message}`));
 
+    // 6) p41 실증권 유형(분납 균등) → 편차 플래그 없음  vs  한 회차 오독(10배) → 편차 warn
+    const uniform = crosscheckInsurance({
+      total_premium: 886990, paid_premium: 736070, car_number: '139우7166', start_date: '2025-11-27', end_date: '2026-11-27',
+      installments: [{ cycle: 2, amount: 50320 }, { cycle: 3, amount: 50280 }, { cycle: 4, amount: 50310 }, { cycle: 5, amount: 50300 }, { cycle: 6, amount: 50310 }],
+    });
+    const outlier = crosscheckInsurance({
+      total_premium: 1_000_000, car_number: '12가3456', start_date: '2026-01-01', end_date: '2027-01-01',
+      installments: [{ cycle: 2, amount: 50000 }, { cycle: 3, amount: 500000 }, { cycle: 4, amount: 50000 }],
+    });
     line('');
-    line('【판정】 정상건은 conf 100/ok, 이상건(page-81 유형·회차오독·번호판누락·세부불일치·VIN오독)은 모두 ⚠/error 로 플래그됨.');
+    line(`⑥ 분납 균등(실 p41 139우7166): level=${uniform.level} conf=${uniform.confidence} (편차 플래그 없어야)`);
+    line(`   한 회차 오독(5만 vs 50만): level=${outlier.level} — ${outlier.issues.map((i) => i.message).join(' / ')}`);
+
+    line('');
+    line('【판정】 정상·균등건은 conf 100/ok, 이상건(page-81·회차오독·번호판누락·세부불일치·VIN오독·분납편차)은 ⚠/error 플래그.');
     line('→ 업로드 후 목록에서 conf 낮은 건만 사람이 확인 = "몰라도 시스템이 알려주는" 능동 검증.');
     line('══════════════════════════════════════════════════════════');
     writeFileSync('sim-crosscheck-report.txt', L.join('\n'), 'utf-8');
@@ -82,5 +95,7 @@ describe('OCR 교차검증 시뮬', () => {
     expect(bad.level).toBe('error');
     expect(pen.level).toBe('warn');
     expect(reg.level).toBe('warn');
+    expect(uniform.issues.some((i) => i.message.includes('편차'))).toBe(false); // 균등 = 편차 플래그 없음
+    expect(outlier.issues.some((i) => i.message.includes('편차'))).toBe(true);  // 오독 = 편차 플래그
   });
 });
