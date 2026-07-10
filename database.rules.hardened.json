@@ -1,0 +1,93 @@
+{
+  "rules": {
+    "$tenant": {
+      ".read": "auth != null",
+
+      "contracts": {
+        ".write": "auth != null",
+        ".indexOn": ["company", "vehiclePlate", "customerName", "contractDate", "returnedDate"],
+        "$contractId": {
+          "id": { ".validate": "newData.isString() && newData.val() === $contractId" },
+          "contractNo": { ".validate": "newData.isString()" },
+          "company": { ".validate": "newData.isString()" },
+          "customerName": { ".validate": "newData.isString()" },
+          "vehiclePlate": { ".validate": "newData.isString()" }
+        }
+      },
+
+      "vehicles": {
+        ".write": "auth != null",
+        ".indexOn": ["plate", "company", "status"],
+        "$vehicleId": {
+          "id": { ".validate": "newData.isString() && newData.val() === $vehicleId" },
+          "plate": { ".validate": "newData.isString()" },
+          "company": { ".validate": "newData.isString()" }
+        }
+      },
+
+      "companies": { ".write": "auth != null", ".indexOn": ["code", "name"] },
+      "bank_tx": { ".write": "auth != null", ".indexOn": ["txDate", "companyCode", "matchedContractId", "importedAt"] },
+      "card_tx": { ".write": "auth != null", ".indexOn": ["txDate", "matchedContractId", "importedAt"] },
+      "penalties": { ".write": "auth != null", ".indexOn": ["issueDate", "carNumber", "status", "matchedContractId"] },
+      "insurances": { ".write": "auth != null", ".indexOn": ["carNumber", "policyNo", "endDate"] },
+      "history_entries": { ".write": "auth != null", ".indexOn": ["date", "scope", "vehiclePlate", "contractId"] },
+      "customers": { ".write": "auth != null" },
+      "schedules": { ".write": "auth != null" },
+      "pending_uploads": { ".write": "auth != null" },
+      "vehicle_attachments": { ".write": "auth != null" },
+      "vendors": { ".write": "auth != null" },
+      "dispatch_orders": { ".write": "auth != null" },
+      "attendance_requests": { ".write": "auth != null" },
+      "field_logs": { ".write": "auth != null" },
+      "field_logs_customer": { ".write": "auth != null" },
+      "field_logs_vehicle": { ".write": "auth != null" },
+      "intake": { ".write": "auth != null" },
+      "issued_documents": { ".write": "auth != null" },
+      "issued_invoices": { ".write": "auth != null" },
+      "notices": { ".write": "auth != null" },
+
+      "closed_periods": {
+        "$yyyymm": {
+          ".write": "auth != null && (auth.token.email === 'pyh@teamjpk.com' || auth.token.email === 'sym@teamjpk.com' || root.child($tenant + '/users/' + auth.uid + '/role').val() === 'master')"
+        }
+      },
+
+      "policy": {
+        ".write": "auth != null && (auth.token.email === 'pyh@teamjpk.com' || auth.token.email === 'sym@teamjpk.com' || root.child($tenant + '/users/' + auth.uid + '/role').val() === 'master')"
+      },
+
+      "modules": {
+        ".write": "auth != null && (auth.token.email === 'pyh@teamjpk.com' || auth.token.email === 'sym@teamjpk.com' || root.child($tenant + '/users/' + auth.uid + '/role').val() === 'master')"
+      },
+
+      "audit_logs": {
+        ".indexOn": ["at", "entity", "entityId", "action", "userId"],
+        "$logId": {
+          ".write": "auth != null && !data.exists()",
+          ".validate": "newData.hasChildren(['at', 'userId', 'action'])",
+          "at": { ".validate": "newData.isString()" },
+          "userId": { ".validate": "newData.isString()" },
+          "action": { ".validate": "newData.isString()" }
+        }
+      },
+
+      "sms_log": {
+        ".indexOn": ["sentAt", "tel", "contractId", "operationKey"],
+        "$logId": {
+          ".write": "auth != null && !data.exists()"
+        }
+      },
+
+      "users": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || root.child($tenant + '/users/' + auth.uid + '/role').val() === 'master')",
+          ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'pyh@teamjpk.com' || auth.token.email === 'sym@teamjpk.com' || root.child($tenant + '/users/' + auth.uid + '/role').val() === 'master')",
+          "role": {
+            ".validate": "(newData.val() === 'admin' || newData.val() === 'staff' || newData.val() === 'master') && (auth.token.email === 'pyh@teamjpk.com' || auth.token.email === 'sym@teamjpk.com' || root.child($tenant + '/users/' + auth.uid + '/role').val() === 'master' || (data.exists() && newData.val() === data.val()))"
+          },
+          "companyCodes": { ".validate": "newData.hasChildren() || newData.val() === null" }
+        }
+      }
+    }
+  }
+}
