@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MagnifyingGlass, ArrowsClockwise, Truck, ArrowUDownLeft, X, Plus, PaperPlaneTilt, DownloadSimple, Car, Upload, FileXls } from '@phosphor-icons/react';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton, ExcelButton, SmsButton, DeleteButton, ActionButton, ActionSep, ClearButton, PageStats } from '@/components/ui/page-actions';
 import {
   todayKr,
   buildDeliveries,
@@ -1030,75 +1031,41 @@ export default function Page() {
       <BottomBar
         left={
           <>
-            <button className="btn btn-primary" type="button" onClick={() => setCreateOpen(true)} title="자산·계약·입출금 1건 수기 등록 (다이얼로그에서 종류 선택)">
-              <Plus size={14} weight="bold" /> 신규 등록
-            </button>
-            <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-            <button className="btn" type="button" onClick={() => setSmsOpen(true)} title="문자 발송" disabled={selectedIds.size === 0}>
-              <PaperPlaneTilt size={14} /> 문자 발송{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
-            </button>
-            <button
-              className="btn"
-              type="button"
+            <NewButton label="신규 등록" onClick={() => setCreateOpen(true)} title="단건 수기 등록 · 엑셀 일괄 업로드 — 다이얼로그 탭에서 선택" />
+            <ActionSep />
+            <ExcelButton
+              count={filteredContracts.length}
               onClick={() => downloadContractsExcel(filteredContracts, companyMaster, {
                 title: `운영현황 — ${view}${companyFilter !== '전체' ? ` (${companyFilter})` : ''}`,
                 fileName: `운영현황-${view}`,
                 sheetName: '운영현황',
                 filter: `${view}${companyFilter !== '전체' ? ` · ${companyFilter}` : ''}`,
               })}
-              title={`현재 페이지 목록 (${filteredContracts.length}건) 엑셀 다운로드`}
-              disabled={filteredContracts.length === 0}
-            >
-              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filteredContracts.length}</span>
-            </button>
+            />
+            <SmsButton count={selectedIds.size} onClick={() => setSmsOpen(true)} disabled={selectedIds.size === 0} />
             {superAdmin && (
               <>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <button
-                  className="btn"
-                  type="button"
+                <ActionSep />
+                <ActionButton
+                  icon={<Truck size={14} />}
+                  label={`일괄 인도완료${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
                   onClick={handleBulkMarkDelivered}
                   disabled={selectedIds.size === 0}
                   title={selectedIds.size === 0 ? '좌측 체크박스로 행을 선택하세요' : '선택 계약 일괄 인도완료 (deliveredDate = 계약시작일)'}
-                >
-                  <Truck size={14} /> 일괄 인도완료{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
-                </button>
-                <button
-                  className="btn btn-danger"
-                  type="button"
+                />
+                <DeleteButton
+                  count={selectedIds.size}
+                  label="일괄 삭제"
                   onClick={handleBulkDelete}
-                  disabled={selectedIds.size === 0}
                   title={selectedIds.size === 0 ? '좌측 체크박스로 행을 선택하세요' : '선택 계약 일괄 삭제 (마스터관리자)'}
-                >
-                  <X size={14} /> 일괄 삭제{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
-                </button>
+                />
               </>
             )}
+            {selectedIds.size > 0 && <ClearButton count={selectedIds.size} onClick={clearSelection} />}
           </>
         }
         right={
-          <>
-            <button className="btn" type="button" onClick={() => { setCreateMode('현황'); setCreateOpen(true); }} title="엑셀 일괄 업로드 (운영현황 형식)">
-              <Upload size={14} weight="bold" /> 운영현황 업로드
-            </button>
-            <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-            <span>전체 <strong>{contracts.length}</strong>건</span>
-            {selectedIds.size > 0 && (
-              <>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <span>선택 <strong>{selectedIds.size}</strong>건</span>
-                <button className="btn btn-sm btn-ghost" type="button" onClick={clearSelection}>
-                  <X size={11} /> 선택 해제
-                </button>
-              </>
-            )}
-            {summary.totalUnpaid > 0 && (
-              <>
-                <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <span>미수 <strong className="mono" style={{ color: 'var(--red-text)' }}>₩{formatCurrency(summary.totalUnpaid)}</strong></span>
-              </>
-            )}
-          </>
+          <PageStats total={contracts.length} selectedCount={selectedIds.size} unpaid={summary.totalUnpaid} />
         }
       />
 
