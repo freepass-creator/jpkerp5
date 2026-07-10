@@ -15,15 +15,22 @@ import { displayCompanyName } from '@/lib/company-display';
 import { FilterSelect } from './filter-select';
 import { CaretLeft, CaretRight } from '@phosphor-icons/react';
 
-/** 회사 dropdown — 'all' + option list */
+/**
+ * 회사 dropdown — 전체 옵션 + option list. 모든 list 페이지 공용.
+ * - allValue: 전체 옵션의 값 (기본 'all'; 운영현황 등 sentinel '전체' 쓰는 페이지는 override).
+ *   matchesCompanyFilter 가 'all'·'전체' 둘 다 통과 처리하므로 어느 쪽이든 안전.
+ * - counts: 회사코드 → 건수. 있으면 옵션 옆 (N) 힌트 표기.
+ */
 export function CompanyFilter({
-  value, onChange, options, master, label = '회사',
+  value, onChange, options, master, label = '회사', allValue = 'all', counts,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: string[];
   master: Company[];
   label?: string;
+  allValue?: string;
+  counts?: Record<string, number>;
 }) {
   return (
     <FilterSelect
@@ -32,8 +39,12 @@ export function CompanyFilter({
       dataW="md"
       title={`${label} 필터`}
       options={[
-        { value: 'all', label: `${label}: 전체` },
-        ...options.map((co) => ({ value: co, label: displayCompanyName(co, master) })),
+        { value: allValue, label: `${label}: 전체` },
+        ...options.map((co) => ({
+          value: co,
+          label: displayCompanyName(co, master) || co,
+          hint: counts && counts[co] ? `(${counts[co]})` : undefined,
+        })),
       ]}
     />
   );

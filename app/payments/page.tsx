@@ -28,6 +28,7 @@ import { showConfirm } from '@/lib/confirm';
 import type { BankTransaction, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { FilterSelect } from '@/components/ui/filter-select';
+import { CompanyFilter } from '@/components/ui/filter-bar';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { useTableSelection } from '@/lib/use-table-selection';
 
@@ -484,18 +485,12 @@ export default function PaymentsPage() {
 
           <div className="filter-bar">
             {/* 회사 — 검색창 우측 맨 앞 */}
-            {companyOptions.length > 0 && (
-              <FilterSelect
-                value={companyFilter}
-                onChange={setCompanyFilter}
-                dataW="md"
-                title="회사별 필터"
-                options={[
-                  { value: 'all', label: '회사: 전체' },
-                  ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) })),
-                ]}
-              />
-            )}
+            <CompanyFilter
+              value={companyFilter}
+              onChange={setCompanyFilter}
+              options={companyOptions}
+              master={companyMaster}
+            />
             <span className="filter-divider" />
             {/* 뷰 chip 그룹 — chip 명은 신규등록 dialog tab 과 동일하게 통일 */}
             <button type="button" className={`chip ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>

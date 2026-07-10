@@ -15,6 +15,7 @@ import { useMemo, useState } from 'react';
 import { ChartBar, FileXls, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { FilterSelect } from '@/components/ui/filter-select';
+import { CompanyFilter } from '@/components/ui/filter-bar';
 import { FINANCE_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { EmptyRow } from '@/components/ui/empty-row';
@@ -293,15 +294,11 @@ export default function FinanceDailyPage() {
     >
       {/* 필터 바 — 회사 / 기간 / 검색 */}
       <div className="filter-bar" style={{ marginBottom: 14, gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <FilterSelect
+        <CompanyFilter
           value={companyFilter}
           onChange={setCompanyFilter}
-          dataW="md"
-          title="회사별 필터"
-          options={[
-            { value: 'all', label: '회사: 전체' },
-            ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) })),
-          ]}
+          options={companyOptions}
+          master={companyMaster}
         />
         <span className="filter-divider" />
         <button type="button" className={`chip ${periodMode === 'month' ? 'active' : ''}`} onClick={() => setPeriodMode('month')}>월</button>

@@ -25,6 +25,7 @@ import { computeAssetLedgerEntry, summarizeLedger } from '@/lib/asset-ledger';
 import { formatCurrency } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { FilterSelect } from '@/components/ui/filter-select';
+import { CompanyFilter } from '@/components/ui/filter-bar';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import type { VehicleStatus } from '@/lib/types';
@@ -95,15 +96,11 @@ export default function AssetLedgerPage() {
             />
           </div>
           <div className="filter-bar">
-            <FilterSelect
+            <CompanyFilter
               value={companyFilter}
               onChange={setCompanyFilter}
-              dataW="md"
-              title="회사별 필터"
-              options={[
-                { value: 'all', label: '회사: 전체' },
-                ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) || co })),
-              ]}
+              options={companyOptions}
+              master={companyMaster}
             />
             <span className="filter-divider" />
             <button type="button" className={`chip ${scope === 'active' ? 'active' : ''}`} onClick={() => setScope('active')}>운영자산</button>

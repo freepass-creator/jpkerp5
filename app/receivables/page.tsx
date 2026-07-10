@@ -7,6 +7,7 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { Sidebar } from '@/components/layout/sidebar';
 import { AppTopbar } from '@/components/layout/app-topbar';
 import { FilterSelect } from '@/components/ui/filter-select';
+import { CompanyFilter } from '@/components/ui/filter-bar';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { NewButton, ExcelButton, SmsButton, ActionButton, ActionSep, ClearButton } from '@/components/ui/page-actions';
@@ -318,15 +319,11 @@ export default function ReceivablesPage() {
           search={{ placeholder: '고객 / 차량 / 차종 / 담당', value: search, onChange: setSearch }}
           filter={
             <>
-              <FilterSelect
+              <CompanyFilter
                 value={companyFilter}
                 onChange={setCompanyFilter}
-                dataW="md"
-                title="회사별 필터"
-                options={[
-                  { value: 'all', label: '회사: 전체' },
-                  ...companyOptions.map((co) => ({ value: co, label: displayCompanyName(co, companyMaster) || co })),
-                ]}
+                options={companyOptions}
+                master={companyMaster}
               />
               <span className="filter-divider" />
               {QUICK_FILTERS.map((f) => {

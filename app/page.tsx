@@ -28,6 +28,7 @@ import { addMonthsKeepDay, extendSchedules } from '@/lib/payment-schedule';
 import { ContractDetailDialog } from '@/components/contract-detail-dialog';
 import { PageShell } from '@/components/ui/page-shell';
 import { FilterSelect } from '@/components/ui/filter-select';
+import { CompanyFilter } from '@/components/ui/filter-bar';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { CreateDialog } from '@/components/create-dialog';
 import { ExtendPopover } from '@/components/extend-popover';
@@ -636,22 +637,15 @@ export default function Page() {
       topbarSearch={{ placeholder: '고객 / 차량 / 차종 / 담당 / 연락처', value: search, onChange: setSearch }}
       topbarFilter={
         <>
-          {companies.length > 1 && (
-            <>
-              <FilterSelect
-                value={companyFilter}
-                onChange={setCompanyFilter}
-                dataW="md"
-                title="회사별 필터"
-                options={companies.map((co) => {
-                  const cnt = companyCounts[co] ?? 0;
-                  const label = co === '전체' ? '회사: 전체' : displayCompanyName(co, companyMaster) || co;
-                  return { value: co, label, hint: cnt > 0 ? `(${cnt})` : undefined };
-                })}
-              />
-              <span className="filter-divider" />
-            </>
-          )}
+          <CompanyFilter
+            value={companyFilter}
+            onChange={setCompanyFilter}
+            options={companies.filter((co) => co !== '전체')}
+            master={companyMaster}
+            allValue="전체"
+            counts={companyCounts}
+          />
+          <span className="filter-divider" />
           {visibleViews.map((v) => {
             const count = viewCounts[v];
             const tone = v === '미수' ? 'red'
