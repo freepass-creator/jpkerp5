@@ -15,6 +15,7 @@ import { splitVat, computeVatReport, vatPeriodRange } from '@/lib/vat-report';
 import { findVehicleForContract } from '@/lib/entity-sync';
 import { deriveCustomers } from '@/lib/customer-derive';
 import { depositLedger, unrefundedDeposit, hasUnrefundedDeposit } from '@/lib/deposit';
+import { computeEarlyTerminationFee } from '@/lib/early-termination';
 import { nextCompanyCode, nextAssetCode, nextContractNo, yymmOf } from '@/lib/code-scheme';
 import type { Contract, BankTransaction, PaymentScheduleInline, PaymentEntry, Vehicle } from '@/lib/types';
 
@@ -210,6 +211,24 @@ describe('코드체계 SSOT (쓰기경로 v6정합)', () => {
     expect(nextContractNo('CP01', [{ contractNo: 'CP01-2607-0003' }, { contractNo: 'CP01-2606-0009' }], '2607')).toBe('CP01-2607-0004');
   });
   it('yymmOf', () => { expect(yymmOf('2026-07-15')).toBe('2607'); });
+});
+
+describe('중도해지 위약금 상시 계산 (계약 요율 반영)', () => {
+  it('잔여기간 × 월대여료 × 요율(계약)', () => {
+    const c = contract({ contractDate: '2025-01-01', termMonths: 12, monthlyRent: 500_000, earlyTerminationRate: 10 });
+    const r = computeEarlyTerminationFee(c, '2025-07-01'); // 만기 2026-01-01, 잔여 6개월
+    expect(r.isEarly).toBe(true);
+    expect(r.remainingMonths).toBe(6);
+    expect(r.fee).toBe(300_000);
+  });
+  it('만기 이후(정상종료)면 위약금 0', () => {
+    const c = contract({ contractDate: '2025-01-01', termMonths: 12, monthlyRent: 500_000, earlyTerminationRate: 10 });
+    expect(computeEarlyTerminationFee(c, '2026-06-01').fee).toBe(0);
+  });
+  it('계약에 요율 없으면 0', () => {
+    const c = contract({ contractDate: '2025-01-01', termMonths: 12, monthlyRent: 500_000 });
+    expect(computeEarlyTerminationFee(c, '2025-07-01').fee).toBe(0);
+  });
 });
 
 describe('보증금 원장 (반납 미반환 처리)', () => {

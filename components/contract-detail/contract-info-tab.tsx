@@ -230,6 +230,7 @@ export const ContractInfoTab = forwardRef<EditableTabHandle, { c: Contract; onUp
           <div>
             <EditableField label="월 대여료" value={editing ? String(draft.monthlyRent ?? 0) : `₩${formatCurrency(c.monthlyRent)}`} editing={editing} mono onChange={(v) => set('monthlyRent', Number(v.replace(/[,\s]/g, '')) || 0)} />
             <EditableField label="보증금" value={editing ? String(draft.deposit ?? 0) : `₩${formatCurrency(c.deposit)}`} editing={editing} mono onChange={(v) => set('deposit', Number(v.replace(/[,\s]/g, '')) || 0)} />
+            <EditableField label="중도해지 위약금율(%)" value={editing ? String(draft.earlyTerminationRate ?? 0) : (c.earlyTerminationRate ? `${c.earlyTerminationRate}%` : '미설정')} editing={editing} mono onChange={(v) => set('earlyTerminationRate', Number(v.replace(/[^0-9.]/g, '')) || 0)} />
             {editing ? (
               <EditableField label="결제방법" value={draft.paymentMethod ?? ''} editing onChange={(v) => set('paymentMethod', v)} placeholder="이체 / 카드 / CMS 등" />
             ) : (

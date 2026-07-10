@@ -17,16 +17,28 @@ import { toast } from '@/lib/toast';
 import { todayKr } from '@/lib/mock-data';
 import { formatCurrency } from '@/lib/utils';
 import { depositLedger, addDepositDeduction, hasUnrefundedDeposit } from '@/lib/deposit';
+import { computeEarlyTerminationFee } from '@/lib/early-termination';
 import { isContractEnded } from '@/lib/contract-lifecycle';
 
 export function DepositSection({ c, onUpdate }: { c: Contract; onUpdate: (c: Contract) => void }) {
   const l = depositLedger(c);
   const ended = isContractEnded(c);
   const flagged = hasUnrefundedDeposit(c);
+  const etf = computeEarlyTerminationFee(c, todayKr()); // 중도해지 위약금 상시 계산(계약 요율)
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const won = (n: number) => `₩${formatCurrency(n)}`;
+
+  function deductEarlyFee() {
+    if (etf.fee <= 0) return;
+    onUpdate({
+      ...c,
+      earlyTerminationFee: etf.fee, // 실제 부과액 확정 기록
+      ...addDepositDeduction(c, { date: todayKr(), amount: etf.fee, reason: `중도해지 위약금 (잔여 ${etf.remainingMonths}개월 × ${etf.rate}%)` }),
+    });
+    toast.success(`위약금 ${won(etf.fee)} 보증금 차감`);
+  }
 
   async function addDeduction() {
     const n = Number(amount.replace(/[,\s]/g, ''));
@@ -62,6 +74,17 @@ export function DepositSection({ c, onUpdate }: { c: Contract; onUpdate: (c: Con
         <Kv k="미반환 잔액" v={won(l.unrefunded)} tone={l.unrefunded > 0 ? 'var(--red-text)' : 'var(--green-text)'} bold />
       </div>
 
+      {/* 중도해지 위약금 — 상시 계산(계약 요율). 요율 없으면 숨김 */}
+      {etf.rate > 0 && (
+        <div style={{ marginTop: 8, fontSize: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="label" style={{ color: 'var(--text-sub)' }}>중도해지 위약금 (오늘 반납 시)</span>
+          <span className="mono" style={{ fontWeight: 700, color: etf.fee > 0 ? 'var(--orange-text)' : undefined }}>
+            {etf.isEarly ? won(etf.fee) : '해당없음(만기 도래)'}
+          </span>
+          {etf.isEarly && <span className="dim" style={{ fontSize: 10 }}>잔여 {etf.remainingMonths}개월 × 월대여료 × {etf.rate}%</span>}
+        </div>
+      )}
+
       {/* 차감 내역 */}
       {(c.depositDeductions ?? []).length > 0 && (
         <div style={{ marginTop: 8, fontSize: 11 }}>
@@ -81,6 +104,9 @@ export function DepositSection({ c, onUpdate }: { c: Contract; onUpdate: (c: Con
           <input className="input" placeholder="차감액" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ width: 100, fontSize: 12 }} inputMode="numeric" />
           <input className="input" placeholder="사유 (미납/손상/과태료…)" value={reason} onChange={(e) => setReason(e.target.value)} style={{ width: 180, fontSize: 12 }} />
           <button className="btn btn-sm" type="button" onClick={addDeduction}>차감 추가</button>
+          {etf.isEarly && etf.fee > 0 && (
+            <button className="btn btn-sm" type="button" onClick={deductEarlyFee} title={`중도해지 위약금 ${won(etf.fee)} 을 보증금에서 차감`}>위약금 {won(etf.fee)} 차감</button>
+          )}
           <button className="btn btn-sm btn-primary" type="button" disabled={busy} onClick={refundRest}>잔액 {won(l.unrefunded)} 환불</button>
         </div>
       )}

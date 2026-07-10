@@ -169,7 +169,9 @@ export type Contract = {
   endReason?: '정상종료' | '중도해지' | '채권보전';
   endedAt?: string;              // 종료 처리 일자 (YYYY-MM-DD)
   unpaidAtEnd?: number;          // 종료 시점 미수 잔액 (채권보전 산출 근거)
-  earlyTerminationFee?: number;  // 중도해지 위약금 (부과 근거)
+  earlyTerminationFee?: number;  // 중도해지 위약금 (실제 부과액 — 확정 기록)
+  /** 중도해지 위약금율(%) — 계약조건(계약서)에서. 상시 위약금 계산에 사용. 잔여기간 대여료 × 요율. */
+  earlyTerminationRate?: number;
   endNotes?: string;             // 종료 사유 부연 (담당자 메모, 추심 단계 등)
   /** 선도구매 — 계약자 없이 회사가 미리 차량 구매 (재고 확보용) */
   isInventoryPurchase?: boolean;
