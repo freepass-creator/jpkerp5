@@ -8,6 +8,7 @@ import { generateSchedules, distributeUnpaid, computeCurrentSeq as computeCurren
 import { todayKr } from './mock-data';
 import { toStr, toNum, toDate, get, type Row } from './parse-helpers';
 import { monthsBetween } from './utils';
+import { classifyDepositSubject } from './classify-subject';
 
 /* ──────────────── 도메인별 picker ──────────────── */
 
@@ -891,9 +892,12 @@ export function parseBankTxRow(row: Row, fileName: string, bankHint?: string): O
   const cpFinal = counterparty || memo || summary || (finalWithdraw > 0 ? '(출금)' : '(미상)');
   const method = deriveBankMethod(summary, memo);
 
-  // 계정과목 — 사용자가 시트에 적었으면 그대로, 아니면 입금은 '대여료수입' 기본 (가장 흔한 케이스), 출금은 미지정.
+  // 계정과목 — 사용자가 시트에 적었으면 그대로. 아니면 입금은 거래상대·적요·금액으로 추론
+  // (기본은 '대여료수입' 유지, 보증금·정산·법인간이체 대액 등 명확한 신호만 재분류 → 회계 왜곡 완화). 출금은 미지정.
   const subjectRaw = toStr(get(row, '계정과목', '과목', 'subject'));
-  const defaultSubject = finalDeposit > 0 && finalWithdraw <= 0 ? '대여료수입' : undefined;
+  const defaultSubject = (finalDeposit > 0 && finalWithdraw <= 0)
+    ? classifyDepositSubject({ counterparty: cpFinal, memo: memo || summary || '', amount: finalDeposit }).subject
+    : undefined;
 
   return {
     txDate,
