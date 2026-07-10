@@ -60,3 +60,24 @@ export function nextContractNo(
 export function yymmOf(dateIso: string): string {
   return (dateIso ?? '').slice(2, 7).replace('-', '');
 }
+
+/**
+ * 배치 계약들에 회사·월 scope 순번 계약번호 재할당 (기존 + 배치 내 누적 offset).
+ * import/일괄생성이 Math.random 충돌위험 대신 순번을 갖게 함. company 이름→code resolve.
+ */
+export function assignContractNos<T extends { company?: string; contractDate?: string }>(
+  batch: T[],
+  existing: ReadonlyArray<{ contractNo?: string }>,
+  companies: ReadonlyArray<{ code?: string; name?: string }>,
+): (T & { contractNo: string })[] {
+  const codeOf = (co?: string) => companies.find((x) => x.code === co || x.name === co)?.code ?? co ?? 'CP00';
+  const counts = new Map<string, number>();
+  return batch.map((c) => {
+    const cc = codeOf(c.company);
+    const yymm = yymmOf(c.contractDate ?? '');
+    const key = `${cc}|${yymm}`;
+    const offset = counts.get(key) ?? 0;
+    counts.set(key, offset + 1);
+    return { ...c, contractNo: nextContractNo(cc, existing, yymm, offset) };
+  });
+}

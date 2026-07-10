@@ -48,7 +48,7 @@ import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { upsertVehicleFromContract, normPlate, findVehicleByPlate } from '@/lib/entity-sync';
-import { nextContractNo, nextAssetCode, yymmOf } from '@/lib/code-scheme';
+import { nextContractNo, nextAssetCode, yymmOf, assignContractNos } from '@/lib/code-scheme';
 import { customerKey } from '@/lib/customer-derive';
 import { useAuth } from '@/lib/use-auth';
 // Phase 2.2 — intake 평행 기록 (배치 단위)
@@ -240,10 +240,11 @@ export function CreateDialog({
       // 중복 검증 — 계약번호 또는 차량번호+계약일+고객 기준
       const dedup = dedupAgainst(valid, contracts, contractKeys);
       const skipped = dedup.duplicates.length;
-      const n = await addContracts(dedup.unique);
+      const withNos = assignContractNos(dedup.unique, contracts, companies); // 회사·월 순번 계약번호(#쓰기경로 v6정합)
+      const n = await addContracts(withNos);
       // 차량 자동 동기화 — 계약 등록 후 같은 plate Vehicle 없으면 자동 생성
       const syncCtx = { vehicles, companies, addVehicle, updateVehicle };
-      for (const c of dedup.unique) {
+      for (const c of withNos) {
         try { await upsertVehicleFromContract(c as Contract, syncCtx); }
         catch (e) { console.error('bulk vehicle sync failed', c.contractNo, e); }
       }
@@ -476,10 +477,11 @@ export function CreateDialog({
       // 중복 검증 (재 import 안전)
       const dedup = dedupAgainst(all, contracts, contractKeys);
       const skipped = dedup.duplicates.length;
-      const created = await addContracts(dedup.unique);
+      const withNos = assignContractNos(dedup.unique, contracts, companies); // 회사·월 순번 계약번호
+      const created = await addContracts(withNos);
       // 차량 자동 동기화 — 가로확장 import 후 vehicle 자동 생성/매칭
       const syncCtx = { vehicles, companies, addVehicle, updateVehicle };
-      for (const c of dedup.unique) {
+      for (const c of withNos) {
         try { await upsertVehicleFromContract(c as Contract, syncCtx); }
         catch (e) { console.error('horizontal import vehicle sync failed', c.contractNo, e); }
       }
@@ -611,10 +613,11 @@ export function CreateDialog({
         else creates.push(out as Omit<Contract, 'id'>);
       }
       if (updates.length > 0) await updateContracts(updates);
-      const created = creates.length > 0 ? await addContracts(creates) : 0;
+      const createsWithNos = assignContractNos(creates, contracts, companies); // 신규만 회사·월 순번 계약번호
+      const created = createsWithNos.length > 0 ? await addContracts(createsWithNos) : 0;
       // 차량 자동 동기화 — 신규 계약에 대해 vehicle 자동 생성/매칭 (updates 도 status 갱신)
       const syncCtx = { vehicles, companies, addVehicle, updateVehicle };
-      for (const c of [...updates, ...creates]) {
+      for (const c of [...updates, ...createsWithNos]) {
         try { await upsertVehicleFromContract(c as Contract, syncCtx); }
         catch (e) { console.error('snapshot vehicle sync failed', (c as Contract).contractNo, e); }
       }
