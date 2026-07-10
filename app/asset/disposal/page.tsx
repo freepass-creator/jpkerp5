@@ -19,7 +19,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { EmptyRow } from "@/components/ui/empty-row";
 import { PageLoading } from "@/components/ui/page-loading";
 import { BottomBar } from '@/components/layout/bottom-bar';
-import { ExcelButton, DeleteButton } from '@/components/ui/page-actions';
+import { NewButton, ExcelButton, DeleteButton } from '@/components/ui/page-actions';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -134,12 +134,12 @@ export default function AssetDisposalPage() {
         <BottomBar
           left={
             <>
-              <button className="btn btn-primary" type="button" onClick={() => {
+              <NewButton label="처분 등록" onClick={() => {
                 const ids = Array.from(sel.selectedIds).filter((id) => !id.startsWith('contract-derived-'));
                 if (ids.length !== 1) { toast.info('처분(매각/폐차)할 차량 1대를 목록에서 선택하세요 (행 더블클릭으로도 상세가 열립니다).'); return; }
                 const v = filtered.find((x) => x.id === ids[0]);
                 if (v?.plate) openVehicle(v.plate, 'asset'); else toast.error('차량번호가 없어 상세를 열 수 없습니다.');
-              }}><Plus size={14} weight="bold" /> 처분 등록</button>
+              }} />
               <span className="btn-sep" />
               {/* 일괄 다음 단계 — 매각검토 → 매각대기 → 매각 progression */}
               <select

@@ -17,7 +17,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { EmptyRow } from "@/components/ui/empty-row";
 import { PageLoading } from "@/components/ui/page-loading";
 import { BottomBar } from '@/components/layout/bottom-bar';
-import { ExcelButton } from '@/components/ui/page-actions';
+import { NewButton, ExcelButton, DeleteButton, ActionSep } from '@/components/ui/page-actions';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
 import { InsuranceDetailDialog } from '@/components/insurance/insurance-detail-dialog';
@@ -289,10 +289,8 @@ export default function AssetInsurancePage() {
         <BottomBar
           left={
             <>
-              <button className="btn btn-primary" type="button" onClick={() => setRegisterOpen(true)}>
-                <Plus size={14} weight="bold" /> 보험증권 등록
-              </button>
-              <span className="btn-sep" />
+              <NewButton label="보험증권 등록" onClick={() => setRegisterOpen(true)} />
+              <ActionSep />
               <ExcelButton
                 count={filtered.length}
                 title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드 — 1~6회차·담보·자동이체 모두 포함`}
@@ -305,12 +303,9 @@ export default function AssetInsurancePage() {
                   );
                 }}
               />
-              <button
-                className="btn"
-                type="button"
-                disabled={selectedIds.size === 0}
+              <DeleteButton
+                count={selectedIds.size}
                 title="체크박스로 선택한 차량의 보험증권 일괄 삭제 (감사로그 남음)"
-                style={{ color: selectedIds.size > 0 ? 'var(--red-text)' : undefined }}
                 onClick={async () => {
                   if (selectedIds.size === 0) return;
                   // 선택된 vehicle id → 매칭된 policy 추출
@@ -330,9 +325,7 @@ export default function AssetInsurancePage() {
                   }
                   setSelectedIds(new Set());
                 }}
-              >
-                <Trash size={14} weight="bold" /> 선택 {selectedIds.size}건 삭제
-              </button>
+              />
             </>
           }
           right={null}
