@@ -19,6 +19,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { EmptyRow } from "@/components/ui/empty-row";
 import { PageLoading } from "@/components/ui/page-loading";
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { ExcelButton, DeleteButton } from '@/components/ui/page-actions';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { useMergedVehicles } from '@/lib/use-merged-vehicles';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -183,12 +184,9 @@ export default function AssetDisposalPage() {
                 <option value="매각">매각 완료</option>
                 <option value="휴차대기">↩ 휴차대기로 복귀</option>
               </select>
-              <button
-                className="btn"
-                type="button"
-                disabled={sel.size === 0}
+              <DeleteButton
+                count={sel.size}
                 title="체크박스로 선택한 자산 일괄 삭제 (감사로그 남음)"
-                style={{ color: sel.size > 0 ? 'var(--red-text)' : undefined }}
                 onClick={async () => {
                   if (sel.size === 0) return;
                   const realIds = Array.from(sel.selectedIds).filter((id) => !id.startsWith('contract-derived-'));
@@ -206,12 +204,9 @@ export default function AssetDisposalPage() {
                   if (fail > 0) toast.error(`${ok}건 삭제, ${fail}건 실패`);
                   else toast.success(`${ok}건 삭제`);
                 }}
-              >
-                <Trash size={14} weight="bold" /> 선택 {sel.size}건 삭제
-              </button>
-              <button
-                className="btn"
-                type="button"
+              />
+              <ExcelButton
+                count={filtered.length}
                 disabled={filtered.length === 0}
                 title={sel.size > 0
                   ? `선택한 ${sel.size}건만 엑셀 다운로드 (체크 해제 시 전체 ${filtered.length}건)`
@@ -247,9 +242,7 @@ export default function AssetDisposalPage() {
                     ],
                   });
                 }}
-              >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
-              </button>
+              />
             </>
           }
           right={null}

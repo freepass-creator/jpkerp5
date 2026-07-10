@@ -16,6 +16,7 @@ import { Calendar, FileXls, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { ExcelButton } from '@/components/ui/page-actions';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -236,9 +237,7 @@ export default function ContractSchedulePage() {
       bottomBar={
         <BottomBar
           left={
-            <button className="btn" type="button" disabled={rows.length === 0} onClick={handleExcel}>
-              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{rows.length}</span>
-            </button>
+            <ExcelButton count={rows.length} onClick={handleExcel} />
           }
           right={
             <span className="dim mono" style={{ fontSize: 11 }}>

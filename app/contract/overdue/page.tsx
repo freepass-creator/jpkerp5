@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { ExcelButton, ActionSep } from '@/components/ui/page-actions';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -91,9 +92,8 @@ export default function ContractOverduePage() {
         <BottomBar
           left={
             <>
-              <button
-                className="btn"
-                type="button"
+              <ExcelButton
+                count={overdue.length}
                 disabled={overdue.length === 0}
                 title={`현재 페이지 목록 (${overdue.length}건) 엑셀 다운로드`}
                 onClick={() => downloadContractsExcel(overdue, companyMaster, {
@@ -102,10 +102,8 @@ export default function ContractOverduePage() {
                   sheetName: '미수금',
                   filter: bucket === 'all' ? undefined : `${overdue.length}건`,
                 })}
-              >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{overdue.length}</span>
-              </button>
-              <span className="btn-sep" />
+              />
+              <ActionSep />
               <Link href="/receivables" className="btn">→ 리스크 관리로 (액션 중심)</Link>
             </>
           }

@@ -13,6 +13,7 @@ import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu'
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { ExcelButton } from '@/components/ui/page-actions';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -116,15 +117,12 @@ export default function ContractIdlePage() {
       bottomBar={
         <BottomBar
           left={
-            <button
-              className="btn"
-              type="button"
+            <ExcelButton
+              count={rows.length}
               disabled={rows.length === 0}
               title={`현재 페이지 목록 (${rows.length}건) 엑셀 다운로드`}
               onClick={() => downloadContractsExcel(rows, companyMaster, { title: '휴차 차량', fileName: '휴차차량', sheetName: '휴차', filter: `${rows.length}건` })}
-            >
-              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{rows.length}</span>
-            </button>
+            />
           }
           right={null}
         />

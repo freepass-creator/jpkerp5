@@ -17,6 +17,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { EmptyRow } from "@/components/ui/empty-row";
 import { PageLoading } from "@/components/ui/page-loading";
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { ExcelButton } from '@/components/ui/page-actions';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { InsuranceRegisterDialog } from '@/components/insurance/insurance-register-dialog';
 import { InsuranceDetailDialog } from '@/components/insurance/insurance-detail-dialog';
@@ -292,9 +293,8 @@ export default function AssetInsurancePage() {
                 <Plus size={14} weight="bold" /> 보험증권 등록
               </button>
               <span className="btn-sep" />
-              <button
-                className="btn"
-                type="button"
+              <ExcelButton
+                count={filtered.length}
                 title={`현재 페이지 목록 (${filtered.length}건) 엑셀 다운로드 — 1~6회차·담보·자동이체 모두 포함`}
                 disabled={filtered.length === 0}
                 onClick={() => {
@@ -304,9 +304,7 @@ export default function AssetInsurancePage() {
                     { title: `보험증권 일람${companyFilter !== 'all' ? ` (${companyFilter})` : ''}` },
                   );
                 }}
-              >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
-              </button>
+              />
               <button
                 className="btn"
                 type="button"

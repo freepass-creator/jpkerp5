@@ -19,6 +19,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { EmptyRow } from "@/components/ui/empty-row";
 import { PageLoading } from "@/components/ui/page-loading";
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { ExcelButton, DeleteButton, ActionSep } from '@/components/ui/page-actions';
 import { AssetTopbar } from '@/components/asset/asset-topbar';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { vehicleStatusTone } from '@/lib/status-tones';
@@ -155,13 +156,10 @@ export default function AssetGpsPage() {
                 const v = filtered.find((x) => x.id === ids[0]);
                 if (v?.plate) openVehicle(v.plate, 'asset'); else toast.error('차량번호가 없어 상세를 열 수 없습니다.');
               }}><Plus size={14} weight="bold" /> GPS 등록</button>
-              <span className="btn-sep" />
-              <button
-                className="btn"
-                type="button"
-                disabled={sel.size === 0}
+              <ActionSep />
+              <DeleteButton
+                count={sel.size}
                 title="선택한 자산 삭제 (감사로그 남음)"
-                style={{ color: sel.size > 0 ? 'var(--red-text)' : undefined }}
                 onClick={async () => {
                   if (sel.size === 0) return;
                   const realIds = Array.from(sel.selectedIds).filter((id) => !id.startsWith('contract-derived-'));
@@ -179,12 +177,9 @@ export default function AssetGpsPage() {
                   if (fail > 0) toast.error(`${ok}건 삭제, ${fail}건 실패`);
                   else toast.success(`${ok}건 삭제`);
                 }}
-              >
-                <Trash size={14} weight="bold" /> 선택 {sel.size}건 삭제
-              </button>
-              <button
-                className="btn"
-                type="button"
+              />
+              <ExcelButton
+                count={sel.size > 0 ? sel.size : filtered.length}
                 disabled={filtered.length === 0}
                 title={sel.size > 0
                   ? `선택한 ${sel.size}건만 엑셀 다운로드 (체크 해제 시 전체 ${filtered.length}건)`
@@ -218,9 +213,7 @@ export default function AssetGpsPage() {
                     ],
                   });
                 }}
-              >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{sel.size > 0 ? sel.size : filtered.length}</span>
-              </button>
+              />
             </>
           }
           right={null}
