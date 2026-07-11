@@ -123,6 +123,7 @@ export type SwitchplanContract = {
 };
 
 export type SwitchplanParseResult = {
+  asOf: string;                    // 미수 기준일 (YYYY-MM-DD)
   current: SwitchplanContract[];   // 채권 (운행중)
   returned: SwitchplanContract[];  // 반납 (종료)
   vehicles: SwitchplanVehicle[];   // 자산 (차량 마스터)
@@ -545,6 +546,7 @@ export function parseSwitchplanWorkbook(buf: ArrayBuffer, asOf?: string): Switch
   const now = asOf ? new Date(asOf) : new Date();
   const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const todayDay = now.getDate();
+  const asOfStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const custIdx = buildCustomerIndex(wb);
   const vehicleList = buildVehicles(wb);
@@ -577,6 +579,7 @@ export function parseSwitchplanWorkbook(buf: ArrayBuffer, asOf?: string): Switch
   const sum = (arr: SwitchplanContract[], f: (c: SwitchplanContract) => number) => arr.reduce((s, c) => s + f(c), 0);
 
   return {
+    asOf: asOfStr,
     current,
     returned,
     vehicles: vehicleList,

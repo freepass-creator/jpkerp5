@@ -301,6 +301,44 @@ export default function MigrateSwitchplanPage() {
             </div>
           </section>
 
+          {/* 사전 점검 */}
+          {res && (
+            <section className="detail-section">
+              <div className="detail-section-header">
+                <CheckCircle size={13} weight="duotone" style={{ color: 'var(--green-text)' }} />
+                <span className="title">사전 점검 · 미수 기준일 {res.asOf}</span>
+              </div>
+              <div className="detail-section-body">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, fontSize: 12 }}>
+                  {[
+                    { label: '채권(운행중)', n: res.totals.countCurrent, base: 102 },
+                    { label: '반납(종료)', n: res.totals.countReturned, base: 75 },
+                    { label: '자산(차량)', n: res.vehicles.length, base: 163 },
+                    { label: '상환합계(할부)', n: res.loans.length, base: 157 },
+                    { label: '등록번호 매칭', n: res.current.filter((c) => c.customerIdentNo).length, base: res.totals.countCurrent },
+                  ].map((c) => (
+                    <div key={c.label} style={{ padding: 8, background: 'var(--bg-sunken)', borderRadius: 'var(--radius)' }}>
+                      <div style={{ color: 'var(--text-weak)', fontSize: 11, marginBottom: 2 }}>{c.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: c.n > 0 ? 'var(--brand)' : 'var(--red-text)' }}>
+                        {c.n > 0 ? '✓ ' : '⚠ '}{c.n}
+                      </div>
+                      <div style={{ color: 'var(--text-weak)', fontSize: 10 }}>직전 {c.base}</div>
+                    </div>
+                  ))}
+                </div>
+                {res.warnings.length > 0 && (
+                  <div className="notice notice--error" style={{ marginTop: 10, fontSize: 12 }}>
+                    <Warning size={13} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                    {res.warnings.join(' · ')}
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: 'var(--text-weak)', marginTop: 8, lineHeight: 1.6 }}>
+                  건수가 「직전」과 비슷하면 정상(최신화). 어느 항목이 <b>0(⚠)</b>이거나 크게 다르면 그 시트명·헤더가 바뀐 것 → 파일 확인.
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* 총계 대조 */}
           {t && (
             <section className="detail-section">
