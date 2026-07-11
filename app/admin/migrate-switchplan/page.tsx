@@ -9,6 +9,7 @@ import { getRtdb, dbPath, ensureAuth, pruneUndefined } from '@/lib/firebase/clie
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields, buildLoanFields, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
+import { parseSwitchplanJbo, type JboParseResult } from '@/lib/migrate/switchplan-jbo';
 import { validateSnapshotRow, applySnapshotToContract } from '@/lib/import-commit';
 import { assignContractNos } from '@/lib/code-scheme';
 import { upsertVehicleFromContract } from '@/lib/entity-sync';
@@ -34,6 +35,8 @@ export default function MigrateSwitchplanPage() {
 
   const [fileName, setFileName] = useState('');
   const [res, setRes] = useState<SwitchplanParseResult | null>(null);
+  const [jboRes, setJboRes] = useState<JboParseResult | null>(null);
+  const [jboFileName, setJboFileName] = useState('');
   const [companyKey, setCompanyKey] = useState('스위치플랜');
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -56,6 +59,27 @@ export default function MigrateSwitchplanPage() {
       toast.success(`파싱 완료 — 운행중 ${parsed.totals.countCurrent}건`);
     } catch (err) {
       append(`✗ 파싱 실패: ${friendlyError(err)}`);
+      toast.error(friendlyError(err));
+    } finally {
+      setBusy(false);
+      e.target.value = '';
+    }
+  }
+
+  async function onJboFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setJboRes(null);
+    try {
+      const buf = await file.arrayBuffer();
+      const parsed = parseSwitchplanJbo(buf);
+      setJboFileName(file.name);
+      setJboRes(parsed);
+      append(`자금일보 파싱 — 거래 ${parsed.totals.count}건 · 계좌 ${parsed.totals.accounts} · 계정과목 ${parsed.totals.subjects}`);
+      toast.success(`자금일보 ${parsed.totals.count}건 파싱`);
+    } catch (err) {
+      append(`✗ 자금일보 파싱 실패: ${friendlyError(err)}`);
       toast.error(friendlyError(err));
     } finally {
       setBusy(false);
@@ -492,6 +516,77 @@ export default function MigrateSwitchplanPage() {
               </div>
             </section>
           )}
+
+          {/* 자금일보 (별도 파일 · 프리뷰) */}
+          <section className="detail-section">
+            <div className="detail-section-header">
+              <Database size={13} weight="duotone" style={{ color: 'var(--brand)' }} />
+              <span className="title">7. 자금일보 (별도 파일 · 현금흐름 프리뷰)</span>
+            </div>
+            <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <label className="btn" style={{ height: 36, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>
+                  <FileXls weight="bold" size={14} /> 자금일보.xlsx 선택
+                  <input type="file" accept=".xlsx,.xls" hidden disabled={busy} onChange={onJboFile} />
+                </label>
+                {jboFileName && <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>{jboFileName}</span>}
+              </div>
+
+              {jboRes && (
+                <>
+                  <div style={{ fontSize: 12, color: 'var(--text-sub)', lineHeight: 1.7 }}>
+                    거래 <b>{jboRes.totals.count.toLocaleString()}</b>건 · {jboRes.totals.dateFrom}~{jboRes.totals.dateTo} · 계좌 {jboRes.totals.accounts} · 계정과목 {jboRes.totals.subjects}종<br />
+                    실입금(자금이동 제외) <b style={{ color: 'var(--green-text)' }}>{won(jboRes.totals.realDeposit)}</b> · 실출금 <b style={{ color: 'var(--red-text)' }}>{won(jboRes.totals.realWithdraw)}</b> · 계좌간이체(sweep) {won(jboRes.totals.sweepDeposit)}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 4 }}>계좌별</div>
+                      <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                        <thead><tr style={{ color: 'var(--text-weak)', textAlign: 'right' }}>
+                          <th style={{ textAlign: 'left', padding: '3px 6px' }}>계좌</th><th style={{ padding: '3px 6px' }}>입금</th><th style={{ padding: '3px 6px' }}>출금</th>
+                        </tr></thead>
+                        <tbody>
+                          {jboRes.byAccount.map((a) => (
+                            <tr key={a.account} style={{ textAlign: 'right', borderTop: '1px solid var(--border-weak)' }}>
+                              <td style={{ textAlign: 'left', padding: '3px 6px' }}>{a.account}</td>
+                              <td style={{ padding: '3px 6px', color: 'var(--green-text)', fontVariantNumeric: 'tabular-nums' }}>{won(a.deposit)}</td>
+                              <td style={{ padding: '3px 6px', color: 'var(--red-text)', fontVariantNumeric: 'tabular-nums' }}>{won(a.withdraw)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 4 }}>계정과목 Top 12 (입출 합)</div>
+                      <div style={{ maxHeight: 230, overflow: 'auto' }}>
+                        <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                          <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)' }}><tr style={{ color: 'var(--text-weak)', textAlign: 'right' }}>
+                            <th style={{ textAlign: 'left', padding: '3px 6px' }}>계정과목</th><th style={{ padding: '3px 6px' }}>입금</th><th style={{ padding: '3px 6px' }}>출금</th><th style={{ padding: '3px 6px' }}>건</th>
+                          </tr></thead>
+                          <tbody>
+                            {jboRes.bySubject.slice(0, 12).map((s) => (
+                              <tr key={s.subject} style={{ textAlign: 'right', borderTop: '1px solid var(--border-weak)' }}>
+                                <td style={{ textAlign: 'left', padding: '3px 6px' }}>{s.subject}</td>
+                                <td style={{ padding: '3px 6px', color: s.deposit > 0 ? 'var(--green-text)' : 'var(--text-weak)', fontVariantNumeric: 'tabular-nums' }}>{s.deposit > 0 ? won(s.deposit) : '—'}</td>
+                                <td style={{ padding: '3px 6px', color: s.withdraw > 0 ? 'var(--red-text)' : 'var(--text-weak)', fontVariantNumeric: 'tabular-nums' }}>{s.withdraw > 0 ? won(s.withdraw) : '—'}</td>
+                                <td style={{ padding: '3px 6px', color: 'var(--text-weak)', fontVariantNumeric: 'tabular-nums' }}>{s.count}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="notice" style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6, background: 'var(--bg-sunken)', padding: 10, borderRadius: 'var(--radius)' }}>
+                    <Warning size={12} weight="fill" style={{ marginRight: 4, verticalAlign: 'middle', color: 'var(--orange-text)' }} />
+                    프리뷰 전용입니다. 자금일보를 bankTransactions로 커밋 + 수납 자동매칭하면, 씨앗 미수(carry)가 이미 2026 입금을 반영하고 있어 <b>미수가 이중 차감</b>될 수 있습니다. 실제 DB 반영은 期初 실현(realizeOpeningBalance) 경로 검증 후 별도로 진행합니다.
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
 
           {/* 로그 */}
           {log.length > 0 && (
