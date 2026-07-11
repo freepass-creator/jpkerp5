@@ -6,7 +6,7 @@ import { Database, Upload, Warning, CheckCircle, FileXls, ArrowsDownUp } from '@
 import { Sidebar } from '@/components/layout/sidebar';
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
-import { parseSwitchplanWorkbook, toSnapshotRows, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
+import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
 import { validateSnapshotRow, applySnapshotToContract } from '@/lib/import-commit';
 import { assignContractNos } from '@/lib/code-scheme';
 import { upsertVehicleFromContract } from '@/lib/entity-sync';
@@ -69,6 +69,11 @@ export default function MigrateSwitchplanPage() {
   const reviewFlags = (c: SwitchplanContract) =>
     c.carryUnpaid !== c.grossUnpaid || c.hasPenaltyMonth || c.hasOverpay;
 
+  const returnedSorted = useMemo(
+    () => (res ? [...res.returned].sort((a, b) => b.carryUnpaid - a.carryUnpaid) : []),
+    [res],
+  );
+
   async function commitSeeds() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!res) return;
@@ -117,6 +122,39 @@ export default function MigrateSwitchplanPage() {
       if (invalid > 0) toast.warning(`${invalid}행 미반영 — 필수(차량번호·계약자·대여료) 누락`);
     } catch (err) {
       append(`✗ 커밋 실패: ${friendlyError(err)}`);
+      toast.error(friendlyError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function commitReturned() {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    if (!res) return;
+    const built = toReturnedContracts(res, companyKey);
+    const key = (plate: string, name: string, date: string) => `${plate.trim()}|${name.trim()}|${date}`;
+    const existingKeys = new Set(contracts.map((c) => key(c.vehiclePlate ?? '', c.customerName ?? '', c.contractDate ?? '')));
+    const fresh = built.filter((c) => !existingKeys.has(key(c.vehiclePlate, c.customerName, c.contractDate)));
+    const dup = built.length - fresh.length;
+    const chaseCount = fresh.filter((c) => c.endReason === '채권보전').length;
+    if (fresh.length === 0) { toast.info(`신규 반납 이력 없음 (이미 있음 ${dup})`); return; }
+    if (!await showConfirm({
+      title: `반납 이력 ${fresh.length}건 커밋`,
+      description:
+        `종료 계약을 이력(status='반납')으로 등록 — 손바뀜 연속성.\n`
+        + `채권보전(잔여미수>0, 추심 대상) ${chaseCount}건 · 잔여 합 ${won(res.totals.carryReturned)}.\n`
+        + `이미 등록된 ${dup}건은 제외. 차량 상태는 건드리지 않습니다.`,
+      confirmLabel: '반납 이력 커밋',
+    })) return;
+
+    setBusy(true);
+    try {
+      const withNos = assignContractNos(fresh, contracts, companies);
+      const created = withNos.length > 0 ? await addContracts(withNos) : 0;
+      append(`✓ 반납 이력 커밋 — 신규 ${created} · 채권보전 ${chaseCount} (이미 있음 ${dup} 제외)`);
+      toast.success(`반납 이력 ${created}건 반영`);
+    } catch (err) {
+      append(`✗ 반납 커밋 실패: ${friendlyError(err)}`);
       toast.error(friendlyError(err));
     } finally {
       setBusy(false);
@@ -283,6 +321,57 @@ export default function MigrateSwitchplanPage() {
                   ✓ 차량번호 기준 upsert — 있으면 갱신, 없으면 신규 (기존 SNAPSHOT 파이프라인 그대로)<br />
                   ✓ 현재미수 = carry → distributeUnpaid 로 직전 회차부터 역순 미납 분배 (期初 씨앗)<br />
                   ✓ 차량 자동 동기화 · 종료(반납) 계약은 이번 대상 아님 (이력 임포트 별도)
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 종료 계약 (반납 이력) */}
+          {res && res.returned.length > 0 && (
+            <section className="detail-section">
+              <div className="detail-section-header">
+                <span className="title">5. 종료 계약 이력 ({res.returned.length}건 · 추심대상 {res.returned.filter((c) => c.carryUnpaid > 0).length}건)</span>
+              </div>
+              <div className="detail-section-body" style={{ padding: 0 }}>
+                <div style={{ maxHeight: 320, overflow: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                      <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
+                        <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
+                        <th style={{ textAlign: 'left', padding: '6px 8px' }}>계약자</th>
+                        <th style={{ padding: '6px 8px' }}>대여료</th>
+                        <th style={{ padding: '6px 8px' }}>잔여미수(carry)</th>
+                        <th style={{ textAlign: 'left', padding: '6px 8px' }}>구분</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {returnedSorted.slice(0, 20).map((c, i) => (
+                        <tr key={`${c.vehiclePlate}-r${i}`} style={{ textAlign: 'right', borderBottom: '1px solid var(--border-weak)', background: c.carryUnpaid > 0 ? 'var(--bg-sunken)' : undefined }}>
+                          <td style={{ textAlign: 'left', padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{c.vehiclePlate}</td>
+                          <td style={{ textAlign: 'left', padding: '5px 8px' }}>{c.customerName}</td>
+                          <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{won(c.monthlyRent)}</td>
+                          <td style={{ padding: '5px 8px', fontWeight: c.carryUnpaid > 0 ? 700 : 400, color: c.carryUnpaid > 0 ? 'var(--red-text)' : 'var(--text-weak)', fontVariantNumeric: 'tabular-nums' }}>{won(c.carryUnpaid)}</td>
+                          <td style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, color: c.carryUnpaid > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>{c.carryUnpaid > 0 ? '채권보전(추심)' : '정상종료'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+                  {returnedSorted.length > 20 && <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>… 외 {returnedSorted.length - 20}건</div>}
+                  <button
+                    className="btn" type="button"
+                    disabled={busy || !superAdmin}
+                    onClick={commitReturned}
+                    style={{ height: 40, fontSize: 13, fontWeight: 600 }}
+                  >
+                    <Upload weight="bold" size={15} /> 반납 이력 {res.returned.length}건 커밋 (손바뀜 연속성 + 추심 잔여)
+                  </button>
+                  <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
+                    ✓ status='반납' 이력으로 등록 — 차량 상세에 과거 임차인 이력 연속 표시<br />
+                    ✓ 잔여미수(carry)&gt;0 → endReason='채권보전'(추심 대상), 리스크/미수 화면에 노출<br />
+                    ✓ 차량번호+계약자+계약일 중복은 자동 제외 · 차량 상태는 안 건드림
+                  </div>
                 </div>
               </div>
             </section>

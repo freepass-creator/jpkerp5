@@ -15,6 +15,8 @@
  */
 
 import * as XLSX from 'xlsx-js-style';
+import type { Contract, PaymentScheduleInline } from '@/lib/types';
+import { generateSchedules, distributeUnpaid } from '@/lib/payment-schedule';
 
 /* ─────────────── 셀 유틸 ─────────────── */
 
@@ -65,6 +67,22 @@ function payDayNum(s: string): number {
   if (/말/.test(raw)) return 31;
   const m = raw.match(/(\d{1,2})/);
   return m ? Math.min(31, Math.max(1, Number(m[1]))) : 1;
+}
+
+function addMonthsStr(yyyymmdd: string, months: number): string {
+  if (!yyyymmdd) return '';
+  const d = new Date(yyyymmdd);
+  if (isNaN(d.getTime())) return '';
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+function monthDiff(start: string, end: string): number {
+  if (!start || !end) return 12;
+  const ds = new Date(start);
+  const de = new Date(end);
+  if (isNaN(ds.getTime()) || isNaN(de.getTime())) return 12;
+  return (de.getFullYear() - ds.getFullYear()) * 12 + (de.getMonth() - ds.getMonth());
 }
 
 /* ─────────────── 타입 ─────────────── */
@@ -421,4 +439,73 @@ export function toSnapshotRows(res: SwitchplanParseResult, companyKey: string): 
     if (c.vehicleModel) row['차종'] = c.vehicleModel;
     return row;
   });
+}
+
+/* ─────────────── 반납(종료) → 계약 이력 레코드 ─────────────── */
+
+/**
+ * 종료 계약(반납 시트)을 Contract 이력 레코드로 변환.
+ * - 씨앗 아님: status='반납', vehicleStatus='반납', returnedDate 세팅 → 손바뀜 연속성.
+ * - 잔여미수(carry>0)면 endReason='채권보전'(추심 대상), unpaidAtEnd=carry.
+ * - 스케줄은 generateSchedules + distributeUnpaid(carry, 반납일) 로 잔여를 직전 회차에 분배.
+ * - contractNo 는 비워둠 → 커밋 시 assignContractNos 가 채움.
+ */
+export function toReturnedContracts(res: SwitchplanParseResult, company: string): Array<Omit<Contract, 'id'>> {
+  const out: Array<Omit<Contract, 'id'>> = [];
+  for (const c of res.returned) {
+    const months = c.ledger.map((e) => e.month).filter(Boolean).sort();
+    const firstMonth = months[0];
+    const lastMonth = months[months.length - 1];
+    const contractDate = c.contractStart || (firstMonth ? `${firstMonth}-01` : '');
+    if (!contractDate) continue; // 시작·원장월 모두 없으면 skip
+    const returnScheduledDate = c.contractEnd
+      || (lastMonth ? addMonthsStr(`${lastMonth}-01`, 1) : addMonthsStr(contractDate, 12));
+    // 반납일 = 원장 마지막 결제일, 없으면 종료예정일
+    const lastPaid = c.ledger.map((e) => e.paidDate).filter(Boolean).sort().pop() || '';
+    const returnedDate = lastPaid || returnScheduledDate || contractDate;
+    const termMonths = Math.max(1, monthDiff(contractDate, returnScheduledDate));
+    const paymentDay = Math.min(31, Math.max(1, c.paymentDay || 1));
+
+    let schedules: PaymentScheduleInline[] = [];
+    if (c.monthlyRent > 0) {
+      const gen = generateSchedules({ contractDate, termMonths, monthlyRent: c.monthlyRent, paymentDay });
+      schedules = gen.map((s, i) => ({ ...s, id: `s${i + 1}` }) as PaymentScheduleInline);
+      schedules = distributeUnpaid(schedules, c.carryUnpaid, returnedDate);
+    }
+    const unpaidSeqCount = schedules.filter((s) => s.status === '연체' || s.status === '부분납').length;
+    const lastCompleted = schedules.filter((s) => s.status === '완료').sort((a, b) => b.dueDate.localeCompare(a.dueDate))[0];
+
+    out.push({
+      contractNo: '',
+      company: company as Contract['company'],
+      customerName: c.customerName,
+      customerKind: c.customerKind as Contract['customerKind'],
+      customerIdentNo: c.customerIdentNo,
+      customerPhone1: c.customerPhone1 || '',
+      vehiclePlate: c.vehiclePlate,
+      vehicleModel: c.vehicleModel || '미정',
+      vehicleStatus: '반납',
+      contractDate,
+      returnScheduledDate,
+      returnedDate,
+      termMonths,
+      longTerm: termMonths >= 12,
+      monthlyRent: c.monthlyRent,
+      deposit: c.deposit,
+      paymentDay,
+      paymentMethod: '이체',
+      status: '반납',
+      endReason: c.carryUnpaid > 0 ? '채권보전' : '정상종료',
+      endedAt: returnedDate,
+      unpaidAtEnd: c.carryUnpaid > 0 ? c.carryUnpaid : undefined,
+      currentSeq: schedules.length || 1,
+      totalSeq: Math.max(1, termMonths),
+      unpaidAmount: c.carryUnpaid,
+      unpaidSeqCount,
+      lastPaidDate: lastCompleted?.paidAt ?? lastCompleted?.dueDate,
+      schedules,
+      notes: `반납 이력 이관${c.branch ? ` (${c.branch})` : ''}`,
+    });
+  }
+  return out;
 }

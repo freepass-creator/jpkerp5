@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx-js-style';
-import { parseSwitchplanWorkbook, toSnapshotRows } from '@/lib/migrate/switchplan';
+import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts } from '@/lib/migrate/switchplan';
 
 function buildWorkbook(): ArrayBuffer {
   // ── 채권(운행중): R0=월라벨, R1=필드헤더, 데이터 R2+ ──
@@ -59,7 +59,13 @@ function buildWorkbook(): ArrayBuffer {
     400000, 400000, '2025-05-30', '입금', 0,
     400000, 400000, '2025-04-30', '입금', 0,
   ];
-  const banap = [banapHeader, rowC];
+  // D: 종료·잔여미수(carry 60만) — 채권보전(추심) 대상
+  const rowD = [
+    '', '대전', '최미납', 0, 600000, '무보증', '', '말일', '', '55마5555', '2024-01-31', '2025-01-30',
+    600000, 0, '', '', 600000,               // block0: 미납
+    600000, 600000, '2024-11-30', '입금', 0, // block1: 완납
+  ];
+  const banap = [banapHeader, rowC, rowD];
 
   // ── 고객(기준) ──
   const gogaek = [
@@ -88,7 +94,7 @@ describe('switchplan adapter', () => {
 
   it('공백 코드명 행 제외 + 시트 분리', () => {
     expect(res.current.length).toBe(2);   // A, B (blank 제외)
-    expect(res.returned.length).toBe(1);  // C
+    expect(res.returned.length).toBe(2);  // C, D
   });
 
   it('정상 계약 A: carry=gross=pastDue', () => {
@@ -113,6 +119,31 @@ describe('switchplan adapter', () => {
     const c = res.returned.find((x) => x.customerName === '이영희')!;
     expect(c.carryUnpaid).toBe(0);
     expect(c.grossUnpaid).toBe(0);
+  });
+
+  it('종료·잔여 D: carry 60만 = 채권보전', () => {
+    const d = res.returned.find((x) => x.customerName === '최미납')!;
+    expect(d.carryUnpaid).toBe(600000);
+  });
+
+  it('toReturnedContracts: 반납 이력 레코드 (정상종료/채권보전 구분)', () => {
+    const returned = toReturnedContracts(res, '스위치플랜');
+    expect(returned.length).toBe(2); // 이영희, 최미납
+
+    const paid = returned.find((c) => c.customerName === '이영희')!;
+    expect(paid.status).toBe('반납');
+    expect(paid.vehicleStatus).toBe('반납');
+    expect(paid.endReason).toBe('정상종료');
+    expect(paid.unpaidAmount).toBe(0);
+    expect(paid.returnedDate).toBeTruthy();
+
+    const chase = returned.find((c) => c.customerName === '최미납')!;
+    expect(chase.status).toBe('반납');
+    expect(chase.endReason).toBe('채권보전');
+    expect(chase.unpaidAtEnd).toBe(600000);
+    expect(chase.unpaidAmount).toBe(600000);
+    expect(chase.company).toBe('스위치플랜');
+    expect(chase.schedules && chase.schedules.length).toBeGreaterThan(0);
   });
 
   it('합계: carry(₩50만)와 pastDue(₩100만)가 갈린다 — 검토대상 발생', () => {
