@@ -15,7 +15,7 @@
  */
 
 import * as XLSX from 'xlsx-js-style';
-import type { Contract, PaymentScheduleInline } from '@/lib/types';
+import type { Contract, Vehicle, PaymentScheduleInline } from '@/lib/types';
 import { generateSchedules, distributeUnpaid } from '@/lib/payment-schedule';
 
 /* ─────────────── 셀 유틸 ─────────────── */
@@ -125,6 +125,7 @@ export type SwitchplanContract = {
 export type SwitchplanParseResult = {
   current: SwitchplanContract[];   // 채권 (운행중)
   returned: SwitchplanContract[];  // 반납 (종료)
+  vehicles: SwitchplanVehicle[];   // 자산 (차량 마스터)
   totals: {
     countCurrent: number;
     countReturned: number;
@@ -183,32 +184,132 @@ function buildCustomerIndex(wb: XLSX.WorkBook): {
   return { byPlate, byPlateName };
 }
 
-/* ─────────────── 자산 → plate별 차종 ─────────────── */
+/* ─────────────── 자산 시트 → 차량 마스터 ─────────────── */
 
-function buildVehicleModelIndex(wb: XLSX.WorkBook): Map<string, string> {
-  const out = new Map<string, string>();
+export type SwitchplanVehicle = {
+  vehiclePlate: string;
+  division: string;             // 구분 (구독/LC구독)
+  garage: string;               // 등록지 (김포 등)
+  acquisitionDate: string;      // 취득일
+  firstRegisteredDate: string;  // 최초등록일
+  vin: string;                  // 차대번호
+  maker: string;
+  modelLine: string;
+  subModel: string;
+  fullModel: string;            // 결합 풀네임
+  year: number;                 // 연식
+  displacementCc: number;       // 배기량
+  fuel: string;                 // 연료
+  trim: string;                 // 트림
+  options: string;              // 선택옵션
+  exteriorColor: string;
+  interiorColor: string;
+  consumerPrice: number;        // 소비자가격
+  vehiclePrice: number;         // 차량가격
+  purchasePrice: number;        // 실제구입가격
+  acqCostTotal: number;         // 취득 부대비용 합
+  acqCostBreakdown: string;     // 내역 (사람이 읽는 문자열)
+  gps: string;
+};
+
+function normDateStr(s: string): string {
+  const m = cellStr(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[0] : '';
+}
+
+function buildVehicles(wb: XLSX.WorkBook): SwitchplanVehicle[] {
+  const out: SwitchplanVehicle[] = [];
   const sheet = wb.Sheets['자산'];
   if (!sheet) return out;
   const G = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false, defval: '' });
   if (G.length === 0) return out;
   const h = (G[0] as unknown[]).map(cellStr);
   const ci = (lbl: string) => h.findIndex((x) => x === lbl);
-  const cPlate = ci('차량번호');
-  const cMaker = ci('제조사');
-  const cModel = ci('모델');
-  const cSub = ci('세부모델');
+  const col = {
+    plate: ci('차량번호'), division: ci('구분'), garage: ci('등록지'),
+    acq: ci('취득일'), firstReg: ci('최초등록일'), vin: ci('차대번호'),
+    maker: ci('제조사'), model: ci('모델'), sub: ci('세부모델'), year: ci('연식'),
+    disp: ci('배기량'), fuel: ci('연료'), trim: ci('트림'), options: ci('선택옵션'),
+    ext: ci('외장색상'), int: ci('내장색상'),
+    consumer: ci('소비자가격'), vprice: ci('차량가격'), purchase: ci('실제구입가격'),
+    acqTax: ci('취등록세'), sellCost: ci('매도비'), perfIns: ci('성능보험료'),
+    transfer: ci('이전대행료'), bond: ci('지역공채'), stamp: ci('인지대'), etcFee: ci('기타수수료'),
+    gps: ci('GPS'),
+  };
+  const get = (row: unknown[], c: number) => (c >= 0 ? cellStr(row[c]) : '');
+  const getN = (row: unknown[], c: number) => (c >= 0 ? cellNum(row[c]) : 0);
   for (let r = 1; r < G.length; r++) {
     const row = G[r] as unknown[];
-    const plate = normPlate(cellStr(row[cPlate]));
+    const plate = get(row, col.plate);
     if (!plate) continue;
-    const name = [cMaker, cModel, cSub]
-      .map((c) => (c >= 0 ? cellStr(row[c]) : ''))
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-    if (name && !out.has(plate)) out.set(plate, name);
+    const maker = get(row, col.maker);
+    const modelLine = get(row, col.model);
+    const subModel = get(row, col.sub);
+    const fullModel = [maker, subModel || modelLine].filter(Boolean).join(' ').trim();
+    const parts: Array<[string, number]> = [
+      ['취등록세', getN(row, col.acqTax)], ['매도비', getN(row, col.sellCost)],
+      ['성능보험료', getN(row, col.perfIns)], ['이전대행료', getN(row, col.transfer)],
+      ['지역공채', getN(row, col.bond)], ['인지대', getN(row, col.stamp)],
+      ['기타수수료', getN(row, col.etcFee)],
+    ];
+    const acqCostTotal = parts.reduce((s, [, v]) => s + v, 0);
+    const acqCostBreakdown = parts.filter(([, v]) => v > 0).map(([k, v]) => `${k} ${v.toLocaleString()}`).join(' · ');
+    out.push({
+      vehiclePlate: plate,
+      division: get(row, col.division),
+      garage: get(row, col.garage),
+      acquisitionDate: normDateStr(get(row, col.acq)),
+      firstRegisteredDate: normDateStr(get(row, col.firstReg)),
+      vin: get(row, col.vin),
+      maker, modelLine, subModel, fullModel,
+      year: getN(row, col.year),
+      displacementCc: getN(row, col.disp),
+      fuel: get(row, col.fuel),
+      trim: get(row, col.trim),
+      options: get(row, col.options),
+      exteriorColor: get(row, col.ext),
+      interiorColor: get(row, col.int),
+      consumerPrice: getN(row, col.consumer),
+      vehiclePrice: getN(row, col.vprice),
+      purchasePrice: getN(row, col.purchase),
+      acqCostTotal,
+      acqCostBreakdown,
+      gps: get(row, col.gps),
+    });
   }
   return out;
+}
+
+/** 파싱된 자산 → Vehicle 필드 패치 (id/status/createdAt 제외 — 병합은 호출측) */
+export function buildVehicleFields(a: SwitchplanVehicle, company: string): Partial<Omit<Vehicle, 'id' | 'status' | 'createdAt'>> {
+  const clean = <T,>(v: T | '' | 0 | undefined): T | undefined => (v === '' || v === 0 || v === undefined ? undefined : v);
+  const notesParts = [
+    a.division ? `구분 ${a.division}` : '',
+    a.acqCostTotal > 0 ? `취득부대 ${a.acqCostTotal.toLocaleString()}(${a.acqCostBreakdown})` : '',
+    a.consumerPrice > 0 ? `소비자가 ${a.consumerPrice.toLocaleString()}` : '',
+    a.gps && a.gps !== '-' ? `GPS ${a.gps}` : '',
+  ].filter(Boolean);
+  return {
+    plate: a.vehiclePlate,
+    company: company as Vehicle['company'],
+    model: a.fullModel || undefined,
+    vehicleMaker: clean(a.maker),
+    vehicleModelLine: clean(a.modelLine),
+    vehicleSubModel: clean(a.subModel),
+    vehicleTrim: clean(a.trim),
+    vehicleOptions: clean(a.options),
+    exteriorColor: clean(a.exteriorColor),
+    interiorColor: clean(a.interiorColor),
+    fuelType: clean(a.fuel),
+    displacementCc: clean(a.displacementCc),
+    vin: clean(a.vin),
+    garage: clean(a.garage),
+    firstRegisteredDate: clean(a.firstRegisteredDate),
+    acquisitionDate: clean(a.acquisitionDate),
+    // 실 매입가: 실제구입가격이 대부분 공란 → 차량가격 fallback
+    purchasePrice: clean(a.purchasePrice || a.vehiclePrice),
+    notes: notesParts.length ? notesParts.join(' / ') : undefined,
+  } as Partial<Omit<Vehicle, 'id' | 'status' | 'createdAt'>>;
 }
 
 /* ─────────────── 원장 시트 파서 (채권/반납 공통) ─────────────── */
@@ -369,7 +470,12 @@ export function parseSwitchplanWorkbook(buf: ArrayBuffer, asOf?: string): Switch
   const todayDay = now.getDate();
 
   const custIdx = buildCustomerIndex(wb);
-  const modelIdx = buildVehicleModelIndex(wb);
+  const vehicleList = buildVehicles(wb);
+  const modelIdx = new Map<string, string>();
+  for (const v of vehicleList) {
+    const key = normPlate(v.vehiclePlate);
+    if (v.fullModel && !modelIdx.has(key)) modelIdx.set(key, v.fullModel);
+  }
 
   const enrich = (c: SwitchplanContract): SwitchplanContract => {
     const key = normPlate(c.vehiclePlate);
@@ -395,6 +501,7 @@ export function parseSwitchplanWorkbook(buf: ArrayBuffer, asOf?: string): Switch
   return {
     current,
     returned,
+    vehicles: vehicleList,
     totals: {
       countCurrent: current.length,
       countReturned: returned.length,

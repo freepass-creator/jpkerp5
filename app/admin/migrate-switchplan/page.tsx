@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Database, Upload, Warning, CheckCircle, FileXls, ArrowsDownUp } from '@phosphor-icons/react';
+import { Database, Upload, Warning, CheckCircle, FileXls, ArrowsDownUp, Car } from '@phosphor-icons/react';
+import { ref, push, update as rtdbUpdate } from 'firebase/database';
 import { Sidebar } from '@/components/layout/sidebar';
+import { getRtdb, dbPath, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
-import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
+import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
 import { validateSnapshotRow, applySnapshotToContract } from '@/lib/import-commit';
 import { assignContractNos } from '@/lib/code-scheme';
 import { upsertVehicleFromContract } from '@/lib/entity-sync';
@@ -155,6 +157,61 @@ export default function MigrateSwitchplanPage() {
       toast.success(`반납 이력 ${created}건 반영`);
     } catch (err) {
       append(`✗ 반납 커밋 실패: ${friendlyError(err)}`);
+      toast.error(friendlyError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 자산 → 차량 마스터 upsert (직접 RTDB 배치)
+  const vehiclePlan = useMemo(() => {
+    if (!res) return { update: 0, create: 0 };
+    const byPlate = new Set(vehicles.map((v) => (v.plate ?? '').trim()));
+    let update = 0;
+    let create = 0;
+    for (const a of res.vehicles) { if (byPlate.has(a.vehiclePlate.trim())) update++; else create++; }
+    return { update, create };
+  }, [res, vehicles]);
+
+  async function commitVehicles() {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    if (!res || res.vehicles.length === 0) { toast.info('자산 데이터 없음'); return; }
+    if (!await showConfirm({
+      title: `자산 ${res.vehicles.length}대 → 차량 마스터`,
+      description:
+        `차대번호·연식·배기량·트림·취득원가(실구입가+부대비용)를 차량 마스터에 반영.\n`
+        + `기존 차량 갱신 ${vehiclePlan.update} · 신규 ${vehiclePlan.create}. 기존 상태·계약연결은 보존.`,
+      confirmLabel: '차량 마스터 반영',
+    })) return;
+
+    setBusy(true);
+    try {
+      await ensureAuth();
+      const db = getRtdb();
+      if (!db) throw new Error('Firebase 미설정');
+      const nowIso = new Date().toISOString();
+      const byPlate = new Map(vehicles.map((v) => [(v.plate ?? '').trim(), v]));
+      const batch: Record<string, unknown> = {};
+      let updated = 0;
+      let created = 0;
+      for (const a of res.vehicles) {
+        const fields = buildVehicleFields(a, companyKey);
+        const existing = byPlate.get(a.vehiclePlate.trim());
+        if (existing) {
+          batch[existing.id] = pruneUndefined({ ...existing, ...fields, id: existing.id, status: existing.status, createdAt: existing.createdAt });
+          updated++;
+        } else {
+          const id = push(ref(db, dbPath('vehicles'))).key;
+          if (!id) continue;
+          batch[id] = pruneUndefined({ model: '미정', ...fields, id, status: '휴차대기', createdAt: nowIso });
+          created++;
+        }
+      }
+      await rtdbUpdate(ref(db, dbPath('vehicles')), batch);
+      append(`✓ 자산 커밋 — 차량 갱신 ${updated} · 신규 ${created}`);
+      toast.success(`차량 마스터 ${updated + created}대 반영`);
+    } catch (err) {
+      append(`✗ 자산 커밋 실패: ${friendlyError(err)}`);
       toast.error(friendlyError(err));
     } finally {
       setBusy(false);
@@ -371,6 +428,57 @@ export default function MigrateSwitchplanPage() {
                     ✓ status='반납' 이력으로 등록 — 차량 상세에 과거 임차인 이력 연속 표시<br />
                     ✓ 잔여미수(carry)&gt;0 → endReason='채권보전'(추심 대상), 리스크/미수 화면에 노출<br />
                     ✓ 차량번호+계약자+계약일 중복은 자동 제외 · 차량 상태는 안 건드림
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 자산 → 차량 마스터 */}
+          {res && res.vehicles.length > 0 && (
+            <section className="detail-section">
+              <div className="detail-section-header">
+                <Car size={13} weight="duotone" style={{ color: 'var(--brand)' }} />
+                <span className="title">6. 자산 → 차량 마스터 ({res.vehicles.length}대)</span>
+              </div>
+              <div className="detail-section-body" style={{ padding: 0 }}>
+                <div style={{ maxHeight: 300, overflow: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                      <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
+                        <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
+                        <th style={{ textAlign: 'left', padding: '6px 8px' }}>차종</th>
+                        <th style={{ textAlign: 'left', padding: '6px 8px' }}>차대번호</th>
+                        <th style={{ padding: '6px 8px' }}>실구입가</th>
+                        <th style={{ padding: '6px 8px' }}>취득부대</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {res.vehicles.slice(0, 15).map((a, i) => (
+                        <tr key={`${a.vehiclePlate}-v${i}`} style={{ textAlign: 'right', borderBottom: '1px solid var(--border-weak)' }}>
+                          <td style={{ textAlign: 'left', padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{a.vehiclePlate}</td>
+                          <td style={{ textAlign: 'left', padding: '5px 8px', color: 'var(--text-weak)' }}>{a.fullModel || '—'}</td>
+                          <td style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, color: 'var(--text-weak)', fontVariantNumeric: 'tabular-nums' }}>{a.vin || '—'}</td>
+                          <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{a.purchasePrice > 0 ? won(a.purchasePrice) : '—'}</td>
+                          <td style={{ padding: '5px 8px', color: 'var(--text-weak)', fontVariantNumeric: 'tabular-nums' }}>{a.acqCostTotal > 0 ? won(a.acqCostTotal) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
+                  {res.vehicles.length > 15 && <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>… 외 {res.vehicles.length - 15}대</div>}
+                  <button
+                    className="btn" type="button"
+                    disabled={busy || !superAdmin}
+                    onClick={commitVehicles}
+                    style={{ height: 40, fontSize: 13, fontWeight: 600 }}
+                  >
+                    <Car weight="bold" size={15} /> 자산 {res.vehicles.length}대 → 차량 마스터 (갱신 {vehiclePlan.update} · 신규 {vehiclePlan.create})
+                  </button>
+                  <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
+                    ✓ 차량번호 기준 upsert — 차대번호·제조사·트림·연식·배기량·색상·실구입가 반영<br />
+                    ✓ 취득 부대비용(취등록세·이전대행료 등)은 비고에 내역 보존 · 기존 상태/계약연결 불변
                   </div>
                 </div>
               </div>

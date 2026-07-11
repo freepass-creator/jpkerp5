@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx-js-style';
-import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts } from '@/lib/migrate/switchplan';
+import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields } from '@/lib/migrate/switchplan';
 
 function buildWorkbook(): ArrayBuffer {
   // ── 채권(운행중): R0=월라벨, R1=필드헤더, 데이터 R2+ ──
@@ -74,10 +74,10 @@ function buildWorkbook(): ArrayBuffer {
     [2, '', '', '박영수', '22나2222', '', '개인', '880202-1234567', '', '010-2222-2222'],
   ];
 
-  // ── 자산 ──
+  // ── 자산 (전체 컬럼) ──
   const jasan = [
-    [' ', '구분', '차량번호', '등록지', '취득일', '최초등록일', '차령만료일', '차대번호', '제조사', '모델', '세부모델'],
-    [1, '구독', '11가1111', '김포', '', '', '', 'VIN1', '현대', '아반떼', '아반떼 AD'],
+    [' ', '구분', '차량번호', '등록지', '취득일', '최초등록일', '차령만료일', '차대번호', '제조사', '모델', '세부모델', '연식', '배기량', '연료', '트림', '선택옵션', '외장색상', '내장색상', '소비자가격', '차량가격', '신차탁송', '실제구입가격', '구입', '취등록세', '매도비', '성능보험료', '이전대행료', '지역공채', '인지대', '기타수수료', 'GPS'],
+    [1, '구독', '11가1111', '김포', '2024-01-24', '2015-11-12', '', 'VIN-AVANTE-01', '현대', '아반떼', '아반떼 AD', 2018, 1591, '가솔린', '아반떼 AD 1.6', '기본', '화이트', '블랙', 20000000, 12000000, '', 13000000, '중고', 300000, '-', 200000, '-', '-', '-', '-', '설치'],
   ];
 
   const wb = XLSX.utils.book_new();
@@ -104,7 +104,7 @@ describe('switchplan adapter', () => {
     expect(a.pastDueUnpaid).toBe(500000);
     expect(a.hasOverpay).toBe(false);
     expect(a.customerIdentNo).toBe('900101-1234567'); // 고객 조인
-    expect(a.vehicleModel).toBe('현대 아반떼 아반떼 AD'); // 자산 조인
+    expect(a.vehicleModel).toBe('현대 아반떼 AD'); // 자산 조인 (maker + 세부모델)
   });
 
   it('묶음결제 B: carry/gross 정상, pastDue 과대 발산', () => {
@@ -151,6 +151,24 @@ describe('switchplan adapter', () => {
     expect(res.totals.grossCurrent).toBe(500000);
     expect(res.totals.pastDueCurrent).toBe(1000000);
     expect(res.totals.overpayCount).toBe(1);
+  });
+
+  it('자산 → 차량 마스터 필드 매핑', () => {
+    const v = res.vehicles.find((x) => x.vehiclePlate === '11가1111')!;
+    expect(v.vin).toBe('VIN-AVANTE-01');
+    expect(v.purchasePrice).toBe(13000000);
+    expect(v.acqCostTotal).toBe(500000); // 취등록세30만 + 성능보험료20만
+    expect(v.displacementCc).toBe(1591);
+
+    const f = buildVehicleFields(v, '스위치플랜');
+    expect(f.plate).toBe('11가1111');
+    expect(f.vin).toBe('VIN-AVANTE-01');
+    expect(f.vehicleMaker).toBe('현대');
+    expect(f.vehicleTrim).toBe('아반떼 AD 1.6');
+    expect(f.purchasePrice).toBe(13000000);
+    expect(f.firstRegisteredDate).toBe('2015-11-12');
+    expect(f.acquisitionDate).toBe('2024-01-24');
+    expect(f.notes).toContain('취득부대');
   });
 
   it('SNAPSHOT 씨앗 Row: 현재미수 = carryUnpaid', () => {
