@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx-js-style';
-import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields } from '@/lib/migrate/switchplan';
+import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields, buildLoanFields } from '@/lib/migrate/switchplan';
 
 function buildWorkbook(): ArrayBuffer {
   // ── 채권(운행중): R0=월라벨, R1=필드헤더, 데이터 R2+ ──
@@ -80,11 +80,20 @@ function buildWorkbook(): ArrayBuffer {
     [1, '구독', '11가1111', '김포', '2024-01-24', '2015-11-12', '', 'VIN-AVANTE-01', '현대', '아반떼', '아반떼 AD', 2018, 1591, '가솔린', '아반떼 AD 1.6', '기본', '화이트', '블랙', 20000000, 12000000, '', 13000000, '중고', 300000, '-', 200000, '-', '-', '-', '-', '설치'],
   ];
 
+  // ── 상환합계 (R0=당월상환액 합계, R1=헤더, R2+=데이터) ──
+  const sanghwan = [
+    ['', '', '', '', '', '', '', '', '', '', '', '', '', '당월상환액->', 0, 0],
+    ['NO', '구분', '차량번호', '차종', '실행일', '만기일', '금융사', '금리', '차', '결제일', '할부원금', '총이자', '수수료', '총상환금액', '21-11', '21-12'],
+    [1, '구독', '11가1111', '아반떼', '2024-01-24', '2028-01-23', 'IBK저축은행', 0.05, 48, '10일', 13000000, 600000, 0, 13600000, 0, 0],
+    [2, '구독', '22나2222', 'K5', '', '', '현금차량', 0, 0, '', 0, 0, 0, 0, 0, 0],
+  ];
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chaekwon), '채권');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(banap), '반납');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(gogaek), '고객(기준)');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(jasan), '자산');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sanghwan), '상환합계');
   const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   return out as ArrayBuffer;
 }
@@ -169,6 +178,26 @@ describe('switchplan adapter', () => {
     expect(f.firstRegisteredDate).toBe('2015-11-12');
     expect(f.acquisitionDate).toBe('2024-01-24');
     expect(f.notes).toContain('취득부대');
+  });
+
+  it('상환합계 → 할부 필드 (원리금·현금차량)', () => {
+    const l = res.loans.find((x) => x.vehiclePlate === '11가1111')!;
+    expect(l.financer).toBe('IBK저축은행');
+    expect(l.months).toBe(48);
+    expect(l.principal).toBe(13000000);
+    expect(l.totalRepayment).toBe(13600000);
+    expect(l.cashOnly).toBe(false);
+
+    const f = buildLoanFields(l);
+    expect(f.loanCompany).toBe('IBK저축은행');
+    expect(f.loanMonths).toBe(48);
+    expect(f.loanPrincipal).toBe(13000000);
+    expect(f.loanTotalRepayment).toBe(13600000);
+    expect(f.loanMonthlyPayment).toBe(Math.round(13600000 / 48));
+
+    const cash = res.loans.find((x) => x.vehiclePlate === '22나2222')!;
+    expect(cash.cashOnly).toBe(true);
+    expect(buildLoanFields(cash).loanCashOnly).toBe(true);
   });
 
   it('SNAPSHOT 씨앗 Row: 현재미수 = carryUnpaid', () => {

@@ -8,7 +8,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
-import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
+import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields, buildLoanFields, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
 import { validateSnapshotRow, applySnapshotToContract } from '@/lib/import-commit';
 import { assignContractNos } from '@/lib/code-scheme';
 import { upsertVehicleFromContract } from '@/lib/entity-sync';
@@ -163,24 +163,25 @@ export default function MigrateSwitchplanPage() {
     }
   }
 
-  // 자산 → 차량 마스터 upsert (직접 RTDB 배치)
+  // 자산+할부 → 차량 마스터 upsert (plate 합집합, 직접 RTDB 배치)
   const vehiclePlan = useMemo(() => {
-    if (!res) return { update: 0, create: 0 };
-    const byPlate = new Set(vehicles.map((v) => (v.plate ?? '').trim()));
+    if (!res) return { total: 0, update: 0, create: 0, loans: 0 };
+    const existing = new Set(vehicles.map((v) => (v.plate ?? '').trim()));
+    const plates = new Set([...res.vehicles.map((v) => v.vehiclePlate.trim()), ...res.loans.map((l) => l.vehiclePlate.trim())]);
     let update = 0;
     let create = 0;
-    for (const a of res.vehicles) { if (byPlate.has(a.vehiclePlate.trim())) update++; else create++; }
-    return { update, create };
+    for (const p of plates) { if (existing.has(p)) update++; else create++; }
+    return { total: plates.size, update, create, loans: res.loans.filter((l) => !l.cashOnly).length };
   }, [res, vehicles]);
 
   async function commitVehicles() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
-    if (!res || res.vehicles.length === 0) { toast.info('자산 데이터 없음'); return; }
+    if (!res || (res.vehicles.length === 0 && res.loans.length === 0)) { toast.info('자산·할부 데이터 없음'); return; }
     if (!await showConfirm({
-      title: `자산 ${res.vehicles.length}대 → 차량 마스터`,
+      title: `자산·할부 ${vehiclePlan.total}대 → 차량 마스터`,
       description:
-        `차대번호·연식·배기량·트림·취득원가(실구입가+부대비용)를 차량 마스터에 반영.\n`
-        + `기존 차량 갱신 ${vehiclePlan.update} · 신규 ${vehiclePlan.create}. 기존 상태·계약연결은 보존.`,
+        `차대번호·연식·배기량·트림·취득원가 + 할부(금융사·원금·총상환·월납)를 반영.\n`
+        + `기존 차량 갱신 ${vehiclePlan.update} · 신규 ${vehiclePlan.create} · 할부 ${vehiclePlan.loans}대. 기존 상태·계약연결은 보존.`,
       confirmLabel: '차량 마스터 반영',
     })) return;
 
@@ -190,25 +191,31 @@ export default function MigrateSwitchplanPage() {
       const db = getRtdb();
       if (!db) throw new Error('Firebase 미설정');
       const nowIso = new Date().toISOString();
-      const byPlate = new Map(vehicles.map((v) => [(v.plate ?? '').trim(), v]));
+      const existingByPlate = new Map(vehicles.map((v) => [(v.plate ?? '').trim(), v]));
+      const assetByPlate = new Map(res.vehicles.map((a) => [a.vehiclePlate.trim(), a]));
+      const loanByPlate = new Map(res.loans.map((l) => [l.vehiclePlate.trim(), l]));
+      const plates = new Set([...assetByPlate.keys(), ...loanByPlate.keys()]);
       const batch: Record<string, unknown> = {};
       let updated = 0;
       let created = 0;
-      for (const a of res.vehicles) {
-        const fields = buildVehicleFields(a, companyKey);
-        const existing = byPlate.get(a.vehiclePlate.trim());
+      for (const plate of plates) {
+        const asset = assetByPlate.get(plate);
+        const loan = loanByPlate.get(plate);
+        const fields = asset ? buildVehicleFields(asset, companyKey) : { plate, company: companyKey };
+        const loanFields = loan ? buildLoanFields(loan) : {};
+        const existing = existingByPlate.get(plate);
         if (existing) {
-          batch[existing.id] = pruneUndefined({ ...existing, ...fields, id: existing.id, status: existing.status, createdAt: existing.createdAt });
+          batch[existing.id] = pruneUndefined({ ...existing, ...fields, ...loanFields, id: existing.id, status: existing.status, createdAt: existing.createdAt });
           updated++;
         } else {
           const id = push(ref(db, dbPath('vehicles'))).key;
           if (!id) continue;
-          batch[id] = pruneUndefined({ model: '미정', ...fields, id, status: '휴차대기', createdAt: nowIso });
+          batch[id] = pruneUndefined({ model: '미정', ...fields, ...loanFields, id, status: '휴차대기', createdAt: nowIso });
           created++;
         }
       }
       await rtdbUpdate(ref(db, dbPath('vehicles')), batch);
-      append(`✓ 자산 커밋 — 차량 갱신 ${updated} · 신규 ${created}`);
+      append(`✓ 자산·할부 커밋 — 차량 갱신 ${updated} · 신규 ${created} · 할부 ${vehiclePlan.loans}`);
       toast.success(`차량 마스터 ${updated + created}대 반영`);
     } catch (err) {
       append(`✗ 자산 커밋 실패: ${friendlyError(err)}`);
@@ -439,7 +446,7 @@ export default function MigrateSwitchplanPage() {
             <section className="detail-section">
               <div className="detail-section-header">
                 <Car size={13} weight="duotone" style={{ color: 'var(--brand)' }} />
-                <span className="title">6. 자산 → 차량 마스터 ({res.vehicles.length}대)</span>
+                <span className="title">6. 자산·할부 → 차량 마스터 (자산 {res.vehicles.length}대 · 할부 {res.loans.filter((l) => !l.cashOnly).length}대)</span>
               </div>
               <div className="detail-section-body" style={{ padding: 0 }}>
                 <div style={{ maxHeight: 300, overflow: 'auto' }}>
@@ -474,11 +481,12 @@ export default function MigrateSwitchplanPage() {
                     onClick={commitVehicles}
                     style={{ height: 40, fontSize: 13, fontWeight: 600 }}
                   >
-                    <Car weight="bold" size={15} /> 자산 {res.vehicles.length}대 → 차량 마스터 (갱신 {vehiclePlan.update} · 신규 {vehiclePlan.create})
+                    <Car weight="bold" size={15} /> 자산·할부 → 차량 마스터 (갱신 {vehiclePlan.update} · 신규 {vehiclePlan.create} · 할부 {vehiclePlan.loans})
                   </button>
                   <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
                     ✓ 차량번호 기준 upsert — 차대번호·제조사·트림·연식·배기량·색상·실구입가 반영<br />
-                    ✓ 취득 부대비용(취등록세·이전대행료 등)은 비고에 내역 보존 · 기존 상태/계약연결 불변
+                    ✓ 할부: 금융사·할부원금·총상환·월납입(총상환/개월) 반영 · 현금차량 표시 (원금/이자 회차분리는 금융사 상환스케줄표 PDF에서)<br />
+                    ✓ 취득 부대비용은 비고에 내역 보존 · 기존 상태/계약연결 불변
                   </div>
                 </div>
               </div>

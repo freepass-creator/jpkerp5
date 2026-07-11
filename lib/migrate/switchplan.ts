@@ -126,6 +126,7 @@ export type SwitchplanParseResult = {
   current: SwitchplanContract[];   // 채권 (운행중)
   returned: SwitchplanContract[];  // 반납 (종료)
   vehicles: SwitchplanVehicle[];   // 자산 (차량 마스터)
+  loans: SwitchplanLoan[];         // 상환합계 (차량 할부)
   totals: {
     countCurrent: number;
     countReturned: number;
@@ -146,6 +147,82 @@ type RawContract = Omit<
   SwitchplanContract,
   'carryUnpaid' | 'grossUnpaid' | 'pastDueUnpaid' | 'futureBilled' | 'hasPenaltyMonth' | 'hasOverpay' | 'ledgerMonths'
 >;
+
+/* ─────────────── 상환합계 시트 → 차량 할부 ─────────────── */
+
+export type SwitchplanLoan = {
+  vehiclePlate: string;
+  financer: string;         // 금융사
+  startDate: string;        // 실행일
+  maturityDate: string;     // 만기일
+  months: number;           // 개월(차)
+  rate: number;             // 금리 (원본 그대로)
+  principal: number;        // 할부원금
+  totalInterest: number;    // 총이자
+  fee: number;              // 수수료
+  totalRepayment: number;   // 총상환금액
+  cashOnly: boolean;        // 현금차량(할부 없음)
+};
+
+function buildLoans(wb: XLSX.WorkBook): SwitchplanLoan[] {
+  const out: SwitchplanLoan[] = [];
+  const sheet = wb.Sheets['상환합계'];
+  if (!sheet) return out;
+  const G = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false, defval: '' });
+  // 헤더 행 = '차량번호' 포함 행 (R0은 '당월상환액->' 합계)
+  const hRow = G.findIndex((r) => (r as unknown[]).some((v) => cellStr(v) === '차량번호'));
+  if (hRow < 0) return out;
+  const h = (G[hRow] as unknown[]).map(cellStr);
+  const ci = (lbl: string) => h.findIndex((x) => x === lbl);
+  const col = {
+    plate: ci('차량번호'), financer: ci('금융사'), start: ci('실행일'), maturity: ci('만기일'),
+    months: ci('차'), rate: ci('금리'), payDay: ci('결제일'),
+    principal: ci('할부원금'), interest: ci('총이자'), fee: ci('수수료'), total: ci('총상환금액'),
+  };
+  const getS = (row: unknown[], c: number) => (c >= 0 ? cellStr(row[c]) : '');
+  const getN = (row: unknown[], c: number) => (c >= 0 ? cellNum(row[c]) : 0);
+  for (let r = hRow + 1; r < G.length; r++) {
+    const row = G[r] as unknown[];
+    const plate = getS(row, col.plate);
+    if (!plate) continue;
+    const financer = getS(row, col.financer);
+    const principal = getN(row, col.principal);
+    const cashOnly = /현금/.test(financer) || (principal === 0 && getN(row, col.total) === 0);
+    out.push({
+      vehiclePlate: plate,
+      financer,
+      startDate: normDateStr(getS(row, col.start)),
+      maturityDate: normDateStr(getS(row, col.maturity)),
+      months: getN(row, col.months),
+      rate: col.rate >= 0 ? (typeof row[col.rate] === 'number' ? (row[col.rate] as number) : cellNum(row[col.rate])) : 0,
+      principal,
+      totalInterest: getN(row, col.interest),
+      fee: getN(row, col.fee),
+      totalRepayment: getN(row, col.total),
+      cashOnly,
+    });
+  }
+  return out;
+}
+
+/** 파싱된 할부 → Vehicle 할부 필드 패치 */
+export function buildLoanFields(l: SwitchplanLoan): Partial<Vehicle> {
+  if (l.cashOnly) {
+    return { loanCashOnly: true };
+  }
+  const monthly = l.months > 0 ? Math.round(l.totalRepayment / l.months) : undefined;
+  const clean = <T,>(v: T | '' | 0 | undefined): T | undefined => (v === '' || v === 0 || v === undefined ? undefined : v);
+  return {
+    loanCompany: clean(l.financer),
+    loanMonths: clean(l.months),
+    loanStartDate: clean(l.startDate),
+    loanPrincipal: clean(l.principal),
+    loanInterestRate: clean(l.rate),
+    loanTotalRepayment: clean(l.totalRepayment),
+    loanMonthlyPayment: monthly,
+    loanCashOnly: false,
+  };
+}
 
 /* ─────────────── 고객(기준) 조인 인덱스 ─────────────── */
 
@@ -471,6 +548,7 @@ export function parseSwitchplanWorkbook(buf: ArrayBuffer, asOf?: string): Switch
 
   const custIdx = buildCustomerIndex(wb);
   const vehicleList = buildVehicles(wb);
+  const loanList = buildLoans(wb);
   const modelIdx = new Map<string, string>();
   for (const v of vehicleList) {
     const key = normPlate(v.vehiclePlate);
@@ -502,6 +580,7 @@ export function parseSwitchplanWorkbook(buf: ArrayBuffer, asOf?: string): Switch
     current,
     returned,
     vehicles: vehicleList,
+    loans: loanList,
     totals: {
       countCurrent: current.length,
       countReturned: returned.length,
