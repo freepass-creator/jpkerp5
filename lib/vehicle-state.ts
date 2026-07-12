@@ -61,12 +61,36 @@ export function saleAxisFromContract(c?: { status?: ContractStatus } | null): Sa
 export function pickVehicleContract(plate: string | undefined, contracts: readonly Contract[]): Contract | undefined {
   if (!plate) return undefined;
   const mine = contracts.filter((c) => c.vehiclePlate === plate);
+  return pickFromGroup(mine);
+}
+
+function pickFromGroup(mine: Contract[]): Contract | undefined {
   if (mine.length === 0) return undefined;
   return (
     mine.find((c) => c.status === '운행') ??
     mine.find((c) => c.status === '대기') ??
     [...mine].sort((a, b) => (b.contractDate ?? '').localeCompare(a.contractDate ?? ''))[0]
   );
+}
+
+/**
+ * plate → 대표 계약 인덱스. 목록 렌더에서 차량마다 pickVehicleContract(전체 스캔)을 돌리면
+ * O(차량×계약)이 되므로, 한 번만 O(계약)으로 그룹핑해 Map 으로 넘긴다. 우선순위는 pickVehicleContract 동일.
+ */
+export function buildVehicleContractIndex(contracts: readonly Contract[]): Map<string, Contract> {
+  const byPlate = new Map<string, Contract[]>();
+  for (const c of contracts) {
+    const p = c.vehiclePlate;
+    if (!p) continue;
+    const arr = byPlate.get(p);
+    if (arr) arr.push(c); else byPlate.set(p, [c]);
+  }
+  const out = new Map<string, Contract>();
+  for (const [p, mine] of byPlate) {
+    const picked = pickFromGroup(mine);
+    if (picked) out.set(p, picked);
+  }
+  return out;
 }
 
 function buildLabel(prep: VehiclePrepStage, sale: SaleAxis, status: VehicleStatus): { label: string; tone: StateTone } {

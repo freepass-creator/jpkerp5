@@ -44,6 +44,7 @@ import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers'
 import type { Vehicle, Contract } from '@/lib/types';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { VehicleStateBadge } from '@/components/asset/vehicle-state-badge';
+import { buildVehicleContractIndex } from '@/lib/vehicle-state';
 import { vehicleStatusTone } from '@/lib/status-tones';
 import { useRole } from '@/lib/use-role';
 import { toast } from '@/lib/toast';
@@ -88,6 +89,8 @@ export default function AssetPage() {
   // 병합 로직 SSOT (use-merged-vehicles) — 인라인 복제 제거.
   // normPlate 키 + plateHistory 인식으로 표기차이·번호변경 유령 중복행 방지.
   const vehicles = useMemo<Vehicle[]>(() => buildMergedVehicles(rawVehicles, contracts), [rawVehicles, contracts]);
+  // plate→대표계약 인덱스 1회 — 행마다 계약 전체 스캔(O(차량×계약)) 방지
+  const vehContractByPlate = useMemo(() => buildVehicleContractIndex(contracts), [contracts]);
 
   const [search, setSearch] = useState('');
   const [companyFilter, setCompanyFilter] = usePersistentState('filter:asset:company', 'all');
@@ -450,7 +453,7 @@ export default function AssetPage() {
                           ? <span style={{ color: 'var(--green-text)' }}>✓ 모두 입력 완료</span>
                           : <MissingText label={missing.join(' · ')} tone="red" />}
                       </td>
-                      <td className="center"><VehicleStateBadge vehicle={v} contracts={contracts} /></td>
+                      <td className="center"><VehicleStateBadge vehicle={v} contract={vehContractByPlate.get(v.plate ?? '') ?? null} /></td>
                     </tr>
                   );
                   })}

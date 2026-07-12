@@ -110,12 +110,6 @@ function needsRecovery(c: Contract, today: string, sentIds: Set<string>): boolea
   return true;
 }
 
-function lastContactDate(contractId: string, history: ReturnType<typeof useHistoryEntries>['entries']): string | undefined {
-  const logs = history.filter((h) => h.scope === 'contract' && h.contractId === contractId && h.category === '연락기록');
-  if (logs.length === 0) return undefined;
-  return logs.map((l) => l.date).sort().reverse()[0];
-}
-
 export default function ReceivablesPage() {
   const { contracts, loading: contractsLoading, update: rtdbUpdate } = useContracts();
   const { vehicles, update: updateVehicleMaster } = useVehicles();
@@ -165,7 +159,23 @@ export default function ReceivablesPage() {
     return s;
   }, [history]);
 
+  // 계약별 최근 연락일 인덱스 1회 — 행마다 history 전체 filter+sort(O(행×이력)) 방지
+  const lastContactByContract = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const h of history) {
+      if (h.scope !== 'contract' || h.category !== '연락기록' || !h.contractId) continue;
+      const prev = m.get(h.contractId);
+      if (!prev || h.date > prev) m.set(h.contractId, h.date);
+    }
+    return m;
+  }, [history]);
+
   const isLatePay = (c: Contract) => (c.unpaidAmount ?? 0) > 0 || hasPartial(c);
+  // 회수 미완료 목록 1회 — '회수 미완료' 패널에서 전수 needsRecovery 필터를 렌더마다 3회 반복하던 것 통합
+  const recoveryList = useMemo(
+    () => contracts.filter((c) => needsRecovery(c, today, noticeSentIds)),
+    [contracts, today, noticeSentIds],
+  );
   const isEngineLock = (c: Contract) => c.engineDisabled === true;
   const isInspection = (c: Contract) => isInspectionOverdue(c, today);
   const isSold = (c: Contract) => c.vehicleStatus === '매각' || c.vehicleStatus === '매각대기';
@@ -213,7 +223,7 @@ export default function ReceivablesPage() {
     // 기본 정렬: 미수금 큰 순 (가장 시급한 회수 대상 위로)
     return [...searched].sort((a, b) => (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, filter, companyFilter, search, noticeSentIds]);
+  }, [contracts, filter, companyFilter, search, noticeSentIds, today]);
 
   const counts = useMemo(() => {
     const base = contracts.filter((c) => c.id && !c.id.startsWith('vehicle-orphan-'));
@@ -411,7 +421,7 @@ export default function ReceivablesPage() {
                   ) : (
                     filtered.map((c) => {
                       const days = maxOverdueDays(c, today);
-                      const lastC = lastContactDate(c.id, history);
+                      const lastC = lastContactByContract.get(c.id);
                       const isChecked = selectedIds.has(c.id);
                       const allIssues = computeActiveIssues(c, today);
                       // 리스크 컬럼은 진짜 리스크(상태)만 — 시동제어/채권화/내용증명은 액션 결과라 별도 컬럼에서 표시
@@ -581,7 +591,7 @@ export default function ReceivablesPage() {
                 </span>
                 회수 미완료
                 {(() => {
-                  const list = contracts.filter((c) => needsRecovery(c, today, noticeSentIds));
+                  const list = recoveryList;
                   return (
                     <span className="badge" style={{ background: '#fef2f2', color: '#7f1d1d', border: '1px solid rgba(127,29,29,0.3)' }}>
                       {list.length}
@@ -590,13 +600,12 @@ export default function ReceivablesPage() {
                 })()}
               </div>
               <div className="panel-meta danger">
-                ₩{contracts.filter((c) => needsRecovery(c, today, noticeSentIds)).reduce((s, c) => s + (c.unpaidAmount ?? 0), 0).toLocaleString()}
+                ₩{recoveryList.reduce((s, c) => s + (c.unpaidAmount ?? 0), 0).toLocaleString()}
               </div>
             </div>
             <div className="panel-body">
               {(() => {
-                const list = contracts
-                  .filter((c) => needsRecovery(c, today, noticeSentIds))
+                const list = [...recoveryList]
                   .sort((a, b) => maxOverdueDays(b, today) - maxOverdueDays(a, today));
                 if (list.length === 0) {
                   return <div className="empty-state">회수 대기 차량 없음</div>;
@@ -606,7 +615,7 @@ export default function ReceivablesPage() {
                     {list.map((c) => {
                       const days = maxOverdueDays(c, today);
                       const reason = c.status === '채권' ? '채권화' : '내용증명 D+' + (days - 10);
-                      const lastC = lastContactDate(c.id, history);
+                      const lastC = lastContactByContract.get(c.id);
                       const lastCDays = lastC ? Math.max(0, Math.round((new Date(today).getTime() - new Date(lastC).getTime()) / 86400000)) : null;
                       return (
                         <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
@@ -670,7 +679,7 @@ export default function ReceivablesPage() {
                         : 0;
                       const reason = (c.engineDisabledReason || '').trim();
                       const reasonKey = ['미납', '검사지연'].find((k) => reason.includes(k)) ?? (reason || '기타');
-                      const lastC = lastContactDate(c.id, history);
+                      const lastC = lastContactByContract.get(c.id);
                       const lastCDays = lastC ? Math.max(0, Math.round((new Date(today).getTime() - new Date(lastC).getTime()) / 86400000)) : null;
                       return (
                         <div key={c.id} className="list-item" onClick={() => setContactOpen(c)} style={{ cursor: 'pointer' }}>
