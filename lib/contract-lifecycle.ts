@@ -35,6 +35,7 @@ export const INACTIVE_VEHICLE_STATUSES: ReadonlySet<VehicleStatus> = new Set([
   '매각검토', '매각', '매각대기',
   '상품화대기', '상품화중', '상품대기',
   '구매대기', '등록대기',
+  '반납',  // 반납 차량=비운영 (isRunning 인라인 목록과 정합). 운영현황 셀표시만 영향(행포함 X). ※정비/사고는 라이브 계약 억제 위험이라 제외.
 ]);
 
 /** 매각 단계 — 자산 회전 종료. */
