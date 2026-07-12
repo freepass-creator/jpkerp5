@@ -84,7 +84,9 @@ function validISO(y: string, mo: string, d: string): string {
   const di = parseInt(d, 10);
   if (yi < 1900 || yi > 2100) return '';
   if (mi < 1 || mi > 12) return '';
-  if (di < 1 || di > 31) return '';
+  // 실제 달력 검증 — 2/30·4/31 같은 불가능 날짜 차단(다운스트림 롤오버 오기 방지)
+  const lastDay = new Date(yi, mi, 0).getDate();
+  if (di < 1 || di > lastDay) return '';
   return `${String(yi).padStart(4, '0')}-${String(mi).padStart(2, '0')}-${String(di).padStart(2, '0')}`;
 }
 

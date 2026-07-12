@@ -91,15 +91,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       }
     }
 
-    // audit log
+    // audit log — AuditLog 스키마 필드명 준수(entityType/label/by). entity·description 은 감사화면서 빈칸으로 뜸.
     const auditRef = db.ref(`${TENANT}/audit_logs`).push();
     await auditRef.set({
       at: new Date().toISOString(),
-      userId: actor.email,
+      by: actor.email,
+      userId: actor.uid,
       action: 'update',
-      entity: 'contract',
+      entityType: 'contract',
       entityId: id,
-      description: `계약 반납 API ${contract.contractNo} ${contract.vehiclePlate} ${contract.customerName} → ${returnedDate}`,
+      label: `계약 반납 API ${contract.contractNo} ${contract.vehiclePlate} ${contract.customerName} → ${returnedDate}`,
     });
 
     return NextResponse.json({ ok: true, returnedDate });

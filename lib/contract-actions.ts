@@ -42,12 +42,13 @@ export function markReturned(c: Contract, returnedDate: string): Contract {
   };
 }
 
-/** 해지 — 계약 비정상 종료. endReason='중도해지'. */
+/** 해지 — 계약 비정상 종료. endReason='중도해지'. 회수=차량 입고이므로 vehicleStatus='반납'(markReturned 와 대칭). */
 export function markTerminated(c: Contract, terminatedDate?: string): Contract {
   return {
     ...c,
     returnedDate: terminatedDate ?? c.returnedDate ?? todayKr(),   // UTC 였으면 KST 00~09시 해지가 전날로 기록
     status: '해지' as const,
+    vehicleStatus: '반납' as const,
     endReason: '중도해지',
   };
 }

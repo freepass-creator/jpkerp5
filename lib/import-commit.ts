@@ -92,6 +92,19 @@ export function previewRow(row: Row, maxFields = 3, maxLen = 18): string {
   return items.join(' / ') || '(빈 행)';
 }
 
+/**
+ * 계약 식별자 → 안정적 5-char base36 코드. **랜덤 금지 이유**: contractNo 가 dedup 'no:' 1순위 키라,
+ * 랜덤이면 (a) 같은 배치 내 서로 다른 계약이 우연히 같은 코드→'중복'으로 소리없이 누락,
+ * (b) 재import 시 새 코드→중복 계약 생성. 식별필드(차번|계약일|계약자)로 결정하면
+ * 'no:' 충돌 ⟺ 신원 충돌(=compose 키와 동일 판정) 이라 오탈락이 사라진다. 36^5≈60M 버킷.
+ */
+function stableContractSeq(plate: string | undefined, contractDate: string | undefined, name: string | undefined): string {
+  const s = [plate, contractDate, name].map((p) => String(p ?? '').trim().toLowerCase()).join('|');
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 33) + s.charCodeAt(i)) >>> 0;
+  return (h >>> 0).toString(36).slice(-5).padStart(5, '0').toUpperCase();
+}
+
 export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
   const customerName = toStr(get(row, '계약자명', '계약자', '고객명', '임차인', '임차인명', 'customerName'));
   const contractDate = toDate(get(row, '계약일', '계약일자', '체결일', '계약체결일', 'contractDate'));
@@ -130,7 +143,7 @@ export function parseContractRow(row: Row): Omit<Contract, 'id'> | null {
 
   const yy = contractDate.slice(2, 4);
   const mm = contractDate.slice(5, 7);
-  const seqHash = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  const seqHash = stableContractSeq(plate, contractDate, customerName);
   const contractNo = `ICR-${yy}${mm}-${seqHash}`;
 
   const licenseNoRaw = toStr(get(row, '면허번호', 'customerLicenseNo', 'licenseNo'));
@@ -507,7 +520,7 @@ export function applySnapshotToContract(
   // 신규
   const yy = patch.contractDate.slice(2, 4);
   const mm = patch.contractDate.slice(5, 7);
-  const seqHash = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  const seqHash = stableContractSeq(patch.vehiclePlate, patch.contractDate, patch.customerName);
   return {
     contractNo: `ICR-${yy}${mm}-${seqHash}`,
     company: (patch.company || '기타') as Contract['company'],

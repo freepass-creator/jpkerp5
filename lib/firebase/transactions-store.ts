@@ -124,6 +124,9 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       const now = new Date().toISOString();
       // 회계일자(#17): importedAt = 시스템 등록 시점, createdAt 도 동일.
       await set(newRef, pruneUndefined({ ...row, id, importedAt: now, createdAt: now, updatedAt: now }));
+      // 감사(#감사로그 필수) — 단건 거래 등록 기록
+      const addAmt = (row as { amount?: number; withdraw?: number }).amount ?? (row as { withdraw?: number }).withdraw ?? 0;
+      void audit.create(auditType, id, `${auditType === 'bank_tx' ? '계좌' : '카드'} 거래 등록 ${(row as { txDate?: string }).txDate ?? ''} ${addAmt.toLocaleString('ko-KR')}원`);
       return id;
     },
     update: async (id: string, patch: Partial<T>) => {
@@ -146,6 +149,11 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       //   pruneUndefined(JSON round-trip)로 키를 지우면 아무것도 안 써져서
       //   매칭 해제(matchedContractId: undefined)가 DB에 영속되지 않던 결함 수정.
       await rtdbUpdate(ref(db, `${path}/${id}`), patchToRtdb({ ...patch, updatedAt: new Date().toISOString() }));
+      // 감사 — 금융편집(금액·일자)만 기록. 매칭 metadata 변경은 audit 대상 아님(노이즈 방지).
+      if (touchesFinancial(patch as Record<string, unknown>)) {
+        const fin = FINANCIAL_KEYS.filter((k) => k in (patch as Record<string, unknown>));
+        void audit.update(auditType, id, `거래 금융수정 (${fin.join('·')})`, undefined, patch as Record<string, unknown>);
+      }
     },
     updateMany: async (patches: Record<string, Partial<T>>) => {
       const ids = Object.keys(patches);
@@ -160,8 +168,13 @@ function useTxStore<T extends { id: string }>(path: string, auditType: AuditEnti
       const updates: Record<string, unknown> = {};
       let closedSkip = 0;
       for (const [id, patch] of Object.entries(patches)) {
-        // #18 — 마감월 거래의 금융편집 patch 만 제외(매칭 등 metadata 는 통과)
-        if (patch && touchesFinancial(patch as Record<string, unknown>) && closedFor(id)) { closedSkip++; continue; }
+        // #18 — 마감월 거래의 금융편집 patch 만 제외(매칭 등 metadata 는 통과).
+        //   update 와 대칭: 기존 일자(closedFor)뿐 아니라 '새 txDate 가 마감월로 이동'하는 경우도 차단.
+        if (patch && touchesFinancial(patch as Record<string, unknown>)) {
+          const newDate = (patch as { txDate?: string }).txDate;
+          const closedM = closedFor(id) ?? (newDate && isDateInClosedPeriod(closedPeriods, newDate) ? newDate.slice(0, 7) : null);
+          if (closedM) { closedSkip++; continue; }
+        }
         for (const [k, v] of Object.entries(patch ?? {})) {
           // undefined = 필드 삭제 의도 → RTDB null (키 제거하면 아무것도 안 써짐)
           updates[`${id}/${k}`] = v === undefined ? null : pruneUndefined(v);
