@@ -14,6 +14,7 @@ import React, { useMemo, useState } from 'react';
 import type { Vehicle, Contract, HistoryEntry, VehicleStatus, LoanRepaymentMethod } from '@/lib/types';
 import { generateLoanSchedule, summarizeLoanSchedule, shouldReplaceLoanSchedule, buildLoanScheduleFromOcr, matchLoanPaymentsToWithdrawals } from '@/lib/loan-schedule-calc';
 import { getFirebaseAuth } from '@/lib/firebase/client';
+import { callOcrExtract } from '@/lib/ocr-client';
 import { simpleVehicleState } from '@/lib/vehicle-state';
 import { nextTransitions, isItemSatisfied, isTransitionReady, transitionProgress } from '@/lib/vehicle-transitions';
 
@@ -626,13 +627,7 @@ function LoanScheduleTab({ vehicle, onUpdate }: { vehicle: Vehicle; onUpdate: (v
     try {
       const user = getFirebaseAuth()?.currentUser;
       if (!user) { setNote('로그인이 필요합니다.'); return; }
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('type', 'loan_schedule');
-      const res = await fetch('/api/ocr/extract', { method: 'POST', headers: { Authorization: `Bearer ${await user.getIdToken()}` }, body: fd });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || 'OCR 실패');
-      const raw = json.extracted as Record<string, unknown>;
+      const { raw } = await callOcrExtract(file, 'loan_schedule');
       const rows = buildLoanScheduleFromOcr(raw);
       if (!rows.length) { setNote('상환표 회차를 못 읽었습니다 — 파일을 확인하세요.'); return; }
       const n = (k: string) => { const v = raw[k]; const x = typeof v === 'number' ? v : Number(String(v ?? '').replace(/[,\s]/g, '')); return Number.isFinite(x) && x > 0 ? x : undefined; };

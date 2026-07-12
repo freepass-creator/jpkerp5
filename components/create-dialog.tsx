@@ -44,6 +44,7 @@ import { enrichBankTxBatch, enrichCardTxBatch } from '@/lib/channel-matching';
 import { bankTxKeys, cardTxKeys, vehicleKeys, contractKeys } from '@/lib/dedup-keys';
 import { normalizePlateLoose } from '@/lib/customer-match';
 import { toast } from '@/lib/toast';
+import { callOcrExtract } from '@/lib/ocr-client';
 import { friendlyError } from '@/lib/friendly-error';
 import { downloadTemplate as excelTemplate } from '@/lib/excel-template';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -1527,23 +1528,7 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
     setError(null);
     setMatchedVehicle(null);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('type', 'vehicle_reg');
-
-      const { getFirebaseAuth } = await import('@/lib/firebase/client');
-      const auth = getFirebaseAuth();
-      const user = auth?.currentUser;
-      const idToken = user ? await user.getIdToken() : '';
-
-      const res = await fetch('/api/ocr/extract', {
-        method: 'POST',
-        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-        body: fd,
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || 'OCR 실패');
-      const raw = json.extracted as Record<string, unknown>;
+      const { raw } = await callOcrExtract(file, 'vehicle_reg');
       const next = {
         plate: String(raw.car_number ?? raw.plate ?? ''),
         model: String(raw.car_name ?? raw.model ?? ''),
@@ -2605,21 +2590,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: (newContractId?: string) =
   async function handleLicenseOcr(file: File) {
     setLicenseOcrBusy(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('type', 'license');
-      const { getFirebaseAuth } = await import('@/lib/firebase/client');
-      const auth = getFirebaseAuth();
-      const user = auth?.currentUser;
-      const idToken = user ? await user.getIdToken() : '';
-      const res = await fetch('/api/ocr/extract', {
-        method: 'POST',
-        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-        body: fd,
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || 'OCR 실패');
-      const raw = json.extracted as Record<string, string | null>;
+      const raw = (await callOcrExtract(file, 'license')).raw as Record<string, string | null>;
       const ln = (raw.license_no ?? '').trim();
       const ltype = (raw.license_type ?? '').trim();
       const holder = (raw.holder_name ?? '').trim();
@@ -2961,24 +2932,10 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
     setBusy(true);
     setProgress({ done: 0, total: fileList.length });
     const out: ExtractedRow[] = [];
-    const { getFirebaseAuth } = await import('@/lib/firebase/client');
-    const auth = getFirebaseAuth();
-    const user = auth?.currentUser;
-    const idToken = user ? await user.getIdToken() : '';
 
     for (const file of fileList) {
       try {
-        const fd = new FormData();
-        fd.append('file', file);
-        fd.append('type', 'rental_contract');
-        const res = await fetch('/api/ocr/extract', {
-          method: 'POST',
-          headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-          body: fd,
-        });
-        const json = await res.json();
-        if (!json.ok) throw new Error(json.error || 'OCR 실패');
-        const raw = json.extracted as Record<string, unknown>;
+        const { raw } = await callOcrExtract(file, 'rental_contract');
         const plate = String(raw.car_number ?? '').trim();
         const rawCompany = String(raw.company_name ?? '');
         out.push({

@@ -17,6 +17,7 @@ import type {
 } from '@/lib/types';
 import { exportToExcel } from '@/lib/excel-export';
 import { toast } from '@/lib/toast';
+import { callOcrExtract } from '@/lib/ocr-client';
 import { showConfirm } from '@/lib/confirm';
 
 type Tab = 'info' | 'finance' | 'locations' | 'documents';
@@ -664,19 +665,7 @@ function InfoEditor({ draft, onChange }: { draft: Company; onChange: (c: Company
     setOcrBusy(true);
     setOcrError(null);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('type', 'business_reg');
-      const { getCurrentIdToken } = await import('@/lib/firebase/client');
-      const idToken = await getCurrentIdToken();
-      const res = await fetch('/api/ocr/extract', {
-        method: 'POST',
-        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-        body: fd,
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || 'OCR 실패');
-      const raw = json.extracted as Record<string, string | null>;
+      const raw = (await callOcrExtract(file, 'business_reg')).raw as Record<string, string | null>;
       // 원본 파일 첨부 — documents 에 사업자등록증 한 줄 추가 (보험증권 패턴)
       let fileUrl: string | undefined;
       try { fileUrl = await fileToDataUrl(file); } catch { /* fallback — OCR 결과만 */ }
