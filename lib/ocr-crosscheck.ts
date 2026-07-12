@@ -150,10 +150,10 @@ export function crosscheckVehicleReg(raw: Record<string, unknown>): CrosscheckRe
   if (!str(raw.plate) && !str(raw.car_number)) {
     issues.push({ field: 'plate', message: '차량번호 미인식 — 자산 등록 불가', severity: 'error' });
   }
-  const first = ymd(raw.first_registered_date);
+  const first = ymd(raw.first_registration_date); // 스키마 필드명 정합 (구 first_registered_date는 미발화였음)
   if (first) {
     const d = daysBetween(new Date().toISOString().slice(0, 10), first);
-    if (d != null && d > 0) issues.push({ field: 'first_registered_date', message: `최초등록일(${first})이 미래 — 날짜 오독 의심`, severity: 'warn' });
+    if (d != null && d > 0) issues.push({ field: 'first_registration_date', message: `최초등록일(${first})이 미래 — 날짜 오독 의심`, severity: 'warn' });
   }
   return summarize(issues);
 }
