@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Trash, X, PencilSimple, CheckCircle, Warning, FileXls, Eye, FileZip, CircleNotch, FileText, User, Receipt, Copy } from '@phosphor-icons/react';
+import { Trash, X, PencilSimple, CheckCircle, Warning, Eye, FileZip, CircleNotch, FileText, User, Receipt, Copy } from '@phosphor-icons/react';
 import { ContextMenu, type ContextMenuItem } from '@/components/ui/context-menu';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { ExcelButton } from '@/components/ui/page-actions';
 import { downloadPenaltyZip, previewPenaltyItem, type PenaltyWorkItem } from '@/lib/penalty-pdf';
 import { usePenaltyStore } from '@/lib/use-penalty-store';
 import { dedupPenalties, describeDuplicate } from '@/lib/penalty-dedup';
@@ -501,14 +502,7 @@ export default function PenaltyPage() {
         )}
         footerRight={
           <>
-            <button
-              className="btn"
-              onClick={handleExcel}
-              disabled={visible.length === 0}
-              title={`현재 페이지 목록 (${visible.length}건) 엑셀 다운로드`}
-            >
-              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{visible.length}</span>
-            </button>
+            <ExcelButton count={visible.length} onClick={handleExcel} title={`현재 페이지 목록 (${visible.length}건) 엑셀 다운로드`} />
             {phase === 'in-progress' && (
               <>
                 {selectedIds.size > 0 && (

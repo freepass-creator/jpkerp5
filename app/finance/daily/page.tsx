@@ -19,6 +19,7 @@ import { CompanyFilter, PeriodFilter } from '@/components/ui/filter-bar';
 import { FINANCE_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { EmptyRow } from '@/components/ui/empty-row';
+import { ExcelButton, ActionButton, ActionSep } from '@/components/ui/page-actions';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { updateBankTxWithMatchSync, updateCardTxWithMatchSync } from '@/lib/firebase/tx-contract-sync';
@@ -260,32 +261,10 @@ export default function FinanceDailyPage() {
         <BottomBar
           left={
             <>
-              <button
-                className="btn"
-                type="button"
-                onClick={handleExport}
-                disabled={daily.length === 0}
-                title={`현재 페이지 목록 (${daily.length}건) 엑셀 다운로드 — 자금일보`}
-              >
-                <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{daily.length}</span>
-              </button>
-              <button
-                className="btn"
-                type="button"
-                onClick={handleTaxInvoiceExport}
-                title={`세금계산서 발행 엑셀 — 전자세금계산서 시스템 (smarttaxinvoice 등) 일괄 업로드용`}
-              >
-                <FileXls size={14} weight="bold" /> 세금계산서 엑셀
-              </button>
-              <span className="btn-sep" />
-              <button
-                className="btn"
-                type="button"
-                onClick={() => void handleCmsAutoMatch()}
-                title="미매칭 CMS 집금건 ↔ 자동이체 자동 묶음 매칭 (일자 ±3일 + 수수료 0.05~0.3%)"
-              >
-                CMS 자동 매칭
-              </button>
+              <ExcelButton count={daily.length} onClick={handleExport} title={`현재 페이지 목록 (${daily.length}건) 엑셀 다운로드 — 자금일보`} />
+              <ActionButton icon={<FileXls size={14} weight="bold" />} label="세금계산서 엑셀" onClick={handleTaxInvoiceExport} title={`세금계산서 발행 엑셀 — 전자세금계산서 시스템 (smarttaxinvoice 등) 일괄 업로드용`} />
+              <ActionSep />
+              <ActionButton label="CMS 자동 매칭" onClick={() => void handleCmsAutoMatch()} title="미매칭 CMS 집금건 ↔ 자동이체 자동 묶음 매칭 (일자 ±3일 + 수수료 0.05~0.3%)" />
             </>
           }
           right={null}
