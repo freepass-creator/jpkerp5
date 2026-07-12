@@ -441,11 +441,11 @@ function AdminSettings() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" type="button" onClick={() => trigger(true)} disabled={busy}>
-              {busy ? <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={12} weight="duotone" />}
+              {busy ? <CircleNotch weight="bold" className="spin" /> : <Play size={12} weight="duotone" />}
               시뮬레이션 (dry-run)
             </button>
             <button className="btn btn-primary" type="button" onClick={() => trigger(false)} disabled={busy}>
-              {busy ? <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={12} weight="fill" />}
+              {busy ? <CircleNotch weight="bold" className="spin" /> : <Play size={12} weight="fill" />}
               지금 실행
             </button>
           </div>

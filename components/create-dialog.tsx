@@ -937,7 +937,7 @@ function UploadPane({
       {onCommit && totalRows > 0 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button className="btn btn-primary" type="button" disabled={busy} onClick={() => void onCommit()}>
-            {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
+            {busy ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} weight="bold" />}
             {' '}{commitLabel ?? `최종 저장 ${totalRows}건`}
           </button>
         </div>
@@ -1020,7 +1020,7 @@ function UploadPaneMulti({
       {onCommit && totalRows > 0 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button className="btn btn-primary" type="button" disabled={busy} onClick={() => void onCommit()}>
-            {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
+            {busy ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} weight="bold" />}
             {' '}최종 저장 {totalRows}건 (자동매칭 실행)
           </button>
         </div>
@@ -1451,7 +1451,7 @@ function VehicleManualForm({ onSubmit }: { onSubmit: (newVehicleId?: string) => 
 
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8, position: 'sticky', bottom: 0, background: 'var(--bg-card)', paddingTop: 8 }}>
         <button type="submit" className="btn btn-primary" disabled={!fullName || saving}>
-          {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+          {saving ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} />}
           {saving ? '저장 중...' : '차량 등록'}
         </button>
       </div>
@@ -1557,7 +1557,7 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
     return (
       <div className="dropzone" style={{ minHeight: 320, cursor: 'default', flex: 1 }}>
         <div className="dropzone-icon">
-          <CircleNotch size={28} weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
+          <CircleNotch size={28} weight="bold" className="spin" />
         </div>
         <div className="dropzone-title">OCR 처리 중...</div>
         <div className="dropzone-desc">자동차등록증을 분석하고 있습니다 (약 1~2초)</div>
@@ -1683,13 +1683,13 @@ function VehicleOcrPane({ onSubmit }: { onSubmit: () => void }) {
                 disabled={saving}
                 onClick={() => void handleUpdateExisting('overwrite')}
               >
-                {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+                {saving ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} />}
                 {saving ? '저장 중...' : '덮어쓰기 갱신'}
               </button>
             </>
           ) : (
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+              {saving ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} />}
               {saving ? '저장 중...' : '신규 등록'}
             </button>
           )}
@@ -1829,7 +1829,7 @@ function VehicleExcelPane({
             setSheets([]);
           }}
         >
-          {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
+          {busy ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} weight="bold" />}
           {' '}최종 저장 {totalRows}건
         </button>
       </div>
@@ -2326,7 +2326,7 @@ function SnapshotExcelPane({
             setPicks({});
           }}
         >
-          {busy ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} weight="bold" />}
+          {busy ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} weight="bold" />}
           {' '}{busy ? '반영 중...' : `${pickedCount}건 반영하기`}
         </button>
       </div>
@@ -2826,7 +2826,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: (newContractId?: string) =
                   disabled={licenseOcrBusy}
                   onChange={(e) => { if (e.target.files?.[0]) handleLicenseOcr(e.target.files[0]); }}
                 />
-                {licenseOcrBusy ? <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <Camera size={12} weight="duotone" />}
+                {licenseOcrBusy ? <CircleNotch weight="bold" className="spin" /> : <Camera size={12} weight="duotone" />}
                 면허증 OCR
               </label>
             </div>
@@ -2875,7 +2875,7 @@ function ContractManualForm({ onSubmit }: { onSubmit: (newContractId?: string) =
 
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8, position: 'sticky', bottom: 0, background: 'var(--bg-card)', paddingTop: 8 }}>
         <button type="submit" className="btn btn-primary" disabled={!valid || saving}>
-          {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+          {saving ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} />}
           {saving ? '저장 중...' : '계약 등록'}
         </button>
       </div>
@@ -3122,7 +3122,7 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
               onClick={handleSaveAll}
               disabled={saving || rows.filter((r) => !r.error && r.customerName.trim() && r.plate.trim()).length === 0}
             >
-              {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+              {saving ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} />}
               {saving ? '저장 중...' : `${rows.filter((r) => !r.error && r.customerName.trim() && r.plate.trim()).length}건 일괄 등록`}
             </button>
           </div>
@@ -3136,7 +3136,7 @@ function ContractOcrPane({ onSubmit }: { onSubmit: () => void }) {
     return (
       <div className="dropzone" style={{ minHeight: 320, cursor: 'default', flex: 1 }}>
         <div className="dropzone-icon">
-          <CircleNotch size={28} weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
+          <CircleNotch size={28} weight="bold" className="spin" />
         </div>
         <div className="dropzone-title">OCR 처리 중...</div>
         <div className="dropzone-desc">
@@ -3438,7 +3438,7 @@ function PastePaneFooter({
       <button type="button" className="btn" onClick={onClear} disabled={busy || !hasText}>지우기</button>
       <button type="button" className="btn btn-primary" onClick={onCommit} disabled={rowCount === 0 || busy}>
         {busy
-          ? <><CircleNotch size={12} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> 저장 중...</>
+          ? <><CircleNotch size={12} weight="bold" className="spin" /> 저장 중...</>
           : <>{rowCount}건 등록</>}
       </button>
     </>
@@ -3721,7 +3721,7 @@ function PaymentManualForm({ onSubmit, variant }: { onSubmit: () => void; varian
 
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', gap: 8, position: 'sticky', bottom: 0, background: 'var(--bg-card)', paddingTop: 8 }}>
         <button type="submit" className="btn btn-primary" disabled={!valid || saving}>
-          {saving ? <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={14} />}
+          {saving ? <CircleNotch size={14} weight="bold" className="spin" /> : <CheckCircle size={14} />}
           {saving
             ? '저장 중...'
             : variant === '입출금' ? '수납 입력'
@@ -3754,7 +3754,7 @@ function PaymentOcrPane({ onSubmit }: { onSubmit: () => void }) {
     return (
       <div className="dropzone" style={{ minHeight: 320, cursor: 'default', flex: 1 }}>
         <div className="dropzone-icon">
-          <CircleNotch size={28} weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
+          <CircleNotch size={28} weight="bold" className="spin" />
         </div>
         <div className="dropzone-title">OCR 처리 중...</div>
         <div className="dropzone-desc">영수증/거래내역을 분석하고 있습니다</div>

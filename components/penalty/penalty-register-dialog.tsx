@@ -233,7 +233,7 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
               padding: '8px 12px', borderRadius: 6, background: 'var(--orange-bg)',
               color: 'var(--orange-text)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              <CircleNotch size={12} weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
+              <CircleNotch size={12} weight="bold" className="spin" />
               계약 데이터 로딩 중 — 매칭 정확도 위해 잠시만 기다린 후 업로드해 주세요.
             </div>
           )}

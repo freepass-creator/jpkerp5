@@ -318,7 +318,7 @@ export function InsuranceRegisterDialog({
                           <input type="checkbox" checked={selectedIds.has(it.id)} onChange={() => toggleRow(it.id)} aria-label="행 선택" />
                         </td>
                         <td className="center">
-                          {it._status === 'pending' && <CircleNotch size={14} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-weak)' }} />}
+                          {it._status === 'pending' && <CircleNotch size={14} className="spin" style={{ color: 'var(--text-weak)' }} />}
                           {it._status === 'done' && plateOk && !dup && !ccWarn && <CheckCircle size={14} weight="duotone" style={{ color: 'var(--green-text)' }} />}
                           {it._status === 'done' && (!plateOk || dup || ccWarn) && (
                             <span title={ccTitle || undefined} style={{ display: 'inline-flex' }}>

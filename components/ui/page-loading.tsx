@@ -32,7 +32,7 @@ export function PageLoading({
       padding: 40, fontSize: 12, color: 'var(--text-weak)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     }}>
-      <CircleNotch size={14} weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
+      <CircleNotch size={14} weight="bold" className="spin" />
       {message}
     </div>
   );

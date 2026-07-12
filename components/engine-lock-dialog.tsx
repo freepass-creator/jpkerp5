@@ -116,7 +116,7 @@ export function EngineLockDialog({
                     onClick={() => void applyEnable(custom.trim())}
                   >
                     {busy
-                      ? <CircleNotch size={12} weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
+                      ? <CircleNotch size={12} weight="bold" className="spin" />
                       : '적용'}
                   </button>
                 </div>
@@ -144,7 +144,7 @@ export function EngineLockDialog({
               onClick={() => void applyDisable()}
             >
               {busy
-                ? <><CircleNotch size={12} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> 처리 중...</>
+                ? <><CircleNotch size={12} weight="bold" className="spin" /> 처리 중...</>
                 : '해제'}
             </button>
           )}

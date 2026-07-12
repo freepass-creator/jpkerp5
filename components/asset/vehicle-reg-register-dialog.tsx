@@ -371,7 +371,7 @@ export function VehicleRegRegisterDialog({
                     return (
                       <tr key={it.id}>
                         <td className="center">
-                          {it._status === 'pending' && <CircleNotch size={14} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-weak)' }} />}
+                          {it._status === 'pending' && <CircleNotch size={14} className="spin" style={{ color: 'var(--text-weak)' }} />}
                           {it._status === 'done' && plateOk && <CheckCircle size={14} weight="duotone" style={{ color: 'var(--green-text)' }} />}
                           {it._status === 'done' && !plateOk && <Warning size={14} weight="duotone" style={{ color: 'var(--orange-text)' }} />}
                           {it._status === 'failed' && <X size={14} weight="bold" style={{ color: 'var(--red-text)' }} />}

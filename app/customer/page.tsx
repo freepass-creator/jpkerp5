@@ -329,7 +329,7 @@ export default function CustomerLookupEntry() {
         <button type="submit" disabled={submitting || !plate.trim() || !ident.trim()}>
           {submitting ? (
             <>
-              <CircleNotch size={16} weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
+              <CircleNotch size={16} weight="bold" className="spin" />
               조회 중…
             </>
           ) : (

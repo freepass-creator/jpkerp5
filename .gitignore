@@ -49,3 +49,10 @@ Thumbs.db
 sources/
 
 .vercel
+
+# 사적 비즈니스 데이터 (로컬 전용 — 커밋 금지)
+/sim-*-report.txt
+/tests/sim-cms*.test.ts
+/tests/sim-bank-real.test.ts
+/tests/sim-reconcile.test.ts
+/인제스천_감사_*.md

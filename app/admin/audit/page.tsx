@@ -213,7 +213,7 @@ export default function AuditPage() {
                   {loading ? (
                     <tr>
                       <td colSpan={6} className="muted center" style={{ padding: '32px 10px' }}>
-                        <ArrowsClockwise size={14} style={{ animation: 'spin 1s linear infinite', marginRight: 6 }} />
+                        <ArrowsClockwise size={14} className="spin" style={{ marginRight: 6 }} />
                         로그 로드 중...
                       </td>
                     </tr>

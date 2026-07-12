@@ -706,7 +706,7 @@ function InfoEditor({ draft, onChange }: { draft: Company; onChange: (c: Company
         <div className="detail-section-body">
           {ocrBusy ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, color: 'var(--text-sub)' }}>
-              <CircleNotch weight="bold" style={{ animation: 'spin 1s linear infinite' }} />
+              <CircleNotch weight="bold" className="spin" />
               <span style={{ fontSize: 12 }}>분석 중...</span>
             </div>
           ) : (

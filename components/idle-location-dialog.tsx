@@ -195,7 +195,7 @@ export function IdleLocationDialog({
           <div style={{ flex: 1 }} />
           <DialogClose asChild><button className="btn">취소</button></DialogClose>
           <button className="btn btn-primary" type="button" onClick={handleSave} disabled={saving || !idleLocation.trim()}>
-            {saving ? <CircleNotch size={12} weight="bold" style={{ animation: 'spin 1s linear infinite' }} /> : <FloppyDisk size={12} weight="bold" />}
+            {saving ? <CircleNotch size={12} weight="bold" className="spin" /> : <FloppyDisk size={12} weight="bold" />}
             저장
           </button>
         </DialogFooter>
