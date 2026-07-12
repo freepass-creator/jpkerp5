@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as XLSX from 'xlsx';
 import {
@@ -13,6 +13,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { IdentInput } from '@/components/ui/ident-input';
 import { parseExcelFile, type ParsedSheet, type UploadKind } from '@/lib/excel-detect';
+import { detectUploadAccount, titleBandText } from '@/lib/detect-upload-account';
 import { formatCurrency, cn, monthsBetween } from '@/lib/utils';
 import { MAKERS, MODELS_BY_MAKER, buildVehicleFullName } from '@/lib/vehicle-master';
 import type { Contract, HistoryCategory, HistoryScope, AdditionalDriver, BankTransaction, CardTransaction } from '@/lib/types';
@@ -120,10 +121,17 @@ export function CreateDialog({
 
   // 계좌 업로드 — 어느 계좌 거래인지 태깅용 (은행 파일은 계좌번호가 헤더에만 있어 행 파싱으론 유실됨).
   const [payAccountKey, setPayAccountKey] = useState('');
+  const [acctAutoKey, setAcctAutoKey] = useState(''); // 파일에서 자동감지된 계좌 key (힌트 표시용)
+  // async 파싱 중 사용자가 수동 선택한 값을 clobber 하지 않도록 최신 선택을 ref 로 미러링.
+  const payAccountKeyRef = useRef('');
+  useEffect(() => { payAccountKeyRef.current = payAccountKey; }, [payAccountKey]);
+  // 탭(mode) 전환 시 계좌 선택 초기화 — 입출금 선택이 자동이체/카드 탭 커밋으로 새지 않게.
+  useEffect(() => { setPayAccountKey(''); setAcctAutoKey(''); payAccountKeyRef.current = ''; }, [mode]);
   const payAccountOpts = useMemo(() => companies.flatMap((co) => (co.accounts ?? []).map((a) => ({
     key: `${co.id}::${a.accountNo}`,
     label: `${co.name} · ${a.bankName} ${a.nickname?.trim() || a.accountNo}`,
     accountNo: a.accountNo,
+    bankName: a.bankName,
     companyCode: co.code || co.name,
   }))), [companies]);
 
@@ -170,6 +178,7 @@ export function CreateDialog({
     setParsed([]);
     setBusy(false);
     setResult(null);
+    setPayAccountKey(''); setAcctAutoKey(''); payAccountKeyRef.current = '';
   }, []);
 
   const handleFiles = useCallback(
@@ -199,9 +208,30 @@ export function CreateDialog({
         ...prev,
         ...results.map((r) => ({ ...r, kind: r.kind === '미분류' ? fallback : r.kind })),
       ]);
+      // 계좌 자동감지 — 방금 추가된 '커밋 대상 은행 시트'(입출금=계좌, 행 있는 것) 전부를 감지.
+      // 하나라도 감지 실패하거나 시트마다 다른 계좌면 자동선택 보류(혼합 배치 오태깅 방지) → 사용자가 직접 고른다.
+      // 기존 선택은 보존(수동/async 중 선택 clobber 방지): 최신값을 ref 로 읽어 비어있을 때만 채운다.
+      if (mode === '입출금' && payAccountOpts.length > 0) {
+        const bankSheets = results.filter((r) => (r.kind === '미분류' ? '계좌' : r.kind) === '계좌' && r.rows.length > 0);
+        let agreed: string | null = null;
+        let ok = bankSheets.length > 0;
+        for (const r of bankSheets) {
+          const det = detectUploadAccount(
+            { sheetName: r.sheetName, fileName: r.fileName, titleText: titleBandText(r.rawAoa, r.headerRow) },
+            payAccountOpts,
+          );
+          if (!det || (agreed && agreed !== det.key)) { ok = false; break; }
+          agreed = det.key;
+        }
+        if (ok && agreed && !payAccountKeyRef.current) {
+          payAccountKeyRef.current = agreed;
+          setPayAccountKey(agreed);
+          setAcctAutoKey(agreed);
+        }
+      }
       setBusy(false);
     },
-    [mode]
+    [mode, payAccountOpts]
   );
 
   const onDrop = useCallback(
@@ -285,8 +315,9 @@ export function CreateDialog({
   }
 
   async function commitPaymentFiles() {
-    // 계좌 업로드는 어느 계좌인지 필수 — 미선택 시 영업/운영 구분·sweep·계정과목이 흔들림
-    const selAcct = payAccountOpts.find((o) => o.key === payAccountKey);
+    // 계좌 업로드는 어느 계좌인지 필수 — 미선택 시 영업/운영 구분·sweep·계정과목이 흔들림.
+    // selAcct 는 입출금 모드에서만 — 자동이체/카드 커밋에 입출금 선택이 새지 않도록 mode 게이트.
+    const selAcct = mode === '입출금' ? payAccountOpts.find((o) => o.key === payAccountKey) : undefined;
     if (mode === '입출금' && payAccountOpts.length > 0 && !selAcct) {
       toast.error('업로드할 계좌를 먼저 선택하세요 — 어느 계좌 거래인지 구분이 필요합니다.');
       return;
@@ -463,6 +494,8 @@ export function CreateDialog({
         toast.warning(`잉여 ${leftoverCount}건 ${leftoverTotal.toLocaleString('ko-KR')}원 — /payments 매칭 dialog 에서 잔여분 계약 매칭 필요`);
       }
       setParsed((all) => all.filter((p) => p.kind !== '계좌' && p.kind !== '자동이체' && p.kind !== '카드'));
+      // 배치 완료 → 계좌 선택 초기화(다음 다른 계좌 업로드가 이전 선택으로 오태깅되지 않게)
+      setPayAccountKey(''); setAcctAutoKey(''); payAccountKeyRef.current = '';
       await intakeBatchEnd(
         intakeId,
         total > 0,
@@ -824,11 +857,15 @@ export function CreateDialog({
                 {payAccountOpts.length > 0 && (
                   <div style={{ padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, flexWrap: 'wrap' }}>
                     <span style={{ color: 'var(--text-weak)', fontWeight: 600 }}>엑셀 업로드 계좌 *</span>
-                    <select className="input" value={payAccountKey} onChange={(e) => setPayAccountKey(e.target.value)} style={{ maxWidth: 340 }}>
+                    <select className="input" value={payAccountKey} onChange={(e) => { setPayAccountKey(e.target.value); setAcctAutoKey(''); }} style={{ maxWidth: 340 }}>
                       <option value="">— 어느 계좌의 거래인지 선택 (필수) —</option>
                       {payAccountOpts.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
                     </select>
-                    <span style={{ color: 'var(--text-weak)', fontSize: 11 }}>업로드 파일 전체가 이 계좌 거래로 태깅됩니다</span>
+                    {payAccountKey && payAccountKey === acctAutoKey ? (
+                      <span style={{ color: 'var(--ok, #16a34a)', fontSize: 11, fontWeight: 600 }}>🔎 파일에서 자동감지됨 · 다르면 위에서 변경</span>
+                    ) : (
+                      <span style={{ color: 'var(--text-weak)', fontSize: 11 }}>업로드 파일 전체가 이 계좌 거래로 태깅됩니다</span>
+                    )}
                   </div>
                 )}
                 <PaymentRegisterPane
