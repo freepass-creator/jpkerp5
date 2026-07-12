@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields, buildLoanFields, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
 import { parseSwitchplanJbo, type JboParseResult } from '@/lib/migrate/switchplan-jbo';
+import { reconcileSwitchplan } from '@/lib/migrate/switchplan-recon';
 import { validateSnapshotRow, applySnapshotToContract } from '@/lib/import-commit';
 import { assignContractNos } from '@/lib/code-scheme';
 import { upsertVehicleFromContract } from '@/lib/entity-sync';
@@ -99,6 +100,9 @@ export default function MigrateSwitchplanPage() {
     () => (res ? [...res.returned].sort((a, b) => b.carryUnpaid - a.carryUnpaid) : []),
     [res],
   );
+
+  // 채권 ↔ 계좌+CMS 대사 (사업현황 + 자금일보 둘 다 있을 때)
+  const recon = useMemo(() => (res && jboRes ? reconcileSwitchplan(res, jboRes) : null), [res, jboRes]);
 
   async function commitSeeds() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
@@ -625,6 +629,57 @@ export default function MigrateSwitchplanPage() {
               )}
             </div>
           </section>
+
+          {/* 채권 ↔ 계좌·CMS 대사 (둘 다 업로드 시) */}
+          {recon && (
+            <section className="detail-section">
+              <div className="detail-section-header">
+                <CheckCircle size={13} weight="duotone" style={{ color: 'var(--brand)' }} />
+                <span className="title">8. 채권 ↔ 계좌·CMS 대사 ({recon.period.from}~{recon.period.to} · 매칭율 {(recon.totals.matchRate * 100).toFixed(1)}%)</span>
+              </div>
+              <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-sub)', lineHeight: 1.7 }}>
+                  사업현황 채권 결제 <b>{won(recon.totals.bizPaid)}</b> vs 자금일보 실입금(차량태깅) <b>{won(recon.totals.jboTotal)}</b> · 차량 {recon.totals.plates}대(양쪽 {recon.totals.bothPlates})<br />
+                  채널: 대여료 {won(recon.totals.rent)} · CMS {won(recon.totals.cms)} · 카드 {won(recon.totals.card)} · 보증금 {won(recon.totals.deposit)} · 기타 {won(recon.totals.other)}
+                </div>
+
+                <div className="notice" style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: 12, borderRadius: 'var(--radius)', lineHeight: 1.6 }}>
+                  <Warning size={13} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--orange-text)' }} />
+                  <b>차량번호 없이 뭉텅이로 들어온 수납성 입금 {won(recon.unmatchedReceiptNoPlate)}</b> (CMS집금·카드집금 등) — 은행엔 집금 합계로만 찍혀 계약별로 안 붙습니다. 이게 아래 「채권&gt;계좌」 차이의 정체입니다. <b>계약별 완전 대사 = CMS/카드 정산내역서</b>가 있어야 배분됩니다.
+                </div>
+
+                <div style={{ maxHeight: 380, overflow: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                      <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
+                        <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
+                        <th style={{ textAlign: 'left', padding: '6px 8px' }}>임차인</th>
+                        <th style={{ padding: '6px 8px' }}>채권 결제</th>
+                        <th style={{ padding: '6px 8px' }}>계좌 대여료</th>
+                        <th style={{ padding: '6px 8px' }}>차이</th>
+                        <th style={{ textAlign: 'left', padding: '6px 8px' }}>상태</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recon.rows.slice(0, 60).map((r, i) => (
+                        <tr key={`${r.plate}-rc${i}`} style={{ textAlign: 'right', borderBottom: '1px solid var(--border-weak)', background: r.status !== '일치' ? 'var(--bg-sunken)' : undefined }}>
+                          <td style={{ textAlign: 'left', padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{r.plate}</td>
+                          <td style={{ textAlign: 'left', padding: '5px 8px', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.bizTenants || r.jboTenants || '—'}</td>
+                          <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{won(r.bizPaid)}</td>
+                          <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{won(r.rent + r.cms + r.card)}</td>
+                          <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums', color: Math.abs(r.diff) > 300000 ? 'var(--orange-text)' : 'var(--text-weak)' }}>{won(r.diff)}</td>
+                          <td style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, color: r.status === '일치' ? 'var(--green-text)' : 'var(--orange-text)' }}>{r.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
+                  「일치」 = 직접 대여료가 계약별로 맞음 · 「채권&gt;계좌」 = 나머지가 CMS/카드 집금(위 뭉텅이)에서 온 것 · 「채권만」 = 이 기간 자금일보에 입금 없음(종료·선납 등)
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* 로그 */}
           {log.length > 0 && (
