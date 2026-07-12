@@ -34,7 +34,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
         gap: 8, background: '#f8f9fa', color: 'var(--text-sub)', fontSize: 12,
       }}>
-        <CircleNotch size={14} className="auth-spin" style={{ color: 'var(--brand)' }} />
+        <CircleNotch size={14} className="spin" style={{ color: 'var(--brand)' }} />
         <span>로딩 중...</span>
       </div>
     );
@@ -133,7 +133,7 @@ function LoginScreen({ onSignup, onReset }: { onSignup: () => void; onReset: () 
           <button type="submit" className="auth-submit" disabled={busy}>
             {busy ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-                <CircleNotch size={14} className="auth-spin" /> 접속 중...
+                <CircleNotch size={14} className="spin" /> 접속 중...
               </span>
             ) : '로그인'}
           </button>
@@ -232,7 +232,7 @@ function SignupScreen({ onBack }: { onBack: () => void }) {
           <button type="submit" className="auth-submit" disabled={busy}>
             {busy ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-                <CircleNotch size={14} className="auth-spin" /> 가입 중...
+                <CircleNotch size={14} className="spin" /> 가입 중...
               </span>
             ) : '가입하기'}
           </button>
@@ -290,7 +290,7 @@ function ResetScreen({ onBack }: { onBack: () => void }) {
           <button type="submit" className="auth-submit" disabled={busy}>
             {busy ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-                <CircleNotch size={14} className="auth-spin" /> 전송 중...
+                <CircleNotch size={14} className="spin" /> 전송 중...
               </span>
             ) : '재설정 메일 전송'}
           </button>

@@ -2063,8 +2063,7 @@ input[type="radio"]:disabled {
 .auth-brand__main { font-weight: var(--font-weight-medium); color: #0D0D0F; }
 .auth-brand__erp  { font-weight: 300; color: #1B2A4A; margin-left: 4px; }
 .auth-copyright { font-size: 11px; color: #9ca3af; letter-spacing: 0.01em; }
-.auth-spin { animation: auth-spin 0.9s linear infinite; display: inline-block; }
-@keyframes auth-spin { to { transform: rotate(360deg); } }
+/* auth 스피너는 공용 .spin 사용 (중복 @keyframes 제거) */
 
 .auth-card {
   width: 100%;
