@@ -13,10 +13,11 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Buildings, Plus } from '@phosphor-icons/react';
+import { Buildings } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { FINANCE_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { NewButton } from '@/components/ui/page-actions';
 import { useBankTx, useCardTx } from '@/lib/firebase/transactions-store';
 import { useVendors } from '@/lib/firebase/vendors-store';
 import { useDataContext } from '@/lib/data-context';
@@ -186,9 +187,7 @@ export default function FinanceVendorPage() {
       bottomBar={
         <BottomBar
           left={
-            <button className="btn btn-primary" type="button" onClick={() => openCreate()}>
-              <Plus size={14} weight="bold" /> 거래처 등록
-            </button>
+            <NewButton label="거래처 등록" onClick={() => openCreate()} />
           }
         />
       }

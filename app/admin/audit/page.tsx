@@ -2,9 +2,10 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardText, MagnifyingGlass, ArrowsClockwise, FileXls } from '@phosphor-icons/react';
+import { ClipboardText, MagnifyingGlass, ArrowsClockwise } from '@phosphor-icons/react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomBar } from '@/components/layout/bottom-bar';
+import { ExcelButton } from '@/components/ui/page-actions';
 import { useAuditLogs } from '@/lib/firebase/audit-store';
 import { useRole } from '@/lib/use-role';
 import { exportToExcel } from '@/lib/excel-export';
@@ -279,10 +280,8 @@ export default function AuditPage() {
 
         <BottomBar
           left={
-            <button
-              className="btn"
-              type="button"
-              disabled={filtered.length === 0}
+            <ExcelButton
+              count={filtered.length}
               title={`표시된 ${filtered.length}건 엑셀 다운로드 (현재 필터 그대로)`}
               onClick={() => {
                 const periodLabel = dateFrom && dateTo ? `${dateFrom} ~ ${dateTo}`
@@ -309,9 +308,7 @@ export default function AuditPage() {
                   ],
                 });
               }}
-            >
-              <FileXls size={14} weight="bold" /> 엑셀 <span className="chip-count">{filtered.length}</span>
-            </button>
+            />
           }
           right={
             <>
