@@ -670,20 +670,21 @@ export default function MigrateSwitchplanPage() {
               </div>
               <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ fontSize: 12, color: 'var(--text-sub)', lineHeight: 1.7 }}>
-                  사업현황 채권 결제 <b>{won(recon.totals.bizPaid)}</b> vs 자금일보 실입금(차량태깅) <b>{won(recon.totals.jboTotal)}</b> · 차량 {recon.totals.plates}대(양쪽 {recon.totals.bothPlates})<br />
-                  채널: 대여료 {won(recon.totals.rent)} · CMS {won(recon.totals.cms)} · 카드 {won(recon.totals.card)} · 보증금 {won(recon.totals.deposit)} · 기타 {won(recon.totals.other)}
+                  사업현황 채권 결제 <b>{won(recon.totals.bizPaid)}</b> vs 계좌 실입금(계약별) <b>{won(recon.totals.jboTotal)}</b> · 차량 {recon.totals.plates}대(양쪽 {recon.totals.bothPlates})<br />
+                  계좌 채널: 대여료 {won(recon.totals.rent)} · 보증금 {won(recon.totals.deposit)} · 기타 {won(recon.totals.other)}
+                  {recon.hasCms && <> · <span style={{ color: 'var(--green-text)' }}>CMS성공 {won(recon.totals.cmsSuccess)}</span> · <span style={{ color: 'var(--red-text)' }}>CMS실패 {won(recon.totals.cmsFailed)}</span></>}
                 </div>
 
                 {!recon.hasCms ? (
                   <div className="notice" style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: 12, borderRadius: 'var(--radius)', lineHeight: 1.6 }}>
                     <Warning size={13} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--orange-text)' }} />
-                    은행 뭉텅이 집금 — CMS {won(recon.totals.cmsLumpBank)} · 카드 {won(recon.totals.cardLumpBank)} — 계약별로 안 붙습니다. 위 <b>「CMS 정산내역 선택」</b>으로 CMS 파일을 올리면 계약별 배분됩니다.
+                    직접 대여료는 이미 계약별로 붙어 대사됩니다. 위 <b>「CMS 정산내역 선택」</b>으로 CMS 파일을 올리면 <b>결제성공/실패(미수 신호)</b>를 계약별로 함께 봅니다. (은행 CMS뭉텅이 {won(recon.totals.cmsLumpBank)}·카드뭉텅이 {won(recon.totals.cardLumpBank)})
                   </div>
                 ) : (
                   <div className="notice" style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: 12, borderRadius: 'var(--radius)', lineHeight: 1.6 }}>
                     <CheckCircle size={13} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--green-text)' }} />
-                    CMS 정산내역 배분: 계약별 <b>{won(recon.totals.cmsAllocated)}</b> vs 은행 CMS뭉텅이 <b>{won(recon.totals.cmsLumpBank)}</b> (교차검증).
-                    <br /><span style={{ color: 'var(--orange-text)' }}>⚠ 배분합이 뭉텅이보다 큰 건 <b>효성 수수료(net 입금)·정산 시점차·일부 직접대여료 중복</b> 때문 — 정확 대사엔 이 셋 정리 필요.</span> 카드뭉텅이 {won(recon.totals.cardLumpBank)}은 별도 카드집금내역 필요.
+                    실측 결론: CMS 집금 대부분이 이미 자금일보 <b>대여료로 태깅</b>돼 있어(겹침 <b>{recon.totals.overlapCount}건</b> 이중계상 방지) — 채권↔계좌는 <b>직접대여료로 대사</b>됩니다.
+                    <br /><span style={{ color: 'var(--text-weak)' }}>CMS 결제실패(최종미납) {won(recon.totals.cmsFailed)}은 대부분 <b>재결제·직접납부로 해소</b>돼 실제 미수와 다름 — 참고 지표일 뿐, <b>실미수는 채권 carry(씨앗)가 정본</b>.</span>
                   </div>
                 )}
 
@@ -694,8 +695,9 @@ export default function MigrateSwitchplanPage() {
                         <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
                         <th style={{ textAlign: 'left', padding: '6px 8px' }}>임차인</th>
                         <th style={{ padding: '6px 8px' }}>채권 결제</th>
-                        <th style={{ padding: '6px 8px' }}>계좌 대여료</th>
+                        <th style={{ padding: '6px 8px' }}>계좌 실입금</th>
                         <th style={{ padding: '6px 8px' }}>차이</th>
+                        {recon.hasCms && <th style={{ padding: '6px 8px' }}>CMS실패</th>}
                         <th style={{ textAlign: 'left', padding: '6px 8px' }}>상태</th>
                       </tr>
                     </thead>
@@ -705,8 +707,9 @@ export default function MigrateSwitchplanPage() {
                           <td style={{ textAlign: 'left', padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{r.plate}</td>
                           <td style={{ textAlign: 'left', padding: '5px 8px', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.bizTenants || r.jboTenants || '—'}</td>
                           <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{won(r.bizPaid)}</td>
-                          <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{won(r.rent + r.cms + r.card)}</td>
+                          <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{won(r.jboTotal)}</td>
                           <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums', color: Math.abs(r.diff) > 300000 ? 'var(--orange-text)' : 'var(--text-weak)' }}>{won(r.diff)}</td>
+                          {recon.hasCms && <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums', color: r.cmsFailed > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>{r.cmsFailed > 0 ? won(r.cmsFailed) : '—'}</td>}
                           <td style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, color: r.status === '일치' ? 'var(--green-text)' : 'var(--orange-text)' }}>{r.status}</td>
                         </tr>
                       ))}
@@ -714,7 +717,7 @@ export default function MigrateSwitchplanPage() {
                   </table>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
-                  「일치」 = 직접 대여료가 계약별로 맞음 · 「채권&gt;계좌」 = 나머지가 CMS/카드 집금(위 뭉텅이)에서 온 것 · 「채권만」 = 이 기간 자금일보에 입금 없음(종료·선납 등)
+                  「일치」 = 채권 결제 ≈ 계좌 실입금 · 「채권&gt;계좌」 = 월경계 시점차·보증금/정산 혼입·카드뭉텅이 등(대부분 노이즈) · 「채권만」 = 이 기간 계좌 입금 없음(종료·선납·연체) · CMS실패 열 = 참고(재결제·직접납부로 대부분 해소, 미수 아님)
                 </div>
               </div>
             </section>

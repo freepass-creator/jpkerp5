@@ -63,16 +63,18 @@ describe('switchplan recon + CMS', () => {
     expect(r.hasCms).toBe(false);
     const row22 = r.rows.find((x) => x.plate === '22나2222')!;
     expect(row22.status).toBe('채권만');       // 계좌 직접입금 없음(뭉텅이라 미귀속)
-    expect(row22.cms).toBe(0);
+    expect(row22.cmsSuccess).toBe(0);
   });
 
-  it('CMS 배분 — 22나2222 뭉텅이가 계약에 붙어 일치', () => {
+  it('CMS 배분 — CMS-only(22나2222)는 jboTotal 반영해 일치', () => {
     const r = reconcileSwitchplan(biz, jbo, cms);
     expect(r.hasCms).toBe(true);
-    expect(r.totals.cmsAllocated).toBe(300000);
-    expect(r.totals.cmsLumpBank).toBe(300000); // 교차검증: 배분 = 뭉텅이
+    expect(r.totals.cmsSuccess).toBe(300000);
+    expect(r.totals.cmsFailed).toBe(500000);   // 99하9999 결제실패
+    expect(r.totals.cmsLumpBank).toBe(300000); // 은행 CMS뭉텅이(교차검증)
     const row22 = r.rows.find((x) => x.plate === '22나2222')!;
-    expect(row22.cms).toBe(300000);
+    expect(row22.cmsSuccess).toBe(300000);
+    expect(row22.cmsInTotal).toBe(300000);     // 직접대여료 없어 CMS가 jboTotal에 반영
     expect(row22.status).toBe('일치');
   });
 
