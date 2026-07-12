@@ -12,6 +12,7 @@ import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehi
 import { parseSwitchplanJbo, type JboParseResult } from '@/lib/migrate/switchplan-jbo';
 import { parseSwitchplanCms, type CmsParseResult } from '@/lib/migrate/switchplan-cms';
 import { reconcileSwitchplan } from '@/lib/migrate/switchplan-recon';
+import { verifyMisuVsCms } from '@/lib/migrate/switchplan-verify';
 import { validateSnapshotRow, applySnapshotToContract } from '@/lib/import-commit';
 import { assignContractNos } from '@/lib/code-scheme';
 import { upsertVehicleFromContract } from '@/lib/entity-sync';
@@ -128,6 +129,12 @@ export default function MigrateSwitchplanPage() {
   const recon = useMemo(
     () => (res && jboRes ? reconcileSwitchplan(res, jboRes, cmsRes ?? undefined) : null),
     [res, jboRes, cmsRes],
+  );
+
+  // 현재 미수 검증 (사업현황 + CMS 있을 때) — CMS로 채권 미수 오류 적발
+  const misuVerify = useMemo(
+    () => (res && cmsRes ? verifyMisuVsCms(res, cmsRes, res.asOf, 6) : null),
+    [res, cmsRes],
   );
 
   async function commitSeeds() {
@@ -718,6 +725,62 @@ export default function MigrateSwitchplanPage() {
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
                   「일치」 = 채권 결제 ≈ 계좌 실입금 · 「채권&gt;계좌」 = 월경계 시점차·보증금/정산 혼입·카드뭉텅이 등(대부분 노이즈) · 「채권만」 = 이 기간 계좌 입금 없음(종료·선납·연체) · CMS실패 열 = 참고(재결제·직접납부로 대부분 해소, 미수 아님)
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 현재 미수 검증 (채권 ↔ CMS) */}
+          {misuVerify && (
+            <section className="detail-section">
+              <div className="detail-section-header">
+                <CheckCircle size={13} weight="duotone" style={{ color: misuVerify.summary.falseMisuCount > 0 ? 'var(--orange-text)' : 'var(--green-text)' }} />
+                <span className="title">9. 현재 미수 검증 (채권 ↔ CMS) · {misuVerify.window.from}~{misuVerify.window.to} · {misuVerify.summary.checked}계약 검증</span>
+              </div>
+              <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {misuVerify.summary.falseMisuCount === 0 ? (
+                  <div className="notice" style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: 12, borderRadius: 'var(--radius)', lineHeight: 1.6 }}>
+                    <CheckCircle size={13} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--green-text)' }} />
+                    <b>✓ 허수 미수 오류 0건</b> — CMS가 걷은 건 채권에 모두 반영돼 있습니다(돈 받았는데 미수로 남긴 게 없음). <b>직원 미수 정리가 CMS와 일치.</b>
+                    <br /><span style={{ color: 'var(--text-weak)' }}>참고: CMS 최종 미수납인데 채권 미수 적은 「누락참고」 {misuVerify.summary.missingRefCount}건 — 대부분 직접납부로 해소된 것(오탐), 아래 참고.</span>
+                  </div>
+                ) : (
+                  <div className="notice notice--error" style={{ fontSize: 12, lineHeight: 1.6 }}>
+                    <Warning size={13} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                    <b>⚠ 허수 미수 의심 {misuVerify.summary.falseMisuCount}건 · {won(misuVerify.summary.falseMisuAmount)}</b> — CMS가 걷었는데 채권엔 미납으로 남음(수납 기록 누락). 아래 계약 확인 필요.
+                  </div>
+                )}
+
+                {(misuVerify.summary.falseMisuCount > 0 || misuVerify.summary.missingRefCount > 0) && (
+                  <div style={{ maxHeight: 320, overflow: 'auto' }}>
+                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                        <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
+                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>임차인</th>
+                          <th style={{ padding: '6px 8px' }}>채권 미수</th>
+                          <th style={{ padding: '6px 8px' }}>허수(CMS걷힘)</th>
+                          <th style={{ padding: '6px 8px' }}>CMS최종미납</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>판정</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {misuVerify.rows.filter((r) => r.verdict === '허수의심' || r.verdict === '누락참고').slice(0, 60).map((r, i) => (
+                          <tr key={`${r.plate}-mv${i}`} style={{ textAlign: 'right', borderBottom: '1px solid var(--border-weak)', background: r.verdict === '허수의심' ? 'var(--bg-sunken)' : undefined }}>
+                            <td style={{ textAlign: 'left', padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{r.plate}</td>
+                            <td style={{ textAlign: 'left', padding: '5px 8px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.tenant}</td>
+                            <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums' }}>{won(r.staffMisu)}</td>
+                            <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums', color: r.falseMisu > 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>{r.falseMisu > 0 ? won(r.falseMisu) : '—'}</td>
+                            <td style={{ padding: '5px 8px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-weak)' }}>{r.cmsFinalUnpaid > 0 ? won(r.cmsFinalUnpaid) : '—'}</td>
+                            <td style={{ textAlign: 'left', padding: '5px 8px', fontSize: 10, color: r.verdict === '허수의심' ? 'var(--red-text)' : 'var(--text-weak)' }}>{r.verdict}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
+                  「허수의심」 = 그 달 CMS가 실제 걷혔는데 채권은 미납 → <b>직원이 미수 잘못 잡음(고쳐야 함)</b> · 「누락참고」 = CMS 최종 미수납인데 채권 미수 적음 → 직접납부면 정상(오탐 많음, 참고만)
                 </div>
               </div>
             </section>
