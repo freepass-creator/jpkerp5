@@ -12,7 +12,7 @@
  */
 
 import { useState, useMemo, useRef } from 'react';
-import { fileToDataUrl } from '@/lib/image-compress';
+import { callOcrExtract } from '@/lib/ocr-client';
 import { useRouter } from 'next/navigation';
 import {
   MagnifyingGlass, IdentificationCard, Camera,
@@ -68,17 +68,9 @@ export default function MobileLicenseVerify() {
     setBusy('ocr');
     setOcr(null); setVerify(null);
     try {
-      // FileReader 기반(스택오버플로 없음). 기존 btoa(String.fromCharCode(...spread))는
-      // 수 MB 실기기 사진에서 바이트를 함수인자로 펼쳐 'Maximum call stack size exceeded'로 터졌음.
-      const b64 = (await fileToDataUrl(file)).split(',')[1] ?? '';
-      const res = await fetch('/api/ocr/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'license', imageBase64: b64, mimeType: file.type }),
-      });
-      if (!res.ok) throw new Error(`OCR ${res.status}`);
-      const data = await res.json();
-      const result: OcrResult = data?.fields ?? data ?? {};
+      // 공용 OCR 헬퍼(멀티파트 + Bearer + json.extracted 규격) — 손롤 JSON 포크 제거(구 규격은 401/400로 죽어있었음)
+      const { raw } = await callOcrExtract(file, 'license');
+      const result = raw as OcrResult;
       setOcr(result);
 
       if (result.license_no) {

@@ -2,9 +2,9 @@
 
 import { useRef, useState } from 'react';
 import { runWithConcurrency } from './parallel';
-import { getFirebaseAuth } from './firebase/client';
 import type { OcrOriginal } from './types';
-import { crosscheckOcr, type CrosscheckResult } from './ocr-crosscheck';
+import type { CrosscheckResult } from './ocr-crosscheck';
+import { callOcrExtract } from './ocr-client';
 
 /**
  * 도메인 무관 OCR 배치 훅 — 자산·과태료·회사 등 공통 사용.
@@ -105,34 +105,17 @@ export function useOcrBatch<W extends OcrBatchItem>(opts: Options<W>) {
             try { toSend = await O.preconvertPdfToImage(file); }
             catch { /* 변환 실패 시 원본 PDF 그대로 fallback */ }
           }
-          const fd = new FormData();
-          fd.append('file', toSend);
-          fd.append('type', O.docType);
-          const auth = getFirebaseAuth();
-          const user = auth?.currentUser;
-          if (!user) {
-            // 직원이 헤매지 않도록 명확한 안내 — 401 거부 메시지 대신
-            throw new Error('로그인이 필요합니다. 우측 상단에서 로그인 후 다시 시도하세요.');
-          }
-          const idToken = await user.getIdToken();
-          const res = await fetch('/api/ocr/extract', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${idToken}` },
-            body: fd,
-          });
-          const json = await res.json();
-          if (!json.ok) throw new Error(json.error || 'OCR 실패');
-          const raw = json.extracted as Record<string, unknown>;
+          // 단일 OCR 헬퍼 경유 (규격·원본보존·검산 SSOT)
+          const { raw, ocrOriginal, crosscheck } = await callOcrExtract(toSend, O.docType);
           setItems((prev) => prev.map((it) => {
             if (it.id !== id) return it;
             const applied = optsRef.current.applyResult(it, raw, prev);
-            // OCR 원본 영구보존(#feedback_ocr_preserve_original + v6 _ocrOriginal 정합) — 파싱 JSON 그대로 스냅샷.
-            // applyResult 가 이미 세팅했으면 존중, 아니면 공통 부착.
+            // OCR 원본 영구보존 + 검산 — applyResult 가 이미 세팅했으면 존중, 아니면 공통 부착.
             return {
               ...applied,
               _status: 'done' as const,
-              _ocrOriginal: applied._ocrOriginal ?? { raw, at: new Date().toISOString(), source: O.docType },
-              _crosscheck: applied._crosscheck ?? crosscheckOcr(O.docType, raw),
+              _ocrOriginal: applied._ocrOriginal ?? ocrOriginal,
+              _crosscheck: applied._crosscheck ?? crosscheck,
             };
           }));
         } catch (err) {

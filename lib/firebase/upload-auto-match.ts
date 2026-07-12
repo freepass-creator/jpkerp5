@@ -16,6 +16,7 @@
 
 import type { Contract, Vehicle } from '../types';
 import { match as intakeMatch } from '@/lib/intake/match';
+import { callOcrExtract } from '@/lib/ocr-client';
 
 export type AutoMatchResult = {
   contractId: string;
@@ -87,17 +88,11 @@ export async function extractOcrHints(
   const ocrKind = kindMap[subCategory];
   if (!ocrKind) return null;
 
-  // base64 부분만 추출
-  const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
   try {
-    const res = await fetch('/api/ocr/extract', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: ocrKind, imageBase64: base64, mimeType }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const fields = data?.fields ?? data ?? {};
+    // 공용 OCR 헬퍼(멀티파트 + Bearer + json.extracted) 경유 — 구 JSON+무인증 포크 제거(항상 실패해 힌트가 죽어있었음)
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], `hint.${mimeType.split('/')[1] || 'bin'}`, { type: mimeType });
+    const { raw: fields } = await callOcrExtract(file, ocrKind);
 
     const plate = fields.plate ?? fields.vehicle_plate ?? fields.car_number;
     const licenseNo = fields.license_no;
