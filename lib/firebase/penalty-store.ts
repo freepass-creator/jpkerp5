@@ -24,7 +24,8 @@ function penaltyTransform(val: unknown): Penalty[] {
     .filter((p) => !p.deletedAt)
     .map((p): Penalty => ({
       id: p.id,
-      docType: (p.doc_type || '기타') as PenaltyDocType,
+      // 허용값 화이트리스트 — 모델이 리스트 밖 값(과속·불법주정차 등) 반환해도 '기타'로 폴백(무검증 캐스팅 방지)
+      docType: (['과태료', '통행료', '속도위반', '주정차위반', '신호위반', '범칙금', '기타'].includes(p.doc_type as string) ? p.doc_type : '기타') as PenaltyDocType,
       noticeNo: p.notice_no ?? '',
       issuer: p.issuer ?? '',
       issueDate: p.issue_date ?? '',

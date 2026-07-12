@@ -113,13 +113,15 @@ export function crosscheckPenalty(raw: Record<string, unknown>): CrosscheckResul
   if (amount == null || amount <= 0) {
     issues.push({ field: 'amount', message: '부과금액을 못 읽음(0/공란) — 금액 확인 요망', severity: 'error' });
   } else {
-    // 세부금액이 있으면(track D) 합계 검산
-    const parts = [num(raw.penalty_amount), num(raw.fine_amount), num(raw.surcharge_amount), num(raw.toll_amount)]
-      .filter((x): x is number => x != null && x > 0);
-    if (parts.length >= 2) {
-      const sum = parts.reduce((a, b) => a + b, 0);
-      if (Math.abs(sum - amount) > 1) {
-        issues.push({ field: 'amount', message: `세부금액 합(${WON(sum)})과 부과금액(${WON(amount)}) 불일치 — 금액 오독 의심`, severity: 'warn' });
+    // 세부금액 검산 — 본세는 상호배타(과태료 OR 범칙금 OR 통행료 중 하나) + 가산금.
+    // 셋을 다 합치면 안 됨(상시 오검). 부과액 = 본세 + 가산금.
+    const main = [num(raw.penalty_amount), num(raw.fine_amount), num(raw.toll_amount)]
+      .find((x): x is number => x != null && x > 0);
+    const surcharge = num(raw.surcharge_amount) ?? 0;
+    if (main != null) {
+      const expected = main + surcharge;
+      if (Math.abs(expected - amount) > 1) {
+        issues.push({ field: 'amount', message: `본세+가산금(${WON(expected)})과 부과금액(${WON(amount)}) 불일치 — 금액 오독 의심`, severity: 'warn' });
       }
     }
   }
