@@ -1,11 +1,13 @@
 /**
  * 시뮬 — 채권 ↔ 계좌·CMS 대사.
- * 핵심: 직접 대여료(차량태깅)는 계약별 매칭, CMS집금은 라벨 있으면 채널집계·없으면 미귀속(뭉텅이).
+ * 모델: 직접채널(대여료 등, 차량태깅)은 계약별 귀속. CMS집금·카드집금은 은행에 뭉텅이 →
+ * CMS 정산내역(회원명에 차량번호)으로만 계약별 배분.
  */
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx-js-style';
 import { parseSwitchplanWorkbook } from '@/lib/migrate/switchplan';
 import { parseSwitchplanJbo } from '@/lib/migrate/switchplan-jbo';
+import { parseSwitchplanCms } from '@/lib/migrate/switchplan-cms';
 import { reconcileSwitchplan } from '@/lib/migrate/switchplan-recon';
 
 function bizBuf(): ArrayBuffer {
@@ -23,45 +25,62 @@ function jboBuf(): ArrayBuffer {
   const h = ['거래월', '거래일', '거래일시', '적요', '입금액', '출금액', '내용', '잔액', '거래점', '계정과목', '차량번호', '임차인', '세부차종', '비고', '구분'];
   const op = [
     ['▶영업'], h,
-    ['1', '10', '2026.01.10 10:00:00', '이체', 500000, 0, '김철수', 500000, '', '대여료', '11가1111', '김철수', '아반떼', '', ''],
-    ['2', '15', '2026.02.15 10:00:00', 'CMS', 500000, 0, '집금', 0, '', 'CMS집금', '', '', '', '', ''],       // 라벨없음
-    ['1', '5', '2026.01.05 09:00:00', 'CMS', 300000, 0, '집금', 0, '', 'CMS집금', '22나2222', '박영수', 'K5', '', ''], // 라벨있음
+    ['1', '10', '2026.01.10 10:00:00', '이체', 500000, 0, '김철수', 500000, '', '대여료', '11가1111', '김철수', '아반떼', '', ''],   // 직접 대여료
+    ['1', '15', '2026.01.15 10:00:00', 'CMS', 300000, 0, '집금', 0, '', 'CMS집금', '', '', '', '', ''],                          // CMS 뭉텅이(라벨없음)
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(op), '영업계좌(신한6616)');
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
 }
 
-describe('switchplan recon', () => {
+function cmsBuf(): ArrayBuffer {
+  const h = ['NO.', '회원번호', '회원명', '청구월', '결제상태', '결제수단', '정산일', '결제일', '수납금액', '미납금액', '부가세', '비고'];
+  const rows = [
+    h,
+    [1, '000', '22나2222 박영수', '2026/01', '완납', 'CMS', '2026-01-15', '2026-01-15', 300000, 0, 30000, ''],
+    [2, '001', '99하9999 실패맨', '2026/01', '결제실패', 'CMS', '2026-01-15', '2026-01-15', 0, 500000, 0, '잔액부족'],
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Sheet1');
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+}
+
+describe('switchplan recon + CMS', () => {
   const biz = parseSwitchplanWorkbook(bizBuf(), '2026-07-11');
   const jbo = parseSwitchplanJbo(jboBuf());
-  const r = reconcileSwitchplan(biz, jbo);
+  const cms = parseSwitchplanCms(cmsBuf());
 
-  it('기간 = 자금일보 커버 기간', () => {
-    expect(r.period.from).toBe('2026-01');
-    expect(r.period.to).toBe('2026-02');
+  it('CMS 파서 — 성공/실패 + 차량태깅', () => {
+    expect(cms.totals.count).toBe(2);
+    expect(cms.totals.withPlate).toBe(2);
+    expect(cms.totals.collected).toBe(300000);
+    expect(cms.totals.failCount).toBe(1);
   });
 
-  it('라벨없는 CMS집금은 미귀속(뭉텅이)', () => {
-    expect(r.unmatchedReceiptNoPlate).toBe(500000);
-    expect(r.totals.cms).toBe(300000); // 라벨있는 것만 채널집계
-    expect(r.totals.rent).toBe(500000);
+  it('CMS 없이 — CMS집금은 뭉텅이(계좌), 22나2222는 채권만', () => {
+    const r = reconcileSwitchplan(biz, jbo);
+    expect(r.totals.cmsLumpBank).toBe(300000);
+    expect(r.hasCms).toBe(false);
+    const row22 = r.rows.find((x) => x.plate === '22나2222')!;
+    expect(row22.status).toBe('채권만');       // 계좌 직접입금 없음(뭉텅이라 미귀속)
+    expect(row22.cms).toBe(0);
   });
 
-  it('직접 대여료 계약: 채권>계좌 (나머지는 CMS 뭉텅이)', () => {
-    const row = r.rows.find((x) => x.plate === '11가1111')!;
-    expect(row.bizPaid).toBe(1000000);   // 1·2월 결제
-    expect(row.rent).toBe(500000);       // 직접 대여료만 태깅
-    expect(row.jboTotal).toBe(500000);
-    expect(row.diff).toBe(500000);
-    expect(row.status).toBe('채권>계좌');
+  it('CMS 배분 — 22나2222 뭉텅이가 계약에 붙어 일치', () => {
+    const r = reconcileSwitchplan(biz, jbo, cms);
+    expect(r.hasCms).toBe(true);
+    expect(r.totals.cmsAllocated).toBe(300000);
+    expect(r.totals.cmsLumpBank).toBe(300000); // 교차검증: 배분 = 뭉텅이
+    const row22 = r.rows.find((x) => x.plate === '22나2222')!;
+    expect(row22.cms).toBe(300000);
+    expect(row22.status).toBe('일치');
   });
 
-  it('라벨있는 CMS 계약: 일치', () => {
-    const row = r.rows.find((x) => x.plate === '22나2222')!;
-    expect(row.bizPaid).toBe(300000);
-    expect(row.cms).toBe(300000);
-    expect(row.diff).toBe(0);
-    expect(row.status).toBe('일치');
+  it('직접 대여료 계약(11가1111)은 CMS 무관하게 매칭', () => {
+    const r = reconcileSwitchplan(biz, jbo, cms);
+    const row11 = r.rows.find((x) => x.plate === '11가1111')!;
+    expect(row11.rent).toBe(500000);
+    expect(row11.bizPaid).toBe(500000); // 기간=자금일보 커버(1월)만
+    expect(row11.status).toBe('일치');
   });
 });

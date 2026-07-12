@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields, buildLoanFields, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
 import { parseSwitchplanJbo, type JboParseResult } from '@/lib/migrate/switchplan-jbo';
+import { parseSwitchplanCms, type CmsParseResult } from '@/lib/migrate/switchplan-cms';
 import { reconcileSwitchplan } from '@/lib/migrate/switchplan-recon';
 import { validateSnapshotRow, applySnapshotToContract } from '@/lib/import-commit';
 import { assignContractNos } from '@/lib/code-scheme';
@@ -38,6 +39,8 @@ export default function MigrateSwitchplanPage() {
   const [res, setRes] = useState<SwitchplanParseResult | null>(null);
   const [jboRes, setJboRes] = useState<JboParseResult | null>(null);
   const [jboFileName, setJboFileName] = useState('');
+  const [cmsRes, setCmsRes] = useState<CmsParseResult | null>(null);
+  const [cmsFileName, setCmsFileName] = useState('');
   const [companyKey, setCompanyKey] = useState('스위치플랜');
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -101,8 +104,31 @@ export default function MigrateSwitchplanPage() {
     [res],
   );
 
-  // 채권 ↔ 계좌+CMS 대사 (사업현황 + 자금일보 둘 다 있을 때)
-  const recon = useMemo(() => (res && jboRes ? reconcileSwitchplan(res, jboRes) : null), [res, jboRes]);
+  async function onCmsFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setCmsRes(null);
+    try {
+      const parsed = parseSwitchplanCms(await file.arrayBuffer());
+      setCmsFileName(file.name);
+      setCmsRes(parsed);
+      append(`CMS 정산내역 파싱 — ${parsed.totals.count}건 · 차량태깅 ${parsed.totals.withPlate} · 성공수납 ${won(parsed.totals.collected)}`);
+      toast.success(`CMS ${parsed.totals.count}건 파싱`);
+    } catch (err) {
+      append(`✗ CMS 파싱 실패: ${friendlyError(err)}`);
+      toast.error(friendlyError(err));
+    } finally {
+      setBusy(false);
+      e.target.value = '';
+    }
+  }
+
+  // 채권 ↔ 계좌+CMS 대사 (사업현황 + 자금일보 둘 다 있을 때, CMS 있으면 계약별 배분)
+  const recon = useMemo(
+    () => (res && jboRes ? reconcileSwitchplan(res, jboRes, cmsRes ?? undefined) : null),
+    [res, jboRes, cmsRes],
+  );
 
   async function commitSeeds() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
@@ -572,6 +598,11 @@ export default function MigrateSwitchplanPage() {
                   <input type="file" accept=".xlsx,.xls" hidden disabled={busy} onChange={onJboFile} />
                 </label>
                 {jboFileName && <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>{jboFileName}</span>}
+                <label className="btn" style={{ height: 36, fontSize: 12, cursor: busy ? 'default' : 'pointer', marginLeft: 8 }}>
+                  <FileXls weight="bold" size={14} /> CMS 정산내역 선택
+                  <input type="file" accept=".xlsx,.xls" hidden disabled={busy} onChange={onCmsFile} />
+                </label>
+                {cmsFileName && <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>{cmsFileName} · 성공 {won(cmsRes?.totals.collected ?? 0)}</span>}
               </div>
 
               {jboRes && (
@@ -643,10 +674,18 @@ export default function MigrateSwitchplanPage() {
                   채널: 대여료 {won(recon.totals.rent)} · CMS {won(recon.totals.cms)} · 카드 {won(recon.totals.card)} · 보증금 {won(recon.totals.deposit)} · 기타 {won(recon.totals.other)}
                 </div>
 
-                <div className="notice" style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: 12, borderRadius: 'var(--radius)', lineHeight: 1.6 }}>
-                  <Warning size={13} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--orange-text)' }} />
-                  <b>차량번호 없이 뭉텅이로 들어온 수납성 입금 {won(recon.unmatchedReceiptNoPlate)}</b> (CMS집금·카드집금 등) — 은행엔 집금 합계로만 찍혀 계약별로 안 붙습니다. 이게 아래 「채권&gt;계좌」 차이의 정체입니다. <b>계약별 완전 대사 = CMS/카드 정산내역서</b>가 있어야 배분됩니다.
-                </div>
+                {!recon.hasCms ? (
+                  <div className="notice" style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: 12, borderRadius: 'var(--radius)', lineHeight: 1.6 }}>
+                    <Warning size={13} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--orange-text)' }} />
+                    은행 뭉텅이 집금 — CMS {won(recon.totals.cmsLumpBank)} · 카드 {won(recon.totals.cardLumpBank)} — 계약별로 안 붙습니다. 위 <b>「CMS 정산내역 선택」</b>으로 CMS 파일을 올리면 계약별 배분됩니다.
+                  </div>
+                ) : (
+                  <div className="notice" style={{ fontSize: 12, background: 'var(--bg-sunken)', padding: 12, borderRadius: 'var(--radius)', lineHeight: 1.6 }}>
+                    <CheckCircle size={13} weight="fill" style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--green-text)' }} />
+                    CMS 정산내역 배분: 계약별 <b>{won(recon.totals.cmsAllocated)}</b> vs 은행 CMS뭉텅이 <b>{won(recon.totals.cmsLumpBank)}</b> (교차검증).
+                    <br /><span style={{ color: 'var(--orange-text)' }}>⚠ 배분합이 뭉텅이보다 큰 건 <b>효성 수수료(net 입금)·정산 시점차·일부 직접대여료 중복</b> 때문 — 정확 대사엔 이 셋 정리 필요.</span> 카드뭉텅이 {won(recon.totals.cardLumpBank)}은 별도 카드집금내역 필요.
+                  </div>
+                )}
 
                 <div style={{ maxHeight: 380, overflow: 'auto' }}>
                   <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
