@@ -30,16 +30,25 @@ export function detectDuplicateManualPayment(
 ): { found: boolean; matchSeq?: number; matchDate?: string } {
   const txTime = new Date(txDate).getTime();
   if (!Number.isFinite(txTime) || amount <= 0) return { found: false };
+  const WINDOW = 3 * 86400_000;
+  // 분할 입금(선납 rollover: 1,000,000 → 500k+500k 두 회차) 대응 — 창 내 수동/현금 entry 합산도 비교.
+  // 단건 정확 일치는 즉시 반환(기존 동작), 아니면 창 합계가 tx 금액과 같으면 중복 경고.
+  let windowSum = 0;
+  let firstSeq: number | undefined;
+  let firstDate: string | undefined;
   for (const s of contract.schedules ?? []) {
     for (const p of s.payments ?? []) {
-      if (p.amount !== amount) continue;
       if (p.source !== '수동' && p.source !== '현금') continue;
       const pTime = new Date(p.date).getTime();
       if (!Number.isFinite(pTime)) continue;
-      if (Math.abs(pTime - txTime) <= 3 * 86400_000) {
-        return { found: true, matchSeq: s.seq, matchDate: p.date };
-      }
+      if (Math.abs(pTime - txTime) > WINDOW) continue;
+      if (p.amount === amount) return { found: true, matchSeq: s.seq, matchDate: p.date };
+      windowSum += p.amount;
+      if (firstSeq === undefined) { firstSeq = s.seq; firstDate = p.date; }
     }
+  }
+  if (windowSum === amount && firstSeq !== undefined) {
+    return { found: true, matchSeq: firstSeq, matchDate: firstDate };
   }
   return { found: false };
 }

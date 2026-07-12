@@ -16,7 +16,7 @@
  */
 
 import type { BankTransaction, CardTransaction, Contract, PaymentEntry, PaymentScheduleInline } from './types';
-import { applyPayment, totalUnpaid, totalUnpaidCount, computeCurrentSeq, addPaymentEntry, distributeEntry } from './payment-schedule';
+import { applyPayment, totalUnpaid, totalUnpaidCount, computeCurrentSeq, addPaymentEntry, distributeEntry, recalcSchedule, effectiveAmount } from './payment-schedule';
 
 /** 이름 정규화 — 공백 제거, 소문자. (입금자명·계약자명 매칭 SSOT) */
 export function normName(s: string): string {
@@ -99,9 +99,13 @@ export function buildMatchIndex(contracts: Contract[]): MatchIndex {
       // 완료·면제 회차는 매칭 대상 제외 — 면제(반납후 미도래 등)에 입금이 흡수되면
       // 미수 차감 없이 증발함.
       if (s.status === '완료' || s.status === '면제') continue;
+      // 청구할인 반영한 실청구(effectiveAmount)도 색인 — 할인 회차의 실제 납부액으로도 자동매칭되게.
+      const eff = effectiveAmount(s);
       const remaining = s.status === '부분납' ? (s.amount - s.paidAmount) : s.amount;
-      const amounts = new Set<number>([s.amount]);
-      if (remaining !== s.amount && remaining > 0) amounts.add(remaining);
+      const effRemaining = s.status === '부분납' ? (eff - s.paidAmount) : eff;
+      const amounts = new Set<number>([s.amount, eff]);
+      if (remaining > 0) amounts.add(remaining);
+      if (effRemaining > 0) amounts.add(effRemaining);
       for (const a of amounts) {
         const arr = byAmount.get(a);
         if (arr) arr.push({ c, s });
@@ -129,8 +133,10 @@ function findCandidatesIndexed(
       const exact: MatchCandidate[] = [];
       for (const s of c.schedules ?? []) {
         if (s.status === '완료' || s.status === '면제') continue;
+        const eff = effectiveAmount(s);
         const remaining = s.status === '부분납' ? (s.amount - s.paidAmount) : s.amount;
-        const amtMatch = s.amount === txAmount || remaining === txAmount;
+        const effRemaining = s.status === '부분납' ? (eff - s.paidAmount) : eff;
+        const amtMatch = s.amount === txAmount || remaining === txAmount || eff === txAmount || effRemaining === txAmount;
         exact.push({
           contract: c, scheduleSeq: s.seq, scheduleAmount: s.amount, scheduleDueDate: s.dueDate,
           confidence: amtMatch ? 'high' : 'medium', // 계약은 확정, 회차는 금액 일치 시 high
@@ -305,19 +311,12 @@ export function reverseMatch(
   txPatch: Partial<BankTransaction>;
   contractPatch: Partial<Contract> & { schedules: PaymentScheduleInline[] };
 } {
-  // tx.id로 연결된 모든 payment entry 제거 (분할매칭도 포함)
+  // tx.id로 연결된 모든 payment entry 제거 (분할매칭도 포함).
+  // 상태 재계산은 엔진 recalcSchedule(effectiveAmount=amount-할인 기준) 재사용 — 할인 회차 허위 '부분납' 방지.
   const schedules = (contract.schedules ?? []).map((s) => {
     const filtered = (s.payments ?? []).filter((p) => p.txId !== tx.id);
     if (filtered.length === (s.payments ?? []).length) return { ...s };
-    const paid = filtered.reduce((sum, p) => sum + p.amount, 0);
-    const lastDate = filtered.reduce<string>((mx, p) => p.date > mx ? p.date : mx, '');
-    let status = s.status;
-    if (s.status !== '면제') {
-      if (paid >= s.amount) status = '완료';
-      else if (paid > 0) status = '부분납';
-      else status = s.dueDate < today ? '연체' : '예정';
-    }
-    return { ...s, payments: filtered, paidAmount: paid, paidAt: lastDate || undefined, status };
+    return recalcSchedule({ ...s, payments: filtered }, today);
   });
 
   return {
@@ -471,15 +470,7 @@ export function reverseCardMatch(
   const schedules = (contract.schedules ?? []).map((s) => {
     const filtered = (s.payments ?? []).filter((p) => p.cardTxId !== tx.id);
     if (filtered.length === (s.payments ?? []).length) return { ...s };
-    const paid = filtered.reduce((sum, p) => sum + p.amount, 0);
-    const lastDate = filtered.reduce<string>((mx, p) => p.date > mx ? p.date : mx, '');
-    let status = s.status;
-    if (s.status !== '면제') {
-      if (paid >= s.amount) status = '완료';
-      else if (paid > 0) status = '부분납';
-      else status = s.dueDate < today ? '연체' : '예정';
-    }
-    return { ...s, payments: filtered, paidAmount: paid, paidAt: lastDate || undefined, status };
+    return recalcSchedule({ ...s, payments: filtered }, today);
   });
   return {
     txPatch: {
