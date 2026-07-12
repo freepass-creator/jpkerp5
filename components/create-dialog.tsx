@@ -118,6 +118,15 @@ export function CreateDialog({
   const { companies } = useCompanies();
   const { user } = useAuth();
 
+  // 계좌 업로드 — 어느 계좌 거래인지 태깅용 (은행 파일은 계좌번호가 헤더에만 있어 행 파싱으론 유실됨).
+  const [payAccountKey, setPayAccountKey] = useState('');
+  const payAccountOpts = useMemo(() => companies.flatMap((co) => (co.accounts ?? []).map((a) => ({
+    key: `${co.id}::${a.accountNo}`,
+    label: `${co.name} · ${a.bankName} ${a.nickname?.trim() || a.accountNo}`,
+    accountNo: a.accountNo,
+    companyCode: co.code || co.name,
+  }))), [companies]);
+
   /**
    * Phase 2.2 — 엑셀 배치 commit 을 intake 에 평행 기록.
    *
@@ -276,6 +285,12 @@ export function CreateDialog({
   }
 
   async function commitPaymentFiles() {
+    // 계좌 업로드는 어느 계좌인지 필수 — 미선택 시 영업/운영 구분·sweep·계정과목이 흔들림
+    const selAcct = payAccountOpts.find((o) => o.key === payAccountKey);
+    if (mode === '입출금' && payAccountOpts.length > 0 && !selAcct) {
+      toast.error('업로드할 계좌를 먼저 선택하세요 — 어느 계좌 거래인지 구분이 필요합니다.');
+      return;
+    }
     setBusy(true);
     const paymentKind: IntakeKind =
       mode === '자동이체' ? 'auto-debit'
@@ -303,6 +318,14 @@ export function CreateDialog({
       let bankParsed = bankParseAll.filter((x): x is NonNullable<typeof x> => !!x);
       if (isAutopay) {
         bankParsed = bankParsed.map((b) => ({ ...b, source: 'CMS' as const, method: b.method || 'CMS' }));
+      }
+      // 선택 계좌로 태깅 — 파일에 계좌번호가 없어도 어느 계좌 거래인지 확정(enrich/dedup/대사 전부 계좌 인지)
+      if (selAcct) {
+        bankParsed = bankParsed.map((b) => ({
+          ...b,
+          account: b.account || selAcct.accountNo,
+          companyCode: b.companyCode || selAcct.companyCode,
+        }));
       }
       const cardParseAll = cardRows.map((x) => parseCardTxRow(x.row, x.file, cardVariantHint));
       const cardParseFail = cardParseAll.filter((x) => x === null).length;
@@ -798,6 +821,16 @@ export function CreateDialog({
                 />
               </Tabs.Content>
               <Tabs.Content value="입출금">
+                {payAccountOpts.length > 0 && (
+                  <div style={{ padding: '8px 4px 4px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, flexWrap: 'wrap' }}>
+                    <span style={{ color: 'var(--text-weak)', fontWeight: 600 }}>엑셀 업로드 계좌 *</span>
+                    <select className="input" value={payAccountKey} onChange={(e) => setPayAccountKey(e.target.value)} style={{ maxWidth: 340 }}>
+                      <option value="">— 어느 계좌의 거래인지 선택 (필수) —</option>
+                      {payAccountOpts.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                    </select>
+                    <span style={{ color: 'var(--text-weak)', fontSize: 11 }}>업로드 파일 전체가 이 계좌 거래로 태깅됩니다</span>
+                  </div>
+                )}
                 <PaymentRegisterPane
                   files={paymentFiles}
                   drag={drag}
