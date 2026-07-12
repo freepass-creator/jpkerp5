@@ -336,8 +336,8 @@ export function computeContractAsOf<T extends Contract>(c: T, asOf: string): T {
   return recalcContract({ ...c, schedules, returnedDate }, asOf);
 }
 
-/** YYYY-MM-DD + n개월 → 같은 day-of-month 의 다음 달 (월말 보정) */
-function addMonths(iso: string, months: number, day: number): string {
+/** YYYY-MM-DD + n개월 → 지정 day-of-month 의 다음 달 (월말 clamp, 타임존 안전). 회차 dueDate 산출 SSOT. */
+export function addMonths(iso: string, months: number, day: number): string {
   if (!iso) return '';
   const [y, m] = iso.split('-').map((s) => parseInt(s, 10));
   const targetM0 = (m - 1) + months;

@@ -20,7 +20,10 @@ import { formatCurrency, formatDateFull } from '@/lib/utils';
 import { useBusyAction } from '@/lib/use-busy-action';
 import { useClosedPeriods, isDateInClosedPeriod } from '@/lib/firebase/closed-periods-store';
 import { todayKr } from '@/lib/mock-data';
-import { recalcSchedule } from '@/lib/payment-schedule';
+import {
+  recalcSchedule, effectiveAmount, addDiscountEntry,
+  totalUnpaid, totalUnpaidCount, computeCurrentSeq, addMonths,
+} from '@/lib/payment-schedule';
 import { toast } from '@/lib/toast';
 import { showConfirm, showPrompt } from '@/lib/confirm';
 import type {
@@ -432,47 +435,18 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
       });
 
   function persist(sched: PaymentScheduleInline[]) {
-    // 미수 = 실청구(amount - discount) - 납부합
-    const totalUnpaidNow = sched.reduce((sum, s) => {
-      const disc = (s.discounts ?? []).reduce((d, x) => d + x.amount, 0);
-      const effective = Math.max(0, s.amount - disc);
-      if (s.status === '연체') return sum + effective;
-      if (s.status === '부분납') return sum + Math.max(0, effective - s.paidAmount);
-      return sum;
-    }, 0);
-    const unpaidSeqCount = sched.filter((s) => s.status === '연체' || s.status === '부분납').length;
-    const overdue = sched.filter((s) => s.status === '연체' || s.status === '부분납').sort((a, b) => a.seq - b.seq);
-    const currentSeq = overdue[0]?.seq
-      ?? sched.find((s) => s.status === '예정')?.seq
-      ?? sched.length;
+    // 미수·미납회차·현재회차 = 엔진(payment-schedule) 파생 SSOT 재사용 (인라인 재구현 금지)
+    const today = todayKr();
     const last = sched.flatMap((s) => s.payments ?? []).sort((a, b) => b.date.localeCompare(a.date))[0];
     onUpdate({
       ...c,
       schedules: sched,
-      unpaidAmount: totalUnpaidNow,
-      unpaidSeqCount,
-      currentSeq,
+      unpaidAmount: totalUnpaid(sched),
+      unpaidSeqCount: totalUnpaidCount(sched),
+      currentSeq: computeCurrentSeq(sched, today),
       lastPaidDate: last?.date,
       lastPaidAmount: last?.amount,
     });
-  }
-
-  function recalcRow(s: PaymentScheduleInline, today: string): PaymentScheduleInline {
-    if (s.status === '면제') {
-      const paid = (s.payments ?? []).reduce((sum, p) => sum + p.amount, 0);
-      const disc = (s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
-      return { ...s, paidAmount: paid, discountAmount: disc };
-    }
-    const paid = (s.payments ?? []).reduce((sum, p) => sum + p.amount, 0);
-    const disc = (s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
-    const effective = Math.max(0, s.amount - disc);
-    const lastDate = (s.payments ?? []).reduce<string>((mx, p) => p.date > mx ? p.date : mx, '');
-    let status: ScheduleStatus;
-    if (effective === 0 && disc > 0) status = '완료';
-    else if (paid >= effective) status = '완료';
-    else if (paid > 0 || disc > 0) status = '부분납';
-    else status = s.dueDate < today ? '연체' : '예정';
-    return { ...s, paidAmount: paid, discountAmount: disc, paidAt: lastDate || undefined, status };
   }
 
   function toggleExpand(seq: number) {
@@ -525,35 +499,24 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
     const snapshotBefore = schedulesNorm.map((s) => ({ ...s, payments: [...(s.payments ?? [])], discounts: [...(s.discounts ?? [])] }));
 
     if (addMode === 'discount') {
-      // 할인 — 해당 회차에만 적용 (다음 회차로 흘리지 않음)
-      const next = schedulesNorm.map((s) => {
-        if (s.seq !== addOpenSeq) return { ...s };
-        const existing = (s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
-        const cap = Math.max(0, s.amount - existing);
-        const applied = Math.min(amt, cap);
-        if (applied <= 0) return { ...s };
-        const list = [...(s.discounts ?? []), {
-          date: addDate || today,
-          amount: applied,
-          reason: addReason,
-          memo: addMemo || undefined,
-          at: new Date().toISOString(),
-        }];
-        return recalcRow({ ...s, discounts: list }, today);
-      });
+      // 할인 — 해당 회차에만 적용 (엔진 addDiscountEntry: cap·재계산 SSOT)
+      const next = schedulesNorm.map((s) =>
+        s.seq === addOpenSeq
+          ? addDiscountEntry(s, { date: addDate || today, amount: amt, reason: addReason, memo: addMemo || undefined, at: new Date().toISOString() }, today)
+          : { ...s },
+      );
       persist(next);
     } else {
-      // 입금 — 선납 자동 분배 (해당 회차부터 시작해서 초과분은 다음 회차로)
+      // 입금 — 선납 자동 분배 (해당 회차부터 시작해서 초과분은 다음 회차로).
+      // owed 산출·재계산은 엔진(effectiveAmount·recalcSchedule) 재사용 — 회차 선택 시작 UX만 여기 유지.
       let remaining = amt;
       const next = schedulesNorm.map((s) => ({ ...s, payments: [...(s.payments ?? [])] }));
       const startIdx = next.findIndex((s) => s.seq === addOpenSeq);
       for (let i = startIdx; i < next.length && remaining > 0; i++) {
         const s = next[i];
         if (s.status === '면제') continue;
-        const discSum = (s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0);
-        const effective = Math.max(0, s.amount - discSum);
         const paidSum = s.payments.reduce((sum, p) => sum + p.amount, 0);
-        const owed = Math.max(0, effective - paidSum);
+        const owed = Math.max(0, effectiveAmount(s) - paidSum);
         if (owed <= 0) continue;
         const apply = Math.min(owed, remaining);
         s.payments.push({
@@ -563,8 +526,7 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
           memo: i > startIdx ? `${addMemo || '선납'} (선납 from ${addOpenSeq}회차)` : (addMemo || undefined),
           at: new Date().toISOString(),
         });
-        const next2 = recalcRow(s, today);
-        Object.assign(s, next2);
+        Object.assign(s, recalcSchedule(s, today));
         remaining -= apply;
       }
       persist(next);
@@ -599,7 +561,7 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
       if (s.seq !== seq) return { ...s };
       const payments = [...(s.payments ?? [])];
       payments.splice(idx, 1);
-      return recalcRow({ ...s, payments }, today);
+      return recalcSchedule({ ...s, payments }, today);
     });
     persist(next);
   }
@@ -611,7 +573,7 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
       if (s.seq !== seq) return { ...s };
       const discounts = [...(s.discounts ?? [])];
       discounts.splice(idx, 1);
-      return recalcRow({ ...s, discounts }, today);
+      return recalcSchedule({ ...s, discounts }, today);
     });
     persist(next);
   }
@@ -927,9 +889,3 @@ function ScheduleTable({ c, onUpdate }: { c: Contract; onUpdate: (u: Contract) =
   );
 }
 
-function addMonths(yyyymmdd: string, months: number, day: number): string {
-  const d = new Date(yyyymmdd);
-  d.setMonth(d.getMonth() + months);
-  d.setDate(Math.min(day, 28));
-  return d.toISOString().slice(0, 10);
-}

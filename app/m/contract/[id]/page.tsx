@@ -22,6 +22,7 @@ import {
   CheckCircle, Circle,
 } from '@phosphor-icons/react';
 import { formatCurrency } from '@/lib/utils';
+import { effectiveAmount } from '@/lib/payment-schedule';
 import { toast } from '@/lib/toast';
 import { InlineTextEdit } from '@/components/ui/inline-text-edit';
 
@@ -336,7 +337,13 @@ function PaymentScheduleHistory({ schedules }: { schedules: NonNullable<ReturnTy
                 fontWeight: 600,
               }}>
                 {s.paidAmount > 0 ? `${(s.paidAmount / 10000).toFixed(0)}만` : '-'}
-                <span style={{ color: 'var(--text-weak)' }}> / {(s.amount / 10000).toFixed(0)}만</span>
+                {/* 실청구 = 청구금액 − 청구할인 (웹과 동일 반영) */}
+                <span style={{ color: 'var(--text-weak)' }}> / {(effectiveAmount(s) / 10000).toFixed(0)}만</span>
+                {(s.discounts ?? []).length > 0 && (
+                  <span style={{ color: 'var(--red-text)', fontSize: 9, marginLeft: 3 }}>
+                    할인-{((s.discounts ?? []).reduce((sum, d) => sum + d.amount, 0) / 10000).toFixed(0)}만
+                  </span>
+                )}
               </span>
               <span className={`badge-base badge-${tone}`} style={{ fontSize: 9 }}>{s.status}</span>
             </div>
