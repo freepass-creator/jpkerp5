@@ -29,8 +29,10 @@ export type Penalty = {
   fineAmount?: number;          // 범칙금
   surcharge?: number;           // 가산금
   tollAmount?: number;          // 통행료
+  earlyPayAmount?: number;      // 자진납부 감경액 (사전통지서 병기 시). amount(정상액)와 별개 — 채권은 amount 기준
   // 납부 정보
   dueDate?: string;
+  earlyDueDate?: string;        // 자진납부(감경) 기한
   payAccount?: string;
   // 처리 상태
   status: PenaltyStatus;

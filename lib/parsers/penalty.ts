@@ -18,8 +18,10 @@ export interface PenaltyParsed {
   demerit_points: number;
   toll_amount: number;
   surcharge_amount: number;
-  amount: number;
+  amount: number;               // 정상(감경 전) 부과 총액 — 채권 기준
+  early_pay_amount?: number;    // 자진납부 감경액 (OCR 사전통지서 병기 시만)
   due_date: string;
+  early_due_date?: string;      // 자진납부(감경) 기한 (OCR only)
   opinion_period: string;
   pay_account: string;
 }

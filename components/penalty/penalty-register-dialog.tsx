@@ -90,6 +90,9 @@ export function PenaltyRegisterDialog({ onCreate, open: openProp, onOpenChange, 
         description: (raw.description as string) ?? '',
         law_article: (raw.law_article as string) ?? '',
         amount: typeof raw.amount === 'number' ? raw.amount : 0,
+        // 자진납부 감경(사전통지서) — amount(정상액)와 분리 저장. 채권은 amount 기준(감경액 아님)
+        early_pay_amount: typeof raw.early_pay_amount === 'number' ? raw.early_pay_amount : undefined,
+        early_due_date: normalizeKoreanDate(raw.early_due_date as string | null | undefined) || undefined,
         // 금액 세분화 — 벌점·범칙금·가산금·통행료 분리 저장(감사 유실 해소). 교차검증(crosscheckPenalty)이 세부합=부과금액 검산.
         penalty_amount: typeof raw.penalty_amount === 'number' ? raw.penalty_amount : 0,
         fine_amount: typeof raw.fine_amount === 'number' ? raw.fine_amount : 0,

@@ -343,7 +343,9 @@ const PENALTY_SCHEMA = {
     location: { type: Type.STRING, nullable: true, description: '위반장소' },
     description: { type: Type.STRING, nullable: true, description: '위반내용 (예: 주정차위반, 속도위반(50km/h 초과))' },
     law_article: { type: Type.STRING, nullable: true, description: '적용법조 (예: 도로교통법 제32조)' },
-    amount: { type: Type.INTEGER, nullable: true, description: '실제 부과 금액 (원). 최종 납부해야 할 메인 금액 (과태료+가산금 등 합계일 수 있음)' },
+    amount: { type: Type.INTEGER, nullable: true, description: '정상(감경 전) 최종 부과액(원) = 본세+가산금 합계. ⚠자진납부 감경액(보통 20%↓)이 병기돼 있어도 절대 감경액을 넣지 말 것 — 감경액은 early_pay_amount로. 감경 표기 없으면 그냥 부과 총액.' },
+    early_pay_amount: { type: Type.INTEGER, nullable: true, description: '자진납부 감경 금액(원) — 사전통지서에 "자진납부 시 OO원" 병기될 때만. 없으면 null' },
+    early_due_date: { type: Type.STRING, nullable: true, description: '자진납부(감경) 기한 YYYY-MM-DD — 병기될 때만. 없으면 null' },
     penalty_amount: { type: Type.INTEGER, nullable: true, description: '과태료 본세(원) — 세부 표기 있을 때만' },
     fine_amount: { type: Type.INTEGER, nullable: true, description: '범칙금(원) — 통고처분(범칙금) 표기 시' },
     surcharge_amount: { type: Type.INTEGER, nullable: true, description: '가산금/중가산금(원) — 납부기한 경과 가산분' },
@@ -357,7 +359,7 @@ const PENALTY_SCHEMA = {
   required: [
     'doc_type', 'notice_no', 'issuer', 'issue_date', 'car_number',
     'date', 'location', 'description', 'law_article',
-    'amount', 'penalty_amount', 'fine_amount', 'surcharge_amount', 'toll_amount',
+    'amount', 'early_pay_amount', 'early_due_date', 'penalty_amount', 'fine_amount', 'surcharge_amount', 'toll_amount',
     'demerit_points', 'payer_name', 'opinion_period', 'due_date', 'pay_account',
   ],
 };
@@ -626,8 +628,8 @@ const TYPE_SPECS: Record<string, TypeSpec> = {
 - **location** (위반장소): 도로명·지번 그대로. 통행료면 영업소/대교/터널 이름.
 - **description** (위반내용): "속도위반(50km/h 초과)", "주정차금지위반" 등 구체. 통행료면 "통행료 미납".
 - **law_article** (적용법조): "도로교통법 제xx조" 형식.
-- **amount** (금액): 실제 부과 금액(원) — 정수. 과태료/범칙금/통행료 중 메인 금액 하나.
-- **due_date** (납부기한): YYYY-MM-DD.
+- **amount** (금액): **정상(감경 전) 부과 총액**(원) — 정수. 과태료/범칙금/통행료 본세+가산금 합계. ⚠사전통지서에 "자진납부 시 xx원(20% 감경)"이 같이 찍혀 있어도 amount엔 **정상액**을 넣고, 감경액은 **early_pay_amount**, 자진납부 기한은 **early_due_date**로 분리. (임차인이 자진납부 기한 넘기면 정상액이 채권이라 amount=정상액이어야 미수가 안 줄어듦)
+- **due_date** (납부기한): YYYY-MM-DD (정상 납부기한).
 - **pay_account** (납부계좌): "농협 123-4567-8901" 같이 은행+계좌 결합.
 
 ## 추출 원칙
