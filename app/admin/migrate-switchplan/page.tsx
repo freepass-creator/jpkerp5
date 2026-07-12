@@ -6,6 +6,7 @@ import { Database, Upload, Warning, CheckCircle, FileXls, ArrowsDownUp, Car } fr
 import { ref, push, update as rtdbUpdate } from 'firebase/database';
 import { Sidebar } from '@/components/layout/sidebar';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
+import { BusyButton } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/use-auth';
 import { isSuperAdmin } from '@/lib/admin-emails';
 import { parseSwitchplanWorkbook, toSnapshotRows, toReturnedContracts, buildVehicleFields, buildLoanFields, type SwitchplanParseResult, type SwitchplanContract } from '@/lib/migrate/switchplan';
@@ -381,7 +382,7 @@ export default function MigrateSwitchplanPage() {
             <section className="detail-section">
               <div className="detail-section-header"><span className="title">2. 미수 3정의 대조 (엑셀 원본 vs ERP 계산)</span></div>
               <div className="detail-section-body">
-                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <table className="table" style={{ fontSize: 13 }}>
                   <thead>
                     <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right' }}>
                       <th style={{ textAlign: 'left', padding: '4px 8px' }} />
@@ -430,8 +431,8 @@ export default function MigrateSwitchplanPage() {
                 </button>
               </div>
               <div className="detail-section-body" style={{ maxHeight: 460, overflow: 'auto', padding: 0 }}>
-                <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                  <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                <table className="table" style={{ fontSize: 12 }}>
+                  <thead>
                     <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
                       <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
                       <th style={{ textAlign: 'left', padding: '6px 8px' }}>계약자</th>
@@ -472,14 +473,15 @@ export default function MigrateSwitchplanPage() {
             <section className="detail-section">
               <div className="detail-section-header"><span className="title">4. 씨앗 커밋</span></div>
               <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button
-                  className="btn btn-primary" type="button"
-                  disabled={busy || !superAdmin}
+                <BusyButton
+                  busy={busy} busyLabel="씨앗 반영 중…"
+                  className="btn btn-primary"
+                  disabled={!superAdmin}
                   onClick={commitSeeds}
                   style={{ height: 44, fontSize: 14, fontWeight: 600 }}
                 >
                   <Upload weight="bold" size={16} /> 운행중 {res.totals.countCurrent}건 씨앗 커밋 (현재미수 = carry)
-                </button>
+                </BusyButton>
                 <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
                   ✓ 차량번호 기준 upsert — 있으면 갱신, 없으면 신규 (기존 SNAPSHOT 파이프라인 그대로)<br />
                   ✓ 현재미수 = carry → distributeUnpaid 로 직전 회차부터 역순 미납 분배 (期初 씨앗)<br />
@@ -497,8 +499,8 @@ export default function MigrateSwitchplanPage() {
               </div>
               <div className="detail-section-body" style={{ padding: 0 }}>
                 <div style={{ maxHeight: 320, overflow: 'auto' }}>
-                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                  <table className="table" style={{ fontSize: 12 }}>
+                    <thead>
                       <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
                         <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
                         <th style={{ textAlign: 'left', padding: '6px 8px' }}>계약자</th>
@@ -522,14 +524,15 @@ export default function MigrateSwitchplanPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
                   {returnedSorted.length > 20 && <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>… 외 {returnedSorted.length - 20}건</div>}
-                  <button
-                    className="btn" type="button"
-                    disabled={busy || !superAdmin}
+                  <BusyButton
+                    busy={busy} busyLabel="반납 이력 반영 중…"
+                    className="btn"
+                    disabled={!superAdmin}
                     onClick={commitReturned}
                     style={{ height: 40, fontSize: 13, fontWeight: 600 }}
                   >
                     <Upload weight="bold" size={15} /> 반납 이력 {res.returned.length}건 커밋 (손바뀜 연속성 + 추심 잔여)
-                  </button>
+                  </BusyButton>
                   <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
                     ✓ status='반납' 이력으로 등록 — 차량 상세에 과거 임차인 이력 연속 표시<br />
                     ✓ 잔여미수(carry)&gt;0 → endReason='채권보전'(추심 대상), 리스크/미수 화면에 노출<br />
@@ -549,8 +552,8 @@ export default function MigrateSwitchplanPage() {
               </div>
               <div className="detail-section-body" style={{ padding: 0 }}>
                 <div style={{ maxHeight: 300, overflow: 'auto' }}>
-                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                  <table className="table" style={{ fontSize: 12 }}>
+                    <thead>
                       <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
                         <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
                         <th style={{ textAlign: 'left', padding: '6px 8px' }}>차종</th>
@@ -574,14 +577,15 @@ export default function MigrateSwitchplanPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
                   {res.vehicles.length > 15 && <div style={{ fontSize: 11, color: 'var(--text-weak)' }}>… 외 {res.vehicles.length - 15}대</div>}
-                  <button
-                    className="btn" type="button"
-                    disabled={busy || !superAdmin}
+                  <BusyButton
+                    busy={busy} busyLabel="차량 마스터 반영 중…"
+                    className="btn"
+                    disabled={!superAdmin}
                     onClick={commitVehicles}
                     style={{ height: 40, fontSize: 13, fontWeight: 600 }}
                   >
                     <Car weight="bold" size={15} /> 자산·할부 → 차량 마스터 (갱신 {vehiclePlan.update} · 신규 {vehiclePlan.create} · 할부 {vehiclePlan.loans})
-                  </button>
+                  </BusyButton>
                   <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
                     ✓ 차량번호 기준 upsert — 차대번호·제조사·트림·연식·배기량·색상·실구입가 반영<br />
                     ✓ 할부: 금융사·할부원금·총상환·월납입(총상환/개월) 반영 · 현금차량 표시 (원금/이자 회차분리는 금융사 상환스케줄표 PDF에서)<br />
@@ -622,7 +626,7 @@ export default function MigrateSwitchplanPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 4 }}>계좌별</div>
-                      <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                      <table className="table" style={{ fontSize: 11 }}>
                         <thead><tr style={{ color: 'var(--text-weak)', textAlign: 'right' }}>
                           <th style={{ textAlign: 'left', padding: '3px 6px' }}>계좌</th><th style={{ padding: '3px 6px' }}>입금</th><th style={{ padding: '3px 6px' }}>출금</th>
                         </tr></thead>
@@ -640,8 +644,8 @@ export default function MigrateSwitchplanPage() {
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 4 }}>계정과목 Top 12 (입출 합)</div>
                       <div style={{ maxHeight: 230, overflow: 'auto' }}>
-                        <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
-                          <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)' }}><tr style={{ color: 'var(--text-weak)', textAlign: 'right' }}>
+                        <table className="table" style={{ fontSize: 11 }}>
+                          <thead><tr style={{ color: 'var(--text-weak)', textAlign: 'right' }}>
                             <th style={{ textAlign: 'left', padding: '3px 6px' }}>계정과목</th><th style={{ padding: '3px 6px' }}>입금</th><th style={{ padding: '3px 6px' }}>출금</th><th style={{ padding: '3px 6px' }}>건</th>
                           </tr></thead>
                           <tbody>
@@ -696,8 +700,8 @@ export default function MigrateSwitchplanPage() {
                 )}
 
                 <div style={{ maxHeight: 380, overflow: 'auto' }}>
-                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                  <table className="table" style={{ fontSize: 12 }}>
+                    <thead>
                       <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
                         <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
                         <th style={{ textAlign: 'left', padding: '6px 8px' }}>임차인</th>
@@ -753,8 +757,8 @@ export default function MigrateSwitchplanPage() {
 
                 {(misuVerify.summary.falseMisuCount > 0 || misuVerify.summary.missingRefCount > 0) && (
                   <div style={{ maxHeight: 320, overflow: 'auto' }}>
-                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                      <thead style={{ position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                    <table className="table" style={{ fontSize: 12 }}>
+                      <thead>
                         <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
                           <th style={{ textAlign: 'left', padding: '6px 8px' }}>차량번호</th>
                           <th style={{ textAlign: 'left', padding: '6px 8px' }}>임차인</th>
