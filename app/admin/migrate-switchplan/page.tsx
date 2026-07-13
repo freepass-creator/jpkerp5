@@ -546,6 +546,7 @@ export default function MigrateSwitchplanPage() {
                     { label: '전체 구매(자산)', n: res.vehicles.length, base: 163 },
                     { label: '현보유(활성)', n: res.activePlates.length, base: 118 },
                     { label: '운행중(계약)', n: res.totals.countCurrent, base: 102 },
+                    { label: '월 대여료(합)', money: res.current.reduce((s, c) => s + (c.monthlyRent ?? 0), 0) },
                     { label: '반납(종료)', n: res.totals.countReturned, base: 75 },
                     { label: '상환합계(할부)', n: res.loans.length, base: 157 },
                     { label: '등록번호 매칭', n: res.current.filter((c) => c.customerIdentNo).length, base: res.totals.countCurrent },
