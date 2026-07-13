@@ -288,6 +288,9 @@ a { color: var(--text-link); text-decoration: none; }
   min-height: 0;
   overflow: auto;
 }
+/* flex column 콘텐츠 래퍼(.app > div가 100vh 스크롤 컨테이너) 안의 자식 섹션이
+   flex-shrink 로 위아래 찌부러지지 않게 — 자연 높이 유지 + 컨테이너가 세로 스크롤. */
+.mig-page-flow > * { flex-shrink: 0; }
 
 /* ────────────── Bottom Action Bar ────────────── */
 .bottom-bar {

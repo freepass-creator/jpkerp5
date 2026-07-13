@@ -359,7 +359,7 @@ export default function MigrateSwitchplanPage() {
           </div>
         </header>
 
-        <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="mig-page-flow" style={{ padding: 24, maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <header className="page-header">
             <div className="page-header-title-group">
               <h1 className="page-header-title">
