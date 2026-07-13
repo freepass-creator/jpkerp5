@@ -124,10 +124,13 @@ export type SwitchplanContract = {
 
 export type SwitchplanParseResult = {
   asOf: string;                    // 미수 기준일 (YYYY-MM-DD)
-  current: SwitchplanContract[];   // 채권 (운행중)
+  current: SwitchplanContract[];   // 채권 (운행중) — 파싱된 실계약(대여료·원장 有)
   returned: SwitchplanContract[];  // 반납 (종료)
   vehicles: SwitchplanVehicle[];   // 자산 (차량 마스터)
   loans: SwitchplanLoan[];         // 상환합계 (차량 할부)
+  /** 채권(활성) 시트의 전체 차량번호 — 코드명·원장 없는 빈행(2번째차/스필오버)까지 포함.
+   *  = 사업현황 "유효 자산" 집합. 차량 활성('운행') 판정 기준(res.current 실계약보다 넓음). */
+  activePlates: string[];
   totals: {
     countCurrent: number;
     countReturned: number;
@@ -488,6 +491,25 @@ function parseLedgerSheet(
   return out;
 }
 
+/** 원장 시트(채권/반납)의 모든 차량번호 — 코드명·원장 유무 무관.
+ *  parseLedgerSheet 는 코드명 없는 스필오버 행을 계약에서 제외하지만, 그 plate 도 유효 자산(2번째차 등)이므로
+ *  활성 자산 판정엔 이 전량 집합을 쓴다. (사업현황 유효자산 = 채권시트 전체 plate) */
+function collectLedgerPlates(wb: XLSX.WorkBook, sheetName: string, hasMonthRow: boolean): string[] {
+  const sheet = wb.Sheets[sheetName];
+  if (!sheet) return [];
+  const G = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false, defval: '' });
+  const hRow = hasMonthRow ? 1 : 0;
+  const H = (G[hRow] as unknown[] | undefined)?.map(cellStr) ?? [];
+  const ci = H.findIndex((x) => x === '차량번호');
+  if (ci < 0) return [];
+  const seen = new Set<string>();
+  for (let r = hRow + 1; r < G.length; r++) {
+    const plate = cellStr((G[r] as unknown[])[ci]).trim();
+    if (plate) seen.add(plate);
+  }
+  return [...seen];
+}
+
 /* ─────────────── 미수 3정의 계산 ─────────────── */
 
 function computeUnpaid(c: RawContract, curMonth: string, todayDay: number): SwitchplanContract {
@@ -584,6 +606,7 @@ export function parseSwitchplanWorkbook(buf: ArrayBuffer, asOf?: string): Switch
     returned,
     vehicles: vehicleList,
     loans: loanList,
+    activePlates: collectLedgerPlates(wb, '채권', true),
     totals: {
       countCurrent: current.length,
       countReturned: returned.length,

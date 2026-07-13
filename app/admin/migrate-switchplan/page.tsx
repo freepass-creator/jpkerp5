@@ -56,9 +56,11 @@ export default function MigrateSwitchplanPage() {
   // 마이그레이션 차량상태 = 계약 상태에서 파생하는 단일 헬퍼(파이프라인 통일).
   //   운행중 계약 있는 plate → '운행', 그 외(종료만/무계약) → '휴차대기'(유휴).
   //   ※ 앱 일상흐름의 "인도까지 휴차"와 달리, 마이그레이션은 이미 인도된 과거 계약이라 운행 반영.
+  //   유효 자산 = 채권(활성) 시트 전체 plate — 실계약(res.current)뿐 아니라 코드명 없는 빈행(2번째차)까지.
+  //   res.current(실계약 102)만 쓰면 유효자산이 과소(사업현황 118과 불일치)라 res.activePlates 사용.
   const activePlates = useMemo(() => {
     const s = new Set<string>();
-    if (res) for (const c of res.current) if (c.vehiclePlate) s.add(c.vehiclePlate.trim());
+    if (res) for (const p of res.activePlates) if (p) s.add(p.trim());
     return s;
   }, [res]);
   const migVehStatus = (plate: string | undefined): VehicleStatus =>
