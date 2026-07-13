@@ -220,8 +220,10 @@ export default function ReceivablesPage() {
       || (c.vehicleModel ?? '').toLowerCase().includes(q)
       || (c.manager ?? '').toLowerCase().includes(q),
     );
-    // 기본 정렬: 미수금 큰 순 (가장 시급한 회수 대상 위로)
-    return [...searched].sort((a, b) => (b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0));
+    // 기본 정렬: 연체 경과일 오래된 순(경과 오래된 = 가장 위험, 위로). 동률이면 미수금 큰 순.
+    return [...searched].sort((a, b) =>
+      (maxOverdueDays(b, today) - maxOverdueDays(a, today))
+      || ((b.unpaidAmount ?? 0) - (a.unpaidAmount ?? 0)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, filter, companyFilter, search, noticeSentIds, today]);
 
