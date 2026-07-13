@@ -149,13 +149,16 @@ function OperationOverviewTab({
       ? '회수 처리 — 차량 [운행]→[반납] + 활성 계약을 [채권보전]으로 전환합니다. 진행할까요?'
       : `차량 상태를 [${vehicle.status}] → [${next}] 로 변경하시겠습니까?`;
     if (!await showConfirm({ title: msg })) return;
-    // 매각 전환 시 saleDate stamp — 자산대장 감가 컷오프 (처분 페이지와 동일 규칙)
+    // 회수 → 계약 채권보전(미수 보존) + 차량 반납. 정본 동기 헬퍼(onUpdateContract)가 계약+차량마스터를
+    // 한 번에 소유하므로 별도 onUpdate(vehicle) 생략 — 같은 차량 노드에 동시 락-write 2건이 나서
+    // 허위 LockConflict·다이얼로그 닫힘이 나던 것 방지. status='채권'이라 일할 환급은 X(사용자 정책).
+    if (isRecovery && activeContract && onUpdateContract) {
+      onUpdateContract({ ...activeContract, status: '채권', vehicleStatus: '반납', endReason: '채권보전' });
+      return;
+    }
+    // 그 외 전이 — 차량 status 직접 변경(매각 시 saleDate stamp = 자산대장 감가 컷오프)
     const saleDate = next === '매각' && !vehicle.saleDate ? todayKr() : vehicle.saleDate;
     onUpdate({ ...vehicle, status: next, saleDate });
-    // 회수 → 계약 채권보전(미수 보존). 데이터는 홀로 안 산다 — 차량↔계약 동반 갱신.
-    if (isRecovery && activeContract && onUpdateContract) {
-      onUpdateContract({ ...activeContract, status: '채권', endReason: '채권보전' });
-    }
   }
 
   // 간편 상태(2축) + 체크리스트 게이팅 전이
@@ -855,14 +858,17 @@ function ContractListTab({ contracts, onUpdateContract }: { contracts: Contract[
                     type="date"
                     className="input-compact"
                     value={c.returnedDate ?? ''}
-                    disabled={!onUpdateContract}
+                    disabled={!onUpdateContract || c.status === '반납' || c.status === '채권'}
                     onChange={(e) => {
                       if (!onUpdateContract) return;
+                      // 정상반납(status='반납')·채권 계약은 여기서 해지/운행 재분류 금지 —
+                      // 공유 필드 returnedDate 에 묶여 정상반납을 무음으로 해지/부활시키던 버그 차단.
+                      if (c.status === '반납' || c.status === '채권') return;
                       const date = e.target.value;
                       onUpdateContract(date ? markTerminated(c, date) : revertToOperating(c));
                     }}
                     style={{ width: 116, fontSize: 11 }}
-                    title="입력하면 계약이 해지 처리되고, 비우면 운행으로 되돌립니다"
+                    title={c.status === '반납' ? '정상반납 계약 — 해지 재분류는 계약 상세에서' : c.status === '채권' ? '채권(회수) 계약' : '입력하면 계약이 해지 처리되고, 비우면 운행으로 되돌립니다'}
                   />
                 </td>
                 <td>

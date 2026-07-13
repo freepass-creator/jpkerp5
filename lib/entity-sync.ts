@@ -209,8 +209,10 @@ export async function upsertVehicleFromPolicy(
  * 계약 저장 후 호출 — Vehicle upsert + 현재계약/상태 동기.
  *
  *  1. 같은 plate Vehicle 있음 → currentContractId + status 갱신
- *      · 활성 계약 ('운행'/'대기') → Vehicle.status = '운행'
- *      · 종료 계약 ('반납'/'해지'/'채권') → currentContractId 만 갱신
+ *      · 자동계산 status(구매대기/등록대기/휴차)만 plate 정규성 따라 갱신 (정상 plate → 휴차).
+ *        '운행'은 명시적 인도(deliver) 처리로만 — 계약이 활성이어도 자동 '운행' 승격 안 함(체크리스트 게이팅 존중).
+ *        운행/매각/정비/사고/반납 등 사용자 명시 상태는 보존.
+ *      · 종료·명시 상태 → currentContractId 만 갱신
  *  2. 없음 → 신규 Vehicle 자동 생성 (계약 임베드 정보로 plate/model/회사 채움)
  */
 export async function upsertVehicleFromContract(

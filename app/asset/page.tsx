@@ -52,6 +52,7 @@ import { showConfirm } from '@/lib/confirm';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { deriveVehicleStatusFromContract } from '@/lib/plate-rules';
 import { syncContractStatusFromVehicle, vehicleMatchesPlate } from '@/lib/entity-sync';
+import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { buildMergedVehicles } from '@/lib/use-merged-vehicles';
 import { safeUpdate } from '@/lib/safe-update';
 import { setVehicleAttachments } from '@/lib/firebase/vehicle-attachments-store';
@@ -702,7 +703,11 @@ export default function AssetPage() {
                 await syncContractStatusFromVehicle(v, contracts, updateContract);
               }, { onConflict: () => setOpenId(null) });
             }}
-            onUpdateContract={(c) => { void safeUpdate(() => updateContract(c)); }}
+            onUpdateContract={(c) => {
+              // 정본 동기 헬퍼로 — 계약 저장 + 차량마스터 status 동기 + (정상반납 시)일할정산 + 감사.
+              // rawVehicles/updateVehicle = 실 Vehicle 노드(병합 synthetic 아님). onConflict 로 락충돌 표면화.
+              void safeUpdate(() => syncContractAndVehicleStatus(c, rawVehicles, updateContract, updateVehicle), { onConflict: () => setOpenId(null) });
+            }}
             onClose={() => setOpenId(null)}
             onEdit={(v) => setEditVehicle(v)}
           />

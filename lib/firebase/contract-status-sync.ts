@@ -35,9 +35,11 @@ export async function syncContractAndVehicleStatus(
   updateContract: (c: Contract) => Promise<void> | void,
   updateVehicleMaster: (v: Vehicle) => Promise<void> | void,
 ): Promise<void> {
-  // 반납 처리 시 마지막 회차 일할 자동 차감 — 어디서 반납하든(웹/모바일/dispatch) 동일하게 자동 적용
+  // 반납 처리 시 마지막 회차 일할 자동 차감 — 어디서 반납하든(웹/모바일/dispatch) 동일하게 자동 적용.
+  // ※ status==='반납'(정상반납)만 환급. 해지/채권(회수)은 vehicleStatus='반납'이어도 환급 X (사용자 정책).
+  //   과거 `|| vehicleStatus==='반납'` 조건은 markTerminated(해지, vehicleStatus='반납')를 잘못 환급시키는 함정이었음.
   let toWrite = contract;
-  if (contract.returnedDate && (contract.status === '반납' || contract.vehicleStatus === '반납')) {
+  if (contract.returnedDate && contract.status === '반납') {
     toWrite = applyReturnedProration(contract, contract.returnedDate);
   }
   await updateContract(toWrite); // throw 가능 — 호출자 catch

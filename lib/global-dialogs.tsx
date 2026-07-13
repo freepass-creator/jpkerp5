@@ -16,6 +16,7 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useHistoryEntries } from '@/lib/firebase/history-store';
 import { syncContractStatusFromVehicle } from '@/lib/entity-sync';
+import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
 import { VehicleDetailDialog, type VehicleDialogTab } from '@/components/asset/vehicle-detail-dialog';
 import { toast } from '@/lib/toast';
 import type { Vehicle } from '@/lib/types';
@@ -79,7 +80,12 @@ export function GlobalDialogsProvider({ children }: { children: ReactNode }) {
             // Vehicle 상태 변경 시 linked Contract.vehicleStatus 도 동기화 (자산 페이지 패턴 일치).
             await syncContractStatusFromVehicle(v, contracts, updateContract);
           }}
-          onUpdateContract={(c) => { void updateContract(c); }}
+          onUpdateContract={(c) => {
+            // 자산 페이지와 동일 SSOT — 계약 저장 + 차량마스터 동기 + (정상반납)일할. raw updateContract 는
+            // 차량마스터 미동기·락충돌 무음실패라 비-자산 진입(홈/미수/과태료)에서도 헬퍼로 통일.
+            void syncContractAndVehicleStatus(c, vehicles, updateContract, updateVehicle)
+              .catch(() => toast.error('저장 실패 — 다른 사용자가 먼저 수정했을 수 있습니다. 새로고침 후 재시도'));
+          }}
           onClose={() => setOpenState(null)}
         />
       )}
