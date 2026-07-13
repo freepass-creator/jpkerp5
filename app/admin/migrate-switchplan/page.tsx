@@ -22,6 +22,7 @@ import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { useBankTx } from '@/lib/firebase/transactions-store';
 import { bankTxKeys } from '@/lib/dedup-keys';
+import { mapJboSubject } from '@/lib/migrate/jbo-subject-map';
 import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
 import { friendlyError } from '@/lib/friendly-error';
@@ -38,7 +39,7 @@ export default function MigrateSwitchplanPage() {
   const { contracts, addMany: addContracts, updateMany: updateContracts } = useContracts();
   const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
   const { companies } = useCompanies();
-  const { rows: existingBankTx, addMany: addBankTx } = useBankTx();
+  const { rows: existingBankTx, addMany: addBankTx, updateMany: updateManyBankTx } = useBankTx();
 
   const [fileName, setFileName] = useState('');
   const [res, setRes] = useState<SwitchplanParseResult | null>(null);
@@ -352,7 +353,7 @@ export default function MigrateSwitchplanPage() {
       source: bank(t.account),
       account: t.account,
       companyCode: companyKey,
-      subject: t.subject || undefined,
+      subject: mapJboSubject(t.subject),   // 자금일보 원문 → 재무 enum 정규화 (드롭다운·GL 정합)
       linkedVehiclePlate: t.plate || undefined,
       linkedCustomerName: t.tenant || undefined,
     }));
@@ -374,6 +375,36 @@ export default function MigrateSwitchplanPage() {
       toast.success(`재무관리 ${fresh.length}건 반영`);
     } catch (err) {
       append(`✗ 재무 반영 실패: ${friendlyError(err)}`);
+      toast.error(friendlyError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 기존 재무관리 거래의 계정과목을 자금일보 원문 → 재무 enum 으로 재매핑 (매핑 도입 전 raw 정리).
+  //   mapJboSubject 는 idempotent — 이미 enum 값이면 그대로. subject 만 patch(금액·매칭·미수 무관).
+  async function remapExistingSubjects(skipConfirm = false) {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    const patches: Record<string, Partial<BankTransaction>> = {};
+    for (const tx of existingBankTx) {
+      if (!tx.subject) continue;
+      const mapped = mapJboSubject(tx.subject);
+      if (mapped && mapped !== tx.subject) patches[tx.id] = { subject: mapped };
+    }
+    const count = Object.keys(patches).length;
+    if (count === 0) { toast.info('재매핑할 계정과목 없음 (이미 정규화됨)'); return; }
+    if (!skipConfirm && !await showConfirm({
+      title: `계정과목 재매핑 ${count}건`,
+      description: '기존 재무관리 거래의 계정과목을 자금일보 원문(대여료·이체수수료·할부금 등) → 재무 표준(대여료수입·수수료·할부금납부 등)으로 정규화합니다. 금액·매칭·미수 영향 없음.',
+      confirmLabel: '재매핑',
+    })) return;
+    setBusy(true);
+    try {
+      await updateManyBankTx(patches);
+      append(`✓ 계정과목 재매핑 ${count}건 (자금일보 원문 → enum)`);
+      toast.success(`계정과목 재매핑 ${count}건`);
+    } catch (err) {
+      append(`✗ 재매핑 실패: ${friendlyError(err)}`);
       toast.error(friendlyError(err));
     } finally {
       setBusy(false);
@@ -769,6 +800,16 @@ export default function MigrateSwitchplanPage() {
                     style={{ height: 42, fontSize: 13, fontWeight: 600, alignSelf: 'flex-start' }}
                   >
                     <Upload weight="bold" size={15} /> 재무관리에 반영 — 계좌 거래 {jboRes.totals.count.toLocaleString()}건 (자동매칭 X · 미수 영향 없음)
+                  </BusyButton>
+                  <BusyButton
+                    busy={busy} busyLabel="재매핑 중…"
+                    className="btn"
+                    disabled={!superAdmin}
+                    onClick={() => remapExistingSubjects()}
+                    style={{ height: 34, fontSize: 12, alignSelf: 'flex-start' }}
+                    title="이미 재무관리에 들어간 거래의 계정과목을 자금일보 원문 → 재무 표준(enum)으로 정규화. 드롭다운·총계정원장 정합용."
+                  >
+                    <ArrowsDownUp weight="bold" size={14} /> 계정과목 재매핑 — 기존 거래 원문 → 재무 표준 (금액·미수 무관)
                   </BusyButton>
                   <div style={{ fontSize: 12, color: 'var(--text-sub)', lineHeight: 1.7 }}>
                     거래 <b>{jboRes.totals.count.toLocaleString()}</b>건 · {jboRes.totals.dateFrom}~{jboRes.totals.dateTo} · 계좌 {jboRes.totals.accounts} · 계정과목 {jboRes.totals.subjects}종<br />

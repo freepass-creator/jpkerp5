@@ -13,6 +13,7 @@
  */
 
 import type { BankTransaction, CardTransaction } from '@/lib/types';
+import { INTERNAL_SUBJECTS } from '@/lib/ledger-subjects';
 
 export type AccountClass = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 
@@ -29,6 +30,9 @@ export const ACCOUNTS: Record<string, AccountDef> = {
   RECEIVABLE_RECOURSE: { code: '120', name: '구상채권', class: 'asset' },
   VEHICLE: { code: '208', name: '차량운반구', class: 'asset' },
   DEPOSIT_LIAB: { code: '301', name: '보증금부채', class: 'liability' },
+  LOAN_LIAB: { code: '302', name: '차입금', class: 'liability' },
+  LOAN_LIAB_SHORT: { code: '303', name: '단기차입금', class: 'liability' },
+  INSTALLMENT_LIAB: { code: '304', name: '할부미지급금', class: 'liability' },
   REVENUE_RENTAL: { code: '401', name: '대여료수입', class: 'revenue' },
   REVENUE_OTHER: { code: '402', name: '잡수입', class: 'revenue' },
   REVENUE_INTEREST: { code: '410', name: '이자수익', class: 'revenue' },
@@ -36,6 +40,7 @@ export const ACCOUNTS: Record<string, AccountDef> = {
   REVENUE_INSURANCE: { code: '404', name: '보험금수입', class: 'revenue' },
   REVENUE_CARD: { code: '405', name: '카드매출', class: 'revenue' },
   REFUND_RECEIVED: { code: '406', name: '환불수령', class: 'revenue' },
+  REVENUE_PENALTY: { code: '407', name: '위약금수입', class: 'revenue' },
   EXP_REPAIR: { code: '501', name: '정비비', class: 'expense' },
   EXP_SUPPLIES: { code: '502', name: '소모품비', class: 'expense' },
   EXP_INSURANCE: { code: '503', name: '보험료', class: 'expense' },
@@ -50,6 +55,8 @@ export const ACCOUNTS: Record<string, AccountDef> = {
   EXP_COMM: { code: '512', name: '통신비', class: 'expense' },
   EXP_ADMIN: { code: '513', name: '관리비', class: 'expense' },
   EXP_FEE: { code: '514', name: '수수료', class: 'expense' },
+  EXP_INTEREST: { code: '515', name: '이자비용', class: 'expense' },
+  EXP_VEHICLE_MGMT: { code: '516', name: '차량관리비', class: 'expense' },
   EXP_MISC: { code: '599', name: '잡지출', class: 'expense' },
   UNCLASSIFIED: { code: '999', name: '미지정', class: 'expense' },
 };
@@ -64,6 +71,16 @@ const RECEIPT_TO_ACCOUNT: Record<string, string> = {
   '잡수입': 'REVENUE_OTHER',
   '이자수익': 'REVENUE_INTEREST',
   '환불수령': 'REFUND_RECEIVED',
+  // 자금일보 신규 입금 계정 (2026-07)
+  '위약금': 'REVENUE_PENALTY',
+  '승계수수료': 'REVENUE_OTHER',      // 지급수수료(EXP_FEE)와 구분되는 수취 수수료 — 잡수입에 귀속
+  '차량매각대금': 'VEHICLE',           // 자산(차량운반구) ↓ — 처분손익은 별도 미반영
+  '차입금': 'LOAN_LIAB',              // 부채 ↑
+  '단기차입금': 'LOAN_LIAB_SHORT',    // 부채 ↑
+  '운영자금대출': 'LOAN_LIAB',        // 부채 ↑
+  'CMS집금': 'REVENUE_RENTAL',        // 대여료 집금 채널 — 대여료수입 귀속 (settlementRole 정산은 별도 처리)
+  '카드자동집금': 'REVENUE_CARD',     // 카드 집금 채널 — 카드매출 귀속
+  '정산금': 'REVENUE_OTHER',          // 방향 애매 — 수취 정산 기본, 잡수입 귀속
 };
 
 /** 출금 거래 (subject → 차변 계정). 대변은 항상 CASH. */
@@ -85,9 +102,16 @@ const EXPENSE_TO_ACCOUNT: Record<string, string> = {
   '관리비': 'EXP_ADMIN',
   '수수료': 'EXP_FEE',
   '잡지출': 'EXP_MISC',
+  // 자금일보 신규 출금 계정 (2026-07)
+  '할부금납부': 'INSTALLMENT_LIAB',   // 할부 원리금 — 부채(할부미지급금) ↓
+  '차입금상환': 'LOAN_LIAB',          // 부채 ↓
+  '중도상환': 'LOAN_LIAB',            // 부채 ↓
+  '이자비용': 'EXP_INTEREST',
+  '차량관리비': 'EXP_VEHICLE_MGMT',
 };
 
-const INTERNAL_SUBJECTS_SET = new Set(['계좌이체', '회사간이체', '대표자가지급', '대표자가수금']);
+// enum(ledger-subjects)에서 파생 — 하드코딩 복제 시 신규 내부이체 과목이 skip 안 돼 오분개 (동기화 SSOT)
+const INTERNAL_SUBJECTS_SET = new Set<string>(INTERNAL_SUBJECTS);
 
 export type JournalEntry = {
   /** 원본 거래 ID (BankTx / CardTx) */
