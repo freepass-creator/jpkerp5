@@ -179,6 +179,22 @@ export default function DevToolsPage() {
             </div>
           )}
 
+          {admin && (
+            <Link
+              href="/admin/migrate-switchplan"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '16px 20px', borderRadius: 12,
+                background: 'var(--brand)', color: 'white',
+                textDecoration: 'none', fontWeight: 700, fontSize: 15,
+              }}
+            >
+              <Database size={22} weight="fill" />
+              스위치플랜 마이그레이션 — 기존 파일 자동 로드 → 버튼 한방 반영
+              <span style={{ marginLeft: 'auto', fontSize: 20 }}>→</span>
+            </Link>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {TOOLS.map((t) => (
               <Link
