@@ -30,6 +30,8 @@ import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { formatCurrency } from '@/lib/utils';
 import { todayKr } from '@/lib/mock-data';
 import { DailyLedgerView } from '@/components/finance/daily-ledger-view';
+import { TransactionDetailDialog, DailyBucketDetailDialog } from '@/components/finance/transaction-detail-dialog';
+import type { BankTransaction } from '@/lib/types';
 import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
 import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
@@ -53,6 +55,10 @@ export default function FinanceDailyPage() {
   const { companies: companyMaster } = useCompanies();
 
   const contractById = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
+
+  // 거래 상세 / 일자행 상세 모달
+  const [detailTx, setDetailTx] = useState<BankTransaction | null>(null);
+  const [bucketDetail, setBucketDetail] = useState<{ companyCode: string; date: string } | null>(null);
 
   // 회사 + 기간 + 검색 필터
   const [search, setSearch] = useState('');
@@ -316,6 +322,7 @@ export default function FinanceDailyPage() {
               if (!old) return;
               void updateCardTxWithMatchSync(old, patch, contracts, updateCard, updateContract);
             }}
+            onOpenTxDetail={setDetailTx}
           />
         </div>
       </section>
@@ -345,7 +352,12 @@ export default function FinanceDailyPage() {
           ) : daily.length === 0 ? (
             <EmptyRow colSpan={8}>거래 내역 없음 — 입출금관리에서 등록</EmptyRow>
           ) : daily.map((r) => (
-            <tr key={r.key}>
+            <tr
+              key={r.key}
+              onDoubleClick={() => setBucketDetail({ companyCode: r.companyCode, date: r.date })}
+              style={{ cursor: 'pointer' }}
+              title="더블클릭 — 그 날 구성 거래 상세"
+            >
               <td className="dim">{displayCompanyName(r.companyCode, companyMaster)}</td>
               <td className="mono">{r.date}</td>
               <td className="num mono">{r.txCount}</td>
@@ -360,6 +372,25 @@ export default function FinanceDailyPage() {
       </table>
         </div>
       </section>
+
+      <TransactionDetailDialog
+        tx={detailTx}
+        open={!!detailTx}
+        onOpenChange={(v) => !v && setDetailTx(null)}
+        contracts={contracts}
+        bankTx={bankTx}
+        companyMaster={companyMaster}
+      />
+      <DailyBucketDetailDialog
+        bucket={bucketDetail}
+        open={!!bucketDetail}
+        onOpenChange={(v) => !v && setBucketDetail(null)}
+        bankTx={bankTx}
+        cardTx={cardTx}
+        contracts={contracts}
+        companyMaster={companyMaster}
+        onOpenTx={(tx) => { setBucketDetail(null); setDetailTx(tx); }}
+      />
     </MasterPageShell>
   );
 }

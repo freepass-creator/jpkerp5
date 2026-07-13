@@ -112,7 +112,7 @@ export function DailyLedgerView({
 
   inPeriod, search, companyFilter, kindFilter,
 
-  onUpdateBank, onUpdateCard,
+  onUpdateBank, onUpdateCard, onOpenTxDetail,
 
 }: {
 
@@ -139,6 +139,9 @@ export function DailyLedgerView({
   onUpdateBank: (id: string, patch: Partial<BankTransaction>) => void;
 
   onUpdateCard: (id: string, patch: Partial<CardTransaction>) => void;
+
+  /** 행 더블클릭 시 거래 상세·유래 모달 열기 (비CMS 계좌행). 없으면 더블클릭 상세 비활성 */
+  onOpenTxDetail?: (tx: BankTransaction) => void;
 
 }) {
 
@@ -567,9 +570,13 @@ export function DailyLedgerView({
           <Fragment key={rowKey}>
 
           <tr
-            onDoubleClick={() => { if (isCmsDeposit) toggleExpand(rowKey); }}
-            style={isCmsDeposit ? { cursor: 'pointer' } : undefined}
-            title={isCmsDeposit ? '더블클릭 — CMS 세부내역(구성 자동이체·수수료) 펼치기' : undefined}
+            onDoubleClick={(e) => {
+              if ((e.target as HTMLElement).closest('input, select, button, a, textarea')) return;
+              if (isCmsDeposit) { toggleExpand(rowKey); return; }
+              if (r.source === 'bank' && bankRecord && onOpenTxDetail) onOpenTxDetail(bankRecord);
+            }}
+            style={(isCmsDeposit || (r.source === 'bank' && onOpenTxDetail)) ? { cursor: 'pointer' } : undefined}
+            title={isCmsDeposit ? '더블클릭 — CMS 세부내역(구성 자동이체·수수료) 펼치기' : (r.source === 'bank' && onOpenTxDetail) ? '더블클릭 — 거래 상세·유래 추적' : undefined}
           >
 
             {/* 1. 거래일자 + CMS 펼침 ▶ */}
