@@ -20,7 +20,7 @@ import { updateBankTxWithMatchSync, detectDuplicateManualPayment } from '@/lib/f
 import { findAllSettlements, buildSettlementPatch } from '@/lib/settlement-match';
 import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
 import { ReceiptMatchDialog, CardMatchDialog } from '@/components/receipt-match-dialog';
-import { TransactionDetailDialog } from '@/components/finance/transaction-detail-dialog';
+import { TransactionDetailDialog, DailyBucketDetailDialog } from '@/components/finance/transaction-detail-dialog';
 import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { audit } from '@/lib/firebase/audit-store';
 import { todayKr } from '@/lib/mock-data';
@@ -100,6 +100,7 @@ export default function PaymentsPage() {
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
   const [cardMatchTarget, setCardMatchTarget] = useState<import('@/lib/types').CardTransaction | null>(null);
   const [detailTx, setDetailTx] = useState<BankTransaction | null>(null);
+  const [bucketDetail, setBucketDetail] = useState<{ companyCode: string; date: string } | null>(null);
 
   const { rows: bankTx, loading: bankTxLoading, update: updateBankTx, updateMany: updateManyBankTx } = useBankTx();
   const { rows: cardTx, loading: cardTxLoading, updateMany: updateManyCardTx, update: updateCard } = useCardTx();
@@ -607,6 +608,7 @@ export default function PaymentsPage() {
                   rows={daily.length > SUMMARY_RENDER_CAP ? daily.slice(0, SUMMARY_RENDER_CAP) : daily}
                   totalCount={daily.length}
                   companyMaster={companyMaster}
+                  onOpenBucket={(companyCode, date) => setBucketDetail({ companyCode, date })}
                 />
               )}
               {tab === 'card' && (
@@ -722,6 +724,16 @@ export default function PaymentsPage() {
           contracts={contracts}
           bankTx={bankTx}
           companyMaster={companyMaster}
+        />
+        <DailyBucketDetailDialog
+          bucket={bucketDetail}
+          open={!!bucketDetail}
+          onOpenChange={(v) => !v && setBucketDetail(null)}
+          bankTx={bankTx}
+          cardTx={cardTx}
+          contracts={contracts}
+          companyMaster={companyMaster}
+          onOpenTx={(tx) => { setBucketDetail(null); setDetailTx(tx); }}
         />
       </div>
     </div>
@@ -887,7 +899,7 @@ function LedgerTable({
 /* ─────────────────── 일자별 집계 테이블 ─────────────────── */
 
 function SummaryTable({
-  rows, totalCount, companyMaster,
+  rows, totalCount, companyMaster, onOpenBucket,
 }: {
   rows: Array<{
     key: string; companyCode: string; date: string;
@@ -896,6 +908,7 @@ function SummaryTable({
   }>;
   totalCount?: number;
   companyMaster: Parameters<typeof displayCompanyName>[1];
+  onOpenBucket?: (companyCode: string, date: string) => void;
 }) {
   const hidden = Math.max(0, (totalCount ?? rows.length) - rows.length);
   return (
@@ -922,7 +935,12 @@ function SummaryTable({
           </tr>
         ) : (<>
           {rows.map((r) => (
-          <tr key={r.key}>
+          <tr
+            key={r.key}
+            onDoubleClick={() => onOpenBucket?.(r.companyCode, r.date)}
+            style={{ cursor: onOpenBucket ? 'pointer' : undefined }}
+            title={onOpenBucket ? '더블클릭 — 그 날 구성 거래 상세' : undefined}
+          >
             <td className="dim">{displayCompanyName(r.companyCode, companyMaster)}</td>
             <td className="mono">{r.date}</td>
             <td className="num mono">{r.txCount}</td>

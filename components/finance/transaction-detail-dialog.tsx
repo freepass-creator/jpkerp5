@@ -11,12 +11,12 @@
  */
 
 import { useMemo } from 'react';
-import { LinkSimple, ArrowSquareOut, Receipt, Info } from '@phosphor-icons/react';
+import { LinkSimple, ArrowSquareOut, Receipt, Info, CaretRight } from '@phosphor-icons/react';
 import { DialogRoot, DialogContent, DialogBody } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatCurrency, formatDateFull } from '@/lib/utils';
 import { displayCompanyName } from '@/lib/company-display';
-import type { BankTransaction, Contract } from '@/lib/types';
+import type { BankTransaction, CardTransaction, Contract } from '@/lib/types';
 
 /** 분개 상태 — payments/page.tsx ledgerStatus 와 동일 규칙 */
 function ledgerStatus(tx: BankTransaction): 'unposted' | 'posted' | 'closed' {
@@ -197,6 +197,116 @@ export function TransactionDetailDialog({
                 </div>
               )}
             </>
+          )}
+        </DialogBody>
+      </DialogContent>
+    </DialogRoot>
+  );
+}
+
+/* ─────────────────── 자금일보 일자행 상세 — 그 날 구성 거래 ─────────────────── */
+
+/**
+ * 자금일보 일자별 집계 1행(회사×일자)이 "어떤 거래들로 이렇게 됐는지".
+ *  · 집계와 동일 필터로 구성 거래를 그대로 나열 (settlementRole!=='item', 같은 day·companyCode
+ *    + 카드매출). 합계 검증줄(Σ입금/Σ출금)과 계정과목 소계까지 노출해 즉시 대조.
+ *  · 각 계좌 거래 줄 → 거래 상세 모달(onOpenTx)로 연결.
+ */
+export function DailyBucketDetailDialog({
+  bucket, open, onOpenChange, bankTx, cardTx, contracts, companyMaster, onOpenTx,
+}: {
+  bucket: { companyCode: string; date: string } | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  bankTx: BankTransaction[];
+  cardTx: CardTransaction[];
+  contracts: Contract[];
+  companyMaster: Parameters<typeof displayCompanyName>[1];
+  onOpenTx: (tx: BankTransaction) => void;
+}) {
+  const contractById = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
+  const data = useMemo(() => {
+    if (!bucket) return null;
+    // 집계(app/finance/daily·payments daily)와 100% 동일 규칙
+    const companyOf = (t: { companyCode?: string; matchedContractId?: string }) =>
+      t.companyCode || (t.matchedContractId ? contractById.get(t.matchedContractId)?.company : '') || '(미지정)';
+    const bank = bankTx.filter((t) => t.settlementRole !== 'item' && (t.txDate ?? '').slice(0, 10) === bucket.date && companyOf(t) === bucket.companyCode);
+    const card = cardTx.filter((t) => (t.kind ?? '매출') === '매출' && (t.txDate ?? '').slice(0, 10) === bucket.date && companyOf(t) === bucket.companyCode);
+    let deposit = 0, withdraw = 0;
+    const bySubject = new Map<string, number>();
+    for (const t of bank) {
+      deposit += t.amount ?? 0; withdraw += t.withdraw ?? 0;
+      const subj = t.subject || ((t.amount ?? 0) > 0 ? '대여료수입' : '(미지정)');
+      bySubject.set(subj, (bySubject.get(subj) ?? 0) + ((t.amount ?? 0) || (t.withdraw ?? 0)));
+    }
+    for (const t of card) {
+      deposit += t.amount ?? 0;
+      bySubject.set('카드매출', (bySubject.get('카드매출') ?? 0) + (t.amount ?? 0));
+    }
+    const excludedItems = bankTx.filter((t) => t.settlementRole === 'item' && (t.txDate ?? '').slice(0, 10) === bucket.date && companyOf(t) === bucket.companyCode);
+    return { bank, card, deposit, withdraw, bySubject: [...bySubject.entries()].sort((a, b) => b[1] - a[1]), excludedItems };
+  }, [bucket, bankTx, cardTx, contractById]);
+
+  if (!bucket || !data) return null;
+
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogContent title={`자금일보 상세 — ${displayCompanyName(bucket.companyCode, companyMaster)} · ${bucket.date}`} mode="view" size="lg">
+        <DialogBody>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', paddingBottom: 8, borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+            <span>거래 <b>{data.bank.length + data.card.length}</b>건</span>
+            <span style={{ color: 'var(--green-text)' }}>입금 <b className="mono">₩{formatCurrency(data.deposit)}</b></span>
+            <span style={{ color: 'var(--red-text)' }}>출금 <b className="mono">₩{formatCurrency(data.withdraw)}</b></span>
+            <span>순증감 <b className="mono">₩{formatCurrency(data.deposit - data.withdraw)}</b></span>
+          </div>
+
+          {data.bySubject.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
+              {data.bySubject.map(([s, v]) => (
+                <span key={s} className="chip" style={{ height: 20, fontSize: 11, padding: '0 8px' }}>{s} <b className="mono" style={{ marginLeft: 4 }}>₩{formatCurrency(v)}</b></span>
+              ))}
+            </div>
+          )}
+
+          <table className="table" style={{ fontSize: 12, marginTop: 4 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 90 }}>채널</th>
+                <th>거래상대</th>
+                <th style={{ width: 100 }}>계정과목</th>
+                <th className="num" style={{ width: 110 }}>입금</th>
+                <th className="num" style={{ width: 110 }}>출금</th>
+                <th className="center" style={{ width: 36 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.bank.map((t) => (
+                <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => onOpenTx(t)} title="거래 상세 열기">
+                  <td className="dim" style={{ fontSize: 11 }}>{t.source || '계좌'}</td>
+                  <td>{t.counterparty || '-'}</td>
+                  <td className="dim">{t.subject || '-'}</td>
+                  <td className="num mono" style={{ color: 'var(--green-text)' }}>{(t.amount ?? 0) > 0 ? `₩${formatCurrency(t.amount)}` : '-'}</td>
+                  <td className="num mono" style={{ color: 'var(--red-text)' }}>{(t.withdraw ?? 0) > 0 ? `₩${formatCurrency(t.withdraw!)}` : '-'}</td>
+                  <td className="center"><CaretRight size={11} className="dim" /></td>
+                </tr>
+              ))}
+              {data.card.map((t) => (
+                <tr key={t.id}>
+                  <td className="dim" style={{ fontSize: 11 }}>카드</td>
+                  <td>{t.customerName || '-'}</td>
+                  <td className="dim">카드매출</td>
+                  <td className="num mono" style={{ color: 'var(--green-text)' }}>₩{formatCurrency(t.amount)}</td>
+                  <td className="num mono">-</td>
+                  <td />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {data.excludedItems.length > 0 && (
+            <div className="dim" style={{ fontSize: 11, marginTop: 8, padding: '6px 8px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-sm)' }}>
+              ※ CMS 구성 자동이체 {data.excludedItems.length}건은 집금 입금에 포함돼 <b>중복 제외</b>됨 (합계에 안 잡힘).
+            </div>
           )}
         </DialogBody>
       </DialogContent>
