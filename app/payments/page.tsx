@@ -20,6 +20,7 @@ import { updateBankTxWithMatchSync, detectDuplicateManualPayment } from '@/lib/f
 import { findAllSettlements, buildSettlementPatch } from '@/lib/settlement-match';
 import { buildCompanyOptions, matchesCompanyFilter, resolveCompanyKey } from '@/lib/filter-helpers';
 import { ReceiptMatchDialog, CardMatchDialog } from '@/components/receipt-match-dialog';
+import { TransactionDetailDialog } from '@/components/finance/transaction-detail-dialog';
 import { downloadDailyLedgerExcel } from '@/lib/ledger-export';
 import { audit } from '@/lib/firebase/audit-store';
 import { todayKr } from '@/lib/mock-data';
@@ -98,6 +99,7 @@ export default function PaymentsPage() {
   const { selectedIds, setSelectedIds } = sel;
   const [matchTarget, setMatchTarget] = useState<BankTransaction | null>(null);
   const [cardMatchTarget, setCardMatchTarget] = useState<import('@/lib/types').CardTransaction | null>(null);
+  const [detailTx, setDetailTx] = useState<BankTransaction | null>(null);
 
   const { rows: bankTx, loading: bankTxLoading, update: updateBankTx, updateMany: updateManyBankTx } = useBankTx();
   const { rows: cardTx, loading: cardTxLoading, updateMany: updateManyCardTx, update: updateCard } = useCardTx();
@@ -596,6 +598,7 @@ export default function PaymentsPage() {
                   onSubjectChange={handleSubjectChange}
                   onNoteChange={handleNoteChange}
                   onOpenMatch={setMatchTarget}
+                  onOpenDetail={setDetailTx}
                   loading={bankTxLoading}
                 />
               )}
@@ -712,6 +715,14 @@ export default function PaymentsPage() {
           onReverse={handleCardReverse}
           onFifo={handleCardFifo}
         />
+        <TransactionDetailDialog
+          tx={detailTx}
+          open={!!detailTx}
+          onOpenChange={(v) => !v && setDetailTx(null)}
+          contracts={contracts}
+          bankTx={bankTx}
+          companyMaster={companyMaster}
+        />
       </div>
     </div>
   );
@@ -720,7 +731,7 @@ export default function PaymentsPage() {
 /* ─────────────────── 자금일보 — 분개 테이블 ─────────────────── */
 
 function LedgerTable({
-  rows, totalCount, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange, onNoteChange, onOpenMatch, loading,
+  rows, totalCount, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange, onNoteChange, onOpenMatch, onOpenDetail, loading,
 }: {
   rows: BankTransaction[];
   totalCount?: number;
@@ -732,6 +743,7 @@ function LedgerTable({
   onSubjectChange: (tx: BankTransaction, subject: string) => void;
   onNoteChange: (tx: BankTransaction, note: string) => void;
   onOpenMatch: (tx: BankTransaction) => void;
+  onOpenDetail: (tx: BankTransaction) => void;
   loading?: boolean;
 }) {
   const hidden = Math.max(0, (totalCount ?? rows.length) - rows.length);
@@ -785,7 +797,13 @@ function LedgerTable({
           const status = ledgerStatus(t);
           const direction: 'deposit' | 'withdraw' = (t.withdraw ?? 0) > 0 ? 'withdraw' : 'deposit';
           return (
-            <tr key={t.id} className={selectedIds.has(t.id) ? 'selected-row' : undefined}>
+            <tr
+              key={t.id}
+              className={selectedIds.has(t.id) ? 'selected-row' : undefined}
+              onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('input, select, button, a')) onOpenDetail(t); }}
+              style={{ cursor: 'pointer' }}
+              title="더블클릭 — 거래 상세·유래 추적"
+            >
               <td className="checkbox-col">
                 <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggleRow(t.id)} aria-label="선택" />
               </td>
