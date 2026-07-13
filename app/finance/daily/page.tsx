@@ -143,7 +143,8 @@ export default function FinanceDailyPage() {
       if ((t.kind ?? '매출') !== '매출') continue;
       const day = (t.txDate ?? '').slice(0, 10);
       if (!day || !inPeriod(day)) continue;
-      const companyCode = (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
+      // 회사귀속: 은행거래와 동일하게 t.companyCode 폴백 (누락 시 카드만 '(미지정)'으로 새 나가 버킷 모달과 불일치)
+      const companyCode = t.companyCode || (t.matchedContractId && contractById.get(t.matchedContractId)?.company) || '(미지정)';
       if (companyFilter !== 'all' && companyCode !== companyFilter) continue;
       const cur = bucket(companyCode, day);
       cur.deposit += t.amount ?? 0;

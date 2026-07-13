@@ -213,7 +213,7 @@ export function TransactionDetailDialog({
  *  · 각 계좌 거래 줄 → 거래 상세 모달(onOpenTx)로 연결.
  */
 export function DailyBucketDetailDialog({
-  bucket, open, onOpenChange, bankTx, cardTx, contracts, companyMaster, onOpenTx,
+  bucket, open, onOpenChange, bankTx, cardTx, contracts, companyMaster, onOpenTx, corpCardAsWithdraw = false,
 }: {
   bucket: { companyCode: string; date: string } | null;
   open: boolean;
@@ -223,29 +223,36 @@ export function DailyBucketDetailDialog({
   contracts: Contract[];
   companyMaster: Parameters<typeof displayCompanyName>[1];
   onOpenTx: (tx: BankTransaction) => void;
+  /** 법인카드 지출을 그 날 출금 합계에 포함할지 — payments daily 집계는 포함(true), finance/daily 집계는 제외(false).
+   *  집계 규칙과 모달 합계를 표면별로 일치시키기 위함. */
+  corpCardAsWithdraw?: boolean;
 }) {
   const contractById = useMemo(() => new Map(contracts.map((c) => [c.id, c])), [contracts]);
   const data = useMemo(() => {
     if (!bucket) return null;
-    // 집계(app/finance/daily·payments daily)와 100% 동일 규칙
+    // 집계(app/finance/daily·payments daily)와 동일 규칙 — bank·card 모두 companyCode 폴백
     const companyOf = (t: { companyCode?: string; matchedContractId?: string }) =>
       t.companyCode || (t.matchedContractId ? contractById.get(t.matchedContractId)?.company : '') || '(미지정)';
-    const bank = bankTx.filter((t) => t.settlementRole !== 'item' && (t.txDate ?? '').slice(0, 10) === bucket.date && companyOf(t) === bucket.companyCode);
-    const card = cardTx.filter((t) => (t.kind ?? '매출') === '매출' && (t.txDate ?? '').slice(0, 10) === bucket.date && companyOf(t) === bucket.companyCode);
+    const inBucket = (t: { txDate?: string; companyCode?: string; matchedContractId?: string }) =>
+      (t.txDate ?? '').slice(0, 10) === bucket.date && companyOf(t) === bucket.companyCode;
+    const bank = bankTx.filter((t) => t.settlementRole !== 'item' && inBucket(t));
+    const card = cardTx.filter((t) => (t.kind ?? '매출') === '매출' && inBucket(t));
+    const corpCard = cardTx.filter((t) => (t.kind ?? '매출') !== '매출' && inBucket(t));
     let deposit = 0, withdraw = 0;
-    const bySubject = new Map<string, number>();
+    // 집계행 depoSubjects/drawSubjects 와 동일: 입금/출금 분리, 무과목 출금은 소계 드롭
+    const depoSub = new Map<string, number>();
+    const drawSub = new Map<string, number>();
     for (const t of bank) {
       deposit += t.amount ?? 0; withdraw += t.withdraw ?? 0;
-      const subj = t.subject || ((t.amount ?? 0) > 0 ? '대여료수입' : '(미지정)');
-      bySubject.set(subj, (bySubject.get(subj) ?? 0) + ((t.amount ?? 0) || (t.withdraw ?? 0)));
+      if ((t.amount ?? 0) > 0) { const s = t.subject || '대여료수입'; depoSub.set(s, (depoSub.get(s) ?? 0) + (t.amount ?? 0)); }
+      if ((t.withdraw ?? 0) > 0 && t.subject) drawSub.set(t.subject, (drawSub.get(t.subject) ?? 0) + (t.withdraw ?? 0));
     }
-    for (const t of card) {
-      deposit += t.amount ?? 0;
-      bySubject.set('카드매출', (bySubject.get('카드매출') ?? 0) + (t.amount ?? 0));
-    }
-    const excludedItems = bankTx.filter((t) => t.settlementRole === 'item' && (t.txDate ?? '').slice(0, 10) === bucket.date && companyOf(t) === bucket.companyCode);
-    return { bank, card, deposit, withdraw, bySubject: [...bySubject.entries()].sort((a, b) => b[1] - a[1]), excludedItems };
-  }, [bucket, bankTx, cardTx, contractById]);
+    for (const t of card) { deposit += t.amount ?? 0; depoSub.set('카드매출', (depoSub.get('카드매출') ?? 0) + (t.amount ?? 0)); }
+    if (corpCardAsWithdraw) for (const t of corpCard) { withdraw += t.amount ?? 0; drawSub.set('법인카드', (drawSub.get('법인카드') ?? 0) + (t.amount ?? 0)); }
+    const excludedItems = bankTx.filter((t) => t.settlementRole === 'item' && inBucket(t));
+    const bySort = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]);
+    return { bank, card, corpCard, deposit, withdraw, depoSub: bySort(depoSub), drawSub: bySort(drawSub), excludedItems };
+  }, [bucket, bankTx, cardTx, contractById, corpCardAsWithdraw]);
 
   if (!bucket || !data) return null;
 
@@ -260,10 +267,13 @@ export function DailyBucketDetailDialog({
             <span>순증감 <b className="mono">₩{formatCurrency(data.deposit - data.withdraw)}</b></span>
           </div>
 
-          {data.bySubject.length > 0 && (
+          {(data.depoSub.length > 0 || data.drawSub.length > 0) && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
-              {data.bySubject.map(([s, v]) => (
-                <span key={s} className="chip" style={{ height: 20, fontSize: 11, padding: '0 8px' }}>{s} <b className="mono" style={{ marginLeft: 4 }}>₩{formatCurrency(v)}</b></span>
+              {data.depoSub.map(([s, v]) => (
+                <span key={`d-${s}`} className="chip" style={{ height: 20, fontSize: 11, padding: '0 8px', color: 'var(--green-text)' }}>{s} <b className="mono" style={{ marginLeft: 4 }}>₩{formatCurrency(v)}</b></span>
+              ))}
+              {data.drawSub.map(([s, v]) => (
+                <span key={`w-${s}`} className="chip" style={{ height: 20, fontSize: 11, padding: '0 8px', color: 'var(--red-text)' }}>{s} <b className="mono" style={{ marginLeft: 4 }}>−₩{formatCurrency(v)}</b></span>
               ))}
             </div>
           )}
@@ -297,6 +307,16 @@ export function DailyBucketDetailDialog({
                   <td className="dim">카드매출</td>
                   <td className="num mono" style={{ color: 'var(--green-text)' }}>₩{formatCurrency(t.amount)}</td>
                   <td className="num mono">-</td>
+                  <td />
+                </tr>
+              ))}
+              {data.corpCard.map((t) => (
+                <tr key={t.id}>
+                  <td className="dim" style={{ fontSize: 11 }}>법인카드</td>
+                  <td>{t.merchant || t.usedBy || '-'}</td>
+                  <td className="dim">{t.category || '지출'}{!corpCardAsWithdraw && <span className="dim" style={{ fontSize: 10 }}> (집계 제외)</span>}</td>
+                  <td className="num mono">-</td>
+                  <td className="num mono" style={{ color: corpCardAsWithdraw ? 'var(--red-text)' : 'var(--text-weak)' }}>₩{formatCurrency(t.amount)}</td>
                   <td />
                 </tr>
               ))}

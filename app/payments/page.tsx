@@ -734,6 +734,7 @@ export default function PaymentsPage() {
           contracts={contracts}
           companyMaster={companyMaster}
           onOpenTx={(tx) => { setBucketDetail(null); setDetailTx(tx); }}
+          corpCardAsWithdraw   /* payments daily 집계는 법인카드를 출금으로 포함 */
         />
       </div>
     </div>
