@@ -329,9 +329,20 @@ export default function MigrateSwitchplanPage() {
           created++;
         }
       }
+      // 고립 차량 정화 — 현재 사업현황(자산∪할부)에 없는 기존 차량 = 이전 버전 마이그레이션 잔재.
+      //   '휴차대기'로 비활성 → 자산현황(유효 자산) 카운트에서 제외. 삭제 아님(원본 보존·복구가능).
+      let deactivated = 0;
+      for (const v of vehicles) {
+        const vp = (v.plate ?? '').trim();
+        if (!vp || plates.has(vp)) continue;                         // 현재 fleet 이면 유지
+        if (v.company && companyKey && v.company !== companyKey) continue; // 타 회사 차량 보호
+        if (v.status === '휴차대기') continue;                        // 이미 비활성
+        batch[v.id] = pruneUndefined({ ...v, status: '휴차대기' as VehicleStatus });
+        deactivated++;
+      }
       await rtdbUpdate(ref(db, dbPath('vehicles')), batch);
-      append(`✓ 자산·할부 커밋 — 차량 갱신 ${updated} · 신규 ${created} · 할부 ${vehiclePlan.loans}`);
-      toast.success(`차량 마스터 ${updated + created}대 반영`);
+      append(`✓ 자산·할부 커밋 — 차량 갱신 ${updated} · 신규 ${created} · 할부 ${vehiclePlan.loans} · 고립 비활성 ${deactivated}`);
+      toast.success(`차량 마스터 ${updated + created}대 반영${deactivated > 0 ? ` · 고립 ${deactivated}대 휴차 처리` : ''}`);
     } catch (err) {
       append(`✗ 자산 커밋 실패: ${friendlyError(err)}`);
       toast.error(friendlyError(err));
@@ -413,7 +424,34 @@ export default function MigrateSwitchplanPage() {
     }
   }
 
-  // 전체 일괄 반영 — 씨앗 → 반납 이력 → 자산·할부 순차 (합쳐진 확인창 1개). 개별 버튼은 그대로 유지.
+  // 1900년대 날짜 보정 — 엑셀 2자리 연도 버그로 <1990 저장된 계약일·만기일 +100년. 멱등(재실행 안전).
+  async function commitFix1900(skipConfirm = false) {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    const shift = (d?: string): string | undefined => {
+      if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return undefined;
+      const y = parseInt(d.slice(0, 4), 10);
+      return y < 1990 ? `${y + 100}${d.slice(4)}` : undefined;
+    };
+    const patches: Contract[] = [];
+    for (const c of contracts) {
+      const cd = shift(c.contractDate);
+      const rd = shift(c.returnScheduledDate);
+      if (cd || rd) patches.push({ ...c, ...(cd ? { contractDate: cd } : {}), ...(rd ? { returnScheduledDate: rd } : {}) });
+    }
+    if (patches.length === 0) { if (!skipConfirm) toast.info('1900년대 날짜 없음 — 보정 불필요'); return; }
+    if (!skipConfirm && !await showConfirm({ title: `1900년대 날짜 ${patches.length}건 +100년 보정`, confirmLabel: '보정' })) return;
+    setBusy(true);
+    try {
+      await updateContracts(patches);
+      append(`✓ 1900년대 날짜 보정 ${patches.length}건 (+100년)`);
+      toast.success(`날짜 보정 ${patches.length}건`);
+    } catch (err) {
+      append(`✗ 날짜 보정 실패: ${friendlyError(err)}`);
+      toast.error(friendlyError(err));
+    } finally { setBusy(false); }
+  }
+
+  // 전체 일괄 반영 — 씨앗 → 반납 이력 → 자산·할부 → 날짜보정 순차 (합쳐진 확인창 1개). 개별 버튼은 그대로 유지.
   async function commitAll() {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!res) return;
@@ -424,7 +462,8 @@ export default function MigrateSwitchplanPage() {
         `한 번에 순차 반영 (차량번호 기준 upsert — 재실행 안전):\n`
         + `① 씨앗(운영 계약) ${seedN}건 · 현재미수 carry ${won(res.totals.carryCurrent)}\n`
         + `② 반납 이력 ${res.returned.length}건 (신규만 · 추심 잔여 ${won(res.totals.carryReturned)})\n`
-        + `③ 자산·할부 ${vehiclePlan.total}대 (갱신 ${vehiclePlan.update}·신규 ${vehiclePlan.create})\n`
+        + `③ 자산·할부 ${vehiclePlan.total}대 (갱신 ${vehiclePlan.update}·신규 ${vehiclePlan.create}) + 고립 차량 휴차 정화\n`
+        + `④ 1900년대 날짜 보정 (엑셀 연도버그 +100년)\n`
         + `※ 자금일보는 대사 전용 — 이번 반영 대상 아님(이중차감 방지). 회사="${companyKey}".`,
       confirmLabel: '전체 반영 진행',
     })) return;
@@ -432,7 +471,8 @@ export default function MigrateSwitchplanPage() {
     await commitSeeds(true);
     await commitReturned(true);
     await commitVehicles(true);
-    append('✓ 전체 일괄 반영 완료 (씨앗·반납·자산할부)');
+    await commitFix1900(true);   // 1900년대 날짜 보정 통합
+    append('✓ 전체 일괄 반영 완료 (씨앗·반납·자산할부·날짜보정)');
     toast.success('전체 일괄 반영 완료');
   }
 
