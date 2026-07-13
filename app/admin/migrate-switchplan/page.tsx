@@ -494,7 +494,7 @@ export default function MigrateSwitchplanPage() {
                   <ArrowsDownUp size={12} /> {showAll ? '상위 30건만' : '전체 보기'}
                 </button>
               </div>
-              <div className="detail-section-body" style={{ maxHeight: 460, overflow: 'auto', padding: 0 }}>
+              <div className="detail-section-body" style={{ overflowX: 'auto', padding: 0 }}>
                 <table className="table" style={{ fontSize: 12 }}>
                   <thead>
                     <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
@@ -584,7 +584,7 @@ export default function MigrateSwitchplanPage() {
                 <span className="title">5. 종료 계약 이력 ({res.returned.length}건 · 추심대상 {res.returned.filter((c) => c.carryUnpaid > 0).length}건)</span>
               </div>
               <div className="detail-section-body" style={{ padding: 0 }}>
-                <div style={{ maxHeight: 320, overflow: 'auto' }}>
+                <div style={{ overflowX: 'auto' }}>
                   <table className="table" style={{ fontSize: 12 }}>
                     <thead>
                       <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
@@ -637,7 +637,7 @@ export default function MigrateSwitchplanPage() {
                 <span className="title">6. 자산·할부 → 차량 마스터 (자산 {res.vehicles.length}대 · 할부 {res.loans.filter((l) => !l.cashOnly).length}대)</span>
               </div>
               <div className="detail-section-body" style={{ padding: 0 }}>
-                <div style={{ maxHeight: 300, overflow: 'auto' }}>
+                <div style={{ overflowX: 'auto' }}>
                   <table className="table" style={{ fontSize: 12 }}>
                     <thead>
                       <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
@@ -729,7 +729,7 @@ export default function MigrateSwitchplanPage() {
                     </div>
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--text-weak)', marginBottom: 4 }}>계정과목 Top 12 (입출 합)</div>
-                      <div style={{ maxHeight: 230, overflow: 'auto' }}>
+                      <div style={{ overflowX: 'auto' }}>
                         <table className="table" style={{ fontSize: 11 }}>
                           <thead><tr style={{ color: 'var(--text-weak)', textAlign: 'right' }}>
                             <th style={{ textAlign: 'left', padding: '3px 6px' }}>계정과목</th><th style={{ padding: '3px 6px' }}>입금</th><th style={{ padding: '3px 6px' }}>출금</th><th style={{ padding: '3px 6px' }}>건</th>
@@ -785,7 +785,7 @@ export default function MigrateSwitchplanPage() {
                   </div>
                 )}
 
-                <div style={{ maxHeight: 380, overflow: 'auto' }}>
+                <div style={{ overflowX: 'auto' }}>
                   <table className="table" style={{ fontSize: 12 }}>
                     <thead>
                       <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
@@ -842,7 +842,7 @@ export default function MigrateSwitchplanPage() {
                 )}
 
                 {(misuVerify.summary.falseMisuCount > 0 || misuVerify.summary.missingRefCount > 0) && (
-                  <div style={{ maxHeight: 320, overflow: 'auto' }}>
+                  <div style={{ overflowX: 'auto' }}>
                     <table className="table" style={{ fontSize: 12 }}>
                       <thead>
                         <tr style={{ color: 'var(--text-weak)', fontSize: 11, textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
