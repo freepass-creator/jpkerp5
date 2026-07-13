@@ -890,19 +890,19 @@ function ContactLogDialog({
           </span>
         }
       >
-        <DialogBody style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div className="form-grid-2" style={{ gridTemplateColumns: '90px minmax(0, 1fr)' }}>
+        <DialogBody style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="form-grid-2" style={{ gridTemplateColumns: '92px minmax(0, 1fr)', rowGap: 13, alignItems: 'center' }}>
             <label className="form-label">연락일</label>
             <input
               type="date"
-              className="input input-compact mono"
+              className="input mono"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
 
             <label className="form-label">방법</label>
             <select
-              className="input input-compact"
+              className="input"
               value={method}
               onChange={(e) => setMethod(e.target.value)}
             >
@@ -921,15 +921,15 @@ function ContactLogDialog({
               value={response}
               onChange={(e) => setResponse(e.target.value)}
               placeholder="예) 5/30 입금 약속, 통화 안 됨, 연체이유 등"
-              rows={3}
+              rows={4}
               autoFocus
-              style={{ resize: 'vertical', fontFamily: 'inherit', padding: 8 }}
+              style={{ resize: 'vertical', fontFamily: 'inherit', padding: 10, minHeight: 96, lineHeight: 1.55 }}
             />
 
             <label className="form-label">다음 약속일</label>
             <input
               type="date"
-              className="input input-compact mono"
+              className="input mono"
               value={nextPromise}
               onChange={(e) => setNextPromise(e.target.value)}
             />
@@ -939,9 +939,9 @@ function ContactLogDialog({
               className="input"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={2}
+              rows={3}
               placeholder="필요시 추가 메모"
-              style={{ resize: 'vertical', fontFamily: 'inherit', padding: 8 }}
+              style={{ resize: 'vertical', fontFamily: 'inherit', padding: 10, minHeight: 62, lineHeight: 1.55 }}
             />
           </div>
         </DialogBody>
