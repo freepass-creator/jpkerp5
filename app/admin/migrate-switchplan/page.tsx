@@ -20,10 +20,12 @@ import { upsertVehicleFromContract } from '@/lib/entity-sync';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
+import { useBankTx } from '@/lib/firebase/transactions-store';
+import { bankTxKeys } from '@/lib/dedup-keys';
 import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
 import { friendlyError } from '@/lib/friendly-error';
-import type { Contract } from '@/lib/types';
+import type { Contract, BankTransaction, VehicleStatus } from '@/lib/types';
 
 const won = (n: number) => '₩' + Math.round(n).toLocaleString('ko-KR');
 
@@ -36,6 +38,7 @@ export default function MigrateSwitchplanPage() {
   const { contracts, addMany: addContracts, updateMany: updateContracts } = useContracts();
   const { vehicles, add: addVehicle, update: updateVehicle } = useVehicles();
   const { companies } = useCompanies();
+  const { rows: existingBankTx, addMany: addBankTx } = useBankTx();
 
   const [fileName, setFileName] = useState('');
   const [res, setRes] = useState<SwitchplanParseResult | null>(null);
@@ -48,6 +51,17 @@ export default function MigrateSwitchplanPage() {
   const [showAll, setShowAll] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const append = (line: string) => setLog((l) => [...l, `[${new Date().toLocaleTimeString('ko-KR')}] ${line}`]);
+
+  // 마이그레이션 차량상태 = 계약 상태에서 파생하는 단일 헬퍼(파이프라인 통일).
+  //   운행중 계약 있는 plate → '운행', 그 외(종료만/무계약) → '휴차대기'(유휴).
+  //   ※ 앱 일상흐름의 "인도까지 휴차"와 달리, 마이그레이션은 이미 인도된 과거 계약이라 운행 반영.
+  const activePlates = useMemo(() => {
+    const s = new Set<string>();
+    if (res) for (const c of res.current) if (c.vehiclePlate) s.add(c.vehiclePlate.trim());
+    return s;
+  }, [res]);
+  const migVehStatus = (plate: string | undefined): VehicleStatus =>
+    plate && activePlates.has(plate.trim()) ? '운행' : '휴차대기';
 
   // 로컬 dev — 디스크의 기존 파일(사업현황+자금일보)을 dev 서버가 읽어 자동 로드.
   // → 업로드 없이 페이지 열면 데이터 채워지고 [전체 일괄 반영] 한 번이면 끝.
@@ -303,12 +317,12 @@ export default function MigrateSwitchplanPage() {
         const loanFields = loan ? buildLoanFields(loan) : {};
         const existing = existingByPlate.get(plate);
         if (existing) {
-          batch[existing.id] = pruneUndefined({ ...existing, ...fields, ...loanFields, id: existing.id, status: existing.status, createdAt: existing.createdAt });
+          batch[existing.id] = pruneUndefined({ ...existing, ...fields, ...loanFields, id: existing.id, status: migVehStatus(plate), createdAt: existing.createdAt });
           updated++;
         } else {
           const id = push(ref(db, dbPath('vehicles'))).key;
           if (!id) continue;
-          batch[id] = pruneUndefined({ model: '미정', ...fields, ...loanFields, id, status: '휴차대기', createdAt: nowIso });
+          batch[id] = pruneUndefined({ model: '미정', ...fields, ...loanFields, id, status: migVehStatus(plate), createdAt: nowIso });
           created++;
         }
       }
@@ -317,6 +331,49 @@ export default function MigrateSwitchplanPage() {
       toast.success(`차량 마스터 ${updated + created}대 반영`);
     } catch (err) {
       append(`✗ 자산 커밋 실패: ${friendlyError(err)}`);
+      toast.error(friendlyError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 자금일보 → 재무관리 (bankTransactions) 반영. **자동매칭 안 함** — carry 씨앗이 이미 입금 반영이라
+  //   매칭하면 미수 이중차감. 거래 이력만 넣어 재무관리에 계좌/CMS 거래가 뜨게. dedup(bankTxKeys)로 재실행 안전.
+  async function commitJboToBank(skipConfirm = false) {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    if (!jboRes) { toast.info('자금일보 없음 — 먼저 불러오세요'); return; }
+    const bank = (s: string) => /신한/.test(s) ? '신한' : /농협/.test(s) ? '농협' : /국민|kb/i.test(s) ? 'KB' : /우리/.test(s) ? '우리' : /하나/.test(s) ? '하나' : undefined;
+    const mapped: Array<Omit<BankTransaction, 'id'>> = jboRes.transactions.map((t) => ({
+      txDate: t.date,
+      amount: t.deposit,
+      withdraw: t.withdraw || undefined,
+      counterparty: (t.detail || t.memo || '').slice(0, 60),
+      memo: t.memo || undefined,
+      source: bank(t.account),
+      account: t.account,
+      companyCode: companyKey,
+      subject: t.subject || undefined,
+      linkedVehiclePlate: t.plate || undefined,
+      linkedCustomerName: t.tenant || undefined,
+    }));
+    const existKeys = new Set(existingBankTx.flatMap((tx) => bankTxKeys(tx).filter(Boolean)));
+    const fresh = mapped.filter((tx) => !bankTxKeys(tx).some((k) => k && existKeys.has(k)));
+    const dup = mapped.length - fresh.length;
+    if (fresh.length === 0) { toast.info(`신규 거래 없음 (이미 있음 ${dup})`); return; }
+    if (!skipConfirm && !await showConfirm({
+      title: `자금일보 → 재무관리 ${fresh.length}건 반영`,
+      description:
+        `계좌 거래(입금·출금·자금이동)를 재무관리에 등록 — 이미 있음 ${dup}건 제외.\n`
+        + `⚠ 자동매칭 안 함 → 미수 영향 없음(carry 씨앗 이중차감 방지). 필요 시 재무관리에서 계약 수동매칭.`,
+      confirmLabel: '재무 반영',
+    })) return;
+    setBusy(true);
+    try {
+      await addBankTx(fresh);
+      append(`✓ 자금일보 → 재무관리 ${fresh.length}건 반영 (매칭 X · 이미 있음 ${dup} 제외)`);
+      toast.success(`재무관리 ${fresh.length}건 반영`);
+    } catch (err) {
+      append(`✗ 재무 반영 실패: ${friendlyError(err)}`);
       toast.error(friendlyError(err));
     } finally {
       setBusy(false);
@@ -704,6 +761,15 @@ export default function MigrateSwitchplanPage() {
 
               {jboRes && (
                 <>
+                  <BusyButton
+                    busy={busy} busyLabel="재무 반영 중…"
+                    className="btn btn-primary"
+                    disabled={!superAdmin}
+                    onClick={() => commitJboToBank()}
+                    style={{ height: 42, fontSize: 13, fontWeight: 600, alignSelf: 'flex-start' }}
+                  >
+                    <Upload weight="bold" size={15} /> 재무관리에 반영 — 계좌 거래 {jboRes.totals.count.toLocaleString()}건 (자동매칭 X · 미수 영향 없음)
+                  </BusyButton>
                   <div style={{ fontSize: 12, color: 'var(--text-sub)', lineHeight: 1.7 }}>
                     거래 <b>{jboRes.totals.count.toLocaleString()}</b>건 · {jboRes.totals.dateFrom}~{jboRes.totals.dateTo} · 계좌 {jboRes.totals.accounts} · 계정과목 {jboRes.totals.subjects}종<br />
                     실입금(자금이동 제외) <b style={{ color: 'var(--green-text)' }}>{won(jboRes.totals.realDeposit)}</b> · 실출금 <b style={{ color: 'var(--red-text)' }}>{won(jboRes.totals.realWithdraw)}</b> · 계좌간이체(sweep) {won(jboRes.totals.sweepDeposit)}
