@@ -25,7 +25,8 @@ import { displayCompanyName } from '@/lib/company-display';
 import { formatDateFull } from '@/lib/utils';
 import { CompanyFilter } from '@/components/ui/filter-bar';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
-import { sumPayments, sumDiscounts, balance } from '@/lib/payment-schedule';
+import { sumPayments, sumDiscounts, balance, addDiscountEntry, totalUnpaid, totalUnpaidCount, computeCurrentSeq } from '@/lib/payment-schedule';
+import { todayKr } from '@/lib/mock-data';
 import { usePersistentState } from '@/lib/use-persistent-state';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { exportToExcel } from '@/lib/excel-export';
@@ -50,7 +51,7 @@ type Row = {
 const fmt = (v: number) => v ? v.toLocaleString('ko-KR') : '';
 
 export default function ContractSchedulePage() {
-  const { contracts, loading } = useContracts();
+  const { contracts, loading, update: updateContract } = useContracts();
   const { rows: bankTx } = useBankTx();
   const { companies: companyMaster } = useCompanies();
   /** 계좌 입금(source='계좌')의 txId → 자금일보 거래 역참조 (연동 표시) */
@@ -63,6 +64,23 @@ export default function ContractSchedulePage() {
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+  }
+  /** 청구할인 적용 — 엔진(addDiscountEntry) 재사용, 미수 파생값 동기 재계산 (payment-tab 과 동일 SSOT) */
+  async function applyDiscount(contract: Contract, seq: number, amount: number, reason: DiscountEntry['reason'], memo?: string) {
+    const today = todayKr();
+    const nextSchedules = (contract.schedules ?? []).map((s) =>
+      s.seq === seq
+        ? addDiscountEntry(s, { date: today, amount, reason, memo, at: new Date().toISOString() }, today)
+        : s,
+    );
+    await updateContract({
+      ...contract,
+      schedules: nextSchedules,
+      unpaidAmount: totalUnpaid(nextSchedules),
+      unpaidSeqCount: totalUnpaidCount(nextSchedules),
+      currentSeq: computeCurrentSeq(nextSchedules, today),
+    });
+    toast.success(`${seq}회차 청구할인 ₩${amount.toLocaleString('ko-KR')} 적용`);
   }
   const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:contract-schedule:company', 'all');
   const [bucket, setBucket] = usePersistentState<Bucket>('filter:contract-schedule:bucket', 'all');
@@ -289,20 +307,18 @@ export default function ContractSchedulePage() {
             const key = `${r.contract.id}-${r.seq}`;
             const pays = r.schedule.payments ?? [];
             const discs = r.schedule.discounts ?? [];
-            const hasEntries = pays.length > 0 || discs.length > 0;
             const isExpanded = expanded.has(key);
+            const canDiscount = r.status !== '완료' && r.status !== '면제';
             return (
               <Fragment key={key}>
               <tr
                 onDoubleClick={() => r.contract.vehiclePlate && openVehicle(r.contract.vehiclePlate, 'payment')}
-                onClick={() => hasEntries && toggleExpand(key)}
-                style={{ cursor: hasEntries ? 'pointer' : 'default' }}
-                title={hasEntries ? '펼쳐서 분할납부·할인·자금일보 연동 보기' : undefined}
+                onClick={() => toggleExpand(key)}
+                style={{ cursor: 'pointer' }}
+                title="펼쳐서 분할납부·할인·자금일보 연동 보기 / 청구할인 넣기"
               >
                 <td className="center">
-                  {hasEntries && (
-                    <CaretRight size={10} weight="bold" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-weak)' }} />
-                  )}
+                  <CaretRight size={10} weight="bold" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-weak)' }} />
                 </td>
                 <td className="dim">{r.contract.company ? displayCompanyName(r.contract.company, companyMaster) : '-'}</td>
                 <td className="mono dim">{r.contract.contractNo || '-'}</td>
@@ -329,10 +345,16 @@ export default function ContractSchedulePage() {
                 </td>
                 <td className="mono dim">{r.paidAt || '-'}</td>
               </tr>
-              {isExpanded && hasEntries && (
+              {isExpanded && (
                 <tr>
                   <td colSpan={13} style={{ background: 'var(--bg-sunken)', padding: 8 }}>
-                    <ScheduleBreakdown pays={pays} discs={discs} bankTxById={bankTxById} />
+                    <ScheduleBreakdown
+                      pays={pays}
+                      discs={discs}
+                      bankTxById={bankTxById}
+                      canDiscount={canDiscount}
+                      onAddDiscount={(amount, reason, memo) => applyDiscount(r.contract, r.seq, amount, reason, memo)}
+                    />
                   </td>
                 </tr>
               )}
@@ -352,19 +374,35 @@ export default function ContractSchedulePage() {
  * payment-tab 의 펼침 상세와 동일 규격 — 여기선 read-only 요약.
  */
 function ScheduleBreakdown({
-  pays, discs, bankTxById,
+  pays, discs, bankTxById, canDiscount, onAddDiscount,
 }: {
   pays: PaymentEntry[];
   discs: DiscountEntry[];
   bankTxById: Map<string, BankTransaction>;
+  canDiscount: boolean;
+  onAddDiscount: (amount: number, reason: DiscountEntry['reason'], memo?: string) => void;
 }) {
+  const [adding, setAdding] = useState(false);
+  const [amt, setAmt] = useState('');
+  const [reason, setReason] = useState<NonNullable<DiscountEntry['reason']>>('자가조치');
+  const [memo, setMemo] = useState('');
+  function submitDiscount() {
+    const n = parseInt(amt.replace(/[^0-9]/g, ''), 10);
+    if (!n || n <= 0) { toast.error('할인 금액을 입력하세요'); return; }
+    onAddDiscount(n, reason, memo || undefined);
+    setAdding(false); setAmt(''); setMemo('');
+  }
   const entries = [
     ...pays.map((p) => ({ kind: 'payment' as const, date: p.date, amount: p.amount, source: p.source, memo: p.memo, by: p.by, txId: p.txId, reason: undefined as string | undefined })),
     ...discs.map((d) => ({ kind: 'discount' as const, date: d.date, amount: d.amount, source: '할인' as const, memo: d.memo, by: d.by, txId: undefined, reason: d.reason })),
   ].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
 
   return (
-    <table className="table" style={{ fontSize: 11, margin: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {entries.length === 0 ? (
+        <div className="dim" style={{ fontSize: 11, padding: '2px 4px' }}>아직 분할납부·할인 내역이 없습니다.</div>
+      ) : (
+      <table className="table" style={{ fontSize: 11, margin: 0 }}>
       <thead>
         <tr>
           <th style={{ width: 100 }}>일자</th>
@@ -427,6 +465,33 @@ function ScheduleBreakdown({
           );
         })}
       </tbody>
-    </table>
+      </table>
+      )}
+      {canDiscount && (adding ? (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 8px', background: 'var(--red-bg)', borderRadius: 'var(--radius-sm)' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--red-text)' }}>청구할인 추가</span>
+          <input type="text" inputMode="numeric" className="input mono" placeholder="원 단위" value={amt}
+            onChange={(e) => setAmt(e.target.value.replace(/[^0-9]/g, ''))} autoFocus style={{ width: 120 }} />
+          <select className="input" value={reason} onChange={(e) => setReason(e.target.value as NonNullable<DiscountEntry['reason']>)} style={{ width: 112 }}>
+            <option value="자가조치">자가조치</option>
+            <option value="보상">보상</option>
+            <option value="사은품">사은품</option>
+            <option value="캠페인">캠페인</option>
+            <option value="반납 일할">반납 일할</option>
+            <option value="기타">기타</option>
+          </select>
+          <input type="text" className="input" placeholder="메모(선택)" value={memo} onChange={(e) => setMemo(e.target.value)} style={{ width: 160 }} />
+          <button className="btn btn-sm btn-primary" type="button" onClick={submitDiscount}>저장</button>
+          <button className="btn btn-sm" type="button" onClick={() => { setAdding(false); setAmt(''); setMemo(''); }}>취소</button>
+          <span style={{ fontSize: 10, color: 'var(--text-weak)' }}>※ 청구금액에서 차감 (미수 아님) · 이 회차에만</span>
+        </div>
+      ) : (
+        <div>
+          <button className="btn btn-sm" type="button" onClick={() => setAdding(true)} style={{ color: 'var(--red-text)' }}>
+            + 청구할인 넣기
+          </button>
+        </div>
+      ))}
+    </div>
   );
 }
