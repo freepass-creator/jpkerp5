@@ -541,20 +541,31 @@ export default function MigrateSwitchplanPage() {
                 <span className="title">사전 점검 · 미수 기준일 {res.asOf}</span>
               </div>
               <div className="detail-section-body">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, fontSize: 12 }}>
-                  {[
-                    { label: '채권(운행중)', n: res.totals.countCurrent, base: 102 },
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, fontSize: 12 }}>
+                  {([
+                    { label: '전체 구매(자산)', n: res.vehicles.length, base: 163 },
+                    { label: '현보유(활성)', n: res.activePlates.length, base: 118 },
+                    { label: '운행중(계약)', n: res.totals.countCurrent, base: 102 },
                     { label: '반납(종료)', n: res.totals.countReturned, base: 75 },
-                    { label: '자산(차량)', n: res.vehicles.length, base: 163 },
                     { label: '상환합계(할부)', n: res.loans.length, base: 157 },
                     { label: '등록번호 매칭', n: res.current.filter((c) => c.customerIdentNo).length, base: res.totals.countCurrent },
-                  ].map((c) => (
+                    { label: '현재 미수건수', n: res.current.filter((c) => (c.carryUnpaid ?? 0) > 0).length, tone: 'plain' },
+                    { label: '현재 미수액', money: res.totals.carryCurrent },
+                    { label: '추심잔여 건수', n: res.returned.filter((c) => (c.carryUnpaid ?? 0) > 0).length, tone: 'plain' },
+                    { label: '추심잔여액', money: res.totals.carryReturned },
+                  ] as Array<{ label: string; n?: number; base?: number; money?: number; tone?: 'plain' }>).map((c) => (
                     <div key={c.label} style={{ padding: 8, background: 'var(--bg-sunken)', borderRadius: 'var(--radius)' }}>
                       <div style={{ color: 'var(--text-weak)', fontSize: 11, marginBottom: 2 }}>{c.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: c.n > 0 ? 'var(--brand)' : 'var(--red-text)' }}>
-                        {c.n > 0 ? '✓ ' : '⚠ '}{c.n}
-                      </div>
-                      <div style={{ color: 'var(--text-weak)', fontSize: 10 }}>직전 {c.base}</div>
+                      {c.money !== undefined ? (
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-main)' }}>{won(c.money)}</div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: c.tone === 'plain' ? 'var(--text-main)' : (c.n ?? 0) > 0 ? 'var(--brand)' : 'var(--red-text)' }}>
+                            {c.tone === 'plain' ? '' : (c.n ?? 0) > 0 ? '✓ ' : '⚠ '}{c.n}
+                          </div>
+                          {c.base !== undefined && <div style={{ color: 'var(--text-weak)', fontSize: 10 }}>직전 {c.base}</div>}
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
