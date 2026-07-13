@@ -349,10 +349,10 @@ export default function AssetPage() {
                     <th className="center" style={{ width: 90 }}>등록증</th>
                     <th className="center" style={{ width: 96 }}>보험증권</th>
                     <th className="center" style={{ width: 90 }}>구매방식</th>
-                    <th className="center" style={{ width: 64 }}>수선</th>
-                    <th className="center" style={{ width: 80 }}>GPS</th>
-                    <th style={{ minWidth: 220 }}>미입력 알람</th>
-                    <th className="center" style={{ width: 76 }}>상태</th>
+                    <th className="center" style={{ width: 60 }}>수선</th>
+                    <th className="center" style={{ width: 72 }}>GPS</th>
+                    <th style={{ width: 230, whiteSpace: 'normal' }}>미입력 알람</th>
+                    <th className="center" style={{ width: 118 }}>상태</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -448,7 +448,7 @@ export default function AssetPage() {
                           </StatusBadge>
                         )}
                       </td>
-                      <td className="dim" style={{ fontSize: 11 }}>
+                      <td className="dim" style={{ fontSize: 11, whiteSpace: 'normal', lineHeight: 1.35 }}>
                         {missing.length === 0
                           ? <span style={{ color: 'var(--green-text)' }}>✓ 모두 입력 완료</span>
                           : <MissingText label={missing.join(' · ')} tone="red" />}
