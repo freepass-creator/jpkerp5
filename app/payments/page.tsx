@@ -34,6 +34,13 @@ import { useTableSelection } from '@/lib/use-table-selection';
 
 type Tab = 'all' | 'autodebit' | 'summary' | 'card' | 'corpcard';
 
+/**
+ * 3년치 대량 거래 렌더 캡 — 목록은 최신순, 넘치면 상위 N만 DOM 에 그림 (행마다 select·버튼·input 이라
+ * 2700행 통째 렌더 시 페이지·탭 전환이 다 느려짐). 합계·필터는 전체 기준 유지. 검색·필터로 좁혀 찾는 구조.
+ */
+const LEDGER_RENDER_CAP = 300;
+const SUMMARY_RENDER_CAP = 500;
+
 /** 자동이체로 분류되는 source 값들 — CMS / 자동이체 / 자동이체-CMS 등 */
 function isAutoDebit(t: BankTransaction): boolean {
   const s = (t.source ?? '').toUpperCase();
@@ -128,6 +135,12 @@ export default function PaymentsPage() {
       })
       .sort((a, b) => b.txDate.localeCompare(a.txDate));
   }, [bankTx, search, filter, companyFilter, subjectFilter, contractById, tab, direction]);
+
+  /** 렌더 캡 적용분 — 화면엔 최신 N행만, 합계·건수는 ledgerRows(전체) 기준 유지 */
+  const visibleLedgerRows = useMemo(
+    () => (ledgerRows.length > LEDGER_RENDER_CAP ? ledgerRows.slice(0, LEDGER_RENDER_CAP) : ledgerRows),
+    [ledgerRows],
+  );
 
   /** 분개 뷰에 노출할 회사 목록 (실 데이터 기반) */
   const companyOptions = useMemo(
@@ -573,7 +586,8 @@ export default function PaymentsPage() {
             <div className="panel-body">
               {(tab === 'all' || tab === 'autodebit') && (
                 <LedgerTable
-                  rows={ledgerRows}
+                  rows={visibleLedgerRows}
+                  totalCount={ledgerRows.length}
                   contractById={contractById}
                   companyMaster={companyMaster}
                   selectedIds={selectedIds}
@@ -586,7 +600,11 @@ export default function PaymentsPage() {
                 />
               )}
               {tab === 'summary' && (
-                <SummaryTable rows={daily} companyMaster={companyMaster} />
+                <SummaryTable
+                  rows={daily.length > SUMMARY_RENDER_CAP ? daily.slice(0, SUMMARY_RENDER_CAP) : daily}
+                  totalCount={daily.length}
+                  companyMaster={companyMaster}
+                />
               )}
               {tab === 'card' && (
                 <CardTable rows={cardRows} loading={cardTxLoading} onOpenMatch={setCardMatchTarget} />
@@ -702,9 +720,10 @@ export default function PaymentsPage() {
 /* ─────────────────── 자금일보 — 분개 테이블 ─────────────────── */
 
 function LedgerTable({
-  rows, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange, onNoteChange, onOpenMatch, loading,
+  rows, totalCount, contractById, companyMaster, selectedIds, toggleRow, setSelectedIds, onSubjectChange, onNoteChange, onOpenMatch, loading,
 }: {
   rows: BankTransaction[];
+  totalCount?: number;
   contractById: Map<string, Contract>;
   companyMaster: Parameters<typeof displayCompanyName>[1];
   selectedIds: Set<string>;
@@ -715,6 +734,7 @@ function LedgerTable({
   onOpenMatch: (tx: BankTransaction) => void;
   loading?: boolean;
 }) {
+  const hidden = Math.max(0, (totalCount ?? rows.length) - rows.length);
   return (
     <table className="table">
       <thead>
@@ -759,7 +779,8 @@ function LedgerTable({
                 : '표시할 거래가 없습니다. 사이드바 → 신규 등록 → 입출금 등록 으로 계좌 엑셀 업로드.'}
             </td>
           </tr>
-        ) : rows.map((t) => {
+        ) : (<>
+          {rows.map((t) => {
           const c = t.matchedContractId ? contractById.get(t.matchedContractId) : undefined;
           const status = ledgerStatus(t);
           const direction: 'deposit' | 'withdraw' = (t.withdraw ?? 0) > 0 ? 'withdraw' : 'deposit';
@@ -830,7 +851,16 @@ function LedgerTable({
               </td>
             </tr>
           );
-        })}
+          })}
+          {hidden > 0 && (
+            <tr>
+              <td colSpan={13} className="muted center" style={{ padding: '14px 10px', fontSize: 12 }}>
+                최신 {rows.length.toLocaleString('ko-KR')}건 표시 / 전체 {(totalCount ?? rows.length).toLocaleString('ko-KR')}건 —
+                나머지 {hidden.toLocaleString('ko-KR')}건은 위 <b>검색·회사·방향·계정과목</b> 필터로 좁혀 보세요. (합계·건수는 전체 기준)
+              </td>
+            </tr>
+          )}
+        </>)}
       </tbody>
     </table>
   );
@@ -839,15 +869,17 @@ function LedgerTable({
 /* ─────────────────── 일자별 집계 테이블 ─────────────────── */
 
 function SummaryTable({
-  rows, companyMaster,
+  rows, totalCount, companyMaster,
 }: {
   rows: Array<{
     key: string; companyCode: string; date: string;
     txCount: number; deposit: number; withdraw: number; netChange: number; endBalance: number;
     depoSubjects: string; drawSubjects: string;
   }>;
+  totalCount?: number;
   companyMaster: Parameters<typeof displayCompanyName>[1];
 }) {
+  const hidden = Math.max(0, (totalCount ?? rows.length) - rows.length);
   return (
     <table className="table">
       <thead>
@@ -870,7 +902,8 @@ function SummaryTable({
               집계할 거래가 없습니다.
             </td>
           </tr>
-        ) : rows.map((r) => (
+        ) : (<>
+          {rows.map((r) => (
           <tr key={r.key}>
             <td className="dim">{displayCompanyName(r.companyCode, companyMaster)}</td>
             <td className="mono">{r.date}</td>
@@ -884,7 +917,16 @@ function SummaryTable({
             <td className="dim" style={{ fontSize: 11, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.depoSubjects || '-'}</td>
             <td className="dim" style={{ fontSize: 11, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.drawSubjects || '-'}</td>
           </tr>
-        ))}
+          ))}
+          {hidden > 0 && (
+            <tr>
+              <td colSpan={9} className="muted center" style={{ padding: '14px 10px', fontSize: 12 }}>
+                최신 {rows.length.toLocaleString('ko-KR')}일 표시 / 전체 {(totalCount ?? rows.length).toLocaleString('ko-KR')}일 —
+                기간을 좁히려면 <b>/finance/daily</b>(자금일보 전용)에서 월·분기·연 필터를 쓰세요.
+              </td>
+            </tr>
+          )}
+        </>)}
       </tbody>
     </table>
   );
