@@ -49,6 +49,42 @@ export default function MigrateSwitchplanPage() {
   const [log, setLog] = useState<string[]>([]);
   const append = (line: string) => setLog((l) => [...l, `[${new Date().toLocaleTimeString('ko-KR')}] ${line}`]);
 
+  // 로컬 dev — 디스크의 기존 파일(사업현황+자금일보)을 dev 서버가 읽어 자동 로드.
+  // → 업로드 없이 페이지 열면 데이터 채워지고 [전체 일괄 반영] 한 번이면 끝.
+  const [autoTried, setAutoTried] = useState(false);
+  async function autoLoad(force = false) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/admin/migrate-source', { cache: 'no-store' });
+      const j = await r.json();
+      if (!j.ok) { append(`자동 불러오기 불가 (${j.error ?? 'dev 전용'})`); return; }
+      const toBuf = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
+      if (j.bizStatus && (force || !res)) {
+        const parsed = parseSwitchplanWorkbook(toBuf(j.bizStatus.b64));
+        setFileName(j.bizStatus.name); setRes(parsed);
+        append(`자동 불러오기 ✓ ${j.bizStatus.name} — 운행중 ${parsed.totals.countCurrent} · 종료 ${parsed.totals.countReturned}`);
+      } else if (!j.bizStatus) {
+        append(`⚠ 사업현황 파일 못 찾음: ${j.bizPath}. 수동 업로드 하세요.`);
+      }
+      if (j.jbo && (force || !jboRes)) {
+        const jbo = parseSwitchplanJbo(toBuf(j.jbo.b64));
+        setJboFileName(j.jbo.name); setJboRes(jbo);
+        append(`자금일보 자동 ✓ ${jbo.totals.count}건 (대사용, 미반영)`);
+      }
+    } catch (err) {
+      append(`자동 불러오기 오류: ${friendlyError(err)} — 수동 업로드 폴백`);
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    if (!superAdmin || res || autoTried) return;
+    setAutoTried(true);
+    void autoLoad();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [superAdmin, res, autoTried]);
+
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -345,13 +381,18 @@ export default function MigrateSwitchplanPage() {
 
           {/* 업로드 */}
           <section className="detail-section">
-            <div className="detail-section-header"><span className="title">1. 원본 업로드</span></div>
-            <div className="detail-section-body" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <label className="btn btn-primary" style={{ height: 40, cursor: busy ? 'default' : 'pointer' }}>
-                <FileXls weight="bold" size={16} /> 사업현황.xlsx 선택
+            <div className="detail-section-header"><span className="title">1. 원본 (기존 파일 자동 불러옴)</span></div>
+            <div className="detail-section-body" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <BusyButton busy={busy} busyLabel="불러오는 중…" className="btn btn-primary" onClick={() => autoLoad(true)} style={{ height: 40 }}>
+                <ArrowsDownUp weight="bold" size={16} /> 기존 파일 다시 불러오기
+              </BusyButton>
+              <label className="btn" style={{ height: 40, cursor: busy ? 'default' : 'pointer' }}>
+                <FileXls weight="bold" size={15} /> 직접 선택(수동)
                 <input type="file" accept=".xlsx,.xls" hidden disabled={busy} onChange={onFile} />
               </label>
-              {fileName && <span style={{ fontSize: 12, color: 'var(--text-sub)' }}>{fileName}</span>}
+              {fileName
+                ? <span style={{ fontSize: 12, color: res ? 'var(--green-text)' : 'var(--text-sub)', fontWeight: 600 }}>✓ {fileName}</span>
+                : !busy && <span style={{ fontSize: 12, color: 'var(--text-weak)' }}>자동 불러오기 대기 — 위 버튼 누르거나 직접 선택</span>}
               <label style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-weak)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 회사
                 <input

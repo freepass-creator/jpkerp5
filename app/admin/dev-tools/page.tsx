@@ -33,6 +33,13 @@ const TOOLS: ToolCard[] = [
     variant: 'op',
   },
   {
+    href: '/admin/migrate-switchplan',
+    title: '스위치플랜 마이그레이션',
+    desc: '사업현황.xlsx → 씨앗(운영 계약·carry 미수)·반납 이력·자산·할부 일괄 반영. 미수 3정의 대조 후 [전체 일괄 반영] 한 번에. 자금일보는 대사 전용(미반영).',
+    icon: <Database size={18} weight="duotone" />,
+    variant: 'op',
+  },
+  {
     href: '/admin/audit',
     title: '감사 로그',
     desc: '누가 언제 무엇을 변경했는지 추적. 모든 entity 변경 기록.',
