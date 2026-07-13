@@ -11,16 +11,18 @@
  *   - 더블클릭 → ContractDetailDialog
  */
 
-import { useMemo, useState } from 'react';
-import { Calendar, FileXls, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { useMemo, useState, Fragment } from 'react';
+import { Calendar, FileXls, CaretLeft, CaretRight, LinkSimple } from '@phosphor-icons/react';
 import { MasterPageShell } from '@/components/layout/master-page-shell';
 import { CONTRACT_SUB } from '@/components/layout/sub-nav';
 import { BottomBar } from '@/components/layout/bottom-bar';
 import { ExcelButton } from '@/components/ui/page-actions';
 import { EmptyRow } from '@/components/ui/empty-row';
 import { useContracts } from '@/lib/firebase/contracts-store';
+import { useBankTx } from '@/lib/firebase/transactions-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
+import { formatDateFull } from '@/lib/utils';
 import { CompanyFilter } from '@/components/ui/filter-bar';
 import { buildCompanyOptions, matchesCompanyFilter } from '@/lib/filter-helpers';
 import { sumPayments, sumDiscounts, balance } from '@/lib/payment-schedule';
@@ -28,7 +30,7 @@ import { usePersistentState } from '@/lib/use-persistent-state';
 import { useVehicleDialog } from '@/lib/global-dialogs';
 import { exportToExcel } from '@/lib/excel-export';
 import { toast } from '@/lib/toast';
-import type { Contract, PaymentScheduleInline, ScheduleStatus } from '@/lib/types';
+import type { Contract, PaymentScheduleInline, ScheduleStatus, PaymentEntry, DiscountEntry, BankTransaction } from '@/lib/types';
 
 type Bucket = 'all' | '예정' | '연체' | '부분납' | '완료' | '면제';
 
@@ -49,7 +51,19 @@ const fmt = (v: number) => v ? v.toLocaleString('ko-KR') : '';
 
 export default function ContractSchedulePage() {
   const { contracts, loading } = useContracts();
+  const { rows: bankTx } = useBankTx();
   const { companies: companyMaster } = useCompanies();
+  /** 계좌 입금(source='계좌')의 txId → 자금일보 거래 역참조 (연동 표시) */
+  const bankTxById = useMemo(() => new Map(bankTx.map((t) => [t.id, t])), [bankTx]);
+  /** 회차 행 펼침 — `${contractId}-${seq}` */
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  function toggleExpand(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
   const [companyFilter, setCompanyFilter] = usePersistentState<string>('filter:contract-schedule:company', 'all');
   const [bucket, setBucket] = usePersistentState<Bucket>('filter:contract-schedule:bucket', 'all');
   const [periodMode, setPeriodMode] = usePersistentState<'month' | 'quarter' | 'year' | 'all'>('filter:contract-schedule:period', 'month');
@@ -250,6 +264,7 @@ export default function ContractSchedulePage() {
       <table className="table">
         <thead>
           <tr>
+            <th className="center" style={{ width: 30 }}></th>
             <th style={{ width: 56 }}>회사</th>
             <th style={{ width: 90 }}>계약번호</th>
             <th style={{ minWidth: 130 }}>계약자</th>
@@ -266,17 +281,29 @@ export default function ContractSchedulePage() {
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr><td colSpan={12} className="muted center" style={{ padding: 32 }}>
+            <tr><td colSpan={13} className="muted center" style={{ padding: 32 }}>
               {loading ? '데이터 불러오는 중…' : '해당 조건의 회차 없음'}
             </td></tr>
           ) : rows.map((r) => {
             const tone = statusTone(r.status);
+            const key = `${r.contract.id}-${r.seq}`;
+            const pays = r.schedule.payments ?? [];
+            const discs = r.schedule.discounts ?? [];
+            const hasEntries = pays.length > 0 || discs.length > 0;
+            const isExpanded = expanded.has(key);
             return (
+              <Fragment key={key}>
               <tr
-                key={`${r.contract.id}-${r.seq}`}
                 onDoubleClick={() => r.contract.vehiclePlate && openVehicle(r.contract.vehiclePlate, 'payment')}
-                style={{ cursor: 'pointer' }}
+                onClick={() => hasEntries && toggleExpand(key)}
+                style={{ cursor: hasEntries ? 'pointer' : 'default' }}
+                title={hasEntries ? '펼쳐서 분할납부·할인·자금일보 연동 보기' : undefined}
               >
+                <td className="center">
+                  {hasEntries && (
+                    <CaretRight size={10} weight="bold" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-weak)' }} />
+                  )}
+                </td>
                 <td className="dim">{r.contract.company ? displayCompanyName(r.contract.company, companyMaster) : '-'}</td>
                 <td className="mono dim">{r.contract.contractNo || '-'}</td>
                 <td>{r.contract.customerName || '-'}</td>
@@ -302,11 +329,104 @@ export default function ContractSchedulePage() {
                 </td>
                 <td className="mono dim">{r.paidAt || '-'}</td>
               </tr>
+              {isExpanded && hasEntries && (
+                <tr>
+                  <td colSpan={13} style={{ background: 'var(--bg-sunken)', padding: 8 }}>
+                    <ScheduleBreakdown pays={pays} discs={discs} bankTxById={bankTxById} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             );
           })}
         </tbody>
       </table>
 
     </MasterPageShell>
+  );
+}
+
+/**
+ * 회차 펼침 상세 — 분할납부(payments) + 청구할인(discounts) 을 날짜순으로 통합.
+ * 계좌 입금(source='계좌' + txId)은 자금일보 거래로 역참조해 "어느 입금이 이 회차를 냈는지" 연동 표시.
+ * payment-tab 의 펼침 상세와 동일 규격 — 여기선 read-only 요약.
+ */
+function ScheduleBreakdown({
+  pays, discs, bankTxById,
+}: {
+  pays: PaymentEntry[];
+  discs: DiscountEntry[];
+  bankTxById: Map<string, BankTransaction>;
+}) {
+  const entries = [
+    ...pays.map((p) => ({ kind: 'payment' as const, date: p.date, amount: p.amount, source: p.source, memo: p.memo, by: p.by, txId: p.txId, reason: undefined as string | undefined })),
+    ...discs.map((d) => ({ kind: 'discount' as const, date: d.date, amount: d.amount, source: '할인' as const, memo: d.memo, by: d.by, txId: undefined, reason: d.reason })),
+  ].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+
+  return (
+    <table className="table" style={{ fontSize: 11, margin: 0 }}>
+      <thead>
+        <tr>
+          <th style={{ width: 100 }}>일자</th>
+          <th className="center" style={{ width: 52 }}>구분</th>
+          <th className="num" style={{ width: 110 }}>금액</th>
+          <th className="center" style={{ width: 64 }}>출처/사유</th>
+          <th style={{ minWidth: 220 }}>자금일보 연동</th>
+          <th>메모</th>
+          <th className="mono dim" style={{ width: 120 }}>등록자</th>
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map((e, i) => {
+          const linked = e.kind === 'payment' && e.source === '계좌' && e.txId ? bankTxById.get(e.txId) : undefined;
+          const chipBg = e.kind === 'discount' ? 'var(--bg-sunken)'
+            : e.source === '정산' ? 'var(--bg-sunken)'
+            : e.source === '계좌' ? 'var(--blue-bg)'
+            : e.source === '카드' ? 'var(--purple-bg)'
+            : 'var(--green-bg)';
+          const chipColor = e.kind === 'discount' ? 'var(--text-weak)'
+            : e.source === '정산' ? 'var(--text-weak)'
+            : e.source === '계좌' ? 'var(--blue-text)'
+            : e.source === '카드' ? 'var(--purple-text)'
+            : 'var(--green-text)';
+          return (
+            <tr key={i}>
+              <td className="mono">{formatDateFull(e.date)}</td>
+              <td className="center">
+                <span className="chip" style={{ height: 16, padding: '0 6px', fontSize: 10, background: e.kind === 'discount' ? 'var(--red-bg)' : 'var(--green-bg)', color: e.kind === 'discount' ? 'var(--red-text)' : 'var(--green-text)' }}>
+                  {e.kind === 'discount' ? '할인' : '입금'}
+                </span>
+              </td>
+              <td className="num mono" style={{ color: e.kind === 'discount' ? 'var(--red-text)' : undefined }}>
+                {e.kind === 'discount' ? '-' : ''}₩{e.amount.toLocaleString('ko-KR')}
+              </td>
+              <td className="center">
+                <span className="chip" style={{ height: 16, padding: '0 6px', fontSize: 10, background: chipBg, color: chipColor }}>
+                  {e.kind === 'discount' ? (e.reason ?? '할인') : e.source}
+                </span>
+              </td>
+              <td className="dim" style={{ fontSize: 11 }}>
+                {linked ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                    <LinkSimple size={10} style={{ color: 'var(--blue-text)' }} />
+                    <span className="mono">{(linked.txDate ?? '').slice(0, 10)}</span>
+                    <span>{linked.counterparty || '입금'}</span>
+                    {linked.account && <span className="mono dim">· {linked.account}</span>}
+                  </span>
+                ) : e.kind === 'payment' && e.source === '계좌' ? (
+                  <span className="dim" style={{ fontSize: 10 }}>계좌 입금 (자금일보 미링크)</span>
+                ) : e.kind === 'payment' && e.source === '정산' ? (
+                  <span className="dim" style={{ fontSize: 10 }}>이월 정산 (실입금 아님)</span>
+                ) : (
+                  <span className="dim">-</span>
+                )}
+              </td>
+              <td className="dim">{e.memo || '-'}</td>
+              <td className="mono dim">{e.by ?? (e.kind === 'payment' && e.source === '정산' ? '(자동)' : '-')}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
