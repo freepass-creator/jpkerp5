@@ -26,6 +26,7 @@ import {
 } from '@/lib/payment-schedule';
 import { toast } from '@/lib/toast';
 import { showConfirm, showPrompt } from '@/lib/confirm';
+import { isContractEnded, isAbnormalEnded } from '@/lib/contract-lifecycle';
 import type {
   Contract, PaymentScheduleInline, PaymentEntry, ScheduleStatus, DepositDeduction,
 } from '@/lib/types';
@@ -41,6 +42,10 @@ export function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contrac
     (sum, s) => sum + ((s.payments ?? []).reduce((p, x) => p + x.amount, 0)),
     0,
   );
+  // 활성 임차인 = 회차별 스케줄(입금 이력 중복이라 숨김) / 종료 계약 = 아래 수납이력(입금 이력).
+  //   단 채권·미수 남은 종료(isAbnormalEnded)는 미수 회차 확인·회수 위해 스케줄도 유지.
+  const ended = isContractEnded(c);
+  const showSchedule = !ended || isAbnormalEnded(c);
   return (
     <div className="detail-stack">
       <Section
@@ -78,18 +83,21 @@ export function PaymentTab({ c, onUpdate }: { c: Contract; onUpdate: (u: Contrac
           blur 시 새 계약에 잘못 저장되던 것 방지 (remount 로 초기화) */}
       <DepositSection key={c.id} c={c} onUpdate={onUpdate} />
 
-      <Section icon={<CurrencyKrw size={12} weight="duotone" />} title="회차별 스케줄" bodyPadding={0}>
-        <ScheduleTable c={c} onUpdate={onUpdate} />
-      </Section>
+      {showSchedule && (
+        <Section icon={<CurrencyKrw size={12} weight="duotone" />} title="회차별 스케줄" bodyPadding={0}>
+          <ScheduleTable c={c} onUpdate={onUpdate} />
+        </Section>
+      )}
 
-      {(() => {
+      {/* 입금 이력(수납이력) — 종료 계약에서만 노출. 활성 임차인은 회차별 스케줄에 이미 이력이 있어 중복. */}
+      {ended && (() => {
         const logs = generatePaymentHistory(c);
         const total = logs.reduce((s, l) => s + l.amount, 0);
         const realIncoming = logs.filter((l) => l.source !== '정산').reduce((s, l) => s + l.amount, 0);
         return (
           <Section
             icon={<CurrencyKrw size={12} weight="duotone" />}
-            title={`입금 이력 — ${logs.length}건`}
+            title={`수납이력 — ${logs.length}건`}
             bodyPadding={0}
             action={logs.length > 0 ? (
               <span style={{ fontSize: 11, color: 'var(--text-sub)', display: 'flex', gap: 10, marginLeft: 'auto' }}>
