@@ -138,12 +138,12 @@ export default function MigrateSwitchplanPage() {
     [res, cmsRes],
   );
 
-  async function commitSeeds() {
+  async function commitSeeds(skipConfirm = false) {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!res) return;
     const rows = toSnapshotRows(res, companyKey);
     if (rows.length === 0) { toast.info('씨앗 대상 없음'); return; }
-    if (!await showConfirm({
+    if (!skipConfirm && !await showConfirm({
       title: `운행중 계약 ${rows.length}건 씨앗 커밋`,
       description:
         `현재미수 씨앗 = 직원 미납칸(carry) 합 ${won(res.totals.carryCurrent)}.\n`
@@ -192,7 +192,7 @@ export default function MigrateSwitchplanPage() {
     }
   }
 
-  async function commitReturned() {
+  async function commitReturned(skipConfirm = false) {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!res) return;
     const built = toReturnedContracts(res, companyKey);
@@ -202,7 +202,7 @@ export default function MigrateSwitchplanPage() {
     const dup = built.length - fresh.length;
     const chaseCount = fresh.filter((c) => c.endReason === '채권보전').length;
     if (fresh.length === 0) { toast.info(`신규 반납 이력 없음 (이미 있음 ${dup})`); return; }
-    if (!await showConfirm({
+    if (!skipConfirm && !await showConfirm({
       title: `반납 이력 ${fresh.length}건 커밋`,
       description:
         `종료 계약을 이력(status='반납')으로 등록 — 손바뀜 연속성.\n`
@@ -236,10 +236,10 @@ export default function MigrateSwitchplanPage() {
     return { total: plates.size, update, create, loans: res.loans.filter((l) => !l.cashOnly).length };
   }, [res, vehicles]);
 
-  async function commitVehicles() {
+  async function commitVehicles(skipConfirm = false) {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!res || (res.vehicles.length === 0 && res.loans.length === 0)) { toast.info('자산·할부 데이터 없음'); return; }
-    if (!await showConfirm({
+    if (!skipConfirm && !await showConfirm({
       title: `자산·할부 ${vehiclePlan.total}대 → 차량 마스터`,
       description:
         `차대번호·연식·배기량·트림·취득원가 + 할부(금융사·원금·총상환·월납)를 반영.\n`
@@ -285,6 +285,29 @@ export default function MigrateSwitchplanPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // 전체 일괄 반영 — 씨앗 → 반납 이력 → 자산·할부 순차 (합쳐진 확인창 1개). 개별 버튼은 그대로 유지.
+  async function commitAll() {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    if (!res) return;
+    const seedN = toSnapshotRows(res, companyKey).length;
+    if (!await showConfirm({
+      title: '전체 일괄 반영',
+      description:
+        `한 번에 순차 반영 (차량번호 기준 upsert — 재실행 안전):\n`
+        + `① 씨앗(운영 계약) ${seedN}건 · 현재미수 carry ${won(res.totals.carryCurrent)}\n`
+        + `② 반납 이력 ${res.returned.length}건 (신규만 · 추심 잔여 ${won(res.totals.carryReturned)})\n`
+        + `③ 자산·할부 ${vehiclePlan.total}대 (갱신 ${vehiclePlan.update}·신규 ${vehiclePlan.create})\n`
+        + `※ 자금일보는 대사 전용 — 이번 반영 대상 아님(이중차감 방지). 회사="${companyKey}".`,
+      confirmLabel: '전체 반영 진행',
+    })) return;
+    append('▶ 전체 일괄 반영 시작…');
+    await commitSeeds(true);
+    await commitReturned(true);
+    await commitVehicles(true);
+    append('✓ 전체 일괄 반영 완료 (씨앗·반납·자산할부)');
+    toast.success('전체 일괄 반영 완료');
   }
 
   const t = res?.totals;
@@ -468,16 +491,38 @@ export default function MigrateSwitchplanPage() {
             </section>
           )}
 
-          {/* 커밋 */}
+          {/* 전체 일괄 반영 — 한 번에 씨앗+반납+자산할부 */}
+          {res && (
+            <section className="detail-section" style={{ borderColor: 'var(--brand)' }}>
+              <div className="detail-section-header"><span className="title">전체 일괄 반영 (한 번에)</span></div>
+              <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <BusyButton
+                  busy={busy} busyLabel="일괄 반영 중…"
+                  className="btn btn-primary"
+                  disabled={!superAdmin}
+                  onClick={() => commitAll()}
+                  style={{ height: 48, fontSize: 15, fontWeight: 700 }}
+                >
+                  <Upload weight="bold" size={18} /> 전체 일괄 반영 — 씨앗 {res.totals.countCurrent} · 반납 {res.returned.length} · 자산 {vehiclePlan.total}
+                </BusyButton>
+                <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
+                  ① 씨앗(운영 계약·carry 미수) → ② 반납 이력(신규만) → ③ 자산·할부 순서로 한 번에 반영.
+                  확인창 1개 · upsert라 재실행 안전 · <b>자금일보는 대사 전용(미반영)</b>. 단계별로 하려면 아래 개별 버튼 사용.
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 커밋 (개별 단계) */}
           {res && (
             <section className="detail-section">
-              <div className="detail-section-header"><span className="title">4. 씨앗 커밋</span></div>
+              <div className="detail-section-header"><span className="title">4. 씨앗 커밋 (개별)</span></div>
               <div className="detail-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <BusyButton
                   busy={busy} busyLabel="씨앗 반영 중…"
                   className="btn btn-primary"
                   disabled={!superAdmin}
-                  onClick={commitSeeds}
+                  onClick={() => commitSeeds()}
                   style={{ height: 44, fontSize: 14, fontWeight: 600 }}
                 >
                   <Upload weight="bold" size={16} /> 운행중 {res.totals.countCurrent}건 씨앗 커밋 (현재미수 = carry)
@@ -528,7 +573,7 @@ export default function MigrateSwitchplanPage() {
                     busy={busy} busyLabel="반납 이력 반영 중…"
                     className="btn"
                     disabled={!superAdmin}
-                    onClick={commitReturned}
+                    onClick={() => commitReturned()}
                     style={{ height: 40, fontSize: 13, fontWeight: 600 }}
                   >
                     <Upload weight="bold" size={15} /> 반납 이력 {res.returned.length}건 커밋 (손바뀜 연속성 + 추심 잔여)
@@ -581,7 +626,7 @@ export default function MigrateSwitchplanPage() {
                     busy={busy} busyLabel="차량 마스터 반영 중…"
                     className="btn"
                     disabled={!superAdmin}
-                    onClick={commitVehicles}
+                    onClick={() => commitVehicles()}
                     style={{ height: 40, fontSize: 13, fontWeight: 600 }}
                   >
                     <Car weight="bold" size={15} /> 자산·할부 → 차량 마스터 (갱신 {vehiclePlan.update} · 신규 {vehiclePlan.create} · 할부 {vehiclePlan.loans})
