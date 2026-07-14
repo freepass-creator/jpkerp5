@@ -362,8 +362,19 @@ export default function MigrateSheetPage() {
       if (!db) throw new Error('Firebase 미설정');
       append(`${RTDB_ROOT} root 삭제 중...`);
       await rtdbRemove(ref(db, RTDB_ROOT));
-      append(`✓ ${RTDB_ROOT} root 통째로 삭제 완료`);
-      toast.success(`${RTDB_ROOT} 전체 삭제 완료`);
+      // 삭제 검증 — 실제로 비었는지 재조회 (rules·권한으로 조용히 실패해도 rtdbRemove 는 에러 안 던짐)
+      const verify = await get(ref(db, RTDB_ROOT));
+      const after = verify.val();
+      const leftKeys = after && typeof after === 'object' ? Object.keys(after) : [];
+      if (leftKeys.length > 0) {
+        const detail = leftKeys.map((k) => `${k}(${after[k] && typeof after[k] === 'object' ? Object.keys(after[k]).length : 0})`).join(', ');
+        append(`✗ 삭제 실패 — ${RTDB_ROOT} 에 아직 남음: ${detail}`);
+        append('  → Firebase Rules(.write) 가 삭제를 막고 있음. Firebase 콘솔에서 rules 확인·배포 필요.');
+        toast.error('삭제 실패 — Rules 가 막고 있음 (로그 확인)');
+      } else {
+        append(`✓ ${RTDB_ROOT} root 완전 삭제 검증 완료 (0 노드). 화면 새로고침(Ctrl+Shift+R)`);
+        toast.success(`${RTDB_ROOT} 전체 삭제 완료 (검증됨)`);
+      }
     } catch (e) {
       append(`✗ 실패: ${friendlyError(e)}`);
       toast.error(friendlyError(e));
