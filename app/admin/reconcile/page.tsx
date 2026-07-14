@@ -24,6 +24,8 @@ import { showConfirm } from '@/lib/confirm';
 import { toast } from '@/lib/toast';
 import { audit } from '@/lib/firebase/audit-store';
 import { planBulkReconcile, buildReconcilePatches } from '@/lib/bulk-reconcile';
+import { findCmsMatchCandidates, buildSettlementPatches } from '@/lib/cms-matching';
+import type { BankTransaction } from '@/lib/types';
 
 export default function ReconcilePage() {
   const router = useRouter();
@@ -35,13 +37,30 @@ export default function ReconcilePage() {
   const [applying, setApplying] = useState(false);
   const [done, setDone] = useState(false);
 
+  // 1단계: CMS 집금 정산 — 집금 deposit ↔ 구성 자동이체(item) 묶음(수수료 산출). high 신뢰만.
+  const cmsCandidates = useMemo(
+    () => findCmsMatchCandidates(bankTx).filter((c) => c.confidence === 'high'),
+    [bankTx],
+  );
+  const cmsPatchMap = useMemo(() => {
+    const m: Record<string, Partial<BankTransaction>> = {};
+    for (const cand of cmsCandidates) for (const { id, patch } of buildSettlementPatches(cand)) m[id] = { ...m[id], ...patch };
+    return m;
+  }, [cmsCandidates]);
+  // CMS 정산 반영분을 미리 얹은 bankTx — 계좌 대사가 집금 제외·item 매칭을 정확히 하도록
+  const bankTxWithCms = useMemo(
+    () => (Object.keys(cmsPatchMap).length ? bankTx.map((t) => (cmsPatchMap[t.id] ? { ...t, ...cmsPatchMap[t.id] } : t)) : bankTx),
+    [bankTx, cmsPatchMap],
+  );
+
+  // 2단계: 계좌 대사 — CMS 반영된 거래로 realizeOpeningBalance(허수→실, 이중차감 없음)
   const plan = useMemo(
-    () => planBulkReconcile(contracts, bankTx, {
+    () => planBulkReconcile(contracts, bankTxWithCms, {
       today: todayKr(),
       actorEmail: user?.email ?? user?.uid,
       isClosed: (d) => isDateInClosedPeriod(closedPeriods, d),
     }),
-    [contracts, bankTx, closedPeriods, user],
+    [contracts, bankTxWithCms, closedPeriods, user],
   );
 
   const matchedContracts = useMemo(
@@ -57,14 +76,20 @@ export default function ReconcilePage() {
   }
 
   async function handleApply() {
-    if (plan.matchedTxIds.length === 0) { toast.info('매칭할 입금이 없습니다'); return; }
+    const cmsCount = Object.keys(cmsPatchMap).length;
+    if (plan.matchedTxIds.length === 0 && cmsCount === 0) { toast.info('매칭할 입금이 없습니다'); return; }
     const ok = await showConfirm({
-      title: `일괄 대사 적용`,
-      description: `입금 ${plan.matchedTxIds.length}건을 ${matchedContracts.length}개 계약에 매칭합니다 (₩${formatCurrency(totalMatchedAmount)}). 각 매칭은 자금일보에서 개별 해제 가능합니다. 진행할까요?`,
+      title: `일괄 대사 (CMS·계좌·자금일보)`,
+      description:
+        `① CMS 집금 정산 ${cmsCandidates.length}건(거래 ${cmsCount}개 태깅)\n`
+        + `② 계좌 입금 ${plan.matchedTxIds.length}건 → ${matchedContracts.length}개 계약 매칭 (₩${formatCurrency(totalMatchedAmount)})\n`
+        + `허수(carry)→실입금 전환이라 미수 이중차감 없음. 각 매칭은 자금일보에서 개별 해제 가능. 진행할까요?`,
     });
     if (!ok) return;
     setApplying(true);
     try {
+      // ① CMS 집금 정산 먼저 반영 (집금 deposit/item 역할·수수료 태깅) → 계좌 대사가 집금 제외·item 매칭 정확
+      if (cmsCount > 0) await updateManyBankTx(cmsPatchMap);
       const { contractRows, txPatches } = buildReconcilePatches(plan);
       // 거래 먼저 마킹 → 계약 갱신. 중간 실패해도 tx.matchedContractId 가 남아
       // /admin/integrity 유령매칭 스캔이 검출 가능(계약 먼저면 실패가 조용히 묻힘). (#11 부분보호)
@@ -99,24 +124,25 @@ export default function ReconcilePage() {
       <main style={{ flex: 1, padding: 24, maxWidth: 1200, margin: '0 auto', width: '100%' }}>
         <header className="page-header" style={{ marginBottom: 16 }}>
           <h1 className="page-header-title">
-            <ArrowsLeftRight size={18} weight="duotone" /> 일괄 대사 매칭 (초기 세팅)
+            <ArrowsLeftRight size={18} weight="duotone" /> 일괄 대사 (CMS · 계좌 · 자금일보)
           </h1>
           <div className="page-header-title-sub">
-            활성 계약자의 계약에 미매칭 은행입금을 계약일순·오래된 미납부터 FIFO 로 채워 미리보기.
-            확인 후 일괄 적용하며, 각 매칭은 자금일보에서 개별 해제 가능합니다.
+            한 번에: ① CMS 집금 정산(집금↔자동이체 묶음·수수료) → ② 계좌 입금을 계약 회차에 매칭.
+            <b> 허수(carry)→실입금 전환이라 미수 이중차감 없음.</b> 각 매칭은 자금일보에서 개별 해제 가능.
           </div>
         </header>
 
         <div className="panel" style={{ marginBottom: 16 }}>
-          <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+            <Kpi label="CMS 집금 정산" value={`${cmsCandidates.length}건`} sub={`거래 ${Object.keys(cmsPatchMap).length}개`} />
             <Kpi label="매칭 대상 계약" value={`${matchedContracts.length}건`} />
             <Kpi label="매칭 입금" value={`${plan.matchedTxIds.length}건`} sub={`₩${formatCurrency(totalMatchedAmount)}`} tone="green" />
             <Kpi label="붕 떠있는 입금" value={`${plan.floating.length}건`} sub={`₩${formatCurrency(floatingAmount)}`} tone={plan.floating.length ? 'red' : undefined} />
             <Kpi label="초과분(선납)" value={`${plan.overflow.length}건`} />
           </div>
           <div style={{ padding: '0 16px 16px', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button className="btn btn-primary" type="button" onClick={handleApply} disabled={applying || done || plan.matchedTxIds.length === 0}>
-              {done ? '적용 완료' : applying ? '적용 중…' : `대사 일괄 적용 (${plan.matchedTxIds.length}건)`}
+            <button className="btn btn-primary" type="button" onClick={handleApply} disabled={applying || done || (plan.matchedTxIds.length === 0 && Object.keys(cmsPatchMap).length === 0)}>
+              {done ? '적용 완료' : applying ? '적용 중…' : `일괄 대사 적용 (CMS ${cmsCandidates.length} · 계좌 ${plan.matchedTxIds.length})`}
             </button>
             <span style={{ fontSize: 11, color: 'var(--text-sub)' }}>
               미리보기는 저장되지 않습니다. [적용]을 눌러야 반영됩니다.

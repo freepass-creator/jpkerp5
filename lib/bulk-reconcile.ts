@@ -92,9 +92,11 @@ export function planBulkReconcile(
     arr.sort((a, b) => (a.contractDate ?? '').localeCompare(b.contractDate ?? ''));
   }
 
-  // 3) 미매칭 입금 (입금·양수·미매칭) 날짜순
+  // 3) 미매칭 입금 (입금·양수·미매칭) 날짜순.
+  //    CMS 집금(settlementRole='deposit')은 N건 묶음의 대표 leg(수수료 계정)라 계약 매칭 제외 —
+  //    구성 개별 자동이체(role='item')가 실제 계약 입금이므로 그것만 대사.
   const deposits = bankTx
-    .filter((t) => (t.amount ?? 0) > 0 && !(t.withdraw && t.withdraw > 0) && !t.matchedContractId)
+    .filter((t) => (t.amount ?? 0) > 0 && !(t.withdraw && t.withdraw > 0) && !t.matchedContractId && t.settlementRole !== 'deposit')
     .sort((a, b) => (a.txDate ?? '').localeCompare(b.txDate ?? ''));
 
   // 4) 회사 스코프 귀속 — 차량끝4 우선, 그다음 이름. 입금 회사가 있으면 그 회사 그룹만,
