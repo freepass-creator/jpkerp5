@@ -155,7 +155,7 @@ function ContractDetailShell({
     <DetailDialogShell
       open={open}
       onOpenChange={onOpenChange}
-      title={`상세 정보 — ${contract.vehiclePlate} · ${contract.customerName || '(무계약)'}`}
+      title={`상세 정보 — ${contract.vehiclePlate} · ${contract.customerName || '(계약없음)'}`}
       heroName={contract.customerName?.trim() || contract.vehicleModelLine || contract.vehicleModel || contract.vehiclePlate || '-'}
       heroMeta={
         <>

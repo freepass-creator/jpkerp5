@@ -54,7 +54,7 @@ export function contractStateTone(name: ContractState | undefined): BadgeTone {
     case '만기경과':
     case '미수검':
     case '위반':         return 'red';
-    case '무계약':       return 'gray';
+    case '계약없음':       return 'gray';
     default:             return 'neutral';
   }
 }

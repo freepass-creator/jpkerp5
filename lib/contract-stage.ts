@@ -120,12 +120,12 @@ export function getVehicleState(c: Contract): { name: VehicleState; days: number
   return { name: '휴차대기', days: daysSince(c.readiedDate ?? c.contractDate, today) };
 }
 
-/** 계약상태 — 계약 라이프사이클 + 컴플라이언스 + 무계약. 우선순위: 위반 > 미수검 > 연장 > 종료 > 만기경과 > 만기임박 > 확정대기 > 계약중 > 무계약 */
-export type ContractState = '무계약' | '확정대기' | '계약중' | '만기임박' | '만기경과' | '연장대기' | '종료대기' | '미수검' | '위반';
+/** 계약상태 — 계약 라이프사이클 + 컴플라이언스 + 계약없음. 우선순위: 위반 > 미수검 > 연장 > 종료 > 만기경과 > 만기임박 > 확정대기 > 계약중 > 계약없음 */
+export type ContractState = '계약없음' | '확정대기' | '계약중' | '만기임박' | '만기경과' | '연장대기' | '종료대기' | '미수검' | '위반';
 
 export function getContractState(c: Contract): { name: ContractState; days: number } {
   const today = todayKr();
-  if (!c.customerName?.trim()) return { name: '무계약', days: 0 };
+  if (!c.customerName?.trim()) return { name: '계약없음', days: 0 };
   if (c.hasViolations) {
     return { name: '위반', days: c.violationSince ? daysSince(c.violationSince, today) : 0 };
   }
