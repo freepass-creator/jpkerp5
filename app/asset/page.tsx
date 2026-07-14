@@ -27,17 +27,13 @@ import type { VehicleStatus } from '@/lib/types';
  */
 const ASSET_STATUS_VALUES: VehicleStatus[] = [
   '구매대기', '등록대기', '상품화대기', '상품화중', '상품대기',
-  '운행', '정비', '사고',
+  '휴차대기', '휴차', '운행', '정비', '사고',
   '매각검토', '매각대기', '매각',
-  // '휴차대기'·'휴차'(유휴)는 자산현황 목록·카운트에서 제외 — 현보유(활성)만 노출해 사전점검(118)과 일치.
-  //  유휴 대수는 상단 생애주기 바에 별도 표시. (종전엔 포함돼 운행118+휴차11=129 로 부풀었음)
 ];
-/** 매각(처분) 상태 — 판 차량 */
+/** 매각(처분·비보유) 상태 — 판 차량. 현보유 = 이것만 제외한 나머지. */
 const SALE_STATUS = new Set<string>(['매각', '매각대기', '매각검토']);
-/** 유휴(휴차) 상태 — 보유하나 현재 미배치 */
+/** 유휴(휴차) 상태 — 보유 중 미배치 (현보유에 포함) */
 const IDLE_STATUS = new Set<string>(['휴차대기', '휴차']);
-/** 현보유(현재 보유차량)에서 제외 — 매각·이탈(반납)·유휴. 현재 활성 배치 차량만 현보유. */
-const NOT_HELD_STATUS = new Set<string>([...SALE_STATUS, ...IDLE_STATUS, '반납']);
 const ASSET_STATUS_SET = new Set<string>(ASSET_STATUS_VALUES);
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useContracts } from '@/lib/firebase/contracts-store';
@@ -196,7 +192,7 @@ export default function AssetPage() {
     const owned = rawVehicles.filter((v) => !v.deletedAt);
     const sold = owned.filter((v) => v.status && SALE_STATUS.has(v.status)).length;
     const idle = owned.filter((v) => v.status && IDLE_STATUS.has(v.status)).length;
-    const held = owned.filter((v) => !v.status || !NOT_HELD_STATUS.has(v.status)).length;
+    const held = owned.length - sold;   // 현보유 = 전체 − 매각(비보유). 유휴는 현보유의 부분집합.
     const contractedPlates = new Set<string>();
     for (const c of contracts) {
       const pl = (c.vehiclePlate ?? '').replace(/\s/g, '');
@@ -352,9 +348,9 @@ export default function AssetPage() {
         <div style={{ display: 'flex', gap: 8, padding: '10px 16px 4px', flexWrap: 'wrap', alignItems: 'stretch' }}>
           {([
             { label: '전체 구매', hint: '총 보유했던 차량(등록 전체)', value: lifecycle.total, color: 'var(--text-main)' },
-            { label: '매각·처분', hint: '판 차량', value: lifecycle.sold, color: 'var(--red-text)' },
-            { label: '유휴(휴차)', hint: '보유하나 미배치', value: lifecycle.idle, color: 'var(--orange-text)' },
-            { label: '현재 보유', hint: '매각·유휴 제외 = 활성 보유', value: lifecycle.held, color: 'var(--brand)', strong: true },
+            { label: '매각·처분', hint: '판 차량 (비보유)', value: lifecycle.sold, color: 'var(--red-text)' },
+            { label: '현재 보유', hint: '전체 − 매각 = 지금 갖고 있는 차', value: lifecycle.held, color: 'var(--brand)', strong: true },
+            { label: '유휴(휴차)', hint: '보유 중 미배치 — 현재 보유에 포함', value: lifecycle.idle, color: 'var(--orange-text)' },
             { label: '현재 계약중', hint: '대여 진행중', value: lifecycle.contracted, color: 'var(--green-text)', strong: true },
           ] as const).map((s) => (
             <div key={s.label} title={s.hint} style={{
@@ -367,8 +363,7 @@ export default function AssetPage() {
             </div>
           ))}
           <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-weak)', fontSize: 11, marginLeft: 4 }}>
-            전체 {lifecycle.total} = 현보유 {lifecycle.held} + 매각 {lifecycle.sold} + 유휴 {lifecycle.idle}
-            {lifecycle.total !== lifecycle.held + lifecycle.sold + lifecycle.idle && ' · (반납 등 기타 포함)'}
+            전체 {lifecycle.total} = 현보유 {lifecycle.held} + 매각 {lifecycle.sold} (유휴 {lifecycle.idle}는 현보유에 포함)
           </div>
         </div>
 

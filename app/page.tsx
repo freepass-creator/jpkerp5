@@ -16,6 +16,7 @@ import type { Contract } from '@/lib/types';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { syncContractAndVehicleStatus } from '@/lib/firebase/contract-status-sync';
+import { normPlate } from '@/lib/entity-sync';
 import { useCompanies } from '@/lib/firebase/companies-store';
 import { displayCompanyName } from '@/lib/company-display';
 import { CompanyCell } from '@/components/ui/company-cell';
@@ -358,12 +359,15 @@ export default function Page() {
    * 적절한 후보: 등록대기/상품화중/상품대기/휴차대기/매각대기 등. 그 외는 휴차대기로 통일.
    */
   const contracts = useMemo<Contract[]>(() => {
-    const contractedPlates = new Set(rawContracts.map((c) => c.vehiclePlate?.trim()).filter(Boolean));
+    const contractedPlates = new Set(rawContracts.map((c) => normPlate(c.vehiclePlate)).filter(Boolean));
+    // 처분(매각)된 차량은 현재 fleet 아님 — 운영현황에 편입하지 않음.
+    //   (종전엔 상태 불문 전부 휴차행으로 편입 → 매각차 11대가 섞여 전체 129 로 부풀던 원인)
+    const NOT_FLEET = new Set<string>(['매각검토', '매각대기', '매각']);
     // 차량 테이블에 있으면 = 구매 완료. 구매대기/운행 은 의미상 어색하므로 휴차대기로 정규화.
     const isIdleAppropriate = (s: string): boolean =>
       ['등록대기', '상품화대기', '상품화중', '상품대기', '인도대기', '출고대기', '휴차대기', '휴차', '매각대기', '정비', '사고', '반납'].includes(s);
     const orphans = vehicles
-      .filter((v) => v.plate && !contractedPlates.has(v.plate.trim()))
+      .filter((v) => v.plate && !contractedPlates.has(normPlate(v.plate)) && !NOT_FLEET.has(v.status))
       .map<Contract>((v) => ({
         id: `vehicle-orphan-${v.id}`,
         contractNo: '',

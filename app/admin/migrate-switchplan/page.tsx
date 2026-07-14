@@ -57,15 +57,16 @@ export default function MigrateSwitchplanPage() {
   // 마이그레이션 차량상태 = 계약 상태에서 파생하는 단일 헬퍼(파이프라인 통일).
   //   운행중 계약 있는 plate → '운행', 그 외(종료만/무계약) → '휴차대기'(유휴).
   //   ※ 앱 일상흐름의 "인도까지 휴차"와 달리, 마이그레이션은 이미 인도된 과거 계약이라 운행 반영.
-  //   유효 자산 = 채권(활성) 시트 전체 plate — 실계약(res.current)뿐 아니라 코드명 없는 빈행(2번째차)까지.
+  //   유효 자산(현보유) = 채권(활성) 시트 전체 plate — 실계약(res.current)뿐 아니라 코드명 없는 빈행(2번째차)까지.
   //   res.current(실계약 102)만 쓰면 유효자산이 과소(사업현황 118과 불일치)라 res.activePlates 사용.
+  //   비보유(자산시트에 있으나 활성 아님) = '매각'(처분) — '휴차대기'로 넣으면 운영현황이 휴차행으로 편입해 129 부풀림.
   const activePlates = useMemo(() => {
     const s = new Set<string>();
-    if (res) for (const p of res.activePlates) if (p) s.add(p.trim());
+    if (res) for (const p of res.activePlates) if (p) s.add(normPlate(p));
     return s;
   }, [res]);
   const migVehStatus = (plate: string | undefined): VehicleStatus =>
-    plate && activePlates.has(plate.trim()) ? '운행' : '휴차대기';
+    plate && activePlates.has(normPlate(plate)) ? '운행' : '매각';
 
   // 로컬 dev — 디스크의 기존 파일(사업현황+자금일보)을 dev 서버가 읽어 자동 로드.
   // → 업로드 없이 페이지 열면 데이터 채워지고 [전체 일괄 반영] 한 번이면 끝.
@@ -329,9 +330,10 @@ export default function MigrateSwitchplanPage() {
       const db = getRtdb();
       if (!db) throw new Error('Firebase 미설정');
       const nowIso = new Date().toISOString();
-      const existingByPlate = new Map(vehicles.map((v) => [(v.plate ?? '').trim(), v]));
-      const assetByPlate = new Map(res.vehicles.map((a) => [a.vehiclePlate.trim(), a]));
-      const loanByPlate = new Map(res.loans.map((l) => [l.vehiclePlate.trim(), l]));
+      // normPlate 키 — "01도 9893" vs "01도9893" 표기 차이로 중복 생성·매칭 실패 방지
+      const existingByPlate = new Map(vehicles.map((v) => [normPlate(v.plate ?? ''), v]));
+      const assetByPlate = new Map(res.vehicles.map((a) => [normPlate(a.vehiclePlate), a]));
+      const loanByPlate = new Map(res.loans.map((l) => [normPlate(l.vehiclePlate), l]));
       const plates = new Set([...assetByPlate.keys(), ...loanByPlate.keys()]);
       const batch: Record<string, unknown> = {};
       let updated = 0;
@@ -356,20 +358,20 @@ export default function MigrateSwitchplanPage() {
           created++;
         }
       }
-      // 고립 차량 정화 — 현재 사업현황(자산∪할부)에 없는 기존 차량 = 이전 버전 마이그레이션 잔재.
-      //   '휴차대기'로 비활성 → 자산현황(유효 자산) 카운트에서 제외. 삭제 아님(원본 보존·복구가능).
+      // 고립 차량 정화 — 현재 사업현황(자산∪할부)에 없는 기존 차량 = 이전 버전 마이그레이션·템플릿 잔재.
+      //   '매각'(비보유)으로 → 운영현황·현보유 카운트에서 제외. 삭제 아님(원본 보존·복구가능).
       let deactivated = 0;
       for (const v of vehicles) {
-        const vp = (v.plate ?? '').trim();
+        const vp = normPlate(v.plate ?? '');
         if (!vp || plates.has(vp)) continue;                         // 현재 fleet 이면 유지
         if (v.company && companyKey && v.company !== companyKey) continue; // 타 회사 차량 보호
-        if (v.status === '휴차대기') continue;                        // 이미 비활성
-        batch[v.id] = pruneUndefined({ ...v, status: '휴차대기' as VehicleStatus });
+        if (v.status === '매각') continue;                            // 이미 비보유
+        batch[v.id] = pruneUndefined({ ...v, status: '매각' as VehicleStatus });
         deactivated++;
       }
       await rtdbUpdate(ref(db, dbPath('vehicles')), batch);
-      append(`✓ 자산·할부 커밋 — 총 ${updated + created}대 (갱신 ${updated}·신규 ${created}) · 현보유(운행) ${heldN} · 유휴(휴차) ${idleN} · 고립 비활성 ${deactivated} · 할부 ${vehiclePlan.loans}`);
-      toast.success(`차량 ${updated + created}대 반영 — 현보유 ${heldN} · 유휴 ${idleN}${deactivated > 0 ? ` · 고립 ${deactivated}` : ''}`);
+      append(`✓ 자산·할부 커밋 — 총 ${updated + created}대 (갱신 ${updated}·신규 ${created}) · 현보유(운행) ${heldN} · 비보유(매각) ${idleN} · 고립 매각처리 ${deactivated} · 할부 ${vehiclePlan.loans}`);
+      toast.success(`차량 ${updated + created}대 반영 — 현보유 ${heldN} · 비보유 ${idleN}${deactivated > 0 ? ` · 고립 ${deactivated}` : ''}`);
     } catch (err) {
       append(`✗ 자산 커밋 실패: ${friendlyError(err)}`);
       toast.error(friendlyError(err));
@@ -419,6 +421,43 @@ export default function MigrateSwitchplanPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // 보유 확정 — DB 의 이 회사 차량 전체를 사업현황 기준으로 정렬: 채권(활성) plate = '운행'(현보유),
+  //   그 외 전부 '매각'(비보유). 상태만 patch(다른 필드 보존). 템플릿·이전 잔재가 뭐가 남아있든 강제 정합.
+  async function commitHeldOnly(skipConfirm = false) {
+    if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
+    if (!res || activePlates.size === 0) { toast.info('사업현황을 먼저 불러오세요'); return; }
+    let toHeld = 0, toSold = 0;
+    // status 만 경로 패치 — 객체 전체 덮어쓰기 금지 (commitAll 체인에서 stale 훅 상태로
+    //   방금 커밋한 차대번호·가격 등을 되돌리는 사고 방지)
+    const batch: Record<string, unknown> = {};
+    for (const v of vehicles) {
+      if (v.company && companyKey && v.company !== companyKey) continue; // 타 회사 보호
+      const want: VehicleStatus = activePlates.has(normPlate(v.plate ?? '')) ? '운행' : '매각';
+      if (v.status === want) continue;
+      batch[`${v.id}/status`] = want;
+      if (want === '운행') toHeld++; else toSold++;
+    }
+    const total = Object.keys(batch).length;
+    if (total === 0) { toast.info(`이미 정합 — 현보유 ${activePlates.size}대 기준`); return; }
+    if (!skipConfirm && !await showConfirm({
+      title: `보유 확정 — 현보유 ${activePlates.size}대만 운행`,
+      description: `DB 차량 상태를 사업현황(채권 활성 plate) 기준으로 강제 정렬:\n· 운행 전환 ${toHeld}대 · 매각(비보유) 전환 ${toSold}대\n다른 필드는 보존, 상태만 변경. 재실행 안전(멱등).`,
+      confirmLabel: '보유 확정',
+    })) return;
+    setBusy(true);
+    try {
+      await ensureAuth();
+      const db = getRtdb();
+      if (!db) throw new Error('Firebase 미설정');
+      await rtdbUpdate(ref(db, dbPath('vehicles')), batch);
+      append(`✓ 보유 확정 — 운행 전환 ${toHeld} · 매각 전환 ${toSold} (기준: 현보유 ${activePlates.size})`);
+      toast.success(`보유 확정 — 운행 ${toHeld} · 매각 ${toSold} 전환`);
+    } catch (err) {
+      append(`✗ 보유 확정 실패: ${friendlyError(err)}`);
+      toast.error(friendlyError(err));
+    } finally { setBusy(false); }
   }
 
   // 기존 재무관리 거래의 계정과목을 자금일보 원문 → 재무 enum 으로 재매핑 (매핑 도입 전 raw 정리).
@@ -499,7 +538,8 @@ export default function MigrateSwitchplanPage() {
     await commitReturned(true);
     await commitVehicles(true);
     await commitFix1900(true);   // 1900년대 날짜 보정 통합
-    append('✓ 전체 일괄 반영 완료 (씨앗·반납·자산할부·날짜보정)');
+    await commitHeldOnly(true);  // 최종 보유 정합 — DB 에 뭐가 남아있든 현보유 118 기준 강제 정렬
+    append('✓ 전체 일괄 반영 완료 (씨앗·반납·자산할부·날짜보정·보유확정)');
     toast.success('전체 일괄 반영 완료');
   }
 
@@ -864,6 +904,16 @@ export default function MigrateSwitchplanPage() {
                     style={{ height: 40, fontSize: 13, fontWeight: 600 }}
                   >
                     <Car weight="bold" size={15} /> 자산·할부 → 차량 마스터 (갱신 {vehiclePlan.update} · 신규 {vehiclePlan.create} · 할부 {vehiclePlan.loans})
+                  </BusyButton>
+                  <BusyButton
+                    busy={busy} busyLabel="보유 확정 중…"
+                    className="btn btn-primary"
+                    disabled={!superAdmin}
+                    onClick={() => commitHeldOnly()}
+                    style={{ height: 40, fontSize: 13, fontWeight: 700 }}
+                    title="DB 차량 상태를 사업현황 기준으로 강제 정렬 — 채권(활성) plate 만 운행, 나머지 전부 매각(비보유). 템플릿·이전 잔재가 뭐가 남아있든 정합."
+                  >
+                    <CheckCircle weight="bold" size={15} /> 보유 확정 — 현보유 {res.activePlates.length}대만 운행 · 그 외 매각(비보유)
                   </BusyButton>
                   <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
                     ✓ 차량번호 기준 upsert — 차대번호·제조사·트림·연식·배기량·색상·실구입가 반영<br />
