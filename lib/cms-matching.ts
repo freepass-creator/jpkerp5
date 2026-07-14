@@ -62,11 +62,9 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
     if ((t.amount ?? 0) > 0 && !t.matchedContractId && (labeled || t.source === '계좌' || t.source === 'CMS집금')) {
       depositCandidates.push(t);
     }
-    // CMS 개별건 — 전통적인 자동이체 채널 + 계좌 채널로 들어왔지만 계약에 매칭된 입금건도 포함
-    // (은행 계좌명세에 CMS 개별건이 계좌 채널로 함께 들어오는 경우 대응)
-    const isCmsItem =
-      t.source === '자동이체' || t.source === 'CMS' ||   // 'CMS' = 자동이체 업로드 SSOT 태그(create-dialog); '자동이체'는 레거시
-      (t.source === '계좌' && !!t.matchedContractId && (t.amount ?? 0) > 0);
+    // CMS 개별건 — 명시적 자동이체 채널만. (계좌채널 매칭입금은 정상 대여료 입금과 구분 불가라
+    //   CMS item 으로 오인 시 재실행에서 그 수익이 집금 gross 로 흡수·오귀속됨 → 제외.)
+    const isCmsItem = t.source === '자동이체' || t.source === 'CMS';   // 'CMS'=자동이체 업로드 SSOT(create-dialog)
     if (isCmsItem) {
       const co = t.companyCode ?? '';
       const arr = itemsByCompany.get(co);
@@ -76,13 +74,16 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
   }
 
   const out: CmsMatchCandidate[] = [];
+  // 이미 다른 집금에 귀속된 item 은 재사용 금지 — 오버랩 윈도우(집금 2건이 14일내)에서
+  //   같은 자동이체가 양쪽 gross 에 이중계상되던 것(수익 과대) 방지.
+  const claimedItems = new Set<string>();
 
   for (const dep of depositCandidates) {
     const co = dep.companyCode ?? '';
     const pool = itemsByCompany.get(co);
     if (!pool || pool.length === 0) continue;
-    // 일자 ±3일 안의 자동이체 묶음 (회사별 pool 안에서만)
-    const sameWindow = pool.filter((it) => dayDiff(it.txDate, dep.txDate) <= DATE_TOLERANCE_DAYS);
+    // 일자 ±윈도우 안의 미귀속 자동이체 묶음 (회사별 pool 안에서만)
+    const sameWindow = pool.filter((it) => !claimedItems.has(it.id) && dayDiff(it.txDate, dep.txDate) <= DATE_TOLERANCE_DAYS);
     if (sameWindow.length === 0) continue;
 
     // 1차 후보: 그 window 의 전체 자동이체
@@ -92,6 +93,9 @@ export function findCmsMatchCandidates(bankTx: BankTransaction[]): CmsMatchCandi
     const feeRate = itemsSum > 0 ? fee / itemsSum : 1;
     if (feeRate > MAX_FEE_RATE) continue;   // 수수료율 상한(3.5%) 초과 = 집금 아님
     void MIN_FEE_RATE;
+
+    // 이 집금이 이 item 들을 확정 소비 — 이후 집금이 재사용 못 하게 claim
+    for (const it of sameWindow) claimedItems.add(it.id);
 
     // 신뢰도 — 전형 CMS 수수료대(0.5~3.5%) + 2건 이상 묶음이면 high(실 집금 패턴).
     // 수수료 매우 낮음(≤0.5%)은 우연 일치(법인이체 등) 가능 → medium 이하로.
