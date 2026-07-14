@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Database, Upload, Warning, CheckCircle, FileXls, ArrowsDownUp, Car } from '@phosphor-icons/react';
-import { ref, push, update as rtdbUpdate } from 'firebase/database';
+import { ref, push, get, update as rtdbUpdate } from 'firebase/database';
 import { Sidebar } from '@/components/layout/sidebar';
 import { getRtdb, dbPath, ensureAuth, pruneUndefined } from '@/lib/firebase/client';
 import { BusyButton } from '@/components/ui/spinner';
@@ -27,7 +27,7 @@ import { mapJboSubject } from '@/lib/migrate/jbo-subject-map';
 import { toast } from '@/lib/toast';
 import { showConfirm } from '@/lib/confirm';
 import { friendlyError } from '@/lib/friendly-error';
-import type { Contract, BankTransaction, VehicleStatus } from '@/lib/types';
+import type { Contract, BankTransaction, Vehicle, VehicleStatus } from '@/lib/types';
 
 const won = (n: number) => '₩' + Math.round(n).toLocaleString('ko-KR');
 
@@ -330,8 +330,12 @@ export default function MigrateSwitchplanPage() {
       const db = getRtdb();
       if (!db) throw new Error('Firebase 미설정');
       const nowIso = new Date().toISOString();
+      // fresh 조회 — commitAll 체인에서 commitSeeds 가 방금 만든 차량이 stale 훅 상태엔 없어
+      //   중복 생성·정합 누락되던 것 방지 (적대검증 B-2). 훅 대신 RTDB 즉시 read.
+      const vehSnap = await get(ref(db, dbPath('vehicles')));
+      const liveVehicles = Object.values((vehSnap.val() ?? {}) as Record<string, Vehicle>);
       // normPlate 키 — "01도 9893" vs "01도9893" 표기 차이로 중복 생성·매칭 실패 방지
-      const existingByPlate = new Map(vehicles.map((v) => [normPlate(v.plate ?? ''), v]));
+      const existingByPlate = new Map(liveVehicles.map((v) => [normPlate(v.plate ?? ''), v]));
       const assetByPlate = new Map(res.vehicles.map((a) => [normPlate(a.vehiclePlate), a]));
       const loanByPlate = new Map(res.loans.map((l) => [normPlate(l.vehiclePlate), l]));
       const plates = new Set([...assetByPlate.keys(), ...loanByPlate.keys()]);
@@ -361,12 +365,12 @@ export default function MigrateSwitchplanPage() {
       // 고립 차량 정화 — 현재 사업현황(자산∪할부)에 없는 기존 차량 = 이전 버전 마이그레이션·템플릿 잔재.
       //   '매각'(비보유)으로 → 운영현황·현보유 카운트에서 제외. 삭제 아님(원본 보존·복구가능).
       let deactivated = 0;
-      for (const v of vehicles) {
+      for (const v of liveVehicles) {
         const vp = normPlate(v.plate ?? '');
         if (!vp || plates.has(vp)) continue;                         // 현재 fleet 이면 유지
         if (v.company && companyKey && v.company !== companyKey) continue; // 타 회사 차량 보호
         if (v.status === '매각') continue;                            // 이미 비보유
-        batch[v.id] = pruneUndefined({ ...v, status: '매각' as VehicleStatus });
+        batch[`${v.id}/status`] = '매각';                             // status 만 경로 패치
         deactivated++;
       }
       await rtdbUpdate(ref(db, dbPath('vehicles')), batch);
@@ -428,31 +432,37 @@ export default function MigrateSwitchplanPage() {
   async function commitHeldOnly(skipConfirm = false) {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!res || activePlates.size === 0) { toast.info('사업현황을 먼저 불러오세요'); return; }
-    let toHeld = 0, toSold = 0;
-    // status 만 경로 패치 — 객체 전체 덮어쓰기 금지 (commitAll 체인에서 stale 훅 상태로
-    //   방금 커밋한 차대번호·가격 등을 되돌리는 사고 방지)
-    const batch: Record<string, unknown> = {};
-    for (const v of vehicles) {
-      if (v.company && companyKey && v.company !== companyKey) continue; // 타 회사 보호
-      const want: VehicleStatus = activePlates.has(normPlate(v.plate ?? '')) ? '운행' : '매각';
-      if (v.status === want) continue;
-      batch[`${v.id}/status`] = want;
-      if (want === '운행') toHeld++; else toSold++;
-    }
-    const total = Object.keys(batch).length;
-    if (total === 0) { toast.info(`이미 정합 — 현보유 ${activePlates.size}대 기준`); return; }
-    if (!skipConfirm && !await showConfirm({
-      title: `보유 확정 — 현보유 ${activePlates.size}대만 운행`,
-      description: `DB 차량 상태를 사업현황(채권 활성 plate) 기준으로 강제 정렬:\n· 운행 전환 ${toHeld}대 · 매각(비보유) 전환 ${toSold}대\n다른 필드는 보존, 상태만 변경. 재실행 안전(멱등).`,
-      confirmLabel: '보유 확정',
-    })) return;
     setBusy(true);
     try {
       await ensureAuth();
       const db = getRtdb();
       if (!db) throw new Error('Firebase 미설정');
+      // fresh 조회 — commitAll 체인에서 seeds/자산커밋이 방금 만든 차량까지 전부 정합 (stale 훅 금지)
+      const vehSnap = await get(ref(db, dbPath('vehicles')));
+      const liveVehicles = Object.values((vehSnap.val() ?? {}) as Record<string, Vehicle>);
+      let toHeld = 0, toSold = 0;
+      // status 만 경로 패치 — 객체 전체 덮어쓰기 금지 (방금 커밋한 차대번호·가격 보존)
+      const batch: Record<string, unknown> = {};
+      for (const v of liveVehicles) {
+        if (v.deletedAt) continue;
+        if (v.company && companyKey && v.company !== companyKey) continue; // 타 회사 보호
+        const want: VehicleStatus = activePlates.has(normPlate(v.plate ?? '')) ? '운행' : '매각';
+        if (v.status === want) continue;
+        batch[`${v.id}/status`] = want;
+        if (want === '운행') toHeld++; else toSold++;
+      }
+      if (Object.keys(batch).length === 0) {
+        append(`✓ 보유 확정 — 이미 정합 (현보유 ${activePlates.size}대 기준, DB ${liveVehicles.length}대)`);
+        if (!skipConfirm) toast.info(`이미 정합 — 현보유 ${activePlates.size}대 기준`);
+        return;
+      }
+      if (!skipConfirm && !await showConfirm({
+        title: `보유 확정 — 현보유 ${activePlates.size}대만 운행`,
+        description: `DB 차량(${liveVehicles.length}대) 상태를 사업현황(채권 활성 plate) 기준으로 강제 정렬:\n· 운행 전환 ${toHeld}대 · 매각(비보유) 전환 ${toSold}대\n다른 필드는 보존, 상태만 변경. 재실행 안전(멱등).`,
+        confirmLabel: '보유 확정',
+      })) return;
       await rtdbUpdate(ref(db, dbPath('vehicles')), batch);
-      append(`✓ 보유 확정 — 운행 전환 ${toHeld} · 매각 전환 ${toSold} (기준: 현보유 ${activePlates.size})`);
+      append(`✓ 보유 확정 — 운행 전환 ${toHeld} · 매각 전환 ${toSold} (기준: 현보유 ${activePlates.size} · DB ${liveVehicles.length}대)`);
       toast.success(`보유 확정 — 운행 ${toHeld} · 매각 ${toSold} 전환`);
     } catch (err) {
       append(`✗ 보유 확정 실패: ${friendlyError(err)}`);

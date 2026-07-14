@@ -17,7 +17,11 @@
 import type { Contract, Vehicle } from '@/lib/types';
 import { applyReturnedProration } from '@/lib/returned-proration';
 import { findVehicleByPlate } from '@/lib/entity-sync';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { audit } from './audit-store';
+
+/** 처분(비보유) 상태 — 종료 계약 편집이 이걸 과거 상태로 되돌리면 현보유 카운트가 조용히 드리프트 */
+const DISPOSED_VEHICLE_STATUSES: ReadonlySet<string> = new Set(['매각', '매각대기', '매각검토']);
 
 /**
  * Multi-entity update — contract → vehicle 순서.
@@ -46,6 +50,10 @@ export async function syncContractAndVehicleStatus(
   if (!toWrite.vehiclePlate || !toWrite.vehicleStatus) return;
   // plate 매칭 SSOT — raw trim 비교면 표기차이·번호변경 차량의 sync 가 조용히 빠짐
   const v = findVehicleByPlate(vehicles, toWrite.vehiclePlate);
+  // 처분차 부활 방지 — 종료(반납/해지/채권) 계약을 편집해도 '매각' 차량 마스터를 과거
+  //   vehicleStatus('반납' 등)로 되돌리지 않음. 역방향 sync(활성계약만)와 가드 대칭.
+  //   활성 계약이 붙으면(재취득·재계약) 정상 sync 됨.
+  if (v && isContractEnded(toWrite) && DISPOSED_VEHICLE_STATUSES.has(v.status)) return;
   if (v && v.status !== toWrite.vehicleStatus) {
     try {
       await updateVehicleMaster({ ...v, status: toWrite.vehicleStatus });
