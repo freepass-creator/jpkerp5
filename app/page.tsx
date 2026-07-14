@@ -359,7 +359,11 @@ export default function Page() {
    * 적절한 후보: 등록대기/상품화중/상품대기/휴차대기/매각대기 등. 그 외는 휴차대기로 통일.
    */
   const contracts = useMemo<Contract[]>(() => {
-    const contractedPlates = new Set(rawContracts.map((c) => normPlate(c.vehiclePlate)).filter(Boolean));
+    // 활성 계약 plate 만 — 종료(반납)계약만 있는 현보유차가 "계약행(숨김)도 휴차행(계약있음 취급)도
+    //   없이 증발"하던 것 방지. (118 중 11대가 과거 반납계약 때문에 사라져 107 로 보이던 원인)
+    const contractedPlates = new Set(
+      rawContracts.filter((c) => !isContractEnded(c)).map((c) => normPlate(c.vehiclePlate)).filter(Boolean),
+    );
     // 처분(매각)된 차량은 현재 fleet 아님 — 운영현황에 편입하지 않음.
     //   (종전엔 상태 불문 전부 휴차행으로 편입 → 매각차 11대가 섞여 전체 129 로 부풀던 원인)
     const NOT_FLEET = new Set<string>(['매각검토', '매각대기', '매각']);
