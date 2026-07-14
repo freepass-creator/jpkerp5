@@ -313,6 +313,29 @@ export default function MigrateSwitchplanPage() {
     };
   }, [vehicles, contracts, res]);
 
+  /**
+   * 💰 자금 정합 — 실 DB(ERP) vs 사업현황 엑셀 자동 대조.
+   *  차량 대수처럼 돈 숫자도 전 화면 정합 검증: 미수·추심·월대여료·재무거래.
+   *  ERP 쪽은 이 회사(companyKey) 계약·거래만 집계.
+   */
+  const moneyRecon = useMemo(() => {
+    if (!res) return null;
+    const mine = contracts.filter((c) => !c.deletedAt && (!companyKey || c.company === companyKey));
+    const active = mine.filter((c) => !isContractEnded(c));
+    const ended = mine.filter((c) => isContractEnded(c));
+    const sum = (arr: Contract[], f: (c: Contract) => number) => arr.reduce((s, c) => s + (f(c) || 0), 0);
+    const rows: Array<{ label: string; erp: number; sheet: number; money?: boolean }> = [
+      { label: '운행중 계약수', erp: active.length, sheet: res.totals.countCurrent },
+      { label: '현재 미수건수', erp: active.filter((c) => (c.unpaidAmount ?? 0) > 0).length, sheet: res.current.filter((c) => (c.carryUnpaid ?? 0) > 0).length },
+      { label: '현재 미수액', erp: sum(active, (c) => c.unpaidAmount), sheet: res.totals.carryCurrent, money: true },
+      { label: '월 대여료(합)', erp: sum(active, (c) => c.monthlyRent), sheet: res.current.reduce((s, c) => s + (c.monthlyRent ?? 0), 0), money: true },
+      { label: '반납(종료) 건수', erp: ended.length, sheet: res.totals.countReturned },
+      { label: '추심잔여액(종료 미수)', erp: sum(ended, (c) => c.unpaidAmount), sheet: res.totals.carryReturned, money: true },
+    ];
+    if (jboRes) rows.push({ label: '재무 계좌거래 건수', erp: existingBankTx.filter((t) => !t.deletedAt).length, sheet: jboRes.totals.count });
+    return rows.map((r) => ({ ...r, diff: r.erp - r.sheet, ok: r.erp === r.sheet }));
+  }, [res, jboRes, contracts, existingBankTx, companyKey]);
+
   async function commitVehicles(skipConfirm = false) {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
     if (!res || (res.vehicles.length === 0 && res.loans.length === 0)) { toast.info('자산·할부 데이터 없음'); return; }
@@ -679,6 +702,48 @@ export default function MigrateSwitchplanPage() {
                 <div className="dim" style={{ fontSize: 11, marginTop: 6 }}>
                   자산현황 129 = 운행 {vehDiag.running} + 계약synthetic {vehDiag.conSyn}. <b>고립운행 or 계약synthetic 이 11이면 그게 범인.</b>
                   {res ? '' : ' (사전점검 로드 후 정확 — 지금은 자산시트 미로드라 고립수 부정확)'}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 💰 자금 정합 — 실 DB(ERP) vs 사업현황 자동 대조 */}
+          {moneyRecon && (
+            <section className="detail-section">
+              <div className="detail-section-header">
+                <span className="title">💰 자금 정합 — ERP(실 DB) vs 사업현황</span>
+                <span className="dim" style={{ fontSize: 11, marginLeft: 'auto' }}>
+                  {moneyRecon.every((r) => r.ok) ? '✓ 전 항목 일치' : `⚠ 불일치 ${moneyRecon.filter((r) => !r.ok).length}건`}
+                </span>
+              </div>
+              <div className="detail-section-body" style={{ padding: 0 }}>
+                <table className="table" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      <th>항목</th>
+                      <th className="num" style={{ width: 150 }}>ERP (실 DB)</th>
+                      <th className="num" style={{ width: 150 }}>사업현황 (엑셀)</th>
+                      <th className="num" style={{ width: 120 }}>차이</th>
+                      <th className="center" style={{ width: 56 }}>판정</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {moneyRecon.map((r) => (
+                      <tr key={r.label} style={{ background: r.ok ? undefined : 'var(--red-bg)' }}>
+                        <td>{r.label}</td>
+                        <td className="num mono">{r.money ? won(r.erp) : r.erp.toLocaleString('ko-KR')}</td>
+                        <td className="num mono">{r.money ? won(r.sheet) : r.sheet.toLocaleString('ko-KR')}</td>
+                        <td className="num mono" style={{ color: r.diff !== 0 ? 'var(--red-text)' : 'var(--text-weak)' }}>
+                          {r.diff === 0 ? '-' : `${r.diff > 0 ? '+' : ''}${r.money ? won(r.diff) : r.diff.toLocaleString('ko-KR')}`}
+                        </td>
+                        <td className="center">{r.ok ? '✓' : '⚠'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="dim" style={{ fontSize: 11, padding: '8px 10px', lineHeight: 1.6 }}>
+                  씨앗·반납·재무 반영 후 전 항목 ✓ 이어야 정상. 미수액은 carry(직원 미납칸) 기준 —
+                  운영현황·리스크·수납·재무가 모두 이 숫자로 정합. 불일치 시 해당 커밋 재실행.
                 </div>
               </div>
             </section>
