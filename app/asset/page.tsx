@@ -227,6 +227,8 @@ export default function AssetPage() {
   /** 회사 필터 + 자산 status 필터 통과한 차량들에서 미입력 카운트 */
   const assetCounts = useMemo(() => {
     const base = vehicles.filter((v) => {
+      if (v.id.startsWith('contract-derived-')) return false;   // 계약파생(가짜차) 제외
+      if (v.status && SALE_STATUS.has(v.status)) return false;   // 매각(처분)은 자산처분 탭 — 자산관리=보유 118
       if (v.status && !ASSET_STATUS_SET.has(v.status)) return false;
       if (!matchesCompanyFilter(v.company, companyFilter)) return false;
       return true;
