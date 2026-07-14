@@ -16,7 +16,8 @@ import { reconcileSwitchplan } from '@/lib/migrate/switchplan-recon';
 import { verifyMisuVsCms } from '@/lib/migrate/switchplan-verify';
 import { validateSnapshotRow, applySnapshotToContract } from '@/lib/import-commit';
 import { assignContractNos } from '@/lib/code-scheme';
-import { upsertVehicleFromContract } from '@/lib/entity-sync';
+import { upsertVehicleFromContract, normPlate } from '@/lib/entity-sync';
+import { isContractEnded } from '@/lib/contract-lifecycle';
 import { useContracts } from '@/lib/firebase/contracts-store';
 import { useVehicles } from '@/lib/firebase/vehicles-store';
 import { useCompanies } from '@/lib/firebase/companies-store';
@@ -288,6 +289,28 @@ export default function MigrateSwitchplanPage() {
     for (const p of plates) { if (existing.has(p)) update++; else create++; }
     return { total: plates.size, update, create, loans: res.loans.filter((l) => !l.cashOnly).length };
   }, [res, vehicles]);
+
+  // 🔬 실 DB 차량 진단 — 자산현황 129 의 정확한 출처 추적 (고립 운행차 vs 계약 synthetic)
+  const vehDiag = useMemo(() => {
+    const live = vehicles.filter((v) => !v.deletedAt);
+    const byStatus: Record<string, number> = {};
+    for (const v of live) byStatus[v.status ?? '(무상태)'] = (byStatus[v.status ?? '(무상태)'] ?? 0) + 1;
+    const sheetNorm = new Set<string>();
+    if (res) { for (const v of res.vehicles) sheetNorm.add(normPlate(v.vehiclePlate)); for (const l of res.loans) sheetNorm.add(normPlate(l.vehiclePlate)); }
+    const vehNorm = new Set(live.map((v) => normPlate(v.plate ?? '')));
+    const hasSheet = sheetNorm.size > 0;
+    const running = live.filter((v) => v.status === '운행');
+    const runningOrphan = hasSheet ? running.filter((v) => !sheetNorm.has(normPlate(v.plate ?? ''))) : [];
+    const orphans = hasSheet ? live.filter((v) => !sheetNorm.has(normPlate(v.plate ?? ''))) : [];
+    const activeCon = contracts.filter((c) => !isContractEnded(c) && (c.vehiclePlate ?? '').trim());
+    const conSyn = activeCon.filter((c) => !vehNorm.has(normPlate(c.vehiclePlate ?? '')));
+    return {
+      dbVehicles: live.length, byStatus, running: running.length,
+      runningOrphan: runningOrphan.length, runningOrphanSample: runningOrphan.slice(0, 12).map((v) => v.plate),
+      orphans: orphans.length,
+      activeContracts: activeCon.length, conSyn: conSyn.length, conSynSample: conSyn.slice(0, 12).map((c) => c.vehiclePlate),
+    };
+  }, [vehicles, contracts, res]);
 
   async function commitVehicles(skipConfirm = false) {
     if (!superAdmin) { toast.error('관리자만 실행 가능합니다'); return; }
@@ -579,6 +602,29 @@ export default function MigrateSwitchplanPage() {
                 )}
                 <div style={{ fontSize: 11, color: 'var(--text-weak)', marginTop: 8, lineHeight: 1.6 }}>
                   건수가 「직전」과 비슷하면 정상(최신화). 어느 항목이 <b>0(⚠)</b>이거나 크게 다르면 그 시트명·헤더가 바뀐 것 → 파일 확인.
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 🔬 차량 진단 — 자산현황 129 출처 추적 */}
+          {superAdmin && (
+            <section className="detail-section" style={{ border: '2px solid var(--orange-text)' }}>
+              <div className="detail-section-header"><span className="title" style={{ color: 'var(--orange-text)' }}>🔬 차량 진단 — 자산현황 129 출처 추적 (실 DB)</span></div>
+              <div className="detail-section-body" style={{ fontSize: 13, lineHeight: 2 }}>
+                <div>DB 실제 차량(비삭제): <b style={{ fontSize: 16 }}>{vehDiag.dbVehicles}</b> · 그중 상태='운행': <b style={{ fontSize: 16, color: 'var(--brand)' }}>{vehDiag.running}</b></div>
+                <div>상태별 분포: {Object.entries(vehDiag.byStatus).map(([s, n]) => `${s} ${n}`).join(' · ') || '(없음)'}</div>
+                <div style={{ color: vehDiag.runningOrphan > 0 ? 'var(--red-text)' : undefined }}>
+                  🔴 <b>고립 운행차</b>(운행인데 자산시트에 plate 없음 = 이전 잔재): <b style={{ fontSize: 16 }}>{vehDiag.runningOrphan}</b>
+                  {vehDiag.runningOrphanSample.length > 0 && <span className="dim"> — {vehDiag.runningOrphanSample.join(', ')}</span>}
+                </div>
+                <div style={{ color: vehDiag.conSyn > 0 ? 'var(--red-text)' : undefined }}>
+                  🔴 <b>계약 synthetic</b>(활성계약인데 차량마스터에 plate 없음 → 자산현황이 가짜차 생성): <b style={{ fontSize: 16 }}>{vehDiag.conSyn}</b> / 활성계약 {vehDiag.activeContracts}
+                  {vehDiag.conSynSample.length > 0 && <span className="dim"> — {vehDiag.conSynSample.join(', ')}</span>}
+                </div>
+                <div className="dim" style={{ fontSize: 11, marginTop: 6 }}>
+                  자산현황 129 = 운행 {vehDiag.running} + 계약synthetic {vehDiag.conSyn}. <b>고립운행 or 계약synthetic 이 11이면 그게 범인.</b>
+                  {res ? '' : ' (사전점검 로드 후 정확 — 지금은 자산시트 미로드라 고립수 부정확)'}
                 </div>
               </div>
             </section>
