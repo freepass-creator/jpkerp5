@@ -336,19 +336,23 @@ export default function MigrateSwitchplanPage() {
       const batch: Record<string, unknown> = {};
       let updated = 0;
       let created = 0;
+      let heldN = 0;  // 운행(현보유)
+      let idleN = 0;  // 휴차대기(유휴)
       for (const plate of plates) {
         const asset = assetByPlate.get(plate);
         const loan = loanByPlate.get(plate);
         const fields = asset ? buildVehicleFields(asset, companyKey) : { plate, company: companyKey };
         const loanFields = loan ? buildLoanFields(loan) : {};
         const existing = existingByPlate.get(plate);
+        const st = migVehStatus(plate);
+        if (st === '운행') heldN++; else idleN++;
         if (existing) {
-          batch[existing.id] = pruneUndefined({ ...existing, ...fields, ...loanFields, id: existing.id, status: migVehStatus(plate), createdAt: existing.createdAt });
+          batch[existing.id] = pruneUndefined({ ...existing, ...fields, ...loanFields, id: existing.id, status: st, createdAt: existing.createdAt });
           updated++;
         } else {
           const id = push(ref(db, dbPath('vehicles'))).key;
           if (!id) continue;
-          batch[id] = pruneUndefined({ model: '미정', ...fields, ...loanFields, id, status: migVehStatus(plate), createdAt: nowIso });
+          batch[id] = pruneUndefined({ model: '미정', ...fields, ...loanFields, id, status: st, createdAt: nowIso });
           created++;
         }
       }
@@ -364,8 +368,8 @@ export default function MigrateSwitchplanPage() {
         deactivated++;
       }
       await rtdbUpdate(ref(db, dbPath('vehicles')), batch);
-      append(`✓ 자산·할부 커밋 — 차량 갱신 ${updated} · 신규 ${created} · 할부 ${vehiclePlan.loans} · 고립 비활성 ${deactivated}`);
-      toast.success(`차량 마스터 ${updated + created}대 반영${deactivated > 0 ? ` · 고립 ${deactivated}대 휴차 처리` : ''}`);
+      append(`✓ 자산·할부 커밋 — 총 ${updated + created}대 (갱신 ${updated}·신규 ${created}) · 현보유(운행) ${heldN} · 유휴(휴차) ${idleN} · 고립 비활성 ${deactivated} · 할부 ${vehiclePlan.loans}`);
+      toast.success(`차량 ${updated + created}대 반영 — 현보유 ${heldN} · 유휴 ${idleN}${deactivated > 0 ? ` · 고립 ${deactivated}` : ''}`);
     } catch (err) {
       append(`✗ 자산 커밋 실패: ${friendlyError(err)}`);
       toast.error(friendlyError(err));
