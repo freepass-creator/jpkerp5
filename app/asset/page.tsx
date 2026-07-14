@@ -175,6 +175,7 @@ export default function AssetPage() {
   const counts = useMemo(() => {
     const c = { 등록예정: 0, 대기: 0, 운행중: 0, 정비: 0, 매각검토: 0, 매각: 0 };
     for (const v of vehicles) {
+      if (v.id.startsWith('contract-derived-')) continue;   // 계약파생(가짜차)는 자산 아님 — 제외
       if (!v.status || !ASSET_STATUS_SET.has(v.status)) continue;
       if (v.status === '구매대기' || v.status === '등록대기') c.등록예정++;
       else if (v.status === '상품화대기' || v.status === '상품화중' || v.status === '상품대기') c.대기++;
@@ -282,6 +283,7 @@ export default function AssetPage() {
       return status === statusFilter;
     };
     return vehicles.filter((v) => {
+      if (v.id.startsWith('contract-derived-')) return false;   // 계약파생(가짜차)는 자산현황에서 제외 — 등록 차량만
       if (v.status && !ASSET_STATUS_SET.has(v.status)) return false;
       if (!matchesCompanyFilter(v.company, companyFilter)) return false;
       if (statusFilter !== 'all' && !groupMatch(v.status)) return false;
