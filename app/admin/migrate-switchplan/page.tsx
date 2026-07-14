@@ -462,7 +462,7 @@ export default function MigrateSwitchplanPage() {
         `한 번에 순차 반영 (차량번호 기준 upsert — 재실행 안전):\n`
         + `① 씨앗(운영 계약) ${seedN}건 · 현재미수 carry ${won(res.totals.carryCurrent)}\n`
         + `② 반납 이력 ${res.returned.length}건 (신규만 · 추심 잔여 ${won(res.totals.carryReturned)})\n`
-        + `③ 자산·할부 ${vehiclePlan.total}대 (갱신 ${vehiclePlan.update}·신규 ${vehiclePlan.create}) + 고립 차량 휴차 정화\n`
+        + `③ 자산·할부 ${vehiclePlan.total}대 (현보유 ${res.activePlates.length}·유휴 ${vehiclePlan.total - res.activePlates.length}) + 고립 차량 휴차 정화\n`
         + `④ 1900년대 날짜 보정 (엑셀 연도버그 +100년)\n`
         + `※ 자금일보는 대사 전용 — 이번 반영 대상 아님(이중차감 방지). 회사="${companyKey}".`,
       confirmLabel: '전체 반영 진행',
@@ -687,7 +687,7 @@ export default function MigrateSwitchplanPage() {
                   onClick={() => commitAll()}
                   style={{ height: 48, fontSize: 15, fontWeight: 700 }}
                 >
-                  <Upload weight="bold" size={18} /> 전체 일괄 반영 — 씨앗 {res.totals.countCurrent} · 반납 {res.returned.length} · 자산 {vehiclePlan.total}
+                  <Upload weight="bold" size={18} /> 전체 일괄 반영 — 자산 {vehiclePlan.total} · 현보유 {res.activePlates.length} · 운행 {res.totals.countCurrent} · 반납 {res.returned.length}
                 </BusyButton>
                 <div style={{ fontSize: 11, color: 'var(--text-weak)', lineHeight: 1.6 }}>
                   ① 씨앗(운영 계약·carry 미수) → ② 반납 이력(신규만) → ③ 자산·할부 순서로 한 번에 반영.
