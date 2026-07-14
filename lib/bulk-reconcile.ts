@@ -17,9 +17,11 @@ import { isContractEnded } from './contract-lifecycle';
 // 정규화 SSOT — 자동매칭(receipt-match)과 동일 로직 재사용 (#1 SSOT)
 import { normName, plateSuffix4, counterpartySuffix4 } from './receipt-match';
 
-/** 문자열 끝쪽 4자리 숫자 — 입금자명 우선, 없으면 적요. */
-function depositSuffix4(t: { counterparty?: string; memo?: string }): string {
-  return counterpartySuffix4(t.counterparty ?? '') || counterpartySuffix4(t.memo ?? '');
+/** 입금의 차량끝4 — JBO 사전태깅 차량번호(linkedVehiclePlate) 우선, 그다음 입금자명·적요 끝4. */
+function depositSuffix4(t: { counterparty?: string; memo?: string; linkedVehiclePlate?: string }): string {
+  return plateSuffix4(t.linkedVehiclePlate ?? '')      // 자금일보가 박아둔 차량번호 = 최우선 신호
+    || counterpartySuffix4(t.counterparty ?? '')
+    || counterpartySuffix4(t.memo ?? '');
 }
 /** 회사|신원 복합 그룹키 — 회사 격리(#19): 입금은 자기 회사 계약에만 귀속. */
 function idOf(c: Contract): string {
@@ -104,7 +106,11 @@ export function planBulkReconcile(
   for (const t of deposits) {
     const suf = depositSuffix4(t);
     let cand = (suf && suffixIndex.get(suf)) || undefined;
-    if (!cand) { const nm = normName(t.counterparty ?? ''); cand = nm ? nameIndex.get(nm) : undefined; }
+    if (!cand) {
+      // 이름 귀속 — JBO 사전태깅 임차인(linkedCustomerName) 우선, 없으면 입금자명
+      const nm = normName(t.linkedCustomerName || t.counterparty || '');
+      cand = nm ? nameIndex.get(nm) : undefined;
+    }
     if (!cand || cand.size === 0) { floating.push(asTx(t)); continue; }
     let picks = [...cand];
     if (t.companyCode) picks = picks.filter((gk) => companyOf(gk) === t.companyCode);
